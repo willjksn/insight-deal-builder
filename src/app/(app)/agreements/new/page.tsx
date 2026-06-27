@@ -81,6 +81,9 @@ import {
   createDefaultTalentParties,
   createDefaultLocationParties,
 } from "@/lib/agreement/payeePartiesDefaults";
+import { QuoteScopeAssistant } from "@/components/agreements/QuoteScopeAssistant";
+import { applyScopeSuggestionToAgreement } from "@/lib/agreement/applyScopeSuggestion";
+import { QuoteScopeSuggestion } from "@/lib/agreement/scopeSuggestTypes";
 import { cn } from "@/lib/utils/cn";
 
 const STEPS = WIZARD_STEP_DEFS.map((s) => ({ id: s.id, label: s.label }));
@@ -397,6 +400,46 @@ function WizardContent() {
     const applied = applyTemplateToAgreement(agreement, templateId, customTemplates);
     setAgreement((prev) => ({ ...prev, ...applied }));
   };
+
+  const handleApplyScopeSuggestion = useCallback(
+    (suggestion: QuoteScopeSuggestion) => {
+      setAgreement((prev) => {
+        let base = prev;
+        if (suggestion.agreementType !== prev.agreementType && !isPartner) {
+          const empty = createEmptyAgreement(suggestion.agreementType);
+          let parties = empty.parties;
+          if (suggestion.agreementType === "internal_collaboration") {
+            parties = ensurePartiesForCreator([], appUser?.company, companies);
+          } else if (suggestion.agreementType === "equipment_rental") {
+            parties = createDefaultEquipmentRentalParties(companies);
+          } else if (suggestion.agreementType === "talent_agreement") {
+            parties = createDefaultTalentParties(companies);
+          } else if (suggestion.agreementType === "contractor_agreement") {
+            parties = createDefaultContractorParties(companies);
+          } else if (suggestion.agreementType === "location_agreement") {
+            parties = createDefaultLocationParties(companies);
+          }
+          base = {
+            ...empty,
+            parties,
+            title: prev.title || empty.title,
+          };
+          base = { ...base, ...applyTemplateToAgreement(base, suggestion.agreementType, customTemplates) };
+          setSelectedTemplateId(suggestion.agreementType);
+        }
+
+        const { patch, selectedPackageId: pkgId } = applyScopeSuggestionToAgreement(
+          base as Agreement,
+          suggestion,
+          servicePackages
+        );
+        if (pkgId) setSelectedPackageId(pkgId);
+        return { ...base, ...patch };
+      });
+      setStep(2);
+    },
+    [servicePackages, isPartner, appUser?.company, companies, customTemplates]
+  );
 
   const renderStep = () => {
     switch (step) {
@@ -963,6 +1006,12 @@ function WizardContent() {
       </aside>
       <div>
         <PageHeader title={isEditing ? "Edit Agreement" : "New Agreement"} subtitle="Guided agreement wizard — optimized for iPad" />
+        {!loadingDraft && (
+          <QuoteScopeAssistant
+            agreementType={agreement.agreementType}
+            onApply={handleApplyScopeSuggestion}
+          />
+        )}
         {loadingDraft ? <LoadingSpinner className="py-12" /> : (
         <>
         <div className="lg:hidden"><WizardSteps steps={STEPS.map((s, i) => ({ ...s, label: getWizardStepLabel(i, agreement.agreementType) }))} currentStep={step} onStepClick={goToStep} /></div>

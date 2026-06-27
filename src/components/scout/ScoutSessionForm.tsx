@@ -6,6 +6,7 @@ import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { ScoutCard } from "@/components/scout/ScoutShell";
 import { ScoutProjectLinkSelect } from "@/components/scout/ScoutProjectLinkSelect";
+import { ScoutGearPicker } from "@/components/scout/ScoutGearPicker";
 import {
   SCOUT_APP_MODES,
   SCOUT_COLOR_GRADING_PREFS,
@@ -54,20 +55,6 @@ export function ScoutSessionForm({
 }: Props) {
   const set = <K extends keyof ScoutSessionFormValues>(key: K, value: ScoutSessionFormValues[K]) => {
     onChange({ ...form, [key]: value });
-  };
-
-  const applyGearProfile = (id: string) => {
-    const profile = gearProfiles.find((g) => g.id === id);
-    if (!profile) return;
-    onChange({
-      ...form,
-      selectedGearProfileId: id,
-      cameraBody: profile.cameraBodies.join(", ") || form.cameraBody,
-      lensOptions: profile.lenses.join(", ") || form.lensOptions,
-      lightingGear: profile.lights.join(", ") || form.lightingGear,
-      audioGear: profile.audio.join(", ") || form.audioGear,
-      stabilizationGear: profile.stabilizers.join(", ") || form.stabilizationGear,
-    });
   };
 
   return (
@@ -203,57 +190,7 @@ export function ScoutSessionForm({
         </div>
       </ScoutCard>
 
-      <ScoutCard className="space-y-4">
-        <h2 className="font-semibold text-slate-900">Camera & gear</h2>
-        {gearProfiles.length > 0 && (
-          <Select
-            label="Load gear profile"
-            value={form.selectedGearProfileId}
-            onChange={(e) => applyGearProfile(e.target.value)}
-            options={[
-              { value: "", label: "Manual entry" },
-              ...gearProfiles.map((g) => ({ value: g.id, label: g.name })),
-            ]}
-            touch
-          />
-        )}
-        <Input
-          label="Camera body"
-          value={form.cameraBody}
-          onChange={(e) => set("cameraBody", e.target.value)}
-          touch
-        />
-        <Input
-          label="Lenses"
-          value={form.lensOptions}
-          onChange={(e) => set("lensOptions", e.target.value)}
-          touch
-        />
-        <Input
-          label="Lights"
-          value={form.lightingGear}
-          onChange={(e) => set("lightingGear", e.target.value)}
-          touch
-        />
-        <Input
-          label="Audio"
-          value={form.audioGear}
-          onChange={(e) => set("audioGear", e.target.value)}
-          touch
-        />
-        <Input
-          label="Stabilization"
-          value={form.stabilizationGear}
-          onChange={(e) => set("stabilizationGear", e.target.value)}
-          touch
-        />
-        <Link href="/settings/scout-gear" className="text-xs text-sky-600 hover:underline">
-          Save as reusable gear profile →
-        </Link>
-        <Link href="/settings/lights" className="block text-xs text-sky-600 hover:underline">
-          Manage lighting fixtures →
-        </Link>
-      </ScoutCard>
+      <ScoutGearPicker form={form} onChange={onChange} gearProfiles={gearProfiles} />
     </div>
   );
 }

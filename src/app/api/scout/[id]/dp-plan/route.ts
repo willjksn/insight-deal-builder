@@ -4,6 +4,7 @@ import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/ap
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { cineScoutGenerateDpPlan } from "@/lib/scout/cineScoutAi";
+import { loadScoutGearContext } from "@/lib/scout/scoutAdminGear";
 import { ScoutLocationAnalysis, ScoutProject, LightFixture } from "@/lib/scout/types";
 import { WINDOW_DAYLIGHT_FIXTURE, WINDOW_DAYLIGHT_ID } from "@/lib/scout/mockFixtures";
 
@@ -43,10 +44,13 @@ export async function POST(
       fixtures = [...fixtures, WINDOW_DAYLIGHT_FIXTURE];
     }
 
+    const { gearProfile, gearList } = await loadScoutGearContext(uid, project);
     const dpPayload = await cineScoutGenerateDpPlan(
       project,
       project.latestAnalysis as ScoutLocationAnalysis,
-      fixtures
+      fixtures,
+      gearProfile,
+      gearList
     );
     const dpRef = await ref.collection("dpPlans").add(
       stripUndefined({

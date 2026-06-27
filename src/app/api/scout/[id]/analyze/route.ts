@@ -4,6 +4,7 @@ import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/ap
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { cineScoutAnalyzeLocation } from "@/lib/scout/cineScoutAi";
+import { loadScoutGearContext } from "@/lib/scout/scoutAdminGear";
 import { ScoutProject, ScoutProjectImage } from "@/lib/scout/types";
 
 export const runtime = "nodejs";
@@ -47,7 +48,8 @@ export async function POST(
     }
 
     const project = { id, ...data } as ScoutProject;
-    const analysisPayload = await cineScoutAnalyzeLocation(project, images);
+    const { gearProfile, gearList } = await loadScoutGearContext(uid, project);
+    const analysisPayload = await cineScoutAnalyzeLocation(project, images, gearProfile, gearList);
     const analysisRef = await ref.collection("analysis").add(
       stripUndefined({
         ...analysisPayload,

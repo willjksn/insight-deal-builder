@@ -47,6 +47,13 @@ export function assertCanUseShotScout(appUser: AppUser): void {
   }
 }
 
+export function assertCanCreateQuotes(appUser: AppUser): void {
+  if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
+  if (!hasPermission(appUser, "createQuotes") && !hasPermission(appUser, "manageUsers")) {
+    throw new Error("Not authorized to create quotes");
+  }
+}
+
 export function apiErrorStatus(message: string): number {
   if (
     message.includes("token") ||

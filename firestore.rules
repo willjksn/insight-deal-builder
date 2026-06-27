@@ -233,6 +233,10 @@ service cloud.firestore {
       allow read, write: if request.auth.uid == userId && canUseShotScout();
     }
 
+    match /users/{userId}/gearList/{docId} {
+      allow read, write: if request.auth.uid == userId && canUseShotScout();
+    }
+
     match /users/{userId}/lightFixtures/{fixtureId} {
       allow read, write: if request.auth.uid == userId && canUseShotScout();
     }

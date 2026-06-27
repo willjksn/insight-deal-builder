@@ -1,4 +1,9 @@
-import { ScoutProject, ScoutProjectImage } from "@/lib/scout/types";
+import { ScoutProject, ScoutProjectImage, ScoutGearProfile, ScoutGearList } from "@/lib/scout/types";
+import {
+  buildGearInventory,
+  buildGearInventoryBlock,
+  GEAR_CONSTRAINT_INSTRUCTIONS,
+} from "@/lib/scout/gearContext";
 import {
   CINESCOUT_ON_SET_WORKFLOW,
   CINESCOUT_SCORING_CRITERIA,
@@ -9,7 +14,12 @@ import {
   SHOT_LIST_JSON_SCHEMA,
 } from "@/lib/scout/prompts/cineScoutSystem";
 
-export function buildSceneContext(project: ScoutProject): string {
+export function buildSceneContext(
+  project: ScoutProject,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
+): string {
+  const inventory = buildGearInventory(project, gearProfile, gearList);
   const lines = [
     `Session: ${project.projectName}`,
     `Scene type: ${project.sceneType}`,
@@ -20,11 +30,15 @@ export function buildSceneContext(project: ScoutProject): string {
     `Aspect ratio: ${project.aspectRatio}`,
     `Skill level: ${project.skillLevel}`,
     `Preferred look: ${project.preferredLook}`,
-    `Camera body: ${project.cameraBody ?? "not specified"}`,
-    `Lenses available: ${project.lensOptions ?? "not specified"}`,
-    `Lights available: ${project.lightingGear ?? "not specified"}`,
-    `Audio gear: ${project.audioGear ?? "not specified"}`,
-    `Stabilization: ${project.stabilizationGear ?? "not specified"}`,
+    "",
+    buildGearInventoryBlock(inventory),
+    "",
+    `Session gear selections (may be a subset of the kit above):`,
+    `  Camera body: ${project.cameraBody ?? "not selected yet"}`,
+    `  Lens: ${project.lensOptions ?? "not selected yet"}`,
+    `  Lights: ${project.lightingGear ?? "not selected yet"}`,
+    `  Audio: ${project.audioGear ?? "not selected yet"}`,
+    `  Stabilization: ${project.stabilizationGear ?? "not selected yet"}`,
   ];
   if (project.linkedProjectName) {
     lines.push(`Linked production project: ${project.linkedProjectName}`);
@@ -54,7 +68,9 @@ export function buildImageManifest(images: ScoutProjectImage[]): string {
 
 export function buildLocationAnalysisUserPrompt(
   project: ScoutProject,
-  images: ScoutProjectImage[]
+  images: ScoutProjectImage[],
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
 ): string {
   const mode =
     project.skillLevel === "beginner"
@@ -66,7 +82,7 @@ export function buildLocationAnalysisUserPrompt(
   return `${mode}
 
 Scene context:
-${buildSceneContext(project)}
+${buildSceneContext(project, gearProfile, gearList)}
 
 Uploaded location photos (${images.length} attached — analyze what you SEE in each image; use exact imageId values):
 ${buildImageManifest(images)}
@@ -75,39 +91,56 @@ Look at walls, windows, ceiling height, depth, clutter, practicals, background, 
 
 Score each angle 0–100 using these criteria: ${CINESCOUT_SCORING_CRITERIA.join(", ")}.
 
+${GEAR_CONSTRAINT_INSTRUCTIONS}
+When scoring angles, consider how each angle works with the user's available camera and lighting gear for the scene idea above.
+
 Return JSON only matching this schema:
 ${LOCATION_ANALYSIS_JSON_SCHEMA}
 
 If subject action, people count, camera movement intent, or platform framing needs are unclear, add questions to missingQuestions.`;
 }
 
-export function buildDpPlanUserPrompt(project: ScoutProject, analysisJson: string): string {
+export function buildDpPlanUserPrompt(
+  project: ScoutProject,
+  analysisJson: string,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
+): string {
   const workflow = CINESCOUT_ON_SET_WORKFLOW.join(" → ");
   return `Skill level: ${project.skillLevel}
 
 Scene context:
-${buildSceneContext(project)}
+${buildSceneContext(project, gearProfile, gearList)}
 
 Location analysis (already completed):
 ${analysisJson}
 
 Build a complete DP plan a crew can execute on set.
 Include onSetWorkflow as these 18 steps in order: ${workflow}
-Only recommend gear from the scene context. Do not invent equipment.
+
+${GEAR_CONSTRAINT_INSTRUCTIONS}
+In cameraSettings, set cameraBodyRecommendation and lensRecommendation to exact models from the available gear lists.
+In lightingPlan, name exact lights from the available inventory for key, fill, hair, and practicals.
 
 Return JSON only matching this schema:
 ${DP_PLAN_JSON_SCHEMA}`;
 }
 
-export function buildShotListUserPrompt(project: ScoutProject, dpPlanJson: string): string {
+export function buildShotListUserPrompt(
+  project: ScoutProject,
+  dpPlanJson: string,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
+): string {
   return `Scene context:
-${buildSceneContext(project)}
+${buildSceneContext(project, gearProfile, gearList)}
 
 DP plan:
 ${dpPlanJson}
 
 Generate coverage including master, medium, close-up, inserts, reaction, movement, vertical social (if platform needs it), and BTS as appropriate.
-Use only gear from scene context.
+${GEAR_CONSTRAINT_INSTRUCTIONS}
+Each shot's camera field must be an exact camera body from available gear; lens must be from available lenses; lightingNotes must reference only available lights.
 
 Return JSON only matching this schema:
 ${SHOT_LIST_JSON_SCHEMA}`;
@@ -116,10 +149,12 @@ ${SHOT_LIST_JSON_SCHEMA}`;
 export function buildPreviewUserPrompt(
   project: ScoutProject,
   dpPlanJson: string,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null,
   bestImageUrl?: string
 ): string {
   return `Scene context:
-${buildSceneContext(project)}
+${buildSceneContext(project, gearProfile, gearList)}
 
 DP plan:
 ${dpPlanJson}
@@ -135,7 +170,9 @@ ${PREVIEW_JSON_SCHEMA}`;
 
 export function buildLightingDiagramImagePromptRequest(
   project: ScoutProject,
-  dpPlanJson: string
+  dpPlanJson: string,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
 ): string {
   const fixtureBlock = dpPlanJson.includes("fixtureAwareLighting")
     ? "Use exact fixture names and roles from fixtureAwareLighting.assignments in the DP plan."
@@ -144,7 +181,7 @@ export function buildLightingDiagramImagePromptRequest(
   return `You are creating an image-generation prompt for a cinematography lighting diagram.
 
 Scene context:
-${buildSceneContext(project)}
+${buildSceneContext(project, gearProfile, gearList)}
 
 DP plan (includes lighting assignments):
 ${dpPlanJson}
@@ -168,7 +205,9 @@ export function buildCinematicFramePromptRequest(
   project: ScoutProject,
   dpPlanJson: string,
   shot?: { shotNumber: number; shotType: string; subjectAction: string; lens: string; cameraMovement: string; lightingNotes: string; shotName?: string },
-  overallViewLabel?: string
+  overallViewLabel?: string,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
 ): string {
   const shotBlock = shot
     ? `Target shot #${shot.shotNumber}${shot.shotName ? ` (${shot.shotName})` : ""}:
@@ -184,7 +223,7 @@ export function buildCinematicFramePromptRequest(
   return `You are writing an image-generation prompt to create a CINEMATIC PREVIS still — how this scene should look ON SET after lighting, NOT a diagram.
 
 Scene context:
-${buildSceneContext(project)}
+${buildSceneContext(project, gearProfile, gearList)}
 
 DP plan:
 ${dpPlanJson}

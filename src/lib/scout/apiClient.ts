@@ -87,3 +87,36 @@ export async function scoutGeneratePreview(scoutProjectId: string) {
   if (!res.ok) throw new Error(body.error ?? "Preview failed");
   return body;
 }
+
+export type ScoutGearSuggestion = {
+  cameraBody: string;
+  lensOptions: string;
+  lightingGear: string;
+  audioGear: string;
+  stabilizationGear: string;
+  rationale: string;
+};
+
+export async function scoutSuggestGear(
+  data: Omit<ScoutGearSuggestion, "rationale"> & {
+    sceneIdea: string;
+    sceneType: string;
+    mood: string;
+    theme?: string;
+    platform: string;
+    aspectRatio: string;
+    skillLevel: string;
+    preferredLook: string;
+    selectedGearProfileId?: string;
+    rationale?: string;
+  }
+): Promise<ScoutGearSuggestion> {
+  const res = await fetch("/api/scout/suggest-gear", {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "Gear suggestion failed");
+  return body.suggestion as ScoutGearSuggestion;
+}

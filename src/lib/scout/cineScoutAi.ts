@@ -1,5 +1,7 @@
 import {
   ScoutDpPlan,
+  ScoutGearProfile,
+  ScoutGearList,
   ScoutLocationAnalysis,
   ScoutPreview,
   ScoutProject,
@@ -21,6 +23,8 @@ import {
   buildShotListUserPrompt,
   CINESCOUT_SYSTEM_PROMPT,
 } from "@/lib/scout/prompts/buildPrompts";
+import { buildGearSuggestUserPrompt } from "@/lib/scout/prompts/gearSuggest";
+import { buildFixtureAwareLightingPlan } from "@/lib/scout/fixtureLighting";
 import { CINESCOUT_ON_SET_WORKFLOW } from "@/lib/scout/prompts/cineScoutSystem";
 import {
   callGeminiGenerate,
@@ -124,15 +128,126 @@ function selectPrevisShots(shotList?: ScoutShotList): ScoutShotListItem[] {
   return picked.slice(0, cap);
 }
 
+import { buildGearInventory } from "@/lib/scout/gearContext";
+import { ScoutSessionFormValues } from "@/lib/scout/sessionForm";
+
+export type ScoutGearSuggestResult = {
+  cameraBody: string;
+  lensOptions: string;
+  lightingGear: string;
+  audioGear: string;
+  stabilizationGear: string;
+  rationale: string;
+};
+
+function mockSuggestGear(
+  form: Pick<
+    ScoutSessionFormValues,
+    | "sceneIdea"
+    | "sceneType"
+    | "mood"
+    | "cameraBody"
+    | "lensOptions"
+    | "lightingGear"
+    | "audioGear"
+    | "stabilizationGear"
+    | "platform"
+    | "aspectRatio"
+    | "skillLevel"
+    | "preferredLook"
+    | "theme"
+  >,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
+): ScoutGearSuggestResult {
+  const inventory = buildGearInventory(
+    {
+      sceneIdea: form.sceneIdea,
+      sceneType: form.sceneType,
+      mood: form.mood,
+      theme: form.theme,
+      platform: form.platform,
+      aspectRatio: form.aspectRatio,
+      skillLevel: form.skillLevel,
+      preferredLook: form.preferredLook,
+      cameraBody: form.cameraBody,
+      lensOptions: form.lensOptions,
+      lightingGear: form.lightingGear,
+      audioGear: form.audioGear,
+      stabilizationGear: form.stabilizationGear,
+    } as ScoutProject,
+    gearProfile,
+    gearList
+  );
+
+  const pickLens =
+    form.mood === "scary" || form.mood === "suspense"
+      ? inventory.lenses.find((l) => /85|70|135/i.test(l)) ?? inventory.lenses[0]
+      : form.platform.includes("reels") || form.aspectRatio === "9:16"
+        ? inventory.lenses.find((l) => /35|24|28/i.test(l)) ?? inventory.lenses[0]
+        : inventory.lenses.find((l) => /50|35/i.test(l)) ?? inventory.lenses[0];
+
+  const lights = inventory.lights.slice(0, 2).join(", ");
+
+  return {
+    cameraBody: inventory.cameraBodies[0] ?? form.cameraBody,
+    lensOptions: pickLens ?? form.lensOptions,
+    lightingGear: lights || form.lightingGear,
+    audioGear: inventory.audio[0] ?? form.audioGear,
+    stabilizationGear: inventory.stabilization[0] ?? form.stabilizationGear,
+    rationale: `For "${form.sceneIdea.slice(0, 80)}${form.sceneIdea.length > 80 ? "…" : ""}", ${pickLens ?? "your lens"} fits the ${form.mood} mood and ${form.platform.replace(/_/g, " ")} framing. ${lights ? `Use ${lights} as your primary lighting.` : "Add lights from your kit for key and fill."}`,
+  };
+}
+
+export async function cineScoutSuggestGear(
+  form: Pick<
+    ScoutSessionFormValues,
+    | "sceneIdea"
+    | "sceneType"
+    | "mood"
+    | "theme"
+    | "platform"
+    | "aspectRatio"
+    | "skillLevel"
+    | "preferredLook"
+    | "cameraBody"
+    | "lensOptions"
+    | "lightingGear"
+    | "audioGear"
+    | "stabilizationGear"
+  >,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
+): Promise<ScoutGearSuggestResult> {
+  if (!form.sceneIdea.trim()) {
+    throw new Error("Describe your scene idea first");
+  }
+
+  if (scoutAiUsesMock()) {
+    return mockSuggestGear(form, gearProfile, gearList);
+  }
+
+  const userPrompt = buildGearSuggestUserPrompt(form, gearProfile, gearList);
+  const parsed = (await callGeminiJsonText(CINESCOUT_SYSTEM_PROMPT, userPrompt)) as ScoutGearSuggestResult;
+
+  if (!parsed.cameraBody?.trim() || !parsed.lensOptions?.trim()) {
+    throw new Error("Invalid gear suggestion from CineScout AI");
+  }
+
+  return parsed;
+}
+
 export async function cineScoutAnalyzeLocation(
   project: ScoutProject,
-  images: ScoutProjectImage[]
+  images: ScoutProjectImage[],
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
 ): Promise<Omit<ScoutLocationAnalysis, "id" | "createdAt">> {
   if (scoutAiUsesMock()) {
     return mockLocationAnalysis(project.id, images);
   }
 
-  const userPrompt = buildLocationAnalysisUserPrompt(project, images);
+  const userPrompt = buildLocationAnalysisUserPrompt(project, images, gearProfile, gearList);
   const imageUrls = images.map((img) => img.storageUrl);
   const parsed = (await callGeminiJsonWithImages(
     CINESCOUT_SYSTEM_PROMPT,
@@ -149,13 +264,15 @@ export async function cineScoutAnalyzeLocation(
 export async function cineScoutGenerateDpPlan(
   project: ScoutProject,
   analysis: ScoutLocationAnalysis,
-  fixtures: import("./types").LightFixture[] = []
+  fixtures: import("./types").LightFixture[] = [],
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
 ): Promise<Omit<ScoutDpPlan, "id" | "createdAt">> {
   if (scoutAiUsesMock()) {
     return mockDpPlan(project, analysis, fixtures);
   }
 
-  const userPrompt = buildDpPlanUserPrompt(project, JSON.stringify(analysis));
+  const userPrompt = buildDpPlanUserPrompt(project, JSON.stringify(analysis), gearProfile, gearList);
   const parsed = (await callGeminiJsonText(CINESCOUT_SYSTEM_PROMPT, userPrompt)) as Omit<
     ScoutDpPlan,
     "id" | "createdAt"
@@ -167,18 +284,31 @@ export async function cineScoutGenerateDpPlan(
   if (!parsed.onSetWorkflow?.length) {
     parsed.onSetWorkflow = [...CINESCOUT_ON_SET_WORKFLOW];
   }
+
+  const fixturePlan = buildFixtureAwareLightingPlan(
+    project,
+    fixtures,
+    parsed.lightingPlan.lightingMotivation || analysis.bestAngle.recommendedLightingMotivation
+  );
+  parsed.fixtureAwareLighting = fixturePlan;
+  if (!parsed.cameraSettings.cameraBodyRecommendation?.trim() && project.cameraBody?.trim()) {
+    parsed.cameraSettings.cameraBodyRecommendation = project.cameraBody.trim();
+  }
+
   return parsed;
 }
 
 export async function cineScoutGenerateShotList(
   project: ScoutProject,
-  dpPlan: ScoutDpPlan
+  dpPlan: ScoutDpPlan,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
 ): Promise<Omit<ScoutShotList, "id" | "createdAt" | "updatedAt">> {
   if (scoutAiUsesMock()) {
     return mockShotList(project, dpPlan);
   }
 
-  const userPrompt = buildShotListUserPrompt(project, JSON.stringify(dpPlan));
+  const userPrompt = buildShotListUserPrompt(project, JSON.stringify(dpPlan), gearProfile, gearList);
   const parsed = (await callGeminiJsonText(CINESCOUT_SYSTEM_PROMPT, userPrompt)) as {
     shots: ScoutShotList["shots"];
   };
@@ -190,9 +320,16 @@ export async function cineScoutGenerateShotList(
 async function buildLightingDiagramPrompt(
   project: ScoutProject,
   dpPlan: ScoutDpPlan,
-  referenceImage: ScoutProjectImage
+  referenceImage: ScoutProjectImage,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
 ): Promise<string> {
-  const request = buildLightingDiagramImagePromptRequest(project, JSON.stringify(dpPlan));
+  const request = buildLightingDiagramImagePromptRequest(
+    project,
+    JSON.stringify(dpPlan),
+    gearProfile,
+    gearList
+  );
   const inline = await fetchImageInlineData(referenceImage.storageUrl);
   if (!inline) {
     throw new Error("Could not load the uploaded location photo for diagram generation");
@@ -210,7 +347,9 @@ async function buildCinematicPrompt(
   dpPlan: ScoutDpPlan,
   referenceImage: ScoutProjectImage,
   shot?: ScoutShotListItem,
-  overallViewLabel?: string
+  overallViewLabel?: string,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
 ): Promise<string> {
   const request = buildCinematicFramePromptRequest(
     project,
@@ -226,7 +365,9 @@ async function buildCinematicPrompt(
           shotName: shot.shotName,
         }
       : undefined,
-    overallViewLabel
+    overallViewLabel,
+    gearProfile,
+    gearList
   );
   const inline = await fetchImageInlineData(referenceImage.storageUrl);
   if (!inline) {
@@ -389,7 +530,9 @@ export async function cineScoutGeneratePreviews(
   project: ScoutProject,
   dpPlan: ScoutDpPlan,
   images: ScoutProjectImage[] = [],
-  shotList?: ScoutShotList
+  shotList?: ScoutShotList,
+  gearProfile?: ScoutGearProfile | null,
+  gearList?: ScoutGearList | null
 ): Promise<ScoutPreviewDraft[]> {
   if (scoutAiUsesMock()) {
     return mockPreviews(project, dpPlan);
@@ -407,7 +550,7 @@ export async function cineScoutGeneratePreviews(
   const previews: ScoutPreviewDraft[] = [];
 
   // 1) Top-down lighting diagram (schematic)
-  const diagramPrompt = await buildLightingDiagramPrompt(project, dpPlan, referenceImage);
+  const diagramPrompt = await buildLightingDiagramPrompt(project, dpPlan, referenceImage, gearProfile, gearList);
   const diagramResult = await generateDiagramImage(diagramPrompt, project.aspectRatio);
   previews.push({
     id: `preview-${project.id}-diagram`,
@@ -430,7 +573,9 @@ export async function cineScoutGeneratePreviews(
         dpPlan,
         referenceImage,
         target.shot,
-        target.shot ? undefined : target.label
+        target.shot ? undefined : target.label,
+        gearProfile,
+        gearList
       );
       const cinematicResult = await generateCinematicImage(
         cinematicPrompt,

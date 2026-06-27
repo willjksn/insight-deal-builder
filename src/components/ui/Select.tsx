@@ -3,7 +3,7 @@ import { SelectHTMLAttributes, forwardRef } from "react";
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; disabled?: boolean }[];
   touch?: boolean;
 }
 
@@ -31,7 +31,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           {...props}
         >
           {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
+            <option key={opt.value || opt.label} value={opt.value} disabled={opt.disabled}>
               {opt.label}
             </option>
           ))}

@@ -184,6 +184,7 @@ export function mockDpPlan(
     },
     fixtureAwareLighting: fixturePlan,
     cameraSettings: {
+      cameraBodyRecommendation: project.cameraBody ?? "Sony FX3",
       lensRecommendation: `${lens} — ${lens === "85mm" ? "intimate compression" : lens === "35mm" ? "environmental context" : "natural portrait perspective"}`,
       frameRate:
         project.platform.includes("shorts") || project.aspectRatio === "9:16" ? "24fps or 30fps" : "24fps",

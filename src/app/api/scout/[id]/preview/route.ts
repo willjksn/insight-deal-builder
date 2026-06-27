@@ -4,6 +4,7 @@ import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/ap
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { cineScoutGeneratePreviews } from "@/lib/scout/cineScoutAi";
+import { loadScoutGearContext } from "@/lib/scout/scoutAdminGear";
 import { uploadScoutPreviewImage } from "@/lib/scout/previewStorage";
 import { ScoutDpPlan, ScoutProject, ScoutProjectImage } from "@/lib/scout/types";
 
@@ -42,11 +43,14 @@ export async function POST(
     }
 
     const images = await loadImages(id);
+    const { gearProfile, gearList } = await loadScoutGearContext(uid, project);
     const previewPayloads = await cineScoutGeneratePreviews(
       project,
       project.latestDpPlan as ScoutDpPlan,
       images,
-      project.latestShotList
+      project.latestShotList,
+      gearProfile,
+      gearList
     );
 
     const saved = [];

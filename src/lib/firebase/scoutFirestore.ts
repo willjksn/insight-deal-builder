@@ -10,6 +10,7 @@ import {
   query,
   orderBy,
   where,
+  limit,
   serverTimestamp,
 } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase/config";
@@ -18,6 +19,7 @@ import {
   LightFixture,
   LightingRecipe,
   ScoutGearProfile,
+  ScoutGearList,
   ScoutProject,
   ScoutProjectImage,
 } from "@/lib/scout/types";
@@ -133,6 +135,28 @@ export async function getGearProfiles(userId: string): Promise<ScoutGearProfile[
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as ScoutGearProfile);
 }
 
+/** Gear profile IDs from recent scout sessions (most recently used first). */
+export async function getRecentGearProfileIds(userId: string, maxCount = 6): Promise<string[]> {
+  const database = ensureDb();
+  const q = query(
+    collection(database, SCOUT_PROJECTS_COLLECTION),
+    where("userId", "==", userId),
+    orderBy("createdAt", "desc"),
+    limit(40)
+  );
+  const snapshot = await getDocs(q);
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const d of snapshot.docs) {
+    const profileId = d.data().selectedGearProfileId as string | undefined;
+    if (!profileId?.trim() || seen.has(profileId)) continue;
+    seen.add(profileId);
+    ids.push(profileId);
+    if (ids.length >= maxCount) break;
+  }
+  return ids;
+}
+
 export async function createGearProfile(
   userId: string,
   data: Omit<ScoutGearProfile, "id" | "userId" | "createdAt" | "updatedAt">
@@ -158,6 +182,39 @@ export async function updateGearProfile(
 
 export async function deleteGearProfile(userId: string, gearId: string): Promise<void> {
   await deleteDoc(doc(ensureDb(), "users", userId, "gearProfiles", gearId));
+}
+
+const GEAR_LIST_DOC_ID = "default";
+
+function gearListDoc(userId: string) {
+  return doc(ensureDb(), "users", userId, "gearList", GEAR_LIST_DOC_ID);
+}
+
+export async function getGearList(userId: string): Promise<ScoutGearList | null> {
+  try {
+    const snap = await getDoc(gearListDoc(userId));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as ScoutGearList;
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : "";
+    if (code === "permission-denied") return null;
+    throw err;
+  }
+}
+
+export async function saveGearList(
+  userId: string,
+  data: Omit<ScoutGearList, "id" | "userId" | "updatedAt">
+): Promise<void> {
+  await setDoc(
+    gearListDoc(userId),
+    stripUndefined({
+      ...data,
+      userId,
+      updatedAt: serverTimestamp(),
+    }),
+    { merge: true }
+  );
 }
 
 function lightFixturesCol(userId: string) {

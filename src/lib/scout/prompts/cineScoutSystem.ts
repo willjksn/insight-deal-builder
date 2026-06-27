@@ -195,7 +195,8 @@ export const DP_PLAN_JSON_SCHEMA = `{
     "whiteBalanceRecommendation": "string"
   },
   "cameraSettings": {
-    "lensRecommendation": "string",
+    "cameraBodyRecommendation": "string — exact model from user's available camera bodies",
+    "lensRecommendation": "string — exact lens from user's available lenses",
     "frameRate": "string",
     "shutter": "string",
     "apertureStartingPoint": "string",

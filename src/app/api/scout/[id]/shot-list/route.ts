@@ -4,6 +4,7 @@ import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/ap
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { cineScoutGenerateShotList } from "@/lib/scout/cineScoutAi";
+import { loadScoutGearContext } from "@/lib/scout/scoutAdminGear";
 import { ScoutDpPlan, ScoutProject } from "@/lib/scout/types";
 
 export const runtime = "nodejs";
@@ -28,9 +29,12 @@ export async function POST(
       return NextResponse.json({ error: "Generate DP plan first" }, { status: 400 });
     }
 
+    const { gearProfile, gearList } = await loadScoutGearContext(uid, project);
     const listPayload = await cineScoutGenerateShotList(
       project,
-      project.latestDpPlan as ScoutDpPlan
+      project.latestDpPlan as ScoutDpPlan,
+      gearProfile,
+      gearList
     );
     const listRef = await ref.collection("shotLists").add(
       stripUndefined({

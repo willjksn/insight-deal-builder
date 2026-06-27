@@ -254,6 +254,22 @@ export interface ScoutGearProfile {
   updatedAt: Timestamp;
 }
 
+/** User's master gear inventory — everything they own; AI suggests from this list. */
+export interface ScoutGearList {
+  id: string;
+  userId: string;
+  cameraBodies: string[];
+  lenses: string[];
+  lights: string[];
+  modifiers: string[];
+  audio: string[];
+  stabilizers: string[];
+  tripods?: string[];
+  preferredProfiles?: string[];
+  preferredFrameRates?: number[];
+  updatedAt: Timestamp;
+}
+
 export interface ScoutImageAnalysis {
   imageId: string;
   roomType: string;
@@ -331,6 +347,7 @@ export interface ScoutLightingPlan {
 }
 
 export interface ScoutCameraSettings {
+  cameraBodyRecommendation?: string;
   lensRecommendation: string;
   frameRate: string;
   shutter: string;

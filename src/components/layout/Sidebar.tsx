@@ -99,12 +99,6 @@ const navItems: NavItem[] = [
     canAccess: canAccessReports,
   },
   { href: "/settings", label: "Settings", icon: Settings },
-  {
-    href: "/admin",
-    label: "Admin",
-    icon: Shield,
-    canAccess: canManageUsers,
-  },
 ];
 
 export function Sidebar() {
@@ -147,6 +141,25 @@ export function Sidebar() {
           })}
           {canUseShotScout(appUser) ? (
             <ScoutSidebarNav />
+          ) : null}
+          {canManageUsers(appUser) ? (
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                pathname.startsWith("/admin")
+                  ? "bg-slate-800 text-white shadow-inner ring-1 ring-sky-400/30"
+                  : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+              )}
+            >
+              <Shield
+                className={cn(
+                  "h-5 w-5 shrink-0",
+                  pathname.startsWith("/admin") && "text-sky-400"
+                )}
+              />
+              Admin
+            </Link>
           ) : null}
         </nav>
 

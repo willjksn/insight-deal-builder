@@ -107,8 +107,8 @@ export default function ScoutDashboardPage() {
               <Camera className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-medium text-slate-900">Camera gear</p>
-              <p className="text-xs text-slate-500">Bodies, lenses, audio</p>
+              <p className="font-medium text-slate-900">My gear</p>
+              <p className="text-xs text-slate-500">Gear list &amp; kits</p>
             </div>
           </ScoutCard>
         </Link>
