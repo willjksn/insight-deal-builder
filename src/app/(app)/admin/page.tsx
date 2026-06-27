@@ -29,8 +29,6 @@ import {
 import { AppUser, UserPermissions, UserRole } from "@/lib/types";
 import { Check, Shield, Users, Building2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
-import { AdminPartnerAgreements } from "@/components/admin/AdminPartnerAgreements";
 
 type UserEdits = Record<
   string,
@@ -261,10 +259,6 @@ export default function AdminPage() {
   return (
     <div>
       <PageHeader title="Admin" subtitle="Workers, partners, and custom permissions" />
-
-      <AdminAnalytics />
-
-      <AdminPartnerAgreements />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-md shadow-slate-200/40 ring-1 ring-slate-100">

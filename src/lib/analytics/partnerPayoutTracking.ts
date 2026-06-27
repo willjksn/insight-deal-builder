@@ -4,7 +4,7 @@ import {
   PaymentInstallmentRecord,
   PayoutDetails,
 } from "@/lib/types";
-import { installmentOutstanding } from "@/lib/analytics/paymentTracking";
+import { installmentOutstanding, InstallmentPaymentMode } from "@/lib/analytics/paymentTracking";
 
 function addPartnerLine(
   rows: PaymentInstallmentRecord[],
@@ -92,6 +92,15 @@ export function listPartnerAgreements(agreements: Agreement[]): Agreement[] {
     .sort((a, b) => (b.updatedAt?.toMillis?.() ?? 0) - (a.updatedAt?.toMillis?.() ?? 0));
 }
 
+const SIGNED_STATUSES = new Set(["signed", "completed", "partially_signed"]);
+
+/** Signed internal deals with collaborator payout balances still open. */
+export function listSignedPartnerAgreementsWithOutstanding(agreements: Agreement[]): Agreement[] {
+  return listPartnerAgreements(agreements).filter(
+    (a) => SIGNED_STATUSES.has(a.status) && partnerOutstanding(a) > 0
+  );
+}
+
 export function mergePartnerInstallments(
   expected: PaymentInstallmentRecord[],
   stored: PaymentInstallmentRecord[] | undefined
@@ -167,19 +176,24 @@ export function recordPartnerInstallmentPayment(
   amount: number,
   paidAt: string,
   recordedBy: string,
-  notes?: string
+  notes?: string,
+  mode: InstallmentPaymentMode = "add"
 ): AgreementPaymentTracking {
   const partnerInstallments = mergePartnerInstallments(
     buildExpectedPartnerInstallments(payout),
     tracking?.partnerInstallments
   ).map((row) => {
     if (row.id !== installmentId) return row;
-    const capped = Math.min(row.amountDue, Math.max(0, amount));
+    const payment = Math.max(0, amount);
+    const nextPaid =
+      mode === "add"
+        ? Math.min(row.amountDue, (row.paidAmount ?? 0) + payment)
+        : Math.min(row.amountDue, payment);
     return {
       ...row,
-      paidAmount: capped,
-      paidAt: capped > 0 ? paidAt : undefined,
-      recordedBy: capped > 0 ? recordedBy : undefined,
+      paidAmount: nextPaid,
+      paidAt: nextPaid > 0 ? paidAt : undefined,
+      recordedBy: nextPaid > 0 ? recordedBy : undefined,
       notes: notes?.trim() || row.notes,
     };
   });

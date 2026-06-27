@@ -129,6 +129,32 @@ export function canExportPayments(user: AppUser | null | undefined): boolean {
   return isInsightOrgUser(user) && (hasPermission(user, "exportPayments") || canManageUsers(user));
 }
 
+/** Sidebar /reports hub — explicit exportPayments only (not all admins). */
+export function canAccessReports(user: AppUser | null | undefined): boolean {
+  return isInsightOrgUser(user) && hasPermission(user, "exportPayments");
+}
+
+/** Shot Scout — location analysis, DP plan, shot list, previs */
+export function canUseShotScout(user: AppUser | null | undefined): boolean {
+  return (
+    isInsightOrgUser(user) &&
+    (hasPermission(user, "useShotScout") ||
+      canManageUsers(user) ||
+      canManageProjects(user))
+  );
+}
+
+/** Pick a production project when creating or linking a scout session */
+export function canLinkScoutToProject(user: AppUser | null | undefined): boolean {
+  if (!canUseShotScout(user)) return false;
+  return (
+    canManageProjects(user) ||
+    canCreateQuotes(user) ||
+    canEditQuotes(user) ||
+    canManageUsers(user)
+  );
+}
+
 /** Record cash received from clients or paid to payees on signed agreements */
 export function canRecordPayments(user: AppUser | null | undefined): boolean {
   return canExportPayments(user);

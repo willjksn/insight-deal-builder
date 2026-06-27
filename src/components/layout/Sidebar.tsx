@@ -16,6 +16,7 @@ import {
   Settings,
   LogOut,
   Shield,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,7 +28,10 @@ import {
   canManageProjects,
   canManageTemplates,
   canManageUsers,
+  canAccessReports,
+  canUseShotScout,
 } from "@/lib/utils/permissions";
+import { ScoutSidebarNav } from "./ScoutSidebarNav";
 import { AppUser } from "@/lib/types";
 
 type NavItem = {
@@ -88,6 +92,12 @@ const navItems: NavItem[] = [
     icon: FileStack,
     canAccess: canManageTemplates,
   },
+  {
+    href: "/reports",
+    label: "Reports",
+    icon: BarChart3,
+    canAccess: canAccessReports,
+  },
   { href: "/settings", label: "Settings", icon: Settings },
   {
     href: "/admin",
@@ -135,6 +145,9 @@ export function Sidebar() {
               </Link>
             );
           })}
+          {canUseShotScout(appUser) ? (
+            <ScoutSidebarNav />
+          ) : null}
         </nav>
 
         <div className="border-t border-slate-700 p-4">

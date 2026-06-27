@@ -11,6 +11,7 @@ import {
   computeAdminAnalytics,
   formatUsd,
 } from "@/lib/analytics/adminMetrics";
+import { getAnalyticsYearOptions } from "@/lib/analytics/yearFilter";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -101,7 +102,12 @@ function OutstandingTable({
   );
 }
 
-export function AdminAnalytics() {
+interface AdminAnalyticsProps {
+  /** When set, omits admin-only wording (e.g. on /reports for accounting users). */
+  variant?: "admin" | "reports";
+}
+
+export function AdminAnalytics({ variant = "admin" }: AdminAnalyticsProps) {
   const { data: agreements, loading } = useAgreements();
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(String(currentYear));
@@ -111,14 +117,8 @@ export function AdminAnalytics() {
     [agreements, year]
   );
 
-  const ANALYTICS_START_YEAR = 2026;
-  const yearOptions = Array.from(
-    { length: Math.max(1, currentYear - ANALYTICS_START_YEAR + 1) },
-    (_, i) => {
-      const y = currentYear - i;
-      return { value: String(y), label: String(y) };
-    }
-  ).filter((opt) => Number(opt.value) >= ANALYTICS_START_YEAR);
+  const yearOptions = getAnalyticsYearOptions(currentYear);
+  const isReports = variant === "reports";
 
   return (
     <PageSection
@@ -126,7 +126,11 @@ export function AdminAnalytics() {
       icon={BarChart3}
       accent="emerald"
       title="Analytics"
-      description="Revenue, cash flow, receivables, and payables — admin only"
+      description={
+        isReports
+          ? "Revenue, cash flow, receivables, and payables for accounting"
+          : "Revenue, cash flow, receivables, and payables — admin only"
+      }
       action={
         <div className="w-32">
           <Select
@@ -140,9 +144,10 @@ export function AdminAnalytics() {
       }
     >
       <InfoCallout variant="blue">
-        Record payments on each signed agreement to keep cash and AR/AP accurate. Cash collected and
-        paid out reflect amounts recorded in {year}. Outstanding balances subtract recorded payments
-        from contract terms and partner payout splits.
+        Record payments on each signed agreement to keep cash and AR/AP accurate.{" "}
+        <strong>Booked revenue</strong> counts deals signed in {year}.{" "}
+        <strong>Cash collected and paid out</strong> use payment dates in {year} across all signed
+        deals. <strong>Outstanding</strong> balances are current totals after recorded payments.
       </InfoCallout>
 
       {loading ? (
@@ -244,21 +249,30 @@ export function AdminAnalytics() {
               <FileText className="mr-1 inline h-3 w-3" />
               {metrics.draftCount} drafts
             </Badge>
-            <Link href="/reports/payments" className="text-sm font-medium text-sky-700 hover:underline">
+            <Link
+              href={`/reports/payments?year=${year}`}
+              className="text-sm font-medium text-sky-700 hover:underline"
+            >
               Open payment export →
+            </Link>
+            <Link
+              href={`/reports/partners?year=${year}`}
+              className="text-sm font-medium text-violet-700 hover:underline"
+            >
+              Partner payout export →
             </Link>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
             <OutstandingTable
               title="Top outstanding receivables"
-              emptyLabel="No outstanding client balances for this year."
+              emptyLabel="No outstanding client balances."
               lines={metrics.receivableLines}
               tone="in"
             />
             <OutstandingTable
               title="Top outstanding payables"
-              emptyLabel="No outstanding payables for this year."
+              emptyLabel="No outstanding payables."
               lines={metrics.payableLines}
               tone="out"
             />

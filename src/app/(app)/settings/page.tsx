@@ -10,7 +10,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useServicePackages } from "@/hooks/useServicePackages";
 import {
-  canExportPayments,
+  canAccessReports,
   canManageProjects,
   canManageUsers,
   hasAnyWritePermission,
@@ -181,23 +181,23 @@ export default function SettingsPage() {
           </div>
         </PageSection>
 
-        {isInsightOrgUser(appUser) && canExportPayments(appUser) && (
+        {isInsightOrgUser(appUser) && canAccessReports(appUser) && (
           <PageSection
             icon={FileStack}
             accent="blue"
             title="Reports & accounting"
             description="Export payee totals for your accountant or tax prep"
             action={
-              <Link href="/reports/payments">
+              <Link href="/reports">
                 <Button variant="outline" size="touch">
-                  Payment export <ChevronRight className="ml-1 h-4 w-4" />
+                  Open reports <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
             }
           >
             <p className="text-sm text-slate-600">
-              Download a CSV of talent, contractor, location, and equipment rental payouts from
-              signed agreements — grouped by payee with tax ID and payment totals.
+              View cash flow analytics and download CSV exports for payees and partner collaborator
+              payouts from signed agreements.
             </p>
           </PageSection>
         )}

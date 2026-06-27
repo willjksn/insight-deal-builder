@@ -26,6 +26,11 @@ function loadServiceAccount(): Record<string, string> | null {
   return null;
 }
 
+/** Service account JSON for Vertex AI and other server-side GCP calls. */
+export function getServiceAccountCredentials(): Record<string, string> | null {
+  return loadServiceAccount();
+}
+
 let adminApp: App | undefined;
 let adminInitFailed = false;
 
@@ -62,9 +67,14 @@ export function getAdminAuth(): Auth | null {
   return app ? getAuth(app) : null;
 }
 
+let cachedAdminDb: Firestore | null | undefined;
+
 export function getAdminDb(): Firestore | null {
   const app = getAdminApp();
-  return app ? getFirestore(app) : null;
+  if (!app) return null;
+  if (cachedAdminDb) return cachedAdminDb;
+  cachedAdminDb = getFirestore(app);
+  return cachedAdminDb;
 }
 
 export function getAdminMessaging(): Messaging | null {

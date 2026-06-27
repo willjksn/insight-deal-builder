@@ -36,6 +36,7 @@ import {
   GearItem,
   Project,
   CustomPayout,
+  Template,
 } from "@/lib/types";
 import {
   PROJECT_TYPES,
@@ -47,6 +48,7 @@ import {
   DELIVERABLE_PRESETS_BY_PROJECT,
 } from "@/lib/constants/presets";
 import { getClausesForType, mergeClausesWithDefaults } from "@/lib/constants/clauses";
+import { applyTemplateToAgreement, listTemplateOptions } from "@/lib/templates/applyTemplate";
 import {
   createEmptyAgreement,
   createDefaultEquipmentRentalParties,
@@ -95,11 +97,16 @@ function WizardContent() {
   const { data: crew } = useConditionalCollection<CrewMember>("crewMembers", canReadSetup);
   const { data: projects } = useConditionalCollection<Project>("projects", canLinkProjects);
   const { data: servicePackages } = useServicePackages();
+  const { data: customTemplates } = useConditionalCollection<Template>(
+    "templates",
+    canReadSetup
+  );
   const { create, update, saving } = useMutations("agreements");
 
   const [step, setStep] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [agreement, setAgreement] = useState(() => createEmptyAgreement());
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("client_project");
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [previewMode, setPreviewMode] = useState<"full" | "summary" | "client">("full");
   const [signPartyId, setSignPartyId] = useState("");
@@ -146,6 +153,7 @@ function WizardContent() {
             doc.clauses
           ),
         });
+        setSelectedTemplateId(doc.templateId || doc.agreementType);
         setDraftId(editId);
         if (doc.servicePackageId) setSelectedPackageId(doc.servicePackageId);
       })
@@ -205,6 +213,7 @@ function WizardContent() {
       const parties = ensurePartiesForCreator([], appUser?.company, companies);
       return { ...empty, parties, title: prev.title || empty.title };
     });
+    setSelectedTemplateId("internal_collaboration");
   }, [isPartner, appUser, companies]);
 
   const updateAgreement = useCallback((patch: Partial<Agreement>) => {
@@ -357,6 +366,38 @@ function WizardContent() {
   const payout = agreement.payoutDetails;
   const payoutTotals = payout ? calculatePayoutTotals(payout) : null;
 
+  const templateOptions = listTemplateOptions(agreement.agreementType, customTemplates);
+
+  const applyAgreementType = (type: AgreementType) => {
+    const empty = createEmptyAgreement(type);
+    let parties = empty.parties;
+    if (type === "internal_collaboration") {
+      parties = ensurePartiesForCreator([], appUser?.company, companies);
+    } else if (type === "equipment_rental") {
+      parties = createDefaultEquipmentRentalParties(companies);
+    } else if (type === "talent_agreement") {
+      parties = createDefaultTalentParties(companies);
+    } else if (type === "contractor_agreement") {
+      parties = createDefaultContractorParties(companies);
+    } else if (type === "location_agreement") {
+      parties = createDefaultLocationParties(companies);
+    }
+    const nextAgreement = {
+      ...empty,
+      parties,
+      title: agreement.title || empty.title || generateAgreementTitle(empty.projectDetails.projectName, type),
+    };
+    const applied = applyTemplateToAgreement(nextAgreement, type, customTemplates);
+    setSelectedTemplateId(type);
+    setAgreement({ ...nextAgreement, ...applied });
+  };
+
+  const applyTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    const applied = applyTemplateToAgreement(agreement, templateId, customTemplates);
+    setAgreement((prev) => ({ ...prev, ...applied }));
+  };
+
   const renderStep = () => {
     switch (step) {
       case 0:
@@ -365,27 +406,7 @@ function WizardContent() {
             <Select
               label="Agreement Type"
               value={agreement.agreementType}
-              onChange={(e) => {
-                const type = e.target.value as AgreementType;
-                const empty = createEmptyAgreement(type);
-                let parties = empty.parties;
-                if (type === "internal_collaboration") {
-                  parties = ensurePartiesForCreator([], appUser?.company, companies);
-                } else if (type === "equipment_rental") {
-                  parties = createDefaultEquipmentRentalParties(companies);
-                } else if (type === "talent_agreement") {
-                  parties = createDefaultTalentParties(companies);
-                } else if (type === "contractor_agreement") {
-                  parties = createDefaultContractorParties(companies);
-                } else if (type === "location_agreement") {
-                  parties = createDefaultLocationParties(companies);
-                }
-                setAgreement({
-                  ...empty,
-                  parties,
-                  title: agreement.title || empty.title || generateAgreementTitle(empty.projectDetails.projectName, type),
-                });
-              }}
+              onChange={(e) => applyAgreementType(e.target.value as AgreementType)}
               options={
                 isPartner
                   ? [{ value: "internal_collaboration", label: "Internal Collaboration Agreement" }]
@@ -400,6 +421,27 @@ function WizardContent() {
               }
               touch
             />
+            {templateOptions.length > 1 && (
+              <Select
+                label="Template"
+                value={selectedTemplateId}
+                onChange={(e) => applyTemplate(e.target.value)}
+                options={templateOptions.map((t) => ({
+                  value: t.id,
+                  label: t.isBuiltin ? t.name : `${t.name} (custom)`,
+                }))}
+                touch
+              />
+            )}
+            {templateOptions.length === 1 && (
+              <p className="text-sm text-slate-500">
+                Using the built-in template for this agreement type. Add custom templates under{" "}
+                <a href="/templates" className="font-medium text-sky-700 hover:underline">
+                  Templates
+                </a>
+                .
+              </p>
+            )}
             <Input label="Agreement Title" value={agreement.title} onChange={(e) => updateAgreement({ title: e.target.value })} touch />
             <Select
               label="Link to Project"

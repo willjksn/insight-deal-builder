@@ -96,9 +96,19 @@ export function cashRecordedInYear(
   return total;
 }
 
+/** Sum of installment payments with paidAt in the given calendar year. */
+export function paidInCalendarYear(
+  agreement: Pick<Agreement, "paymentTerms" | "paymentTracking">,
+  year: number
+): number {
+  return cashRecordedInYear(agreement, year);
+}
+
 export function isInstallmentFullyPaid(row: PaymentInstallmentRecord): boolean {
   return installmentOutstanding(row) <= 0 && (row.paidAmount ?? 0) > 0;
 }
+
+export type InstallmentPaymentMode = "add" | "set";
 
 export function recordInstallmentPayment(
   tracking: AgreementPaymentTracking | undefined,
@@ -107,7 +117,8 @@ export function recordInstallmentPayment(
   amount: number,
   paidAt: string,
   recordedBy: string,
-  notes?: string
+  notes?: string,
+  mode: InstallmentPaymentMode = "add"
 ): AgreementPaymentTracking {
   const installments = mergePaymentInstallments(
     buildExpectedInstallments(terms),
@@ -115,12 +126,16 @@ export function recordInstallmentPayment(
   );
   const next = installments.map((row) => {
     if (row.id !== installmentId) return row;
-    const capped = Math.min(row.amountDue, Math.max(0, amount));
+    const payment = Math.max(0, amount);
+    const nextPaid =
+      mode === "add"
+        ? Math.min(row.amountDue, (row.paidAmount ?? 0) + payment)
+        : Math.min(row.amountDue, payment);
     return {
       ...row,
-      paidAmount: capped,
-      paidAt: capped > 0 ? paidAt : undefined,
-      recordedBy: capped > 0 ? recordedBy : undefined,
+      paidAmount: nextPaid,
+      paidAt: nextPaid > 0 ? paidAt : undefined,
+      recordedBy: nextPaid > 0 ? recordedBy : undefined,
       notes: notes?.trim() || row.notes,
     };
   });

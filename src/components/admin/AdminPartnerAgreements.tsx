@@ -8,6 +8,7 @@ import { useAgreements } from "@/hooks/useAgreements";
 import { formatUsd } from "@/lib/analytics/adminMetrics";
 import {
   listPartnerAgreements,
+  listSignedPartnerAgreementsWithOutstanding,
   partnerOutstanding,
   partnerTotalDue,
   partnerTotalPaid,
@@ -19,9 +20,18 @@ function partnerName(agreement: ReturnType<typeof listPartnerAgreements>[number]
   return collaborator?.name || "—";
 }
 
-export function AdminPartnerAgreements() {
+export function AdminPartnerAgreements({
+  signedOutstandingOnly = false,
+  variant = "admin",
+}: {
+  /** When true, only signed deals with open collaborator balances. */
+  signedOutstandingOnly?: boolean;
+  variant?: "admin" | "reports";
+}) {
   const { data: agreements, loading } = useAgreements();
-  const partnerDeals = listPartnerAgreements(agreements);
+  const partnerDeals = signedOutstandingOnly
+    ? listSignedPartnerAgreementsWithOutstanding(agreements)
+    : listPartnerAgreements(agreements);
 
   return (
     <PageSection
@@ -29,7 +39,13 @@ export function AdminPartnerAgreements() {
       icon={Users}
       accent="violet"
       title="Partner agreements"
-      description="Internal collaboration deals with production partners — all active statuses"
+      description={
+        signedOutstandingOnly
+          ? "Signed internal deals with outstanding collaborator payouts"
+          : variant === "reports"
+            ? "Internal collaboration deals — record payouts on each agreement"
+            : "Internal collaboration deals with production partners — all active statuses"
+      }
       action={
         <Link
           href="/agreements?type=internal_collaboration"
@@ -43,11 +59,17 @@ export function AdminPartnerAgreements() {
         <LoadingSpinner className="py-8" />
       ) : partnerDeals.length === 0 ? (
         <p className="py-6 text-sm text-slate-500">
-          No partner / internal collaboration agreements yet. Create one from{" "}
-          <Link href="/agreements/new" className="font-medium text-sky-700 hover:underline">
-            New Agreement
-          </Link>{" "}
-          and choose <strong>Internal Collaboration Agreement</strong>.
+          {signedOutstandingOnly
+            ? "No signed partner deals with outstanding payouts."
+            : "No partner / internal collaboration agreements yet. Create one from "}
+          {!signedOutstandingOnly && (
+            <>
+              <Link href="/agreements/new" className="font-medium text-sky-700 hover:underline">
+                New Agreement
+              </Link>{" "}
+              and choose <strong>Internal Collaboration Agreement</strong>.
+            </>
+          )}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200">

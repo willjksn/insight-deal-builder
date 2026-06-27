@@ -126,9 +126,8 @@ export default function TemplatesPage() {
       >
         <InfoCallout variant="sky">
           <p>
-            When you create a new agreement, the wizard loads the default clauses for that agreement
-            type. Customize payout splits, gear, deliverables, and policies per project. Custom
-            templates will be selectable in the wizard in a future update.
+            When you create a new agreement, pick a built-in or custom template on step 1 of the
+            wizard. Customize payout splits, gear, deliverables, and policies per project.
           </p>
         </InfoCallout>
       </PageSection>

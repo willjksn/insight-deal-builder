@@ -81,6 +81,7 @@ service cloud.firestore {
           || hasPerm('createQuotes')
           || hasPerm('editQuotes')
           || hasPerm('loadDemoData')
+          || hasPerm('useShotScout')
         );
     }
 
@@ -185,6 +186,59 @@ service cloud.firestore {
       allow update: if canReadNotification(resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'updatedAt']);
       allow delete: if false;
+    }
+
+    function canUseShotScout() {
+      return isInsightOrg() && (
+        hasPerm('useShotScout')
+        || canManageUsers()
+        || hasPerm('manageProjects')
+      );
+    }
+
+    match /shotScoutProjects/{scoutId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if canUseShotScout()
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if canUseShotScout()
+        && resource.data.userId == request.auth.uid;
+
+      match /images/{imageId} {
+        allow read, write: if canUseShotScout()
+          && get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data.userId == request.auth.uid;
+      }
+
+      match /analysis/{docId} {
+        allow read, write: if canUseShotScout()
+          && get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data.userId == request.auth.uid;
+      }
+
+      match /dpPlans/{docId} {
+        allow read, write: if canUseShotScout()
+          && get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data.userId == request.auth.uid;
+      }
+
+      match /shotLists/{docId} {
+        allow read, write: if canUseShotScout()
+          && get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data.userId == request.auth.uid;
+      }
+
+      match /previews/{docId} {
+        allow read, write: if canUseShotScout()
+          && get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data.userId == request.auth.uid;
+      }
+    }
+
+    match /users/{userId}/gearProfiles/{gearId} {
+      allow read, write: if request.auth.uid == userId && canUseShotScout();
+    }
+
+    match /users/{userId}/lightFixtures/{fixtureId} {
+      allow read, write: if request.auth.uid == userId && canUseShotScout();
+    }
+
+    match /users/{userId}/lightingRecipes/{recipeId} {
+      allow read, write: if request.auth.uid == userId && canUseShotScout();
     }
 
     // Client signing links — server-only (Firebase Admin SDK)

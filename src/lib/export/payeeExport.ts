@@ -1,5 +1,5 @@
 import { Agreement, PayeeTaxInfo } from "@/lib/types";
-import { agreementOutstanding, agreementTotalPaid } from "@/lib/analytics/paymentTracking";
+import { agreementOutstanding, agreementTotalPaid, paidInCalendarYear } from "@/lib/analytics/paymentTracking";
 import { getExternalSigningParty } from "@/lib/agreement/payeeParties";
 import { hasW9Document } from "@/lib/w9/payeeTax";
 import { getAgreementTypeLabel } from "@/lib/agreement/wizardSteps";
@@ -26,6 +26,7 @@ export type PayeeExportRow = {
   deposit: number;
   balance: number;
   paidAmount: number;
+  paidInYear: number;
   outstanding: number;
   paymentStatus: string;
   signedDate: string;
@@ -76,6 +77,7 @@ export function buildPayeeExportRows(agreements: Agreement[], year: number): Pay
     const tax = taxFromAgreement(agreement);
 
     const paidAmount = agreementTotalPaid(agreement);
+    const paidInYear = paidInCalendarYear(agreement, year);
     const outstanding = agreementOutstanding(agreement);
     const paymentStatus =
       outstanding <= 0 && paidAmount > 0 ? "Paid" : paidAmount > 0 ? "Partial" : "Unpaid";
@@ -101,6 +103,7 @@ export function buildPayeeExportRows(agreements: Agreement[], year: number): Pay
       deposit: agreement.paymentTerms.depositAmount ?? 0,
       balance: agreement.paymentTerms.balanceAmount ?? 0,
       paidAmount,
+      paidInYear,
       outstanding,
       paymentStatus,
       signedDate: signedDateForParty(agreement, payee.id),
@@ -133,6 +136,7 @@ export function payeeExportToCsv(rows: PayeeExportRow[]): string {
     "deposit",
     "balance",
     "paidAmount",
+    "paidInYear",
     "outstanding",
     "paymentStatus",
     "signedDate",

@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { canRecordPayments } from "@/lib/utils/permissions";
 import {
   installmentOutstanding,
+  InstallmentPaymentMode,
   isInstallmentFullyPaid,
 } from "@/lib/analytics/paymentTracking";
 import {
@@ -43,11 +44,13 @@ export function PartnerPayoutTrackingSection({
   onUpdated,
 }: PartnerPayoutTrackingSectionProps) {
   const { appUser } = useAuth();
-  const { update, saving } = useMutations("agreements");
+  const { update, saving, error: saveError } = useMutations("agreements");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editorMode, setEditorMode] = useState<InstallmentPaymentMode>("add");
   const [amount, setAmount] = useState("");
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const installments = useMemo(
     () => resolvePartnerInstallments(agreement),
@@ -85,28 +88,39 @@ export function PartnerPayoutTrackingSection({
   const totalPaid = partnerTotalPaid(agreement);
   const outstanding = partnerOutstanding(agreement);
 
-  const openEditor = (id: string, defaultAmount: number) => {
+  const openEditor = (id: string, defaultAmount: number, mode: InstallmentPaymentMode) => {
     setEditingId(id);
+    setEditorMode(mode);
     setAmount(String(defaultAmount));
     setPaidAt(new Date().toISOString().slice(0, 10));
     setNotes("");
+    setLocalError(null);
   };
 
   const handleSave = async (installmentId: string) => {
+    setLocalError(null);
     const parsed = Number(amount.replace(/,/g, ""));
-    if (!Number.isFinite(parsed) || parsed <= 0) return;
-    const next = recordPartnerInstallmentPayment(
-      agreement.paymentTracking,
-      agreement.payoutDetails!,
-      installmentId,
-      parsed,
-      paidAt,
-      appUser?.email || appUser?.displayName || "staff",
-      notes
-    );
-    await update(agreementId, { paymentTracking: next });
-    setEditingId(null);
-    onUpdated?.();
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setLocalError("Enter a payout amount greater than zero.");
+      return;
+    }
+    try {
+      const next = recordPartnerInstallmentPayment(
+        agreement.paymentTracking,
+        agreement.payoutDetails!,
+        installmentId,
+        parsed,
+        paidAt,
+        appUser?.email || appUser?.displayName || "staff",
+        notes,
+        editorMode
+      );
+      await update(agreementId, { paymentTracking: next });
+      setEditingId(null);
+      onUpdated?.();
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "Failed to save payout");
+    }
   };
 
   const handleClear = async (installmentId: string) => {
@@ -150,6 +164,11 @@ export function PartnerPayoutTrackingSection({
         {!canRecord && (
           <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
             Payout recording is available to accounting staff and admins.
+          </p>
+        )}
+        {(localError || saveError) && (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            {localError || saveError}
           </p>
         )}
 
@@ -200,10 +219,20 @@ export function PartnerPayoutTrackingSection({
                               size="sm"
                               variant="outline"
                               disabled={saving}
-                              onClick={() => openEditor(row.id, remaining > 0 ? remaining : row.amountDue)}
+                              onClick={() => openEditor(row.id, remaining, "add")}
                             >
-                              {fullyPaid ? "Adjust" : "Record payout"}
+                              Record payout
                             </Button>
+                            {(row.paidAmount ?? 0) > 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={saving}
+                                onClick={() => openEditor(row.id, row.paidAmount ?? 0, "set")}
+                              >
+                                Adjust total
+                              </Button>
+                            )}
                             {(row.paidAmount ?? 0) > 0 && (
                               <Button
                                 size="sm"
@@ -218,10 +247,15 @@ export function PartnerPayoutTrackingSection({
                         ) : (
                           <div className="min-w-[220px] space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                             <NumberInput
-                              label="Amount"
+                              label={editorMode === "add" ? "Payout amount" : "Total paid"}
                               value={amount === "" ? undefined : Number(amount)}
                               onChange={(v) => setAmount(v == null ? "" : String(v))}
                             />
+                            {editorMode === "add" && (row.paidAmount ?? 0) > 0 && (
+                              <p className="text-xs text-slate-500">
+                                Adds to {formatMoney(row.paidAmount ?? 0)} already recorded.
+                              </p>
+                            )}
                             <Input
                               label="Payment date"
                               type="date"

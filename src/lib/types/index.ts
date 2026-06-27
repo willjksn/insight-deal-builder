@@ -27,6 +27,8 @@ export interface UserPermissions {
   viewW9Docs: boolean;
   /** Download payee payment CSV for accounting and 1099 prep */
   exportPayments: boolean;
+  /** AI location scout, DP plan, and shot previs */
+  useShotScout: boolean;
 }
 
 export interface UserProfile {
@@ -604,6 +606,8 @@ export interface Agreement {
   projectId?: string;
   /** Service package used to auto-fill fee, deliverables, and splits */
   servicePackageId?: string;
+  /** Built-in agreement type id or Firestore custom template id */
+  templateId?: string;
   agreementType: AgreementType;
   title: string;
   version: number;

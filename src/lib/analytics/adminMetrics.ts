@@ -133,11 +133,14 @@ export function computeAdminAnalytics(agreements: Agreement[], year: number): Ad
     }
 
     const yearMatch = inYear(agreement, year);
+    const signed = isSigned(agreement);
 
     if (RECEIVABLE_TYPES.has(agreement.agreementType)) {
-      if (isSigned(agreement) && yearMatch) {
+      if (signed && yearMatch) {
         signedClientCount++;
         bookedClientRevenue += agreement.paymentTerms.totalFee ?? 0;
+      }
+      if (signed) {
         cashCollected += cashRecordedInYear(agreement, year);
         const outstanding = agreementOutstanding(agreement);
         const paid = agreementTotalPaid(agreement);
@@ -160,28 +163,32 @@ export function computeAdminAnalytics(agreements: Agreement[], year: number): Ad
       }
     }
 
-    if (PAYABLE_TYPES.has(agreement.agreementType) && isSigned(agreement) && yearMatch) {
-      signedPayeeCount++;
-      payeeObligations += agreement.paymentTerms.totalFee ?? 0;
-      payeeCashPaidOut += cashRecordedInYear(agreement, year);
-      const outstanding = agreementOutstanding(agreement);
-      const paid = agreementTotalPaid(agreement);
-      outstandingPayables += outstanding;
-      if (outstanding > 0) {
-        payableLines.push({
-          agreementId: agreement.id,
-          title: agreement.title,
-          projectName: agreement.projectDetails.projectName,
-          status: agreement.status,
-          totalFee: agreement.paymentTerms.totalFee ?? 0,
-          outstanding,
-          paid,
-          counterparty: payeeCounterparty(agreement),
-        });
+    if (PAYABLE_TYPES.has(agreement.agreementType)) {
+      if (signed && yearMatch) {
+        signedPayeeCount++;
+        payeeObligations += agreement.paymentTerms.totalFee ?? 0;
+      }
+      if (signed) {
+        payeeCashPaidOut += cashRecordedInYear(agreement, year);
+        const outstanding = agreementOutstanding(agreement);
+        const paid = agreementTotalPaid(agreement);
+        outstandingPayables += outstanding;
+        if (outstanding > 0) {
+          payableLines.push({
+            agreementId: agreement.id,
+            title: agreement.title,
+            projectName: agreement.projectDetails.projectName,
+            status: agreement.status,
+            totalFee: agreement.paymentTerms.totalFee ?? 0,
+            outstanding,
+            paid,
+            counterparty: payeeCounterparty(agreement),
+          });
+        }
       }
     }
 
-    if (agreement.agreementType === "internal_collaboration" && isSigned(agreement)) {
+    if (agreement.agreementType === "internal_collaboration" && signed) {
       signedInternalCount++;
       internalPartnerPayables += partnerTotalDue(agreement);
       partnerCashPaidOut += partnerCashRecordedInYear(agreement, year);

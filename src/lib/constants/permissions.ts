@@ -137,6 +137,13 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     group: "imgData",
     insightOnly: true,
   },
+  {
+    key: "useShotScout",
+    label: "Shot Scout (AI DP assistant)",
+    description: "Scout locations, generate DP plans, shot lists, and previs",
+    group: "imgData",
+    insightOnly: true,
+  },
 ];
 
 export const PERMISSION_GROUPS = [
@@ -165,6 +172,7 @@ export const EMPTY_PERMISSIONS: UserPermissions = {
   viewIdentityDocs: false,
   viewW9Docs: false,
   exportPayments: false,
+  useShotScout: false,
 };
 
 export const FULL_IMG_PERMISSIONS: UserPermissions = {
@@ -187,6 +195,7 @@ export const FULL_IMG_PERMISSIONS: UserPermissions = {
   viewIdentityDocs: true,
   viewW9Docs: true,
   exportPayments: true,
+  useShotScout: true,
 };
 
 /** Production partner — own quotes only, no IMG client/company/crew access */
@@ -211,6 +220,7 @@ export const PRODUCER_PERMISSIONS: UserPermissions = {
   emailQuotes: true,
   viewAllOrgDeals: true,
   manageProjects: true,
+  useShotScout: true,
 };
 
 /** @deprecated alias — use PRODUCER_PERMISSIONS */

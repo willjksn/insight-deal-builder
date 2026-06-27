@@ -36,6 +36,17 @@ export function assertCanViewIdentity(appUser: AppUser): void {
   }
 }
 
+export function assertCanUseShotScout(appUser: AppUser): void {
+  if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
+  if (
+    !hasPermission(appUser, "useShotScout") &&
+    !hasPermission(appUser, "manageUsers") &&
+    !hasPermission(appUser, "manageProjects")
+  ) {
+    throw new Error("Not authorized for Shot Scout");
+  }
+}
+
 export function apiErrorStatus(message: string): number {
   if (
     message.includes("token") ||
