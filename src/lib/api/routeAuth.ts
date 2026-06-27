@@ -1,8 +1,18 @@
 import { NextRequest } from "next/server";
-import { getAdminDb } from "@/lib/firebase/admin";
-import { verifyAuthToken } from "@/lib/notifications/server";
+import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 import { hasPermission, isInsightOrgUser, resolvePermissions } from "@/lib/utils/permissions";
 import { AppUser } from "@/lib/types";
+
+export async function verifyAuthToken(authHeader: string | null): Promise<string> {
+  const adminAuth = getAdminAuth();
+  if (!adminAuth) throw new Error("Firebase Admin Auth is not configured");
+
+  const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
+  if (!token) throw new Error("Missing authorization token");
+
+  const decoded = await adminAuth.verifyIdToken(token);
+  return decoded.uid;
+}
 
 export async function loadAppUser(uid: string): Promise<AppUser> {
   const db = getAdminDb();

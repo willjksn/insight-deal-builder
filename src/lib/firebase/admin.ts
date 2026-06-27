@@ -1,8 +1,8 @@
-import { cert, getApps, initializeApp, App } from "firebase-admin/app";
-import { getAuth, Auth } from "firebase-admin/auth";
-import { getFirestore, Firestore } from "firebase-admin/firestore";
-import { getMessaging, Messaging } from "firebase-admin/messaging";
-import { getStorage, Storage } from "firebase-admin/storage";
+import type { App } from "firebase-admin/app";
+import type { Auth } from "firebase-admin/auth";
+import type { Firestore } from "firebase-admin/firestore";
+import type { Messaging } from "firebase-admin/messaging";
+import type { Storage } from "firebase-admin/storage";
 
 function loadServiceAccount(): Record<string, string> | null {
   const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -32,16 +32,21 @@ let adminInitFailed = false;
 export function getAdminApp(): App | null {
   if (adminInitFailed) return null;
   if (adminApp) return adminApp;
-  const existing = getApps();
-  if (existing.length) {
-    adminApp = existing[0];
-    return adminApp;
-  }
 
   const serviceAccount = loadServiceAccount();
   if (!serviceAccount) return null;
 
   try {
+    // Lazy require keeps firebase-admin out of the module graph until first use (Vercel serverless).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { cert, getApps, initializeApp } = require("firebase-admin/app") as typeof import("firebase-admin/app");
+
+    const existing = getApps();
+    if (existing.length) {
+      adminApp = existing[0];
+      return adminApp;
+    }
+
     adminApp = initializeApp({
       credential: cert(serviceAccount as Parameters<typeof cert>[0]),
       storageBucket:
@@ -59,22 +64,34 @@ export function getAdminApp(): App | null {
 
 export function getAdminAuth(): Auth | null {
   const app = getAdminApp();
-  return app ? getAuth(app) : null;
+  if (!app) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getAuth } = require("firebase-admin/auth") as typeof import("firebase-admin/auth");
+  return getAuth(app);
 }
 
 export function getAdminDb(): Firestore | null {
   const app = getAdminApp();
-  return app ? getFirestore(app) : null;
+  if (!app) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getFirestore } = require("firebase-admin/firestore") as typeof import("firebase-admin/firestore");
+  return getFirestore(app);
 }
 
 export function getAdminMessaging(): Messaging | null {
   const app = getAdminApp();
-  return app ? getMessaging(app) : null;
+  if (!app) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getMessaging } = require("firebase-admin/messaging") as typeof import("firebase-admin/messaging");
+  return getMessaging(app);
 }
 
 export function getAdminStorage(): Storage | null {
   const app = getAdminApp();
-  return app ? getStorage(app) : null;
+  if (!app) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getStorage } = require("firebase-admin/storage") as typeof import("firebase-admin/storage");
+  return getStorage(app);
 }
 
 export function isAdminConfigured(): boolean {

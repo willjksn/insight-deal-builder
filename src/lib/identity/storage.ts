@@ -1,6 +1,5 @@
 import { randomBytes } from "crypto";
-import { getStorage } from "firebase-admin/storage";
-import { getAdminApp } from "@/lib/firebase/admin";
+import { getAdminApp, getAdminStorage } from "@/lib/firebase/admin";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
@@ -17,8 +16,9 @@ function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; contentType: string
 function getBucket() {
   const app = getAdminApp();
   if (!app) throw new Error("Firebase Admin is not configured");
+  const storage = getAdminStorage();
+  if (!storage) throw new Error("Firebase Admin Storage is not configured");
   const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-  const storage = getStorage(app);
   return bucketName ? storage.bucket(bucketName) : storage.bucket();
 }
 
