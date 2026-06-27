@@ -5,6 +5,7 @@ import { AgreementPayload } from "@/lib/agreement/lifecycle";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { NumberInput } from "@/components/ui/NumberInput";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { useEquipmentCatalog } from "@/hooks/useEquipmentCatalog";
@@ -110,8 +111,8 @@ export function EquipmentRentalStep({ agreement, onChange }: EquipmentRentalStep
 
       <Card>
         <CardBody className="grid gap-4 md:grid-cols-2">
-          <Input label="Deposit ($)" type="number" min={0} value={rental.depositAmount ?? ""} onChange={(e) => updateRental({ depositAmount: Number(e.target.value) })} touch />
-          <Input label="Late fee ($/day)" type="number" min={0} value={rental.lateFeePerDay ?? ""} onChange={(e) => updateRental({ lateFeePerDay: Number(e.target.value) })} touch />
+          <NumberInput label="Deposit ($)" value={rental.depositAmount} onChange={(depositAmount) => updateRental({ depositAmount: depositAmount ?? 0 })} touch />
+          <NumberInput label="Late fee ($/day)" value={rental.lateFeePerDay} onChange={(lateFeePerDay) => updateRental({ lateFeePerDay })} touch />
           <label className="flex items-center gap-2 text-sm md:col-span-2">
             <input type="checkbox" checked={!!rental.insuranceRequired} onChange={(e) => updateRental({ insuranceRequired: e.target.checked })} className="h-5 w-5" />
             Renter must provide insurance

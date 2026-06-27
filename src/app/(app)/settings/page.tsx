@@ -10,7 +10,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useServicePackages } from "@/hooks/useServicePackages";
 import {
-  canEditQuotes,
+  canExportPayments,
   canManageProjects,
   canManageUsers,
   hasAnyWritePermission,
@@ -181,7 +181,7 @@ export default function SettingsPage() {
           </div>
         </PageSection>
 
-        {isInsightOrgUser(appUser) && canEditQuotes(appUser) && (
+        {isInsightOrgUser(appUser) && canExportPayments(appUser) && (
           <PageSection
             icon={FileStack}
             accent="blue"

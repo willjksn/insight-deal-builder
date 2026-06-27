@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Input } from "@/components/ui/Input";
+import { NumberInput } from "@/components/ui/NumberInput";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
@@ -55,6 +56,8 @@ import {
   getProjectOverview,
   generateAgreementTitle,
   suggestPaymentTerms,
+  syncPaymentSplitFromDeposit,
+  syncPaymentSplitFromBalance,
   ensureInsightPartyForInternal,
   ensurePartiesForCreator,
 } from "@/lib/agreement/defaults";
@@ -806,12 +809,33 @@ function WizardContent() {
       case 7:
         return (
           <div className="space-y-4">
-            <Input label="Total Fee" type="number" value={agreement.paymentTerms.totalFee} onChange={(e) => updateAgreement({ paymentTerms: suggestPaymentTerms(Number(e.target.value)) })} touch />
+            <NumberInput label="Total Fee" value={agreement.paymentTerms.totalFee} onChange={(totalFee) => updateAgreement({ paymentTerms: suggestPaymentTerms(totalFee ?? 0) })} touch />
             <Select label="Payment Structure" value={agreement.paymentTerms.paymentStructure} onChange={(e) => updateAgreement({ paymentTerms: { ...agreement.paymentTerms, paymentStructure: e.target.value as Agreement["paymentTerms"]["paymentStructure"] } })} options={[{ value: "100% due before shoot", label: "100% due before shoot" }, { value: "50% deposit / 50% before final delivery", label: "50% deposit / 50% before final delivery" }, { value: "50% deposit / 25% shoot day / 25% before final delivery", label: "50% deposit / 25% shoot day / 25% before final delivery" }, { value: "Monthly retainer paid in advance", label: "Monthly retainer paid in advance" }, { value: "Custom", label: "Custom" }]} touch />
             <div className="grid gap-4 md:grid-cols-2">
-              <Input label="Deposit" type="number" value={agreement.paymentTerms.depositAmount ?? ""} onChange={(e) => updateAgreement({ paymentTerms: { ...agreement.paymentTerms, depositAmount: Number(e.target.value) } })} touch />
-              <Input label="Balance" type="number" value={agreement.paymentTerms.balanceAmount ?? ""} onChange={(e) => updateAgreement({ paymentTerms: { ...agreement.paymentTerms, balanceAmount: Number(e.target.value) } })} touch />
+              <NumberInput
+                label="Deposit"
+                value={agreement.paymentTerms.depositAmount}
+                onChange={(depositAmount) =>
+                  updateAgreement({
+                    paymentTerms: syncPaymentSplitFromDeposit(agreement.paymentTerms, depositAmount),
+                  })
+                }
+                touch
+              />
+              <NumberInput
+                label="Balance"
+                value={agreement.paymentTerms.balanceAmount}
+                onChange={(balanceAmount) =>
+                  updateAgreement({
+                    paymentTerms: syncPaymentSplitFromBalance(agreement.paymentTerms, balanceAmount),
+                  })
+                }
+                touch
+              />
             </div>
+            <p className="text-xs text-slate-500">
+              Deposit and balance stay in sync — they always add up to the total fee.
+            </p>
             <Textarea label="Payment Notes" value={agreement.paymentTerms.paymentNotes || ""} onChange={(e) => updateAgreement({ paymentTerms: { ...agreement.paymentTerms, paymentNotes: e.target.value } })} touch />
           </div>
         );

@@ -18,6 +18,7 @@ import {
   canManageUsers,
   resolvePermissions,
 } from "@/lib/utils/permissions";
+import { isUserPendingApproval, shouldApproveOnAdminSave } from "@/lib/users/approval";
 import {
   EMPTY_PERMISSIONS,
   PERMISSION_DEFINITIONS,
@@ -26,8 +27,10 @@ import {
   sanitizePermissionsForCompany,
 } from "@/lib/constants/permissions";
 import { AppUser, UserPermissions, UserRole } from "@/lib/types";
-import { Check, Shield, Users, Building2 } from "lucide-react";
+import { Check, Shield, Users, Building2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
+import { AdminPartnerAgreements } from "@/components/admin/AdminPartnerAgreements";
 
 type UserEdits = Record<
   string,
@@ -44,16 +47,25 @@ function permissionsEqual(a: UserPermissions, b: UserPermissions): boolean {
 
 function userSummaryLabel(permissions: UserPermissions, company: string): string {
   if (permissions.manageUsers && company === INSIGHT_MEDIA_GROUP_LLC) return "Full admin";
+  if (permissions.exportPayments && company === INSIGHT_MEDIA_GROUP_LLC && !permissions.editQuotes) {
+    return "Accounting";
+  }
+  if (permissions.viewIdentityDocs && permissions.editQuotes && company === INSIGHT_MEDIA_GROUP_LLC) {
+    return "Compliance";
+  }
   if (permissions.createQuotes && company !== INSIGHT_MEDIA_GROUP_LLC && company) return "Partner";
-  if (permissions.createQuotes && company === INSIGHT_MEDIA_GROUP_LLC) return "IMG staff";
+  if (permissions.createQuotes && company === INSIGHT_MEDIA_GROUP_LLC) return "Producer";
   if (permissions.signQuotes) return "View & sign";
   return "Limited access";
 }
 
 function badgeVariant(label: string): "success" | "warning" | "info" | "default" {
   if (label === "Full admin") return "success";
+  if (label === "Pending approval") return "warning";
   if (label === "Partner") return "info";
-  if (label === "IMG staff") return "warning";
+  if (label === "Producer") return "warning";
+  if (label === "Accounting") return "info";
+  if (label === "Compliance") return "warning";
   return "default";
 }
 
@@ -74,6 +86,7 @@ export default function AdminPage() {
   const { data: companies } = useCollection<{ id: string; displayName: string }>("companies");
   const { update, saving } = useMutations("users");
   const [edits, setEdits] = useState<UserEdits>({});
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,8 +116,37 @@ export default function AdminPage() {
     const partners = users.filter(
       (u) => u.company && u.company !== INSIGHT_MEDIA_GROUP_LLC
     ).length;
-    return { total: users.length, img, partners };
+    const pending = users.filter((u) => isUserPendingApproval(u)).length;
+    return { total: users.length, img, partners, pending };
   }, [users]);
+
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      const aPending = isUserPendingApproval(a) ? 0 : 1;
+      const bPending = isUserPendingApproval(b) ? 0 : 1;
+      if (aPending !== bPending) return aPending - bPending;
+      return (a.email || "").localeCompare(b.email || "");
+    });
+  }, [users]);
+
+  useEffect(() => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      for (const user of users) {
+        if (isUserPendingApproval(user)) next.add(user.id);
+      }
+      return next;
+    });
+  }, [users]);
+
+  const toggleExpanded = (userId: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
 
   const getEdit = (user: AppUser) => {
     const base = edits[user.id];
@@ -137,6 +179,7 @@ export default function AdminPage() {
       }
       return { ...prev, [userId]: next };
     });
+    setExpandedIds((prev) => new Set(prev).add(userId));
   };
 
   const togglePermission = (userId: string, key: keyof UserPermissions) => {
@@ -177,11 +220,13 @@ export default function AdminPage() {
         : "member";
 
     try {
+      const approved = shouldApproveOnAdminSave(edit.company, permissions);
       await update(user.id, {
         displayName: edit.displayName.trim() || user.email,
         company: edit.company,
         permissions,
         role,
+        approved,
       });
       setEdits((prev) => {
         const next = { ...prev };
@@ -217,7 +262,11 @@ export default function AdminPage() {
     <div>
       <PageHeader title="Admin" subtitle="Workers, partners, and custom permissions" />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <AdminAnalytics />
+
+      <AdminPartnerAgreements />
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-md shadow-slate-200/40 ring-1 ring-slate-100">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 text-white">
@@ -251,7 +300,27 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+        <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50 to-white p-4 ring-1 ring-amber-100">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold tabular-nums text-slate-900">{stats.pending}</p>
+              <p className="text-xs font-medium text-amber-800/80">Pending approval</p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {stats.pending > 0 && (
+        <div className="mb-6">
+        <InfoCallout variant="blue">
+          {stats.pending} user{stats.pending === 1 ? "" : "s"} waiting for approval. Assign company
+          and permissions below, then save to grant access.
+        </InfoCallout>
+        </div>
+      )}
 
       <PageSection
         className="mb-6"
@@ -277,14 +346,16 @@ export default function AdminPage() {
         </Card>
       ) : (
         <div className="space-y-5">
-          {users.map((user) => {
+          {sortedUsers.map((user) => {
             const edit = getEdit(user);
             const dirty = isDirty(user);
             const isCurrentUser = user.id === appUser.id;
-            const summary = userSummaryLabel(edit.permissions, edit.company);
+            const pending = isUserPendingApproval(user);
+            const summary = pending ? "Pending approval" : userSummaryLabel(edit.permissions, edit.company);
             const applicableDefs = PERMISSION_DEFINITIONS.filter(
               (d) => !d.insightOnly || edit.company === INSIGHT_MEDIA_GROUP_LLC
             );
+            const expanded = expandedIds.has(user.id) || dirty;
 
             return (
               <Card
@@ -294,10 +365,15 @@ export default function AdminPage() {
                   isCurrentUser ? "ring-sky-200 shadow-lg shadow-sky-500/10" : "ring-slate-100"
                 )}
               >
-                <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 to-white px-6 py-4">
+                <button
+                  type="button"
+                  onClick={() => toggleExpanded(user.id)}
+                  aria-expanded={expanded}
+                  className="w-full border-b border-slate-100 bg-gradient-to-r from-slate-50/90 to-white px-6 py-4 text-left transition-colors hover:from-slate-100/90"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 text-sm font-bold text-white shadow-md">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 text-sm font-bold text-white shadow-md">
                         {userInitials(user, edit.displayName)}
                       </div>
                       <div>
@@ -310,10 +386,22 @@ export default function AdminPage() {
                         <p className="text-sm text-slate-500">{user.email}</p>
                       </div>
                     </div>
-                    <Badge variant={badgeVariant(summary)}>{summary}</Badge>
+                    <div className="flex items-center gap-2">
+                      {dirty && (
+                        <span className="text-xs font-medium text-amber-700">Unsaved changes</span>
+                      )}
+                      <Badge variant={badgeVariant(summary)}>{summary}</Badge>
+                      <ChevronDown
+                        className={cn(
+                          "h-5 w-5 text-slate-400 transition-transform",
+                          expanded && "rotate-180"
+                        )}
+                      />
+                    </div>
                   </div>
-                </div>
+                </button>
 
+                {expanded && (
                 <CardBody className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-2">
                     <Input
@@ -403,6 +491,7 @@ export default function AdminPage() {
                     </Button>
                   </div>
                 </CardBody>
+                )}
               </Card>
             );
           })}

@@ -60,6 +60,12 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {isSignUp && (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Your account will stay locked until an administrator approves you and assigns
+                  permissions.
+                </p>
+              )}
+              {isSignUp && (
                 <Input
                   label="Display Name"
                   value={displayName}
@@ -96,7 +102,7 @@ export default function LoginPage() {
                 className="w-full"
                 disabled={loading || !isConfigured}
               >
-                {loading ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"}
+                {loading ? "Please wait..." : isSignUp ? "Request access" : "Sign In"}
               </Button>
             </form>
 
@@ -108,7 +114,7 @@ export default function LoginPage() {
               >
                 {isSignUp
                   ? "Already have an account? Sign in"
-                  : "Need an account? Create one"}
+                  : "Need an account? Request access"}
               </button>
             </div>
           </CardBody>

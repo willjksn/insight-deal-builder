@@ -63,6 +63,14 @@ service cloud.firestore {
           .hasOnly(['signatures', 'initials', 'status', 'updatedAt']);
     }
 
+    function canRecordPaymentTracking(data) {
+      return isInsightOrg()
+        && (hasPerm('exportPayments') || canManageUsers())
+        && (canSeeAllAgreements() || isPartyOnAgreement(data))
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['paymentTracking', 'updatedAt']);
+    }
+
     function canReadInsightSetup() {
       return isInsightOrg()
         && (
@@ -85,7 +93,8 @@ service cloud.firestore {
       allow read: if isSignedIn() && (request.auth.uid == userId || canManageUsers());
       allow create: if request.auth.uid == userId
         && request.resource.data.role == 'member'
-        && request.resource.data.company == '';
+        && request.resource.data.company == ''
+        && request.resource.data.approved == false;
       allow update: if canManageUsers()
         || (
           request.auth.uid == userId
@@ -137,7 +146,9 @@ service cloud.firestore {
     match /agreements/{docId} {
       allow read: if canSeeAllAgreements() || isPartyOnAgreement(resource.data);
       allow create: if hasPerm('createQuotes');
-      allow update: if canEditAgreement(resource.data) || canSignAgreement(resource.data);
+      allow update: if canEditAgreement(resource.data)
+        || canSignAgreement(resource.data)
+        || canRecordPaymentTracking(resource.data);
       allow delete: if hasPerm('deleteQuotes')
         && (canSeeAllAgreements() || isPartyOnAgreement(resource.data));
     }

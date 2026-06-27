@@ -64,7 +64,7 @@ function AgreementsContent() {
     <div>
       <PageHeader
         title="Agreements"
-        subtitle="Internal collaboration and client project agreements"
+        subtitle="Partner collaborations, client projects, and payee agreements"
         actionLabel={canCreateQuotes(appUser) ? "New Agreement" : undefined}
         actionHref={canCreateQuotes(appUser) ? "/agreements/new" : undefined}
       />
@@ -92,7 +92,7 @@ function AgreementsContent() {
           onChange={(e) => updateFilters(statusFilter, e.target.value)}
           options={[
             { value: "", label: "All types" },
-            { value: "internal_collaboration", label: "Internal" },
+            { value: "internal_collaboration", label: "Partner / Internal" },
             { value: "client_project", label: "Client" },
             { value: "equipment_rental", label: "Equipment Rental" },
             { value: "talent_agreement", label: "Talent Agreement" },

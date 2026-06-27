@@ -1,134 +1,124 @@
 "use client";
 
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
-import { ContentPanel, InfoCallout, PageSection } from "@/components/ui/PageSection";
-import { INTERNAL_AGREEMENT_TEMPLATE, CLIENT_AGREEMENT_TEMPLATE, EQUIPMENT_RENTAL_AGREEMENT_TEMPLATE, TALENT_AGREEMENT_TEMPLATE, CONTRACTOR_AGREEMENT_TEMPLATE, LOCATION_AGREEMENT_TEMPLATE } from "@/lib/constants/clauses";
-import { FileStack, Handshake, Users, Sparkles, HardDrive, UserCircle, Briefcase, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { InfoCallout, PageSection } from "@/components/ui/PageSection";
+import { useCollection } from "@/hooks/useCollection";
+import { useAuth } from "@/contexts/AuthContext";
+import { canManageTemplates } from "@/lib/utils/permissions";
+import { BUILTIN_TEMPLATES } from "@/lib/constants/templateCatalog";
+import { Template } from "@/lib/types";
+import { getAgreementTypeLabel } from "@/lib/agreement/wizardSteps";
+import { ChevronRight, FileStack, Plus, Sparkles } from "lucide-react";
 
 export default function TemplatesPage() {
+  const { appUser } = useAuth();
+  const { data: customTemplates, loading } = useCollection<Template>("templates");
+  const canEdit = canManageTemplates(appUser);
+
   return (
     <div>
       <PageHeader
         title="Templates"
-        subtitle="Built-in agreement structures applied when you start a new quote in the wizard"
+        subtitle="Built-in agreement structures and your custom templates — click to view full wording"
+        action={
+          canEdit ? (
+            <Link href="/templates/new">
+              <Button size="touch">
+                <Plus className="mr-2 h-4 w-4" />
+                Add template
+              </Button>
+            </Link>
+          ) : undefined
+        }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <div className="rounded-2xl border border-sky-200/60 bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100">
-          <p className="text-xs font-bold uppercase tracking-wider text-sky-700">Internal</p>
-          <p className="mt-1 text-sm text-slate-600">Insight + partner collaborations, payouts & gear</p>
-        </div>
-        <div className="rounded-2xl border border-sky-200/60 bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100">
-          <p className="text-xs font-bold uppercase tracking-wider text-sky-700">Client</p>
-          <p className="mt-1 text-sm text-slate-600">Production company + client deliverables & payment</p>
-        </div>
-        <div className="rounded-2xl border border-sky-200/60 bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100">
-          <p className="text-xs font-bold uppercase tracking-wider text-sky-700">Equipment Rental</p>
-          <p className="mt-1 text-sm text-slate-600">Rent IMG gear to AVE, clients, or partners with line-item pricing</p>
-        </div>
-        <div className="rounded-2xl border border-sky-200/60 bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100">
-          <p className="text-xs font-bold uppercase tracking-wider text-sky-700">Talent</p>
-          <p className="mt-1 text-sm text-slate-600">On-camera talent, releases, usage, ID verification</p>
-        </div>
-        <div className="rounded-2xl border border-sky-200/60 bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100">
-          <p className="text-xs font-bold uppercase tracking-wider text-sky-700">Contractor</p>
-          <p className="mt-1 text-sm text-slate-600">Crew & contractors — services, pay, W-9, work-for-hire</p>
-        </div>
-        <div className="rounded-2xl border border-sky-200/60 bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100">
-          <p className="text-xs font-bold uppercase tracking-wider text-sky-700">Location / Prop</p>
-          <p className="mt-1 text-sm text-slate-600">Film locations, property releases, prop line-item fees</p>
-        </div>
+      <PageSection
+        className="mb-6"
+        icon={FileStack}
+        accent="sky"
+        title="Built-in templates"
+        description="Applied automatically when you start a new quote of that type in the wizard"
+      />
+
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {BUILTIN_TEMPLATES.map((template) => {
+          const Icon = template.icon;
+          return (
+            <Link
+              key={template.id}
+              href={`/templates/${template.id}`}
+              className="group rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-md shadow-slate-200/30 ring-1 ring-slate-100 transition-all hover:border-sky-300 hover:shadow-lg hover:ring-sky-200"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-500 text-white shadow-md shadow-sky-500/25">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <ChevronRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-sky-500" />
+              </div>
+              <p className="mt-4 font-semibold text-slate-900">{template.name}</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">{template.description}</p>
+              <div className="mt-3">
+                <Badge variant="info">{template.categoryLabel}</Badge>
+              </div>
+            </Link>
+          );
+        })}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        <PageSection
-          icon={Handshake}
-          accent="sky"
-          title="Internal Collaboration"
-          description="Default clauses for IMG ↔ partner deals"
-          action={<Badge variant="warning">Internal</Badge>}
-        >
-          <ContentPanel className="max-h-[420px] overflow-y-auto">
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">
-              {INTERNAL_AGREEMENT_TEMPLATE}
-            </pre>
-          </ContentPanel>
-        </PageSection>
+      {canEdit && (
+        <>
+          <PageSection
+            className="mb-6"
+            icon={Sparkles}
+            accent="violet"
+            title="Custom templates"
+            description="Your own agreement structures — AI-assisted drafting coming soon"
+          />
 
-        <PageSection
-          icon={Users}
-          accent="sky"
-          title="Client Project"
-          description="Default clauses for client-facing agreements"
-          action={<Badge variant="info">Client</Badge>}
-        >
-          <ContentPanel className="max-h-[420px] overflow-y-auto">
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">
-              {CLIENT_AGREEMENT_TEMPLATE}
-            </pre>
-          </ContentPanel>
-        </PageSection>
-
-        <PageSection
-          icon={HardDrive}
-          accent="sky"
-          title="Equipment Rental"
-          description="Gear schedule, deposit, insurance, and return terms"
-          action={<Badge variant="success">Rental</Badge>}
-        >
-          <ContentPanel className="max-h-[420px] overflow-y-auto">
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">
-              {EQUIPMENT_RENTAL_AGREEMENT_TEMPLATE}
-            </pre>
-          </ContentPanel>
-        </PageSection>
-
-        <PageSection
-          icon={UserCircle}
-          accent="sky"
-          title="Talent Agreement"
-          description="Appearance, compensation, likeness release, age verification"
-          action={<Badge variant="warning">Talent</Badge>}
-        >
-          <ContentPanel className="max-h-[420px] overflow-y-auto">
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">
-              {TALENT_AGREEMENT_TEMPLATE}
-            </pre>
-          </ContentPanel>
-        </PageSection>
-
-        <PageSection
-          icon={Briefcase}
-          accent="sky"
-          title="Contractor Agreement"
-          description="Crew/contractor services, 1099-ready tax fields, work-for-hire"
-          action={<Badge variant="default">Contractor</Badge>}
-        >
-          <ContentPanel className="max-h-[420px] overflow-y-auto">
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">
-              {CONTRACTOR_AGREEMENT_TEMPLATE}
-            </pre>
-          </ContentPanel>
-        </PageSection>
-
-        <PageSection
-          icon={MapPin}
-          accent="sky"
-          title="Location & Prop"
-          description="Property use, prop rental, insurance, and owner release"
-          action={<Badge variant="success">Location</Badge>}
-        >
-          <ContentPanel className="max-h-[420px] overflow-y-auto">
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">
-              {LOCATION_AGREEMENT_TEMPLATE}
-            </pre>
-          </ContentPanel>
-        </PageSection>
-      </div>
+          {loading ? (
+            <LoadingSpinner className="py-12" />
+          ) : customTemplates.length === 0 ? (
+            <InfoCallout variant="blue">
+              <p>
+                No custom templates yet. Use <strong>Add template</strong> to create one, or wait
+                for the Gemini assistant to help draft clauses later.
+              </p>
+            </InfoCallout>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {customTemplates.map((template) => (
+                <Link
+                  key={template.id}
+                  href={`/templates/${template.id}`}
+                  className="group rounded-2xl border border-violet-200/60 bg-gradient-to-br from-violet-50/50 to-white p-5 ring-1 ring-violet-100 transition-all hover:border-violet-300 hover:shadow-lg"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-400 to-purple-500 text-white shadow-md">
+                      <FileStack className="h-5 w-5" />
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-violet-500" />
+                  </div>
+                  <p className="mt-4 font-semibold text-slate-900">{template.name}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                    {template.description || "Custom agreement template"}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant="default">Custom</Badge>
+                    <Badge variant="info">{getAgreementTypeLabel(template.type)}</Badge>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       <PageSection
-        className="mt-6"
+        className="mt-8"
         icon={Sparkles}
         accent="violet"
         title="How templates work"
@@ -136,19 +126,11 @@ export default function TemplatesPage() {
       >
         <InfoCallout variant="sky">
           <p>
-            Templates are applied automatically when you create a new agreement. Use the wizard to
-            customize clauses, payout splits, gear packages, deliverables, and policies for each project.
+            When you create a new agreement, the wizard loads the default clauses for that agreement
+            type. Customize payout splits, gear, deliverables, and policies per project. Custom
+            templates will be selectable in the wizard in a future update.
           </p>
         </InfoCallout>
-        <div className="flex items-center gap-3 text-sm text-slate-600">
-          <FileStack className="h-5 w-5 text-violet-500 shrink-0" />
-          <span>
-            Need to change default wording long-term? Edit{" "}
-            <code className="rounded-md bg-white px-1.5 py-0.5 text-xs ring-1 ring-slate-200">
-              src/lib/constants/clauses.ts
-            </code>
-          </span>
-        </div>
       </PageSection>
     </div>
   );

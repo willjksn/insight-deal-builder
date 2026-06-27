@@ -4,6 +4,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Agreement } from "@/lib/types";
 import { agreementSupportsW9Upload, getPayeeTaxFromAgreement } from "@/lib/w9/payeeTax";
 import { W9UploadField } from "@/components/w9/W9UploadField";
+import { canUploadW9Docs, canViewW9Docs } from "@/lib/utils/permissions";
+import { useAuth } from "@/contexts/AuthContext";
 import { FileText } from "lucide-react";
 
 interface PayeeW9SectionProps {
@@ -13,7 +15,9 @@ interface PayeeW9SectionProps {
 }
 
 export function PayeeW9Section({ agreement, agreementId, onUpdated }: PayeeW9SectionProps) {
+  const { appUser } = useAuth();
   if (!agreementSupportsW9Upload(agreement.agreementType)) return null;
+  if (!canUploadW9Docs(appUser) && !canViewW9Docs(appUser)) return null;
 
   const tax = getPayeeTaxFromAgreement(agreement);
 

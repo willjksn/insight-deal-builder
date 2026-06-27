@@ -114,6 +114,26 @@ export function canViewIdentityDocs(user: AppUser | null | undefined): boolean {
   return isInsightOrgUser(user) && (hasPermission(user, "viewIdentityDocs") || canManageUsers(user));
 }
 
+export function canViewW9Docs(user: AppUser | null | undefined): boolean {
+  return isInsightOrgUser(user) && (hasPermission(user, "viewW9Docs") || canManageUsers(user));
+}
+
+export function canUploadW9Docs(user: AppUser | null | undefined): boolean {
+  return (
+    isInsightOrgUser(user) &&
+    (hasPermission(user, "editQuotes") || hasPermission(user, "signQuotes"))
+  );
+}
+
+export function canExportPayments(user: AppUser | null | undefined): boolean {
+  return isInsightOrgUser(user) && (hasPermission(user, "exportPayments") || canManageUsers(user));
+}
+
+/** Record cash received from clients or paid to payees on signed agreements */
+export function canRecordPayments(user: AppUser | null | undefined): boolean {
+  return canExportPayments(user);
+}
+
 export function canCaptureIdentityDocs(user: AppUser | null | undefined): boolean {
   return (
     isInsightOrgUser(user) &&

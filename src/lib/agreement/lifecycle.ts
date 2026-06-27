@@ -28,6 +28,7 @@ export function duplicateAgreement(source: Agreement): AgreementPayload {
     signatures: [],
     initials: [],
     identityVerifications: [],
+    paymentTracking: undefined,
     pdfUrl: undefined,
     servicePackageId: base.servicePackageId,
   });

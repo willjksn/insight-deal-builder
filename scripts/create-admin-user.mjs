@@ -29,6 +29,9 @@ const FULL_PERMISSIONS = {
   deleteTemplates: true,
   manageUsers: true,
   loadDemoData: true,
+  viewIdentityDocs: true,
+  viewW9Docs: true,
+  exportPayments: true,
 };
 
 function boolField(value) {
@@ -90,6 +93,7 @@ const body = {
     role: { stringValue: "admin" },
     company: { stringValue: "Insight Media Group LLC" },
     permissions: permissionsMap(FULL_PERMISSIONS),
+    approved: { booleanValue: true },
     createdAt: { timestampValue: new Date().toISOString() },
     updatedAt: { timestampValue: new Date().toISOString() },
   },
@@ -101,6 +105,7 @@ const mask = [
   "role",
   "company",
   "permissions",
+  "approved",
   "createdAt",
   "updatedAt",
 ]

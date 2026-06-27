@@ -94,9 +94,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: "member",
       company: "",
       permissions: { ...EMPTY_PERMISSIONS },
+      approved: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    try {
+      const token = await credential.user.getIdToken();
+      await fetch("/api/users/signup-notify", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (notifyErr) {
+      console.error("Failed to notify admins of signup:", notifyErr);
+    }
   };
 
   const signOut = async () => {

@@ -23,6 +23,10 @@ export interface UserPermissions {
   loadDemoData: boolean;
   /** View government ID photos captured for renters/talent (Insight staff only) */
   viewIdentityDocs: boolean;
+  /** Open W-9 PDFs stored for payee agreements (accounting / admin) */
+  viewW9Docs: boolean;
+  /** Download payee payment CSV for accounting and 1099 prep */
+  exportPayments: boolean;
 }
 
 export interface UserProfile {
@@ -39,6 +43,8 @@ export interface UserProfile {
   notifyEmail?: boolean;
   /** Browser push alerts (default true) */
   notifyPush?: boolean;
+  /** False until an admin assigns company and permissions */
+  approved?: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -488,6 +494,24 @@ export interface PaymentTerms {
   paymentNotes?: string;
 }
 
+export type PaymentInstallmentId = "deposit" | "balance" | "full";
+
+export interface PaymentInstallmentRecord {
+  id: string;
+  label: string;
+  amountDue: number;
+  paidAmount: number;
+  paidAt?: string;
+  recordedBy?: string;
+  notes?: string;
+}
+
+/** Cash received (client), paid out (payee), or partner splits on internal deals */
+export interface AgreementPaymentTracking {
+  installments: PaymentInstallmentRecord[];
+  partnerInstallments?: PaymentInstallmentRecord[];
+}
+
 export interface RevisionPolicy {
   includedRevisionRounds: number;
   revisionRequestWindowDays: number;
@@ -595,6 +619,8 @@ export interface Agreement {
   roles: AgreementRole[];
   deliverables: Deliverable[];
   paymentTerms: PaymentTerms;
+  /** Recorded cash in/out against payment terms (accounting) */
+  paymentTracking?: AgreementPaymentTracking;
   revisionPolicy: RevisionPolicy;
   usageRights: UsageRights;
   rawFootagePolicy: RawFootagePolicy;
@@ -612,15 +638,18 @@ export interface Agreement {
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
-export type NotificationType = "agreement_signed";
+export type NotificationType = "agreement_signed" | "user_signup_pending";
 
 export interface AppNotification {
   id: string;
   type: NotificationType;
-  agreementId: string;
-  agreementTitle: string;
+  agreementId?: string;
+  agreementTitle?: string;
   projectName?: string;
-  signerName: string;
+  signerName?: string;
+  pendingUserId?: string;
+  pendingUserEmail?: string;
+  pendingUserName?: string;
   /** Specific user to notify (e.g. agreement creator) */
   userId?: string;
   /** All users in this company see the notification (e.g. Insight Media Group LLC) */
@@ -648,6 +677,8 @@ export interface Template {
   name: string;
   type: AgreementType;
   description: string;
+  /** Full clause text for custom templates */
+  body?: string;
   isDefault: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;

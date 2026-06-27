@@ -7,9 +7,11 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
 import { NotificationBell } from "./NotificationBell";
+import { PendingApprovalScreen } from "./PendingApprovalScreen";
+import { isUserPendingApproval } from "@/lib/users/approval";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, isConfigured } = useAuth();
+  const { user, appUser, loading, isConfigured } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -32,6 +34,21 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         <LoadingSpinner />
       </div>
     );
+  }
+
+  if (isConfigured && user && !appUser) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <p className="max-w-sm text-center text-sm text-slate-600">
+          Your account profile could not be loaded. Try signing out and back in, or contact an
+          administrator.
+        </p>
+      </div>
+    );
+  }
+
+  if (isUserPendingApproval(appUser)) {
+    return <PendingApprovalScreen />;
   }
 
   return (

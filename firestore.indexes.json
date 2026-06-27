@@ -23,6 +23,14 @@
         { "fieldPath": "agreementId", "order": "ASCENDING" },
         { "fieldPath": "type", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "pendingUserId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

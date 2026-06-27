@@ -16,11 +16,19 @@ async function loadAppUser(uid: string): Promise<AppUser> {
   return { id: userSnap.id, ...userSnap.data() } as AppUser;
 }
 
-function assertCanManageW9(appUser: AppUser): void {
+function assertCanViewW9(appUser: AppUser): void {
+  resolvePermissions(appUser);
+  if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
+  if (!hasPermission(appUser, "viewW9Docs") && !hasPermission(appUser, "manageUsers")) {
+    throw new Error("Not authorized to view W-9 documents");
+  }
+}
+
+function assertCanUploadW9(appUser: AppUser): void {
   resolvePermissions(appUser);
   if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
   if (!hasPermission(appUser, "editQuotes") && !hasPermission(appUser, "signQuotes")) {
-    throw new Error("Not authorized to manage W-9 documents");
+    throw new Error("Not authorized to upload W-9 documents");
   }
 }
 
@@ -35,7 +43,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   try {
     const uid = await verifyAuthToken(_request.headers.get("authorization"));
     const appUser = await loadAppUser(uid);
-    assertCanManageW9(appUser);
+    assertCanViewW9(appUser);
 
     const { id: agreementId } = await context.params;
     const agreement = await loadAgreement(agreementId);
@@ -61,7 +69,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const uid = await verifyAuthToken(request.headers.get("authorization"));
     const appUser = await loadAppUser(uid);
-    assertCanManageW9(appUser);
+    assertCanUploadW9(appUser);
 
     const { id: agreementId } = await context.params;
     const body = await request.json();

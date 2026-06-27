@@ -233,6 +233,37 @@ export function createDefaultPayout(totalFee: number): PayoutDetails {
   };
 }
 
+export function roundMoney(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+/** Keep deposit + balance aligned with total fee when one side is edited. */
+export function syncPaymentSplitFromDeposit(
+  terms: PaymentTerms,
+  depositAmount: number | undefined
+): PaymentTerms {
+  const total = terms.totalFee ?? 0;
+  const deposit = depositAmount ?? 0;
+  return {
+    ...terms,
+    depositAmount,
+    balanceAmount: roundMoney(Math.max(0, total - deposit)),
+  };
+}
+
+export function syncPaymentSplitFromBalance(
+  terms: PaymentTerms,
+  balanceAmount: number | undefined
+): PaymentTerms {
+  const total = terms.totalFee ?? 0;
+  const balance = balanceAmount ?? 0;
+  return {
+    ...terms,
+    balanceAmount,
+    depositAmount: roundMoney(Math.max(0, total - balance)),
+  };
+}
+
 export function suggestPaymentTerms(totalFee: number): PaymentTerms {
   let structure: PaymentStructure;
   let deposit: number;

@@ -9,7 +9,7 @@ import { InfoCallout } from "@/components/ui/PageSection";
 import { useAgreements } from "@/hooks/useAgreements";
 import { buildPayeeExportRows, downloadPayeeExportCsv } from "@/lib/export/payeeExport";
 import { useAuth } from "@/contexts/AuthContext";
-import { canEditQuotes, isInsightOrgUser } from "@/lib/utils/permissions";
+import { canExportPayments, isInsightOrgUser } from "@/lib/utils/permissions";
 import { Download } from "lucide-react";
 
 export default function PaymentExportPage() {
@@ -18,7 +18,7 @@ export default function PaymentExportPage() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(String(currentYear));
 
-  const allowed = isInsightOrgUser(appUser) && canEditQuotes(appUser);
+  const allowed = isInsightOrgUser(appUser) && canExportPayments(appUser);
 
   const rows = useMemo(
     () => buildPayeeExportRows(data, Number(year)),
@@ -29,7 +29,7 @@ export default function PaymentExportPage() {
     return (
       <div className="py-20 text-center">
         <h2 className="text-xl font-semibold">Payment export</h2>
-        <p className="mt-2 text-slate-500">Insight staff with edit access can export payee reports.</p>
+        <p className="mt-2 text-slate-500">Insight staff with payment export permission can download payee reports.</p>
       </div>
     );
   }
@@ -41,7 +41,8 @@ export default function PaymentExportPage() {
     return { value: String(y), label: String(y) };
   });
 
-  const totalPaid = rows.reduce((sum, r) => sum + r.totalFee, 0);
+  const totalPaid = rows.reduce((sum, r) => sum + r.paidAmount, 0);
+  const totalOutstanding = rows.reduce((sum, r) => sum + r.outstanding, 0);
 
   return (
     <div>
@@ -67,9 +68,11 @@ export default function PaymentExportPage() {
         <Select label="Tax year" value={year} onChange={(e) => setYear(e.target.value)} options={yearOptions} touch />
       </div>
 
-      <div className="mb-4 flex gap-6 text-sm">
+      <div className="mb-4 flex flex-wrap gap-6 text-sm">
         <p><span className="text-slate-500">Agreements:</span> <strong>{rows.length}</strong></p>
-        <p><span className="text-slate-500">Total fees:</span> <strong>${totalPaid.toLocaleString()}</strong></p>
+        <p><span className="text-slate-500">Total fees:</span> <strong>${rows.reduce((s, r) => s + r.totalFee, 0).toLocaleString()}</strong></p>
+        <p><span className="text-slate-500">Recorded paid:</span> <strong>${totalPaid.toLocaleString()}</strong></p>
+        <p><span className="text-slate-500">Outstanding:</span> <strong>${totalOutstanding.toLocaleString()}</strong></p>
       </div>
 
       {rows.length === 0 ? (
@@ -83,6 +86,9 @@ export default function PaymentExportPage() {
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Project</th>
                 <th className="px-4 py-3">Fee</th>
+                <th className="px-4 py-3">Paid</th>
+                <th className="px-4 py-3">Outstanding</th>
+                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">W-9</th>
                 <th className="px-4 py-3">Signed</th>
               </tr>
@@ -94,6 +100,9 @@ export default function PaymentExportPage() {
                   <td className="px-4 py-3">{row.agreementType}</td>
                   <td className="px-4 py-3">{row.projectName}</td>
                   <td className="px-4 py-3">${row.totalFee.toLocaleString()}</td>
+                  <td className="px-4 py-3">${row.paidAmount.toLocaleString()}</td>
+                  <td className="px-4 py-3">${row.outstanding.toLocaleString()}</td>
+                  <td className="px-4 py-3">{row.paymentStatus}</td>
                   <td className="px-4 py-3">{row.w9OnFile}</td>
                   <td className="px-4 py-3">{row.signedDate || "—"}</td>
                 </tr>

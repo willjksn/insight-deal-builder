@@ -3,7 +3,21 @@ import { Agreement, AgreementParty } from "@/lib/types";
 import { INSIGHT_MEDIA_GROUP_LLC } from "@/lib/utils/permissions";
 import { NotificationRecipient } from "@/lib/notifications/recipients";
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+/** Strip accidental "Bearer ", whitespace, and line breaks from pasted env values. */
+function normalizeResendApiKey(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const key = raw.replace(/^Bearer\s+/i, "").replace(/\s+/g, "").trim();
+  return key.length > 0 ? key : null;
+}
+
+let resendClient: Resend | null | undefined;
+
+function getResendClient(): Resend | null {
+  if (resendClient !== undefined) return resendClient;
+  const key = normalizeResendApiKey(process.env.RESEND_API_KEY);
+  resendClient = key ? new Resend(key) : null;
+  return resendClient;
+}
 
 const FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL || "Insight Deal Builder <notifications@insightmediagroup.com>";
@@ -36,6 +50,7 @@ export async function sendAgreementSignedEmails(
   recipients: NotificationRecipient[],
   emailContent: { subject: string; html: string; text: string }
 ): Promise<{ sent: number; skipped: number }> {
+  const resend = getResendClient();
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping agreement signed emails");
     return { sent: 0, skipped: recipients.length };
@@ -76,6 +91,7 @@ export async function sendClientAgreementEmail(params: {
   pdfFilename: string;
   pdfBase64: string;
 }): Promise<void> {
+  const resend = getResendClient();
   if (!resend) {
     throw new Error("RESEND_API_KEY is not configured — add it to .env.local to send emails");
   }
@@ -129,6 +145,52 @@ export async function sendAgreementSignedPush(
     webpush: {
       fcmOptions: {
         link: `${payload.appUrl}/agreements/${payload.agreementId}`,
+      },
+    },
+  });
+
+  return {
+    sent: response.successCount,
+    failed: response.failureCount,
+  };
+}
+
+export async function sendSignupPendingEmails(
+  recipients: NotificationRecipient[],
+  emailContent: { subject: string; html: string; text: string }
+): Promise<{ sent: number; skipped: number }> {
+  return sendAgreementSignedEmails(recipients, emailContent);
+}
+
+export async function sendSignupPendingPush(
+  messaging: import("firebase-admin/messaging").Messaging,
+  recipients: NotificationRecipient[],
+  payload: { title: string; body: string; appUrl: string }
+): Promise<{ sent: number; failed: number }> {
+  const tokens = [
+    ...new Set(
+      recipients
+        .filter((r) => r.notifyPush)
+        .flatMap((r) => r.fcmTokens ?? [])
+        .filter(Boolean)
+    ),
+  ];
+
+  if (!tokens.length) return { sent: 0, failed: 0 };
+
+  const response = await messaging.sendEachForMulticast({
+    tokens,
+    notification: {
+      title: payload.title,
+      body: payload.body,
+    },
+    data: {
+      type: "user_signup_pending",
+      url: "/admin",
+    },
+    webpush: {
+      fcmOptions: {
+        link: `${payload.appUrl}/admin`,
       },
     },
   });
