@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f0f7ff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --accent: #0ea5e9;
+  --accent-hover: #0284c7;
+  --accent-soft: #e0f2fe;
+  --sidebar: #0f172a;
+  --muted: #64748b;
+  --ring: rgba(14, 165, 233, 0.25);
 }
 
 @theme inline {
@@ -12,15 +20,56 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.app-canvas {
+  min-height: 100vh;
+  background-color: #eef4fb;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 100% -10%, rgba(125, 211, 252, 0.35), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(147, 197, 253, 0.2), transparent 45%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4fb 50%, #e8f0fa 100%);
+}
+
+.login-canvas {
+  min-height: 100vh;
+  background-color: #0f172a;
+  background-image:
+    radial-gradient(ellipse 70% 60% at 20% 10%, rgba(56, 189, 248, 0.18), transparent 55%),
+    radial-gradient(ellipse 50% 50% at 90% 90%, rgba(96, 165, 250, 0.15), transparent 50%),
+    linear-gradient(160deg, #0f172a 0%, #1e293b 45%, #0f172a 100%);
+}
+
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+input,
+select,
+textarea,
+button {
+  touch-action: manipulation;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

@@ -1,0 +1,18 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Identity verification images — server-only via Admin SDK signed URLs
+    match /identity-verification/{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    match /w9-documents/{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

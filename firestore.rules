@@ -1,0 +1,184 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isLegacyInsightAdmin() {
+      return isSignedIn()
+        && userDoc().role == 'admin'
+        && userDoc().company == 'Insight Media Group LLC';
+    }
+
+    function isInsightOrg() {
+      return isSignedIn()
+        && userDoc().company == 'Insight Media Group LLC';
+    }
+
+    function hasPerm(field) {
+      return isLegacyInsightAdmin()
+        || (userDoc().permissions != null && userDoc().permissions[field] == true);
+    }
+
+    function canManageUsers() {
+      return hasPerm('manageUsers');
+    }
+
+    function canSeeAllAgreements() {
+      return canManageUsers() || isLegacyInsightAdmin();
+    }
+
+    function isPartyOnAgreement(data) {
+      return isSignedIn()
+        && data.accessKeys != null
+        && (
+          (
+            request.auth.token.email != null
+            && ('email:' + request.auth.token.email) in data.accessKeys
+          )
+          || (
+            request.auth.token.email != null
+            && ('email:' + request.auth.token.email.lower()) in data.accessKeys
+          )
+          || (
+            userDoc().company != null
+            && userDoc().company != ''
+            && ('company:' + userDoc().company) in data.accessKeys
+          )
+        );
+    }
+
+    // Sign-only users may update signature fields without full editQuotes
+    function canSignAgreement(data) {
+      return hasPerm('signQuotes')
+        && isPartyOnAgreement(data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['signatures', 'initials', 'status', 'updatedAt']);
+    }
+
+    function canReadInsightSetup() {
+      return isInsightOrg()
+        && (
+          hasPerm('manageClients')
+          || hasPerm('manageCompanies')
+          || hasPerm('manageCrew')
+          || hasPerm('manageProjects')
+          || hasPerm('createQuotes')
+          || hasPerm('editQuotes')
+          || hasPerm('loadDemoData')
+        );
+    }
+
+    function canEditAgreement(data) {
+      return hasPerm('editQuotes')
+        && (canSeeAllAgreements() || isPartyOnAgreement(data));
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || canManageUsers());
+      allow create: if request.auth.uid == userId
+        && request.resource.data.role == 'member'
+        && request.resource.data.company == '';
+      allow update: if canManageUsers()
+        || (
+          request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['fcmTokens', 'notifyEmail', 'notifyPush', 'updatedAt'])
+        );
+      allow delete: if canManageUsers();
+    }
+
+    match /companies/{docId} {
+      allow read: if canReadInsightSetup();
+      allow create, update: if isInsightOrg() && hasPerm('manageCompanies');
+      allow delete: if isInsightOrg() && hasPerm('manageCompanies');
+    }
+
+    match /clients/{docId} {
+      allow read: if canReadInsightSetup();
+      allow create, update: if isInsightOrg() && hasPerm('manageClients');
+      allow delete: if isInsightOrg() && hasPerm('manageClients');
+    }
+
+    match /crewMembers/{docId} {
+      allow read: if canReadInsightSetup();
+      allow create, update: if isInsightOrg() && hasPerm('manageCrew');
+      allow delete: if isInsightOrg() && hasPerm('manageCrew');
+    }
+
+    match /projects/{docId} {
+      allow read: if canReadInsightSetup();
+      allow create, update: if isInsightOrg() && hasPerm('manageProjects');
+      allow delete: if isInsightOrg() && hasPerm('manageProjects');
+    }
+
+    match /servicePackages/{docId} {
+      allow read: if hasPerm('createQuotes') || hasPerm('editQuotes') || canReadInsightSetup();
+      allow create, update, delete: if isInsightOrg() && hasPerm('manageProjects');
+    }
+
+    match /equipmentCatalog/{docId} {
+      allow read: if hasPerm('createQuotes') || hasPerm('editQuotes') || canReadInsightSetup();
+      allow create, update, delete: if isInsightOrg() && hasPerm('manageProjects');
+    }
+
+    match /locationCatalog/{docId} {
+      allow read: if hasPerm('createQuotes') || hasPerm('editQuotes') || canReadInsightSetup();
+      allow create, update, delete: if isInsightOrg() && hasPerm('manageProjects');
+    }
+
+    match /agreements/{docId} {
+      allow read: if canSeeAllAgreements() || isPartyOnAgreement(resource.data);
+      allow create: if hasPerm('createQuotes');
+      allow update: if canEditAgreement(resource.data) || canSignAgreement(resource.data);
+      allow delete: if hasPerm('deleteQuotes')
+        && (canSeeAllAgreements() || isPartyOnAgreement(resource.data));
+    }
+
+    match /templates/{docId} {
+      allow read: if isInsightOrg()
+        && (hasPerm('manageTemplates') || hasPerm('createQuotes') || hasPerm('editQuotes'));
+      allow create, update: if isInsightOrg() && hasPerm('manageTemplates');
+      allow delete: if isInsightOrg() && hasPerm('deleteTemplates');
+    }
+
+    function canReadNotification(data) {
+      return isSignedIn() && (
+        (data.userId != null && data.userId == request.auth.uid)
+        || (
+          data.companyRecipient != null
+          && userDoc().company == data.companyRecipient
+        )
+      );
+    }
+
+    match /notifications/{docId} {
+      allow read: if canReadNotification(resource.data);
+      allow create: if isSignedIn()
+        && request.resource.data.type == 'agreement_signed'
+        && request.resource.data.read == false
+        && request.resource.data.agreementId is string
+        && request.resource.data.signerName is string
+        && (
+          request.resource.data.userId is string
+          || request.resource.data.companyRecipient is string
+        )
+        && (hasPerm('signQuotes') || hasPerm('editQuotes') || hasPerm('createQuotes'));
+      allow update: if canReadNotification(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Client signing links — server-only (Firebase Admin SDK)
+    match /signingLinks/{docId} {
+      allow read, write: if false;
+    }
+  }
+}
