@@ -8,6 +8,8 @@ import { AppUser, Agreement } from "@/lib/types";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+export const runtime = "nodejs";
+
 async function loadAppUser(uid: string): Promise<AppUser> {
   const db = getAdminDb();
   if (!db) throw new Error("Firebase Admin is not configured");

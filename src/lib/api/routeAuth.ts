@@ -1,0 +1,41 @@
+import { NextRequest } from "next/server";
+import { getAdminDb } from "@/lib/firebase/admin";
+import { verifyAuthToken } from "@/lib/notifications/server";
+import { hasPermission, isInsightOrgUser, resolvePermissions } from "@/lib/utils/permissions";
+import { AppUser } from "@/lib/types";
+
+export async function loadAppUser(uid: string): Promise<AppUser> {
+  const db = getAdminDb();
+  if (!db) throw new Error("Firebase Admin is not configured");
+  const userSnap = await db.collection("users").doc(uid).get();
+  if (!userSnap.exists) throw new Error("User not found");
+  return { id: userSnap.id, ...userSnap.data() } as AppUser;
+}
+
+export async function requireAuthUser(request: NextRequest): Promise<{ uid: string; appUser: AppUser }> {
+  const uid = await verifyAuthToken(request.headers.get("authorization"));
+  const appUser = await loadAppUser(uid);
+  return { uid, appUser };
+}
+
+export function assertCanViewIdentity(appUser: AppUser): void {
+  resolvePermissions(appUser);
+  if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
+  if (!hasPermission(appUser, "viewIdentityDocs") && !hasPermission(appUser, "manageUsers")) {
+    throw new Error("Not authorized to view ID verification");
+  }
+}
+
+export function apiErrorStatus(message: string): number {
+  if (
+    message.includes("token") ||
+    message.includes("authorization") ||
+    message.includes("Not authorized") ||
+    message.includes("User not found")
+  ) {
+    return 401;
+  }
+  if (message.includes("not configured")) return 503;
+  if (message.includes("not found") || message.includes("No ID verification")) return 404;
+  return 500;
+}

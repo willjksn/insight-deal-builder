@@ -7,6 +7,8 @@ import {
 } from "@/lib/notifications/server";
 import { Agreement } from "@/lib/types";
 
+export const runtime = "nodejs";
+
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyAuthToken(request.headers.get("authorization"));

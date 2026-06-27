@@ -5,6 +5,8 @@ import { createSigningLink, getSigningLinkUrl } from "@/lib/signing/server";
 import { hasPermission, resolvePermissions } from "@/lib/utils/permissions";
 import { AppUser } from "@/lib/types";
 
+export const runtime = "nodejs";
+
 async function assertCanManageLinks(uid: string): Promise<void> {
   const db = getAdminDb();
   if (!db) throw new Error("Server not configured");

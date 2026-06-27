@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase/admin";
-import { verifyAuthToken } from "@/lib/notifications/server";
-import {
-  applyStaffIdentityCapture,
-  getPartyIdentityImageUrls,
-} from "@/lib/signing/server";
+import { apiErrorStatus, requireAuthUser } from "@/lib/api/routeAuth";
+import { applyStaffIdentityCapture } from "@/lib/signing/server";
 import { hasPermission, isInsightOrgUser, resolvePermissions } from "@/lib/utils/permissions";
 import { AppUser } from "@/lib/types";
 
-type RouteContext = { params: Promise<{ id: string }> };
+export const runtime = "nodejs";
 
-async function loadAppUser(uid: string): Promise<AppUser> {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin is not configured");
-  const userSnap = await db.collection("users").doc(uid).get();
-  if (!userSnap.exists) throw new Error("User not found");
-  return { id: userSnap.id, ...userSnap.data() } as AppUser;
-}
+type RouteContext = { params: Promise<{ id: string }> };
 
 function assertCanCaptureIdentity(appUser: AppUser): void {
   resolvePermissions(appUser);
@@ -32,8 +22,7 @@ function assertCanCaptureIdentity(appUser: AppUser): void {
 
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
-    const uid = await verifyAuthToken(request.headers.get("authorization"));
-    const appUser = await loadAppUser(uid);
+    const { uid, appUser } = await requireAuthUser(request);
     assertCanCaptureIdentity(appUser);
 
     const { id: agreementId } = await context.params;
@@ -60,10 +49,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
   } catch (err) {
     console.error("identity POST error:", err);
     const message = err instanceof Error ? err.message : "Failed to save ID verification";
-    const status =
-      message.includes("token") || message.includes("authorization") || message.includes("Not authorized")
-        ? 401
-        : 400;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
   }
 }

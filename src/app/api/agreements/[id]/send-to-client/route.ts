@@ -14,6 +14,8 @@ import { formatDate } from "@/lib/utils/format";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+export const runtime = "nodejs";
+
 async function assertCanSendToClient(uid: string): Promise<void> {
   const db = getAdminDb();
   if (!db) throw new Error("Firebase Admin is not configured");

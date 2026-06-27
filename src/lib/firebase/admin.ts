@@ -27,8 +27,10 @@ function loadServiceAccount(): Record<string, string> | null {
 }
 
 let adminApp: App | undefined;
+let adminInitFailed = false;
 
 export function getAdminApp(): App | null {
+  if (adminInitFailed) return null;
   if (adminApp) return adminApp;
   const existing = getApps();
   if (existing.length) {
@@ -39,14 +41,20 @@ export function getAdminApp(): App | null {
   const serviceAccount = loadServiceAccount();
   if (!serviceAccount) return null;
 
-  adminApp = initializeApp({
-    credential: cert(serviceAccount as Parameters<typeof cert>[0]),
-    storageBucket:
-      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-      process.env.FIREBASE_STORAGE_BUCKET ||
-      `${serviceAccount.project_id}.appspot.com`,
-  });
-  return adminApp;
+  try {
+    adminApp = initializeApp({
+      credential: cert(serviceAccount as Parameters<typeof cert>[0]),
+      storageBucket:
+        process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+        process.env.FIREBASE_STORAGE_BUCKET ||
+        `${serviceAccount.project_id}.appspot.com`,
+    });
+    return adminApp;
+  } catch (err) {
+    adminInitFailed = true;
+    console.error("Firebase Admin initialization failed:", err);
+    return null;
+  }
 }
 
 export function getAdminAuth(): Auth | null {

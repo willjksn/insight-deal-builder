@@ -10,6 +10,8 @@ import {
 
 type RouteContext = { params: Promise<{ token: string }> };
 
+export const runtime = "nodejs";
+
 export async function GET(_request: NextRequest, context: RouteContext) {
   try {
     const { token } = await context.params;

@@ -4,6 +4,8 @@ import { verifyAuthToken } from "@/lib/notifications/server";
 import { notifyAdminsOfSignup } from "@/lib/notifications/signupNotify";
 import { AppUser } from "@/lib/types";
 
+export const runtime = "nodejs";
+
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyAuthToken(request.headers.get("authorization"));
