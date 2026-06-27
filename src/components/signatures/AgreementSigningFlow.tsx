@@ -22,8 +22,6 @@ import {
   partyRequiresIdVerification,
 } from "@/lib/identity/verification";
 import { IdPhotoCapture, useIdPhotoCaptureState } from "@/components/identity/IdPhotoCapture";
-import { W9UploadField } from "@/components/w9/W9UploadField";
-import { agreementSupportsW9Upload, getPayeeTaxFromAgreement } from "@/lib/w9/payeeTax";
 import { ChevronRight, CheckCircle } from "lucide-react";
 
 type SignPhase = "identity" | "setup" | "document";
@@ -47,7 +45,6 @@ export interface AgreementSigningFlowProps {
     consentGiven: boolean
   ) => Promise<SigningPersistResult | void>;
   signingToken?: string;
-  onW9Uploaded?: () => void;
   subtitle?: string;
   footer?: ReactNode;
 }
@@ -61,14 +58,11 @@ export function AgreementSigningFlow({
   onPersistSignature,
   onPersistIdentity,
   signingToken,
-  onW9Uploaded,
   subtitle,
   footer,
 }: AgreementSigningFlowProps) {
   const partyId = party.id;
   const idRequired = partyRequiresIdVerification(agreement, party);
-  const w9Supported = agreementSupportsW9Upload(agreement.agreementType);
-  const payeeTax = getPayeeTaxFromAgreement(agreement);
   const identityComplete = isPartyIdentityComplete(agreement, partyId);
   const {
     frontImage,
@@ -328,15 +322,6 @@ export function AgreementSigningFlow({
                 )}
               </div>
             </div>
-            {w9Supported && signingToken && (
-              <W9UploadField
-                agreementId={agreement.id}
-                tax={payeeTax}
-                signingToken={signingToken}
-                disabled={locked || saving}
-                onUploaded={onW9Uploaded}
-              />
-            )}
             <Button size="touch" disabled={!canStartDocument} onClick={enterDocument}>
               Continue to document
               <ChevronRight className="ml-2 h-5 w-5" />

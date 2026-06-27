@@ -4,23 +4,16 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { PayeeTaxInfo } from "@/lib/types";
-import { W9UploadField } from "@/components/w9/W9UploadField";
 
 interface PayeeTaxFieldsProps {
   tax: PayeeTaxInfo;
   onChange: (tax: PayeeTaxInfo) => void;
-  agreementId?: string;
-  signingToken?: string;
-  onW9Uploaded?: () => void;
   legalNameLabel?: string;
 }
 
 export function PayeeTaxFields({
   tax,
   onChange,
-  agreementId,
-  signingToken,
-  onW9Uploaded,
   legalNameLabel = "Legal name (for 1099)",
 }: PayeeTaxFieldsProps) {
   return (
@@ -68,19 +61,6 @@ export function PayeeTaxFields({
           touch
         />
       </div>
-
-      {agreementId && (
-        <W9UploadField
-          agreementId={agreementId}
-          tax={tax}
-          signingToken={signingToken}
-          onUploaded={onW9Uploaded}
-        />
-      )}
-
-      {!agreementId && !signingToken && (
-        <p className="text-xs text-slate-500">Save the agreement as a draft to upload a W-9 PDF.</p>
-      )}
     </div>
   );
 }

@@ -274,19 +274,6 @@ function WizardContent() {
     router.push(`/agreements/${id}/sign`);
   };
 
-  const reloadDraftAfterW9 = async () => {
-    if (!draftId) return;
-    const doc = await getDocument<Agreement>("agreements", draftId);
-    if (!doc) return;
-    setAgreement({
-      ...agreementFromDocument(doc),
-      clauses: mergeClausesWithDefaults(
-        getClausesForType(doc.agreementType, doc.gearDetails?.insightGearUsed ?? false),
-        doc.clauses
-      ),
-    });
-  };
-
   const addParty = () => {
     const party: AgreementParty = {
       id: crypto.randomUUID(),
@@ -765,13 +752,13 @@ function WizardContent() {
           return <EquipmentRentalStep agreement={agreement} onChange={updateAgreement} />;
         }
         if (isTalent) {
-          return <PayeeEngagementStep mode="talent" agreement={agreement} crew={crew} onChange={updateAgreement} agreementId={draftId} onW9Uploaded={reloadDraftAfterW9} />;
+          return <PayeeEngagementStep mode="talent" agreement={agreement} crew={crew} onChange={updateAgreement} />;
         }
         if (isContractor) {
-          return <PayeeEngagementStep mode="contractor" agreement={agreement} crew={crew} onChange={updateAgreement} agreementId={draftId} onW9Uploaded={reloadDraftAfterW9} />;
+          return <PayeeEngagementStep mode="contractor" agreement={agreement} crew={crew} onChange={updateAgreement} />;
         }
         if (isLocation && agreement.locationAgreementDetails) {
-          return <LocationAgreementStep agreement={agreement} onChange={updateAgreement} agreementId={draftId} onW9Uploaded={reloadDraftAfterW9} />;
+          return <LocationAgreementStep agreement={agreement} onChange={updateAgreement} />;
         }
         return (
           <div className="space-y-4">

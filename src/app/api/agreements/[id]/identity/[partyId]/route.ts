@@ -35,7 +35,10 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "No ID verification on file for this party" }, { status: 404 });
     }
 
-    return NextResponse.json(images);
+    return NextResponse.json({
+      capturedAt: images.capturedAt,
+      capturedBy: images.capturedBy,
+    });
   } catch (err) {
     console.error("identity GET error:", err);
     const message = err instanceof Error ? err.message : "Failed to load ID verification";

@@ -41,10 +41,20 @@ export async function uploadIdentityImage(
 export async function getIdentityImageSignedUrl(storagePath: string, ttlMs = 60 * 60 * 1000): Promise<string> {
   const file = getBucket().file(storagePath);
   const [url] = await file.getSignedUrl({
+    version: "v4",
     action: "read",
     expires: Date.now() + ttlMs,
   });
   return url;
+}
+
+export async function downloadIdentityImage(storagePath: string): Promise<{ buffer: Buffer; contentType: string }> {
+  const file = getBucket().file(storagePath);
+  const [buffer] = await file.download();
+  const [metadata] = await file.getMetadata().catch(() => [{ contentType: "image/jpeg" }]);
+  const contentType =
+    (metadata as { contentType?: string }).contentType?.split(";")[0] || "image/jpeg";
+  return { buffer, contentType };
 }
 
 export function newIdentityRecordId(): string {

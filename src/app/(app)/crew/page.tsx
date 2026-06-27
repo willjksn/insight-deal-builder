@@ -6,6 +6,7 @@ import { DataTable, DataRow } from "@/components/ui/DataTable";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { NumberInput } from "@/components/ui/NumberInput";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -43,7 +44,7 @@ export default function CrewPage() {
               <Select label="Default Role" value={form.defaultRole || ""} onChange={(e) => setForm({ ...form, defaultRole: e.target.value })} options={[{ value: "", label: "Select..." }, ...CREW_ROLES.map((r) => ({ value: r, label: r }))]} touch />
               <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} touch />
               <Input label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} touch />
-              <Input label="Default Rate" type="number" value={form.defaultRate ?? ""} onChange={(e) => setForm({ ...form, defaultRate: Number(e.target.value) })} touch />
+              <NumberInput label="Default Rate" value={form.defaultRate} onChange={(defaultRate) => setForm({ ...form, defaultRate })} touch />
               <Select label="Rate Type" value={form.rateType || "flat"} onChange={(e) => setForm({ ...form, rateType: e.target.value as CrewMember["rateType"] })} options={[{ value: "flat", label: "Flat" }, { value: "hourly", label: "Hourly" }, { value: "day", label: "Day" }, { value: "percentage", label: "Percentage" }]} touch />
               <label className="flex items-center gap-2"><input type="checkbox" checked={form.signatureRequired} onChange={(e) => setForm({ ...form, signatureRequired: e.target.checked })} className="h-5 w-5" /> Signature required</label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={form.initialsRequired} onChange={(e) => setForm({ ...form, initialsRequired: e.target.checked })} className="h-5 w-5" /> Initials required</label>

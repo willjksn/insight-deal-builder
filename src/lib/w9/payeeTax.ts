@@ -6,8 +6,8 @@ export const W9_PAYEE_AGREEMENT_TYPES: AgreementType[] = [
   "location_agreement",
 ];
 
-export function agreementSupportsW9Upload(agreementType: AgreementType): boolean {
-  return W9_PAYEE_AGREEMENT_TYPES.includes(agreementType);
+export function agreementSupportsW9Upload(_agreementType: AgreementType): boolean {
+  return false;
 }
 
 export function getPayeeTaxFromAgreement(agreement: Agreement): PayeeTaxInfo | undefined {

@@ -69,6 +69,13 @@ function PartyIdentityRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [complete, canView, party.id]);
 
+  useEffect(() => {
+    return () => {
+      if (viewUrls?.frontUrl) URL.revokeObjectURL(viewUrls.frontUrl);
+      if (viewUrls?.backUrl) URL.revokeObjectURL(viewUrls.backUrl);
+    };
+  }, [viewUrls]);
+
   const handleSave = async () => {
     if (!ready || !idConsent) return;
     setSaving(true);

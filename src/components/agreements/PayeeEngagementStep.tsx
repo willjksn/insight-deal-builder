@@ -24,8 +24,6 @@ interface PayeeEngagementStepProps {
   agreement: AgreementPayload;
   crew: CrewMember[];
   onChange: (patch: Partial<AgreementPayload>) => void;
-  agreementId?: string | null;
-  onW9Uploaded?: () => void;
 }
 
 export function PayeeEngagementStep({
@@ -33,8 +31,6 @@ export function PayeeEngagementStep({
   agreement,
   crew,
   onChange,
-  agreementId,
-  onW9Uploaded,
 }: PayeeEngagementStepProps) {
   const isTalent = mode === "talent";
   const talent = agreement.talentAgreementDetails;
@@ -100,12 +96,10 @@ export function PayeeEngagementStep({
           <Textarea label="Appearance / services" value={talent.appearanceDescription || ""} onChange={(e) => updateTalent({ appearanceDescription: e.target.value })} touch />
           <Textarea label="Usage scope" value={talent.usageScope || ""} onChange={(e) => updateTalent({ usageScope: e.target.value })} touch />
           <Card><CardBody>
-            <h3 className="mb-4 font-semibold">Tax / W-9 info (for accountant export)</h3>
+            <h3 className="mb-4 font-semibold">Payee tax info (for accountant export)</h3>
             <PayeeTaxFields
               tax={talent.payeeTax || {}}
               onChange={(payeeTax) => updateTalent({ payeeTax })}
-              agreementId={agreementId || undefined}
-              onW9Uploaded={onW9Uploaded}
             />
           </CardBody></Card>
         </>
@@ -122,12 +116,10 @@ export function PayeeEngagementStep({
           </div>
           <Textarea label="Services description" value={contractor.servicesDescription || ""} onChange={(e) => updateContractor({ servicesDescription: e.target.value })} touch />
           <Card><CardBody>
-            <h3 className="mb-4 font-semibold">Tax / W-9 info (for accountant export)</h3>
+            <h3 className="mb-4 font-semibold">Payee tax info (for accountant export)</h3>
             <PayeeTaxFields
               tax={contractor.payeeTax || {}}
               onChange={(payeeTax) => updateContractor({ payeeTax })}
-              agreementId={agreementId || undefined}
-              onW9Uploaded={onW9Uploaded}
             />
           </CardBody></Card>
         </>

@@ -41,6 +41,10 @@ export function getAdminApp(): App | null {
 
   adminApp = initializeApp({
     credential: cert(serviceAccount as Parameters<typeof cert>[0]),
+    storageBucket:
+      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+      process.env.FIREBASE_STORAGE_BUCKET ||
+      `${serviceAccount.project_id}.appspot.com`,
   });
   return adminApp;
 }

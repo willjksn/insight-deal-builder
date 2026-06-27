@@ -118,9 +118,6 @@ export default function PublicSignPage() {
             return { identityVerifications: updated.identityVerifications };
           }}
           signingToken={token}
-          onW9Uploaded={() => {
-            void loadSession().then(setSession);
-          }}
         />
       </main>
     </div>

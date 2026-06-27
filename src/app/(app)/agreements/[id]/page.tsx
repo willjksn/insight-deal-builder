@@ -36,7 +36,6 @@ import { Agreement, AgreementStatus } from "@/lib/types";
 import { ArrowLeft, Download, PenLine, Pencil, Files, Send } from "lucide-react";
 import { SendToClientPanel } from "@/components/agreements/SendToClientPanel";
 import { PartyIdentitySection } from "@/components/identity/PartyIdentitySection";
-import { PayeeW9Section } from "@/components/w9/PayeeW9Section";
 import { PaymentTrackingSection } from "@/components/agreements/PaymentTrackingSection";
 import { PartnerPayoutTrackingSection } from "@/components/agreements/PartnerPayoutTrackingSection";
 import { InternalPayoutBreakdown } from "@/components/agreements/InternalPayoutBreakdown";
@@ -203,7 +202,6 @@ export default function AgreementDetailPage() {
       <PartyIdentitySection agreement={agreement} agreementId={id} onUpdated={refresh} />
       <PaymentTrackingSection agreement={agreement} agreementId={id} onUpdated={refresh} />
       <PartnerPayoutTrackingSection agreement={agreement} agreementId={id} onUpdated={refresh} />
-      <PayeeW9Section agreement={agreement} agreementId={id} onUpdated={refresh} />
 
       <Card className="mt-6"><CardBody>
         <h2 className="font-semibold text-lg mb-4">Agreement Preview</h2>

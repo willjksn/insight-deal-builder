@@ -10,7 +10,6 @@ import {
   isPartyIdentityComplete,
 } from "@/lib/identity/verification";
 import {
-  getIdentityImageSignedUrl,
   newIdentityRecordId,
   uploadIdentityImage,
 } from "@/lib/identity/storage";
@@ -275,23 +274,18 @@ export async function applyStaffIdentityCapture(
 export async function getPartyIdentityImageUrls(
   agreementId: string,
   partyId: string
-): Promise<{ frontUrl: string; backUrl: string; capturedAt: string; capturedBy: string } | null> {
-  const db = getAdminDb()!;
+): Promise<{ capturedAt: string; capturedBy: string } | null> {
+  const db = getAdminDb();
+  if (!db) throw new Error("Firebase Admin is not configured");
+
   const agreementSnap = await db.collection("agreements").doc(agreementId).get();
   if (!agreementSnap.exists) return null;
 
   const agreement = { id: agreementSnap.id, ...agreementSnap.data() } as Agreement;
   const record = (agreement.identityVerifications ?? []).find((v) => v.partyId === partyId);
-  if (!record?.idFrontStoragePath || !record.idBackStoragePath) return null;
-
-  const [frontUrl, backUrl] = await Promise.all([
-    getIdentityImageSignedUrl(record.idFrontStoragePath),
-    getIdentityImageSignedUrl(record.idBackStoragePath),
-  ]);
+  if (!record?.idFrontStoragePath || !record?.idBackStoragePath) return null;
 
   return {
-    frontUrl,
-    backUrl,
     capturedAt: record.capturedAt,
     capturedBy: record.capturedBy,
   };

@@ -24,11 +24,9 @@ import { Plus, Trash2 } from "lucide-react";
 interface LocationAgreementStepProps {
   agreement: AgreementPayload;
   onChange: (patch: Partial<AgreementPayload>) => void;
-  agreementId?: string | null;
-  onW9Uploaded?: () => void;
 }
 
-export function LocationAgreementStep({ agreement, onChange, agreementId, onW9Uploaded }: LocationAgreementStepProps) {
+export function LocationAgreementStep({ agreement, onChange }: LocationAgreementStepProps) {
   const { data: catalog, loading: catalogLoading } = useLocationCatalog();
   const location = agreement.locationAgreementDetails!;
   const total = calculateLocationAgreementTotal(location);
@@ -182,8 +180,6 @@ export function LocationAgreementStep({ agreement, onChange, agreementId, onW9Up
           <PayeeTaxFields
             tax={location.payeeTax || {}}
             onChange={(payeeTax) => updateLocation({ payeeTax })}
-            agreementId={agreementId || undefined}
-            onW9Uploaded={onW9Uploaded}
             legalNameLabel="Owner legal name (for 1099)"
           />
         </CardBody>
