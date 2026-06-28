@@ -54,7 +54,7 @@ export function BoardCard({
             onClick={() => setOpen((v) => !v)}
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
-            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+            <h3 className="min-w-0 truncate text-sm font-semibold text-slate-900">{title}</h3>
             {!open && summary ? (
               <span className="min-w-0 truncate text-xs text-slate-500">{summary}</span>
             ) : null}

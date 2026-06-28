@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Camera, Search, UserPlus, X } from "lucide-react";
+import { Search, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { CrewMember } from "@/lib/types";
-import { ProductionPerson } from "@/lib/production/types";
+import { ProductionPerson, ProductionPersonGroup } from "@/lib/production/types";
+import { PersonAvatar } from "@/components/production/PersonAvatar";
 import Link from "next/link";
 
 function ModalShell({
@@ -141,7 +142,7 @@ export function CrewPickerModal({
 export function PersonDetailModal({
   person,
   crewMember,
-  iconMode,
+  group,
   onUpdate,
   onRemove,
   onPhoto,
@@ -149,53 +150,48 @@ export function PersonDetailModal({
 }: {
   person: ProductionPerson;
   crewMember?: CrewMember;
-  iconMode?: boolean;
+  group: ProductionPersonGroup;
   onUpdate: (patch: Partial<ProductionPerson>) => void;
   onRemove: () => void;
   onPhoto: (file: File) => Promise<void>;
   onClose: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const title = person.name?.trim() || "Crew member";
 
   return (
     <ModalShell title={title} onClose={onClose}>
       <div className="space-y-4">
         <div className="flex items-start gap-4">
-          <label
-            className={`relative block h-20 w-20 shrink-0 cursor-pointer overflow-hidden border border-slate-200 bg-slate-100 ${
-              iconMode ? "rounded-2xl" : "rounded-full"
-            }`}
-          >
-            {person.photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={person.photoUrl} alt="" className="h-full w-full object-cover" />
-            ) : iconMode ? (
-              <span className="flex h-full w-full items-center justify-center bg-violet-100 text-violet-700">
-                {person.name?.trim() ? (
-                  <span className="text-2xl font-bold">{person.name.charAt(0).toUpperCase()}</span>
-                ) : (
-                  <Camera className="h-7 w-7" />
-                )}
-              </span>
-            ) : (
-              <span className="flex h-full w-full items-center justify-center text-2xl font-semibold text-slate-400">
-                {person.name?.trim() ? person.name.charAt(0).toUpperCase() : "?"}
-              </span>
-            )}
-            <span className="absolute inset-x-0 bottom-0 bg-slate-900/55 py-0.5 text-center text-[10px] font-medium text-white">
+          <label className="relative block shrink-0 cursor-pointer">
+            <PersonAvatar person={person} group={group} size="lg" />
+            <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-slate-900/55 py-0.5 text-center text-[10px] font-medium text-white">
               {uploading ? "Uploading…" : "Add photo"}
             </span>
             <input
               type="file"
               accept="image/*"
-              className="sr-only"
+              className="absolute inset-0 cursor-pointer opacity-0"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 setUploading(true);
+                setUploadError(null);
                 try {
                   await onPhoto(file);
+                } catch (err) {
+                  const code =
+                    err && typeof err === "object" && "code" in err
+                      ? String((err as { code: string }).code)
+                      : "";
+                  setUploadError(
+                    code === "storage/unauthorized"
+                      ? "Photo upload was denied. Deploy the latest storage.rules to Firebase, then try again."
+                      : err instanceof Error
+                        ? err.message
+                        : "Photo upload failed"
+                  );
                 } finally {
                   setUploading(false);
                   e.target.value = "";
@@ -216,6 +212,12 @@ export function PersonDetailModal({
             />
           </div>
         </div>
+
+        {uploadError ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {uploadError}
+          </p>
+        ) : null}
 
         {crewMember && (
           <div className="rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-2.5 text-xs text-sky-950">

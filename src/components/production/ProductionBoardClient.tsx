@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Banknote,
@@ -20,9 +20,7 @@ import {
   Plus,
   Trash2,
   Upload,
-  UserPlus,
   Users,
-  UserRoundPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -35,6 +33,7 @@ import {
   PersonDetailModal,
 } from "@/components/production/ProductionPersonModals";
 import { ScoutSessionsCard } from "@/components/production/ScoutSessionsCard";
+import { PersonAvatar } from "@/components/production/PersonAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgreements } from "@/hooks/useAgreements";
 import { useCollection } from "@/hooks/useCollection";
@@ -262,7 +261,6 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
               group="camera_department"
               people={cameraDept}
               crewCatalog={crewCatalog}
-              iconMode
               onChange={(people) => patchPeople("camera_department", people)}
               onPhoto={(personId, file) =>
                 handlePersonPhoto(board, personId, file, project.id, persist)
@@ -391,18 +389,35 @@ function AboutCard({
   board: ProductionBoard;
   onPatch: (partial: Partial<ProductionBoard>) => void;
 }) {
+  const titleRef = useRef<HTMLTextAreaElement>(null);
   const inlineField =
     "w-full min-w-0 border-0 bg-transparent placeholder:text-slate-400 focus:outline-none focus:ring-0 break-words";
 
+  const resizeTitle = useCallback(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    resizeTitle();
+  }, [board.filmTitle, resizeTitle]);
+
   return (
     <BoardCard title="About the film" bodyClassName="space-y-3 px-4 py-4">
-      <input
+      <textarea
+        ref={titleRef}
         value={board.filmTitle ?? ""}
-        onChange={(e) => onPatch({ filmTitle: e.target.value })}
+        onChange={(e) => {
+          onPatch({ filmTitle: e.target.value });
+          resizeTitle();
+        }}
         placeholder="Film title"
+        rows={1}
         className={cn(
           inlineField,
-          "text-lg font-serif font-bold leading-snug text-slate-900 xl:text-xl"
+          "resize-none overflow-hidden text-lg font-serif font-bold leading-snug text-slate-900 xl:text-xl"
         )}
       />
       <textarea
@@ -467,6 +482,83 @@ function MetaField({
   );
 }
 
+function AddPersonMenu({
+  hasCrewCatalog,
+  onAddFromCrew,
+  onAddManual,
+}: {
+  hasCrewCatalog: boolean;
+  onAddFromCrew: () => void;
+  onAddManual: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  if (!hasCrewCatalog) {
+    return (
+      <button
+        type="button"
+        onClick={onAddManual}
+        className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        title="Add person"
+        aria-label="Add person"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        title="Add person"
+        aria-label="Add person"
+        aria-expanded={open}
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+      {open ? (
+        <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+            onClick={() => {
+              onAddFromCrew();
+              setOpen(false);
+            }}
+          >
+            From crew catalog
+          </button>
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+            onClick={() => {
+              onAddManual();
+              setOpen(false);
+            }}
+          >
+            Add manually
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function PeopleListCard({
   title,
   group,
@@ -474,7 +566,6 @@ function PeopleListCard({
   crewCatalog,
   onChange,
   onPhoto,
-  iconMode,
 }: {
   title: string;
   group: ProductionPersonGroup;
@@ -482,7 +573,6 @@ function PeopleListCard({
   crewCatalog: CrewMember[];
   onChange: (people: ProductionPerson[]) => void;
   onPhoto: (personId: string, file: File) => Promise<void>;
-  iconMode?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [detailPersonId, setDetailPersonId] = useState<string | null>(null);
@@ -506,6 +596,7 @@ function PeopleListCard({
     if (fromCrew?.phone) person.phone = fromCrew.phone;
     if (fromCrew?.id) person.crewMemberId = fromCrew.id;
     onChange([...people, person]);
+    setDetailPersonId(person.id);
   };
 
   const update = (id: string, patch: Partial<ProductionPerson>) => {
@@ -526,53 +617,24 @@ function PeopleListCard({
             : "No one added yet"
         }
         action={
-          <div className="flex items-center gap-0.5">
-            {crewCatalog.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setPickerOpen(true)}
-                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-sky-700"
-                title="Add from crew catalog"
-              >
-                <UserRoundPlus className="h-4 w-4" />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => addPerson()}
-              className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              title="Add blank person"
-            >
-              <UserPlus className="h-4 w-4" />
-            </button>
-          </div>
+          <AddPersonMenu
+            hasCrewCatalog={crewCatalog.length > 0}
+            onAddFromCrew={() => setPickerOpen(true)}
+            onAddManual={() => addPerson()}
+          />
         }
         bodyClassName="p-0"
       >
         <BoardScrollArea className="max-h-[360px]">
           {sorted.length === 0 ? (
-            <div className="space-y-3 px-3.5 py-4">
-              <p className="text-sm text-slate-500">No one added yet.</p>
-              {crewCatalog.length > 0 && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setPickerOpen(true)}
-                >
-                  <UserRoundPlus className="mr-1.5 h-4 w-4" />
-                  Add from crew
-                </Button>
-              )}
-            </div>
+            <p className="px-3.5 py-4 text-sm text-slate-500">No one added yet.</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {sorted.map((person) => (
                 <PersonRow
                   key={person.id}
                   person={person}
-                  iconMode={iconMode}
+                  group={group}
                   onOpen={() => setDetailPersonId(person.id)}
                   onRemove={() => onChange(people.filter((p) => p.id !== person.id))}
                 />
@@ -595,7 +657,7 @@ function PeopleListCard({
         <PersonDetailModal
           person={detailPerson}
           crewMember={detailCrew}
-          iconMode={iconMode}
+          group={group}
           onUpdate={(patch) => update(detailPerson.id, patch)}
           onRemove={() => onChange(people.filter((p) => p.id !== detailPerson.id))}
           onPhoto={(file) => onPhoto(detailPerson.id, file)}
@@ -608,43 +670,21 @@ function PeopleListCard({
 
 function PersonRow({
   person,
+  group,
   onOpen,
   onRemove,
-  iconMode,
 }: {
   person: ProductionPerson;
+  group: ProductionPersonGroup;
   onOpen: () => void;
   onRemove: () => void;
-  iconMode?: boolean;
 }) {
   const displayRole = person.role?.trim();
 
   return (
     <li className="group">
       <div className="flex items-center gap-2.5 px-3 py-2.5">
-        {iconMode ? (
-          <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-violet-100 text-violet-700">
-            {person.photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={person.photoUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center">
-                <Camera className="h-4 w-4" />
-              </span>
-            )}
-          </div>
-        ) : (
-          <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
-            {person.photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={person.photoUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-500">
-                {(person.name || "?").charAt(0).toUpperCase()}
-              </span>
-            )}
-          </div>
-        )}
+        <PersonAvatar person={person} group={group} />
         <button
           type="button"
           onClick={onOpen}
