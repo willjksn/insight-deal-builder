@@ -1,6 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -22,9 +22,14 @@ let db: Firestore | undefined;
 let storage: FirebaseStorage | undefined;
 
 if (typeof window !== "undefined" && isFirebaseConfigured) {
-  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  if (getApps().length === 0) {
+    app = initializeApp(firebaseConfig);
+    db = initializeFirestore(app, { ignoreUndefinedProperties: true });
+  } else {
+    app = getApps()[0];
+    db = getFirestore(app);
+  }
   auth = getAuth(app);
-  db = getFirestore(app);
   storage = getStorage(app);
 }
 

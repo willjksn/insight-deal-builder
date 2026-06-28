@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FileText, Plus, Clapperboard } from "lucide-react";
+import { FileText, Plus, Clapperboard, LayoutGrid } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -16,7 +16,7 @@ import { formatDate } from "@/lib/utils/format";
 import { Project } from "@/lib/types";
 import { ScoutProject } from "@/lib/scout/types";
 import { getScoutProjectsForLinkedProject } from "@/lib/firebase/scoutFirestore";
-import { canUseShotScout } from "@/lib/utils/permissions";
+import { canUseShotScout, canManageProjects } from "@/lib/utils/permissions";
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -27,6 +27,7 @@ export default function ProjectDetailPage() {
   const [scoutSessions, setScoutSessions] = useState<ScoutProject[]>([]);
   const projectAgreements = agreements.filter((a) => a.projectId === id);
   const showScout = canUseShotScout(appUser);
+  const showProduction = showScout || canManageProjects(appUser);
 
   useEffect(() => {
     if (!showScout || !id) return;
@@ -50,6 +51,14 @@ export default function ProjectDetailPage() {
         subtitle={`${project.clientName || "No client"} · $${project.totalProjectFee.toLocaleString()}`}
         action={
           <div className="flex flex-wrap gap-2">
+            {showProduction && (
+              <Link href={`/projects/${project.id}/production`}>
+                <Button size="touch" variant="outline">
+                  <LayoutGrid className="mr-2 h-5 w-5" />
+                  Pre-production
+                </Button>
+              </Link>
+            )}
             {showScout && (
               <Link href={`/scout/new?projectId=${project.id}`}>
                 <Button size="touch" variant="outline">

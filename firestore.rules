@@ -245,6 +245,21 @@ service cloud.firestore {
       allow read, write: if request.auth.uid == userId && canUseShotScout();
     }
 
+    function canUseProductionBoard() {
+      return isInsightOrg()
+        && (canUseShotScout() || hasPerm('manageProjects'));
+    }
+
+    match /productionBoards/{boardId} {
+      allow read: if canReadInsightSetup() || canUseProductionBoard();
+      allow create: if canUseProductionBoard()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.projectId is string;
+      allow update: if canUseProductionBoard();
+      allow delete: if canUseProductionBoard()
+        && (resource.data.userId == request.auth.uid || hasPerm('manageProjects'));
+    }
+
     // Client signing links — server-only (Firebase Admin SDK)
     match /signingLinks/{docId} {
       allow read, write: if false;

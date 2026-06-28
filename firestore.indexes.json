@@ -47,6 +47,13 @@
         { "fieldPath": "linkedProjectId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "productionBoards",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "projectId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

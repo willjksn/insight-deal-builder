@@ -136,10 +136,13 @@ export default function ScoutGearSettingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingList, setSavingList] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const load = async () => {
     if (!user?.uid) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const [list, loadedProfiles] = await Promise.all([
         getGearList(user.uid),
@@ -148,6 +151,15 @@ export default function ScoutGearSettingsPage() {
       setGearList(list);
       setProfiles(loadedProfiles);
       if (list) setGearForm(gearListToForm(list));
+    } catch (err) {
+      const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : "";
+      if (code === "permission-denied") {
+        setLoadError(
+          "Firestore denied access to gear data. Ask an admin to deploy the latest firestore.rules, or confirm your account has Shot Scout permission."
+        );
+      } else {
+        setLoadError(err instanceof Error ? err.message : "Failed to load gear");
+      }
     } finally {
       setLoading(false);
     }
@@ -171,9 +183,19 @@ export default function ScoutGearSettingsPage() {
   const saveGearListForm = async () => {
     if (!user?.uid) return;
     setSavingList(true);
+    setSaveError(null);
     try {
       await saveGearList(user.uid, payloadFromGearFields(gearForm));
       await load();
+    } catch (err) {
+      const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : "";
+      setSaveError(
+        code === "permission-denied"
+          ? "Could not save gear list — Firestore permissions. Rules were just deployed; refresh and try again."
+          : err instanceof Error
+            ? err.message
+            : "Failed to save gear list"
+      );
     } finally {
       setSavingList(false);
     }
@@ -182,6 +204,7 @@ export default function ScoutGearSettingsPage() {
   const saveProfile = async () => {
     if (!user?.uid || !profileForm.name.trim()) return;
     setSavingProfile(true);
+    setSaveError(null);
     const payload = {
       name: profileForm.name.trim(),
       ...payloadFromGearFields(profileForm),
@@ -195,6 +218,15 @@ export default function ScoutGearSettingsPage() {
       setProfileForm(EMPTY_PROFILE);
       setEditingId(null);
       await load();
+    } catch (err) {
+      const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : "";
+      setSaveError(
+        code === "permission-denied"
+          ? "Could not save kit — Firestore permissions. Rules were just deployed; refresh and try again."
+          : err instanceof Error
+            ? err.message
+            : "Failed to save kit"
+      );
     } finally {
       setSavingProfile(false);
     }
@@ -313,6 +345,12 @@ export default function ScoutGearSettingsPage() {
         title="My gear & kits"
         subtitle="Build your master gear list first — AI suggests camera and lighting from what you own. Save named kits for quick session setup."
       />
+
+      {(loadError || saveError) && (
+        <div className="mb-6">
+          <InfoCallout variant="blue">{saveError || loadError}</InfoCallout>
+        </div>
+      )}
 
       <PageSection
         className="mb-8"

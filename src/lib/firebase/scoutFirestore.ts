@@ -130,9 +130,15 @@ function gearCol(userId: string) {
 }
 
 export async function getGearProfiles(userId: string): Promise<ScoutGearProfile[]> {
-  const q = query(gearCol(userId), orderBy("updatedAt", "desc"));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as ScoutGearProfile);
+  try {
+    const q = query(gearCol(userId), orderBy("updatedAt", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as ScoutGearProfile);
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : "";
+    if (code === "permission-denied") return [];
+    throw err;
+  }
 }
 
 /** Gear profile IDs from recent scout sessions (most recently used first). */
