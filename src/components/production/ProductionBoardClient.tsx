@@ -273,6 +273,8 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
             <StoryCard
               projectId={project.id}
               links={board.storyLinks}
+              scriptFountain={board.scriptFountain}
+              scriptSessionId={board.scriptSessionId}
               onChange={(storyLinks) => patch({ storyLinks })}
             />
             <BoardCard
@@ -757,10 +759,14 @@ function storyHostLabel(url: string): string {
 function StoryCard({
   projectId,
   links,
+  scriptFountain,
+  scriptSessionId,
   onChange,
 }: {
   projectId: string;
   links: ProductionStoryLink[];
+  scriptFountain?: string;
+  scriptSessionId?: string;
   onChange: (links: ProductionStoryLink[]) => void;
 }) {
   const sorted = [...links]
@@ -799,6 +805,26 @@ function StoryCard({
       }
       bodyClassName="p-0"
     >
+      {scriptFountain ? (
+        <div className="border-b border-slate-100 px-3 py-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+              AI script
+            </p>
+            {scriptSessionId ? (
+              <Link
+                href={`/script-writer/${scriptSessionId}`}
+                className="text-xs font-medium text-sky-700 hover:underline"
+              >
+                Open in script writer
+              </Link>
+            ) : null}
+          </div>
+          <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-slate-700">
+            {scriptFountain}
+          </pre>
+        </div>
+      ) : null}
       <ul className="divide-y divide-slate-100">
         {sorted.map((link) => (
           <StoryLinkRow

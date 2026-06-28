@@ -54,6 +54,10 @@ export function assertCanCreateQuotes(appUser: AppUser): void {
   }
 }
 
+export function assertCanUseScriptWriter(appUser: AppUser): void {
+  assertCanUseShotScout(appUser);
+}
+
 export function apiErrorStatus(message: string): number {
   if (
     message.includes("token") ||

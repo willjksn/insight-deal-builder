@@ -11,6 +11,11 @@ export type GeminiPart =
   | { text: string }
   | { inlineData: { mimeType: string; data: string } };
 
+export type GeminiChatTurn = {
+  role: "user" | "model";
+  parts: GeminiPart[];
+};
+
 function geminiModel(override?: string): string {
   const raw = override ?? process.env.GEMINI_SCOUT_MODEL ?? "gemini-2.5-flash";
   if (raw === "gemini-2.0-flash" || raw === "gemini-2.0-flash-001") return "gemini-2.5-flash";
@@ -40,7 +45,8 @@ function isGeminiBlockedError(err: unknown): boolean {
 
 async function callGeminiApiKeyGenerate(params: {
   systemPrompt: string;
-  userParts: GeminiPart[];
+  userParts?: GeminiPart[];
+  history?: GeminiChatTurn[];
   json?: boolean;
   model?: string;
   temperature?: number;
@@ -51,12 +57,19 @@ async function callGeminiApiKeyGenerate(params: {
   const model = geminiModel(params.model);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+  const contents = params.history?.length
+    ? params.history.map((turn) => ({
+        role: turn.role,
+        parts: toGeminiApiParts(turn.parts),
+      }))
+    : [{ role: "user", parts: toGeminiApiParts(params.userParts ?? []) }];
+
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: params.systemPrompt }] },
-      contents: [{ role: "user", parts: toGeminiApiParts(params.userParts) }],
+      contents,
       generationConfig: {
         ...(params.json ? { responseMimeType: "application/json" } : {}),
         temperature: params.temperature ?? 0.4,
@@ -103,7 +116,8 @@ export type GeminiProvider = "api_key" | "vertex";
 
 export async function callGeminiGenerate(params: {
   systemPrompt: string;
-  userParts: GeminiPart[];
+  userParts?: GeminiPart[];
+  history?: GeminiChatTurn[];
   json?: boolean;
   model?: string;
   temperature?: number;
@@ -272,6 +286,21 @@ export async function callGeminiJson(
   model?: string
 ): Promise<unknown> {
   const text = await callGeminiGenerate({ systemPrompt, userParts, json: true, model });
+  return extractJson(text);
+}
+
+export async function callGeminiJsonWithHistory(
+  systemPrompt: string,
+  history: GeminiChatTurn[],
+  options?: { model?: string; temperature?: number }
+): Promise<unknown> {
+  const text = await callGeminiGenerate({
+    systemPrompt,
+    history,
+    json: true,
+    model: options?.model,
+    temperature: options?.temperature,
+  });
   return extractJson(text);
 }
 

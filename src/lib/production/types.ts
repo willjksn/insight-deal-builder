@@ -112,6 +112,9 @@ export interface ProductionBoard {
   budgetLink?: string;
   productionDays: ProductionDay[];
   linkedScoutProjectIds: string[];
+  /** Linked script writer session when applied from AI script */
+  scriptSessionId?: string;
+  scriptFountain?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

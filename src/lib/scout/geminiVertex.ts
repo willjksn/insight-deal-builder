@@ -1,6 +1,6 @@
 import { GoogleAuth } from "google-auth-library";
 import { getServiceAccountCredentials } from "@/lib/firebase/admin";
-import type { GeminiPart } from "@/lib/scout/geminiClient";
+import type { GeminiChatTurn, GeminiPart } from "@/lib/scout/geminiClient";
 
 /** Default Vertex model (2.0 flash retired 2026-06-01). */
 const DEFAULT_VERTEX_MODEL = "gemini-2.5-flash";
@@ -341,7 +341,8 @@ export async function vertexGeminiGenerateImage(params: {
 
 export async function vertexGeminiGenerate(params: {
   systemPrompt: string;
-  userParts: GeminiPart[];
+  userParts?: GeminiPart[];
+  history?: GeminiChatTurn[];
   json?: boolean;
   model?: string;
   temperature?: number;
@@ -353,9 +354,15 @@ export async function vertexGeminiGenerate(params: {
 
   const preferredModel = vertexModelId(params.model);
   const token = await getVertexAccessToken();
+  const contents = params.history?.length
+    ? params.history.map((turn) => ({
+        role: turn.role,
+        parts: toVertexParts(turn.parts),
+      }))
+    : [{ role: "user", parts: toVertexParts(params.userParts ?? []) }];
   const body = {
     systemInstruction: { parts: [{ text: params.systemPrompt }] },
-    contents: [{ role: "user", parts: toVertexParts(params.userParts) }],
+    contents,
     generationConfig: {
       ...(params.json ? { responseMimeType: "application/json" } : {}),
       temperature: params.temperature ?? 0.4,

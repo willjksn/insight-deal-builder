@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Camera, Sparkles, Film, List, ImageIcon, FileDown, RefreshCw } from "lucide-react";
+import { ArrowLeft, Camera, Sparkles, Film, List, ImageIcon, FileDown, RefreshCw, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -257,6 +257,18 @@ export default function ScoutProjectPage() {
           </Link>
           <Link href={`/scout/${id}/export`} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sky-700 hover:border-sky-300 hover:bg-sky-50">
             Export
+          </Link>
+          <Link
+            href={`/script-writer?${new URLSearchParams({
+              idea: project.sceneIdea,
+              title: project.projectName,
+              ...(project.linkedProjectId ? { projectId: project.linkedProjectId } : {}),
+              scoutId: id,
+            }).toString()}`}
+            className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-violet-800 hover:border-violet-300 hover:bg-violet-100"
+          >
+            <ScrollText className="mr-1 inline h-3.5 w-3.5" />
+            Write full script
           </Link>
         </div>
 

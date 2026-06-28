@@ -32,6 +32,7 @@ import {
   canUseShotScout,
 } from "@/lib/utils/permissions";
 import { ScoutSidebarNav } from "./ScoutSidebarNav";
+import { ScriptWriterSidebarNav } from "./ScriptWriterSidebarNav";
 import { AppUser } from "@/lib/types";
 
 type NavItem = {
@@ -140,7 +141,10 @@ export function Sidebar() {
             );
           })}
           {canUseShotScout(appUser) ? (
-            <ScoutSidebarNav />
+            <>
+              <ScoutSidebarNav />
+              <ScriptWriterSidebarNav />
+            </>
           ) : null}
           {canManageUsers(appUser) ? (
             <Link

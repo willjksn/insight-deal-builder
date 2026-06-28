@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FileText, Plus, Clapperboard, LayoutGrid } from "lucide-react";
+import { FileText, Plus, Clapperboard, LayoutGrid, ScrollText } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -56,6 +56,20 @@ export default function ProjectDetailPage() {
                 <Button size="touch" variant="outline">
                   <LayoutGrid className="mr-2 h-5 w-5" />
                   Pre-production
+                </Button>
+              </Link>
+            )}
+            {showScout && (
+              <Link
+                href={`/script-writer?${new URLSearchParams({
+                  idea: `A ${project.projectType} project for ${project.clientName || "client"}: ${project.projectName}`,
+                  title: project.projectName,
+                  projectId: project.id,
+                }).toString()}`}
+              >
+                <Button size="touch" variant="outline">
+                  <ScrollText className="mr-2 h-5 w-5" />
+                  Script writer
                 </Button>
               </Link>
             )}
