@@ -321,7 +321,6 @@ export async function assertScriptSessionAccess(
   appUser: AppUser,
   requireWrite = true
 ): Promise<void> {
-  if (!appUser.approved) throw new Error("Not authorized");
   const { allowed } = await resolveScriptSessionAccess(db, session, uid, appUser, requireWrite);
   if (!allowed) throw new Error("Not authorized");
 }
@@ -359,7 +358,6 @@ export async function assertScoutAccess(
   uid: string,
   appUser: AppUser
 ): Promise<void> {
-  if (!appUser.approved) throw new Error("Not authorized");
   const { allowed } = await resolveScoutAccess(db, project, uid, appUser);
   if (!allowed) throw new Error("Not authorized");
 }
@@ -399,7 +397,6 @@ export async function assertScriptWriterAppAccess(
   uid: string,
   appUser: AppUser
 ): Promise<void> {
-  if (!appUser.approved) throw new Error("Not authorized");
   if (hasGlobalProjectAdmin(appUser)) return;
 
   if (canUseShotScout(appUser)) return;
