@@ -9,8 +9,10 @@ import { stripUndefined } from "@/lib/firebase/firestore";
 import {
   hasGlobalProjectAdmin,
   listResourceMembers,
+  listTeamUserCandidates,
   loadScriptSession,
   lookupUserByEmail,
+  lookupUserById,
   normalizeEmail,
   RESOURCE_MEMBERS_SUBCOLLECTION,
   resolveScriptSessionAccess,
@@ -59,9 +61,13 @@ export async function GET(
     const members = canManage
       ? await listResourceMembers(db, SCRIPT_WRITER_SESSIONS_COLLECTION, sessionId)
       : [];
+    const memberIds = new Set(members.map((m) => m.userId));
+    if (session.userId) memberIds.add(session.userId);
+    const candidates = canManage ? await listTeamUserCandidates(db, [...memberIds]) : [];
 
     return NextResponse.json({
       members,
+      candidates,
       canManageSharing: canManage,
       linkedProjectId: session.linkedProjectId ?? session.appliedProjectId ?? null,
     });
@@ -80,20 +86,27 @@ export async function POST(
     const { uid, appUser } = await requireAuthUser(request);
     assertApprovedUser(appUser);
 
-    const body = (await request.json()) as { email?: string };
-    const email = body.email?.trim();
-    if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
-    }
+    const body = (await request.json()) as { userId?: string; email?: string };
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
     await assertCanManageScriptShares(db, sessionId, uid, appUser);
 
-    const user = await lookupUserByEmail(db, email);
+    const userId = body.userId?.trim();
+    const email = body.email?.trim();
+    if (!userId && !email) {
+      return NextResponse.json({ error: "Select a person to share with." }, { status: 400 });
+    }
+
+    const user = userId
+      ? await lookupUserById(db, userId)
+      : await lookupUserByEmail(db, email!);
     if (!user?.approved) {
       return NextResponse.json(
-        { error: "User not found or not approved yet." },
+        {
+          error:
+            "That person is not approved yet. Have them sign up, then approve them in Admin.",
+        },
         { status: 404 }
       );
     }

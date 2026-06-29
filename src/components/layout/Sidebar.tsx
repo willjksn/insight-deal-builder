@@ -211,8 +211,8 @@ export function Sidebar() {
               System
             </p>
             <div className="space-y-0.5">
-              <NavLink item={{ href: "/settings", label: "Settings", icon: Settings }} active={pathname.startsWith("/settings")} />
-              {canManageUsers(appUser) ? (
+              <NavLink item={{ href: "/settings", label: "Settings", icon: Settings }} active={pathname === "/settings"} />
+              {canManageUsers(appUser) || canManageProjects(appUser) ? (
                 <NavLink item={{ href: "/admin", label: "Admin", icon: Shield }} active={pathname.startsWith("/admin")} />
               ) : null}
             </div>

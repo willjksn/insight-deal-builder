@@ -6,6 +6,13 @@ import {
   ResourceMember,
 } from "@/lib/projectAccess/types";
 
+export interface TeamUserCandidate {
+  userId: string;
+  email: string;
+  displayName?: string;
+  approved: boolean;
+}
+
 async function authFetch(
   getToken: () => Promise<string>,
   path: string,
@@ -22,11 +29,26 @@ async function authFetch(
   });
 }
 
+export async function fetchTeamManagementHub(
+  getToken: () => Promise<string>
+): Promise<{
+  projects: { id: string; projectName: string; clientName?: string; ownerUserId: string | null }[];
+  candidates: TeamUserCandidate[];
+  standaloneScripts: { id: string; title: string }[];
+  canManage: boolean;
+}> {
+  const res = await authFetch(getToken, "/api/projects/team-management");
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to load access settings");
+  return data;
+}
+
 export async function fetchProjectTeam(
   getToken: () => Promise<string>,
   projectId: string
 ): Promise<{
   members: ProjectMember[];
+  candidates: TeamUserCandidate[];
   permissions: ProjectAccessPermissions;
   canManageTeam: boolean;
   ownerUserId: string | null;
@@ -40,12 +62,12 @@ export async function fetchProjectTeam(
 export async function addProjectMember(
   getToken: () => Promise<string>,
   projectId: string,
-  email: string,
+  userId: string,
   permissions: Partial<ProjectAccessPermissions>
 ): Promise<ProjectMember> {
   const res = await authFetch(getToken, `/api/projects/${projectId}/members`, {
     method: "POST",
-    body: JSON.stringify({ email, permissions }),
+    body: JSON.stringify({ userId, permissions }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to add member");
@@ -83,6 +105,7 @@ export async function fetchScriptSharing(
   sessionId: string
 ): Promise<{
   members: ResourceMember[];
+  candidates: TeamUserCandidate[];
   canManageSharing: boolean;
   linkedProjectId: string | null;
 }> {
@@ -95,11 +118,11 @@ export async function fetchScriptSharing(
 export async function shareScriptSession(
   getToken: () => Promise<string>,
   sessionId: string,
-  email: string
+  userId: string
 ): Promise<ResourceMember> {
   const res = await authFetch(getToken, `/api/script-writer/sessions/${sessionId}/members`, {
     method: "POST",
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ userId }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to share script");

@@ -303,19 +303,27 @@ export default function SettingsPage() {
           <InfoCallout variant="sky">
             {canManageUsers(appUser) ? (
               <>
-                You can manage workers and partners from the{" "}
+                Approve users, org permissions, and project access are in{" "}
                 <Link href="/admin" className="font-semibold underline underline-offset-2">
-                  Admin
-                </Link>{" "}
-                tab — assign custom checkboxes per user.
+                  Admin → Team &amp; access
+                </Link>
+                .
+              </>
+            ) : canManageProjects(appUser) ? (
+              <>
+                Manage project team access from{" "}
+                <Link href="/admin" className="font-semibold underline underline-offset-2">
+                  Admin → Team &amp; access
+                </Link>
+                .
               </>
             ) : (
-              "Ask an Insight Media Group admin to adjust your permissions from the Admin tab."
+              "Ask an Insight Media Group admin to adjust your permissions from Admin."
             )}
           </InfoCallout>
-          {canManageUsers(appUser) && (
+          {(canManageProjects(appUser) || canManageUsers(appUser)) && (
             <Link href="/admin">
-              <Button variant="outline" size="touch" className="w-full sm:w-auto">
+              <Button variant="outline" size="touch" className="mt-3 w-full sm:w-auto">
                 Open Admin <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             </Link>

@@ -40,6 +40,59 @@ export function hasAnyProjectPermission(permissions: ProjectAccessPermissions): 
   return permissions.scripts || permissions.scout || permissions.production || permissions.shots;
 }
 
+export interface TeamUserCandidate {
+  userId: string;
+  email: string;
+  displayName?: string;
+  approved: boolean;
+}
+
+export async function lookupUserById(
+  db: Firestore,
+  userId: string
+): Promise<{ id: string; email: string; displayName?: string; approved?: boolean } | null> {
+  const snap = await db.collection("users").doc(userId).get();
+  if (!snap.exists) return null;
+  const data = snap.data()!;
+  return {
+    id: snap.id,
+    email: data.email as string,
+    displayName: data.displayName as string | undefined,
+    approved: data.approved as boolean | undefined,
+  };
+}
+
+export async function listTeamUserCandidates(
+  db: Firestore,
+  excludeUserIds: string[] = []
+): Promise<TeamUserCandidate[]> {
+  const exclude = new Set(excludeUserIds);
+  const snap = await db.collection("users").get();
+  return snap.docs
+    .map((doc) => {
+      const data = doc.data();
+      return {
+        userId: doc.id,
+        email: (data.email as string) ?? "",
+        displayName: data.displayName as string | undefined,
+        approved: Boolean(data.approved),
+      };
+    })
+    .filter((u) => u.email && !exclude.has(u.userId))
+    .sort((a, b) => {
+      const aName = (a.displayName || a.email).toLowerCase();
+      const bName = (b.displayName || b.email).toLowerCase();
+      return aName.localeCompare(bName);
+    });
+}
+
+export function teamUserLabel(candidate: TeamUserCandidate): string {
+  if (candidate.displayName?.trim()) {
+    return `${candidate.displayName.trim()} (${candidate.email})`;
+  }
+  return candidate.email;
+}
+
 export async function lookupUserByEmail(
   db: Firestore,
   email: string
@@ -129,6 +182,48 @@ export async function getProjectIdsForMember(db: Firestore, userId: string): Pro
   return snap.docs
     .map((d) => d.ref.parent.parent?.id)
     .filter((id): id is string => Boolean(id));
+}
+
+/** Projects where the user can add or edit team members. */
+export async function listManageableProjects(
+  db: Firestore,
+  uid: string,
+  appUser: AppUser
+): Promise<Project[]> {
+  if (hasGlobalProjectAdmin(appUser)) {
+    const snap = await db.collection("projects").orderBy("updatedAt", "desc").limit(200).get();
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Project);
+  }
+
+  const snap = await db.collection("projects").where("ownerUserId", "==", uid).get();
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as Project)
+    .sort((a, b) => a.projectName.localeCompare(b.projectName));
+}
+
+/** Script sessions owned by the user that are not linked to a project (direct share only). */
+export async function listStandaloneScriptsForSharing(
+  db: Firestore,
+  uid: string,
+  appUser: AppUser
+): Promise<{ id: string; title: string }[]> {
+  const ownerId = hasGlobalProjectAdmin(appUser) ? uid : uid;
+  const snap = await db
+    .collection(SCRIPT_WRITER_SESSIONS_COLLECTION)
+    .where("userId", "==", ownerId)
+    .orderBy("updatedAt", "desc")
+    .limit(100)
+    .get();
+
+  return snap.docs
+    .filter((d) => {
+      const data = d.data();
+      return !data.linkedProjectId && !data.appliedProjectId;
+    })
+    .map((d) => ({
+      id: d.id,
+      title: (d.data().title as string) || "Untitled script",
+    }));
 }
 
 export async function resolveProjectPermissions(

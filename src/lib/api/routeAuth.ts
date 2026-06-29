@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
-import { hasPermission, isInsightOrgUser, resolvePermissions } from "@/lib/utils/permissions";
+import { hasPermission, isInsightOrgUser, resolvePermissions, canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 import { AppUser } from "@/lib/types";
 
 export async function verifyAuthToken(authHeader: string | null): Promise<string> {
@@ -59,7 +59,10 @@ export function assertCanUseScriptWriter(appUser: AppUser): void {
 }
 
 export function assertApprovedUser(appUser: AppUser): void {
-  if (!appUser.approved) throw new Error("Not authorized");
+  if (appUser.approved) return;
+  // Staff who manage users/projects may lack approved on legacy docs but use Admin APIs.
+  if (canManageUsers(appUser) || canManageProjects(appUser)) return;
+  throw new Error("Not authorized");
 }
 
 export function apiErrorStatus(message: string): number {

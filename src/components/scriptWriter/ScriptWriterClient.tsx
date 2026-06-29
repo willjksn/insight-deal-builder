@@ -36,7 +36,7 @@ import {
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { cn } from "@/lib/utils/cn";
 import { ScriptEditorPanel } from "@/components/scriptWriter/ScriptEditorPanel";
-import { ScriptSharePanel } from "@/components/scriptWriter/ScriptSharePanel";
+import { canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPanel";
 
 interface ScriptWriterClientProps {
@@ -45,7 +45,7 @@ interface ScriptWriterClientProps {
 
 export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, appUser } = useAuth();
   const { data: projects } = useCollection<Project>("projects");
   const [session, setSession] = useState<ScriptWriterSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -241,10 +241,32 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         </p>
       )}
 
-      <ScriptSharePanel
-        sessionId={sessionId}
-        isOwner={Boolean(user && session.userId === user.uid)}
-      />
+      {(canManageProjects(appUser) ||
+        canManageUsers(appUser) ||
+        (user && session.userId === user.uid)) && (
+        <p className="mb-4 text-sm text-slate-500">
+          {session.linkedProjectId || session.appliedProjectId ? (
+            <>
+              Script access for collaborators is managed via{" "}
+              <Link
+                href={`/admin?project=${session.linkedProjectId ?? session.appliedProjectId}`}
+                className="font-medium text-sky-700 hover:underline"
+              >
+                Admin → Team &amp; access
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              Share this script from{" "}
+              <Link href="/admin" className="font-medium text-sky-700 hover:underline">
+                Admin → Team &amp; access
+              </Link>
+              .
+            </>
+          )}
+        </p>
+      )}
 
       {session.brief ? (
         <div className="mb-4 flex flex-wrap gap-2">

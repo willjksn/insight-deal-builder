@@ -9,17 +9,19 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import {
   assertProjectTeamManagement,
-  getProjectMember,
+  canManageProjectTeam,
   hasGlobalProjectAdmin,
   listProjectMembers,
+  listTeamUserCandidates,
   lookupUserByEmail,
+  lookupUserById,
   normalizeEmail,
   PROJECT_MEMBERS_SUBCOLLECTION,
   resolveProjectPermissions,
   sanitizeProjectPermissions,
 } from "@/lib/projectAccess/server";
 import { ProjectAccessPermissions } from "@/lib/projectAccess/types";
-import { canUseShotScout } from "@/lib/utils/permissions";
+import { Project } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -36,28 +38,30 @@ export async function GET(
     if (!db) throw new Error("Firebase Admin is not configured");
 
     const perms = await resolveProjectPermissions(db, projectId, uid, appUser);
-    const canManage = hasGlobalProjectAdmin(appUser);
     const projectSnap = await db.collection("projects").doc(projectId).get();
     if (!projectSnap.exists) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    const project = projectSnap.data()!;
-    const isOwner = project.ownerUserId === uid;
-    const canViewTeam =
-      canManage ||
-      isOwner ||
-      Object.values(perms).some(Boolean);
+    const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
+    const canManageTeam = canManageProjectTeam(appUser, project, uid);
+    const canViewTeam = canManageTeam || Object.values(perms).some(Boolean);
 
-    if (!canViewTeam && !canUseShotScout(appUser)) {
+    if (!canViewTeam) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
 
-    const members = canManage || isOwner ? await listProjectMembers(db, projectId) : [];
+    const members = canManageTeam ? await listProjectMembers(db, projectId) : [];
+    const memberIds = new Set(members.map((m) => m.userId));
+    if (project.ownerUserId) memberIds.add(project.ownerUserId);
+    const candidates = canManageTeam
+      ? await listTeamUserCandidates(db, [...memberIds])
+      : [];
 
     return NextResponse.json({
       members,
+      candidates,
       permissions: perms,
-      canManageTeam: canManage || isOwner,
+      canManageTeam,
       ownerUserId: project.ownerUserId ?? null,
     });
   } catch (err) {
@@ -76,25 +80,30 @@ export async function POST(
     assertApprovedUser(appUser);
 
     const body = (await request.json()) as {
+      userId?: string;
       email?: string;
       permissions?: Partial<ProjectAccessPermissions>;
     };
-    const email = body.email?.trim();
-    if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
-    }
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
 
     await assertProjectTeamManagement(db, projectId, uid, appUser);
 
-    const user = await lookupUserByEmail(db, email);
+    const userId = body.userId?.trim();
+    const email = body.email?.trim();
+    if (!userId && !email) {
+      return NextResponse.json({ error: "Select a team member to add." }, { status: 400 });
+    }
+
+    const user = userId
+      ? await lookupUserById(db, userId)
+      : await lookupUserByEmail(db, email!);
     if (!user) {
       return NextResponse.json(
         {
           error:
-            "No account found with that email. They need to sign up and be approved first, then try again.",
+            "That person is not in the system yet. Have them sign up first, then approve them in Admin.",
         },
         { status: 404 }
       );

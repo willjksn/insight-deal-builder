@@ -21,9 +21,8 @@ import { getScoutProjectsForLinkedProject } from "@/lib/firebase/scoutFirestore"
 import { getProductionBoardByProject } from "@/lib/firebase/productionFirestore";
 import { scriptWriterListSessions } from "@/lib/scriptWriter/apiClient";
 import { ProjectSpine } from "@/components/projects/ProjectSpine";
-import { ProjectTeamPanel } from "@/components/projects/ProjectTeamPanel";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
-import { canCreateQuotes, canUseShotScout, canManageProjects } from "@/lib/utils/permissions";
+import { canCreateQuotes, canUseShotScout, canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 
 function pickProjectScriptSession(
   sessions: ScriptWriterSession[],
@@ -74,6 +73,7 @@ export default function ProjectDetailPage() {
     projectAccess.canAccessProduction ||
     projectAccess.canAccessShots;
   const canCreateDeal = canCreateQuotes(appUser);
+  const canOpenTeamAccess = canManageProjects(appUser) || canManageUsers(appUser);
 
   const primaryScript = useMemo(
     () => pickProjectScriptSession(scriptSessions, id, board),
@@ -168,6 +168,19 @@ export default function ProjectDetailPage() {
           </div>
         }
       />
+
+      {canOpenTeamAccess && (
+        <p className="mb-6 text-sm text-slate-500">
+          Team and permissions for this project are managed in{" "}
+          <Link
+            href={`/admin?project=${project.id}`}
+            className="font-medium text-sky-700 hover:underline"
+          >
+            Admin → Team &amp; access
+          </Link>
+          .
+        </p>
+      )}
 
       {spineLoading && showScout ? (
         <LoadingSpinner className="py-8 mb-8" />
@@ -365,8 +378,6 @@ export default function ProjectDetailPage() {
           </Card>
         )}
       </div>
-
-      <ProjectTeamPanel projectId={project.id} />
     </div>
   );
 }

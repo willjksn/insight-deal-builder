@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchProjectTeam } from "@/lib/projectAccess/apiClient";
 import { ProjectAccessPermissions } from "@/lib/projectAccess/types";
-import { canManageProjects } from "@/lib/utils/permissions";
+import { canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 import { FULL_PROJECT_ACCESS } from "@/lib/projectAccess/types";
 
 export function useProjectAccess(projectId: string | undefined, ownerUserId?: string) {
@@ -27,7 +27,7 @@ export function useProjectAccess(projectId: string | undefined, ownerUserId?: st
     }
     setLoading(true);
     try {
-      if (canManageProjects(appUser)) {
+      if (canManageProjects(appUser) || canManageUsers(appUser)) {
         setPermissions({ ...FULL_PROJECT_ACCESS });
         setCanManageTeam(true);
         return;
@@ -53,7 +53,7 @@ export function useProjectAccess(projectId: string | undefined, ownerUserId?: st
   }, [refresh]);
 
   const isOwner = Boolean(ownerUserId && user?.uid === ownerUserId);
-  const hasGlobal = canManageProjects(appUser);
+  const hasGlobal = canManageProjects(appUser) || canManageUsers(appUser);
 
   return {
     permissions,

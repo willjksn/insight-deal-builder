@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -15,9 +15,11 @@ import { useMutations } from "@/hooks/useMutations";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   INSIGHT_MEDIA_GROUP_LLC,
+  canManageProjects,
   canManageUsers,
   resolvePermissions,
 } from "@/lib/utils/permissions";
+import { ProjectAccessHub } from "@/components/projectAccess/ProjectAccessHub";
 import { isUserPendingApproval, shouldApproveOnAdminSave } from "@/lib/users/approval";
 import {
   EMPTY_PERMISSIONS,
@@ -79,6 +81,8 @@ function userInitials(user: AppUser, displayName: string): string {
 
 export default function AdminPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialProjectId = searchParams.get("project") ?? "";
   const { appUser, refreshProfile } = useAuth();
   const { data: users, loading, refresh } = useCollection<AppUser>("users");
   const { data: companies } = useCollection<{ id: string; displayName: string }>("companies");
@@ -88,13 +92,15 @@ export default function AdminPage() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const isAdmin = canManageUsers(appUser);
+  const isOrgAdmin = canManageUsers(appUser);
+  const canManageProjectTeams = canManageProjects(appUser) || isOrgAdmin;
+  const canAccessAdmin = isOrgAdmin || canManageProjectTeams;
 
   useEffect(() => {
-    if (appUser && !isAdmin) {
+    if (appUser && !canAccessAdmin) {
       router.replace("/dashboard");
     }
-  }, [appUser, isAdmin, router]);
+  }, [appUser, canAccessAdmin, router]);
 
   const companyOptions = useMemo(() => {
     const names = new Set<string>([INSIGHT_MEDIA_GROUP_LLC]);
@@ -252,14 +258,22 @@ export default function AdminPage() {
     );
   };
 
-  if (!appUser || !isAdmin) {
+  if (!appUser || !canAccessAdmin) {
     return <LoadingSpinner className="py-20" />;
   }
 
   return (
     <div>
-      <PageHeader title="Admin" subtitle="Workers, partners, and custom permissions" />
+      <PageHeader
+        title="Admin"
+        subtitle={
+          isOrgAdmin
+            ? "Workers, partners, org permissions, and project access"
+            : "Project and production access for your team"
+        }
+      />
 
+      {isOrgAdmin && (
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-md shadow-slate-200/40 ring-1 ring-slate-100">
           <div className="flex items-center gap-3">
@@ -306,8 +320,9 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+      )}
 
-      {stats.pending > 0 && (
+      {isOrgAdmin && stats.pending > 0 && (
         <div className="mb-6">
         <InfoCallout variant="blue">
           {stats.pending} user{stats.pending === 1 ? "" : "s"} waiting for approval. Assign company
@@ -321,26 +336,32 @@ export default function AdminPage() {
         icon={Shield}
         accent="sky"
         title="Team & access"
-        description="Assign Insight employees or production partners. Partners only see their own quotes — not clients, companies, or crew."
-      />
+        description={
+          isOrgAdmin
+            ? "Approve users and set org-wide permissions (quotes, clients, Scout). Then assign per-project access for scripts, Scout, pre-production, and call sheet shots."
+            : "Assign teammates and partners to projects — scripts, Scout, pre-production, and call sheet shots."
+        }
+      >
+        {isOrgAdmin && (
+          <>
+            <p className="mb-4 text-sm font-medium text-slate-800">Organization access</p>
+            {error && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {error}
+              </div>
+            )}
 
-      {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <LoadingSpinner className="py-12" />
-      ) : users.length === 0 ? (
-        <Card>
-          <CardBody>
-            <p className="text-sm text-slate-500">No users found.</p>
-          </CardBody>
-        </Card>
-      ) : (
-        <div className="space-y-5">
-          {sortedUsers.map((user) => {
+            {loading ? (
+              <LoadingSpinner className="py-12" />
+            ) : users.length === 0 ? (
+              <Card>
+                <CardBody>
+                  <p className="text-sm text-slate-500">No users found.</p>
+                </CardBody>
+              </Card>
+            ) : (
+              <div className="space-y-5">
+                {sortedUsers.map((user) => {
             const edit = getEdit(user);
             const dirty = isDirty(user);
             const isCurrentUser = user.id === appUser.id;
@@ -489,8 +510,17 @@ export default function AdminPage() {
               </Card>
             );
           })}
-        </div>
-      )}
+              </div>
+            )}
+          </>
+        )}
+
+        {canManageProjectTeams && (
+          <div className={isOrgAdmin ? "mt-10 border-t border-slate-200 pt-10" : ""}>
+            <ProjectAccessHub initialProjectId={initialProjectId} onAdminPage={isOrgAdmin} />
+          </div>
+        )}
+      </PageSection>
     </div>
   );
 }
