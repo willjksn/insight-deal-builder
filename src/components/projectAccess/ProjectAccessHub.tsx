@@ -35,11 +35,11 @@ export function ProjectAccessHub({ initialProjectId = "", onAdminPage = false }:
   const [selectedScriptId, setSelectedScriptId] = useState("");
   const [copied, setCopied] = useState(false);
 
+  // Use the site the admin is on now (Vercel URL or custom domain). NEXT_PUBLIC_APP_URL
+  // is for server-sent emails only — it may point at a domain not wired up yet.
   const signupUrl = useMemo(() => {
-    const base =
-      process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-      (typeof window !== "undefined" ? window.location.origin : "");
-    return `${base}/login`;
+    if (typeof window === "undefined") return "/login";
+    return `${window.location.origin}/login`;
   }, []);
 
   const load = useCallback(async () => {
