@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { Agreement, AgreementParty } from "@/lib/types";
+import { APP_NOTIFICATION_FROM } from "@/lib/brand";
 import { INSIGHT_MEDIA_GROUP_LLC } from "@/lib/utils/permissions";
 import { NotificationRecipient } from "@/lib/notifications/recipients";
 
@@ -19,8 +20,7 @@ function getResendClient(): Resend | null {
   return resendClient;
 }
 
-const FROM_EMAIL =
-  process.env.RESEND_FROM_EMAIL || "Insight Deal Builder <notifications@insightmediagroup.com>";
+const FROM_EMAIL = APP_NOTIFICATION_FROM;
 
 export function buildAgreementSignedEmail(params: {
   agreement: Pick<Agreement, "id" | "title" | "projectDetails">;

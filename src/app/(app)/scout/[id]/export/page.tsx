@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getScoutProject, createLightingRecipe } from "@/lib/firebase/scoutFirestore";
 import { ScoutProject } from "@/lib/scout/types";
 import { canUseShotScout } from "@/lib/utils/permissions";
+import { downloadScoutPdf } from "@/lib/pdf/generateScoutPdf";
 
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -110,23 +111,32 @@ export default function ScoutExportPage() {
             <li>{dp?.onSetWorkflow?.length ? "✓ Rehearsal / on-set checklist" : "○ Checklist"}</li>
             <li>{previews.length ? "✓ Previs prompts" : "○ Previs prompts"}</li>
           </ul>
-          <p className="mt-4 text-xs text-slate-500">Printable PDF export coming soon.</p>
-          <Button
-            className="mt-4"
-            disabled={!dp}
-            onClick={() => downloadJson(`${project.projectName.replace(/\s+/g, "-")}-dp-plan.json`, exportPacket)}
-          >
-            Download JSON packet
-          </Button>
-          {dp?.fixtureAwareLighting && (
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button
-              variant="secondary"
-              className="mt-4 ml-2"
-              disabled={savingRecipe}
-              onClick={() => void saveRecipe()}
+              disabled={!dp}
+              onClick={() => downloadScoutPdf(project)}
             >
-              {savingRecipe ? "Saving…" : "Save as lighting recipe"}
+              Download PDF packet
             </Button>
+            <Button
+              variant="outline"
+              disabled={!dp}
+              onClick={() => downloadJson(`${project.projectName.replace(/\s+/g, "-")}-dp-plan.json`, exportPacket)}
+            >
+              Download JSON packet
+            </Button>
+            {dp?.fixtureAwareLighting && (
+              <Button
+                variant="secondary"
+                disabled={savingRecipe}
+                onClick={() => void saveRecipe()}
+              >
+                {savingRecipe ? "Saving…" : "Save as lighting recipe"}
+              </Button>
+            )}
+          </div>
+          {!dp && (
+            <p className="mt-3 text-xs text-slate-500">Generate a DP plan on the session page before exporting.</p>
           )}
         </ScoutCard>
 

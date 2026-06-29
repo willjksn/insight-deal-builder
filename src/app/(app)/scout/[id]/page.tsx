@@ -30,6 +30,7 @@ import {
 } from "@/lib/scout/constants";
 import { ScoutImageLabel, ScoutProject, ScoutProjectImage } from "@/lib/scout/types";
 import { canLinkScoutToProject, canUseShotScout } from "@/lib/utils/permissions";
+import { downloadScoutPdf } from "@/lib/pdf/generateScoutPdf";
 import { LightingAssignmentTable } from "@/components/scout/LightingAssignmentTable";
 import { ScoutLinkToProjectCard } from "@/components/scout/ScoutLinkToProjectCard";
 import { useConditionalCollection } from "@/hooks/useConditionalCollection";
@@ -729,7 +730,7 @@ export default function ScoutProjectPage() {
           <ScoutCard>
             <h2 className="font-semibold text-slate-900">Export packet</h2>
             <p className="mt-2 text-sm text-slate-600">
-              Download JSON or view the full export page. Printable PDF coming soon.
+              Download a printable PDF or JSON packet for the crew. Includes analysis, DP plan, fixture table, and shot list.
             </p>
             <ul className="mt-4 space-y-2 text-sm text-slate-700">
               <li>{analysis ? "✓ Location analysis" : "○ Location analysis"}</li>
@@ -738,9 +739,14 @@ export default function ScoutProjectPage() {
               <li>{shots ? "✓ Shot list" : "○ Shot list"}</li>
               <li>{previews.length ? "✓ Scene previs + lighting diagram" : "○ Scene previs"}</li>
             </ul>
-            <Link href={`/scout/${id}/export`} className="mt-4 inline-block">
-              <Button>Open export page</Button>
-            </Link>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button disabled={!dp} onClick={() => downloadScoutPdf(project)}>
+                Download PDF
+              </Button>
+              <Link href={`/scout/${id}/export`}>
+                <Button variant="outline">Open export page</Button>
+              </Link>
+            </div>
           </ScoutCard>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { APP_NAME } from "@/lib/brand";
 
 export async function GET() {
   const config = {
@@ -16,7 +17,7 @@ importScripts("https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging-comp
 firebase.initializeApp(${JSON.stringify(config)});
 const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function(payload) {
-  const title = payload.notification?.title || "Insight Deal Builder";
+  const title = payload.notification?.title || ${JSON.stringify(APP_NAME)};
   const options = {
     body: payload.notification?.body || "",
     icon: "/favicon.ico",

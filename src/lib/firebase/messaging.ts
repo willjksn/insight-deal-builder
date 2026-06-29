@@ -2,6 +2,7 @@
 
 import { getApps, initializeApp } from "firebase/app";
 import { getMessaging, getToken, isSupported, onMessage, Messaging } from "firebase/messaging";
+import { APP_NAME } from "@/lib/brand";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -53,7 +54,7 @@ export async function subscribeForegroundPush(
   if (!messaging) return () => {};
 
   return onMessage(messaging, (payload) => {
-    const title = payload.notification?.title || "Insight Deal Builder";
+    const title = payload.notification?.title || APP_NAME;
     const body = payload.notification?.body || "";
     const url = payload.data?.url;
     onPayload(title, body, url);

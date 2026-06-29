@@ -16,6 +16,7 @@ import {
   hasAnyWritePermission,
   isInsightOrgUser,
   resolvePermissions,
+  canUseShotScout,
 } from "@/lib/utils/permissions";
 import { repairAllAgreementAccessKeys } from "@/lib/agreement/lifecycle";
 import { PAYOUT_RULES_SUMMARY } from "@/lib/seed/demoData";
@@ -28,6 +29,9 @@ import {
   ChevronRight,
   Bell,
   FileStack,
+  Clapperboard,
+  Camera,
+  Lightbulb,
 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
@@ -199,6 +203,34 @@ export default function SettingsPage() {
               View cash flow analytics and download CSV exports for payees and partner collaborator
               payouts from signed agreements.
             </p>
+          </PageSection>
+        )}
+
+        {canUseShotScout(appUser) && (
+          <PageSection
+            icon={Clapperboard}
+            accent="violet"
+            title="Production tools"
+            description="Scout gear and lighting presets used by Shot Scout"
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Link
+                href="/settings/scout-gear"
+                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 transition-colors hover:border-violet-200 hover:bg-violet-50/50"
+              >
+                <Camera className="h-5 w-5 text-violet-500" />
+                Scout gear lists
+                <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
+              </Link>
+              <Link
+                href="/settings/lights"
+                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 transition-colors hover:border-violet-200 hover:bg-violet-50/50"
+              >
+                <Lightbulb className="h-5 w-5 text-amber-500" />
+                Lighting presets
+                <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
+              </Link>
+            </div>
           </PageSection>
         )}
 

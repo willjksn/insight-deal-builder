@@ -1695,7 +1695,7 @@ function FilmingCard({
             <div className="space-y-2">
               <div className="rounded-lg border border-sky-200/80 bg-sky-50/50 px-3 py-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-800/80">
-                  Project fee (Deal Builder)
+                  Project fee
                 </p>
                 <p className="mt-0.5 text-lg font-semibold tabular-nums text-slate-900">{formattedFee}</p>
                 {projectClientName ? (

@@ -12,9 +12,12 @@ import {
   FileStack,
   Settings,
   Shield,
+  Clapperboard,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
+import { APP_NAME, APP_SHORT_TAGLINE } from "@/lib/brand";
 import {
   canManageClients,
   canManageCompanies,
@@ -22,26 +25,32 @@ import {
   canManageProjects,
   canManageTemplates,
   canManageUsers,
+  canUseShotScout,
 } from "@/lib/utils/permissions";
-
-const navItems = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-  { href: "/projects", label: "Projects", icon: FolderKanban, canAccess: canManageProjects },
-  { href: "/agreements", label: "Agreements", icon: FileText },
-  { href: "/clients", label: "Clients", icon: Users, canAccess: canManageClients },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
 
 export function MobileNav() {
   const pathname = usePathname();
   const { appUser } = useAuth();
+  const showProduction = canUseShotScout(appUser);
 
-  const visibleNavItems = navItems.filter(
-    (item) => !("canAccess" in item && item.canAccess) || item.canAccess!(appUser)
-  );
+  const navItems = [
+    { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+    ...(canManageProjects(appUser)
+      ? [{ href: "/projects", label: "Projects", icon: FolderKanban }]
+      : []),
+    ...(showProduction
+      ? [
+          { href: "/script-writer", label: "Script", icon: ScrollText },
+          { href: "/scout", label: "Scout", icon: Clapperboard },
+        ]
+      : []),
+    { href: "/agreements", label: "Deals", icon: FileText },
+    { href: "/settings", label: "Settings", icon: Settings },
+  ];
 
   const visibleMoreItems = [
     { href: "/companies", label: "Companies", icon: Building2, canAccess: canManageCompanies },
+    { href: "/clients", label: "Clients", icon: Users, canAccess: canManageClients },
     { href: "/crew", label: "Crew", icon: UserCircle, canAccess: canManageCrew },
     { href: "/templates", label: "Templates", icon: FileStack, canAccess: canManageTemplates },
     { href: "/admin", label: "Admin", icon: Shield, canAccess: canManageUsers },
@@ -50,51 +59,56 @@ export function MobileNav() {
   return (
     <>
       <header className="lg:hidden sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-md shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-base font-bold text-slate-900">Insight Deal Builder</h1>
-            <p className="text-xs text-sky-600/90 font-medium">Production Agreements</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-bold text-slate-900">{APP_NAME}</h1>
+            <p className="truncate text-[10px] font-medium text-sky-700/90">{APP_SHORT_TAGLINE}</p>
           </div>
-          <nav className="hidden md:flex items-center gap-1">
-            {visibleMoreItems.map((item) => {
-              const Icon = item.icon;
-              const active = pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
-                    active
-                      ? "bg-sky-50 text-sky-900 ring-1 ring-sky-200"
-                      : "text-slate-500 hover:bg-slate-100"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+          {visibleMoreItems.length > 0 ? (
+            <nav className="hidden md:flex shrink-0 items-center gap-1">
+              {visibleMoreItems.map((item) => {
+                const Icon = item.icon;
+                const active = pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors",
+                      active
+                        ? "bg-sky-50 text-sky-900 ring-1 ring-sky-200"
+                        : "text-slate-500 hover:bg-slate-100"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          ) : null}
         </div>
       </header>
 
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/80 bg-white/95 backdrop-blur-md safe-area-pb shadow-[0_-4px_20px_rgba(15,23,42,0.06)]">
-        <div className="flex items-center justify-around px-2 py-2">
-          {visibleNavItems.map((item) => {
+        <div className="flex items-center justify-around px-1 py-2">
+          {navItems.map((item) => {
             const Icon = item.icon;
-            const active = pathname.startsWith(item.href);
+            const active =
+              item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 min-w-[64px] min-h-[52px] justify-center transition-colors",
+                  "flex flex-col items-center gap-0.5 rounded-xl px-2 py-2 min-w-[56px] min-h-[52px] justify-center transition-colors",
                   active ? "text-sky-600" : "text-slate-400"
                 )}
               >
-                <Icon className={cn("h-6 w-6", active && "stroke-[2.5]")} />
-                <span className="text-[10px] font-semibold">{item.label}</span>
+                <Icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
+                <span className="text-[9px] font-semibold">{item.label}</span>
               </Link>
             );
           })}
