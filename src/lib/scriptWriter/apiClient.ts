@@ -1,4 +1,10 @@
 import { ScriptWriterBrief } from "@/lib/scriptWriter/brief";
+import {
+  ScriptInspirationImage,
+  ScriptInspirationUrl,
+  ScriptInspirationVideo,
+  ScriptVideoReferenceMode,
+} from "@/lib/scriptWriter/types";
 
 export const SCRIPT_WRITER_SESSIONS_COLLECTION = "scriptWriterSessions";
 
@@ -25,6 +31,7 @@ export async function scriptWriterCreateSession(
     title?: string;
     linkedProjectId?: string;
     linkedScoutProjectId?: string;
+    workflowMode?: "text" | "inspiration";
   }
 ) {
   const res = await fetch("/api/script-writer/sessions", {
@@ -32,7 +39,50 @@ export async function scriptWriterCreateSession(
     headers: await authHeaders(getToken),
     body: JSON.stringify(body),
   });
-  return parseJson<{ ok: true; id: string; session: unknown }>(res);
+  return parseJson<{ ok: true; id: string; session: unknown; readyToWrite?: boolean }>(res);
+}
+
+export async function scriptWriterAnalyzeInspiration(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  body: {
+    images: ScriptInspirationImage[];
+    video?: ScriptInspirationVideo | null;
+    urls?: Pick<ScriptInspirationUrl, "id" | "url" | "tag" | "label" | "referenceMode">[];
+  }
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/analyze`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ session: unknown; analysis: unknown }>(res);
+}
+
+export async function scriptWriterConfirmAnalysis(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  notes?: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/confirm-analysis`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ notes }),
+  });
+  return parseJson<{ session: unknown }>(res);
+}
+
+export async function scriptWriterRefineScript(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  message: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/refine`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ message }),
+  });
+  return parseJson<{ session: unknown }>(res);
 }
 
 export async function scriptWriterGetSession(
@@ -97,3 +147,24 @@ export async function scriptWriterApplyToProject(
     productionBoardId?: string;
   }>(res);
 }
+
+export type PendingInspirationImage = {
+  id: string;
+  file: File;
+  tag: ScriptInspirationImage["tag"];
+  label: string;
+};
+
+export type PendingInspirationVideo = {
+  id: string;
+  file: File;
+  referenceMode: ScriptVideoReferenceMode;
+};
+
+export type PendingInspirationUrl = {
+  id: string;
+  url: string;
+  tag: ScriptInspirationUrl["tag"];
+  label: string;
+  referenceMode?: ScriptVideoReferenceMode;
+};

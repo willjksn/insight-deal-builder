@@ -20,8 +20,10 @@ import { useCollection } from "@/hooks/useCollection";
 import { Project } from "@/lib/types";
 import {
   scriptWriterApplyToProject,
+  scriptWriterConfirmAnalysis,
   scriptWriterGenerateScript,
   scriptWriterGetSession,
+  scriptWriterRefineScript,
   scriptWriterSendMessage,
 } from "@/lib/scriptWriter/apiClient";
 import {
@@ -32,6 +34,7 @@ import {
 } from "@/lib/scriptWriter/brief";
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { cn } from "@/lib/utils/cn";
+import { ScriptProductionPackView } from "@/components/scriptWriter/ScriptProductionPackView";
 
 interface ScriptWriterClientProps {
   sessionId: string;
@@ -49,6 +52,10 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const [generating, setGenerating] = useState(false);
   const [applying, setApplying] = useState(false);
   const [readyToWrite, setReadyToWrite] = useState(false);
+  const [confirmNotes, setConfirmNotes] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [refineInput, setRefineInput] = useState("");
+  const [refining, setRefining] = useState(false);
   const [projectId, setProjectId] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -113,6 +120,43 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
     }
   };
 
+  const confirmAndWrite = async () => {
+    if (!user || confirming) return;
+    setConfirming(true);
+    setError(null);
+    try {
+      const { session: updated } = await scriptWriterConfirmAnalysis(
+        () => user.getIdToken(),
+        sessionId,
+        confirmNotes.trim() || undefined
+      );
+      setSession(updated as ScriptWriterSession);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Generation failed");
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const refine = async () => {
+    if (!user || !refineInput.trim() || refining) return;
+    setRefining(true);
+    setError(null);
+    try {
+      const { session: updated } = await scriptWriterRefineScript(
+        () => user.getIdToken(),
+        sessionId,
+        refineInput.trim()
+      );
+      setSession(updated as ScriptWriterSession);
+      setRefineInput("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Refinement failed");
+    } finally {
+      setRefining(false);
+    }
+  };
+
   const apply = async () => {
     if (!user || !projectId || applying) return;
     setApplying(true);
@@ -146,12 +190,19 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   }
 
   const script = session.script as ScriptDocument | null;
+  const isInspiration = session.workflowMode === "inspiration";
+  const awaitingAnalysisConfirm = session.status === "analysis_ready";
+  const canRefine = Boolean(script && session.status === "script_ready" && !session.refineUsed);
 
   return (
     <div className="pb-24">
       <PageHeader
         title={session.title || "Script writer"}
-        subtitle="Refine in chat, then generate a screenplay tied to your board, shot list, and call sheets."
+        subtitle={
+          isInspiration
+            ? "Review the analysis, confirm, then get a full production script."
+            : "Refine in chat, then generate a screenplay tied to your board, shot list, and call sheets."
+        }
         action={
           <Link href="/script-writer">
             <Button size="touch" variant="outline">
@@ -177,15 +228,33 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         </div>
       ) : null}
 
+      {session.inspirationImages?.length || session.inspirationVideo || session.inspirationUrls?.length ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {session.inspirationVideo ? (
+            <BriefChip label={`Clip · ${session.inspirationVideo.referenceMode.replace(/_/g, " ")}`} />
+          ) : null}
+          {session.inspirationImages?.map((img) => (
+            <BriefChip key={img.id} label={img.label || img.tag} />
+          ))}
+          {session.inspirationUrls?.map((u) => (
+            <BriefChip key={u.id} label={u.label || u.pageTitle || "Link"} />
+          ))}
+        </div>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="flex min-h-[480px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-4 py-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <Sparkles className="h-4 w-4 text-violet-600" />
-              Conversation
+              {awaitingAnalysisConfirm ? "Analysis" : "Conversation"}
             </h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              Follow-ups only for what&apos;s still unclear — your setup answers are already locked in.
+              {awaitingAnalysisConfirm
+                ? "Confirm what Gemini saw, add a note if needed, then write the full script."
+                : isInspiration
+                  ? "Inspiration flow — one optional refinement after the script is ready."
+                  : "Follow-ups only for what's still unclear."}
             </p>
           </div>
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
@@ -204,7 +273,31 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
             ))}
             <div ref={chatEndRef} />
           </div>
-          {session.status !== "applied" && (
+          {awaitingAnalysisConfirm && session.status !== "applied" ? (
+            <div className="space-y-3 border-t border-slate-100 p-3">
+              <textarea
+                value={confirmNotes}
+                onChange={(e) => setConfirmNotes(e.target.value)}
+                placeholder="Optional: e.g. Pool only in the final beat, more whisper less gore…"
+                rows={2}
+                className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-300/20"
+              />
+              <Button
+                type="button"
+                className="w-full bg-gradient-to-b from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700"
+                disabled={confirming}
+                onClick={() => void confirmAndWrite()}
+              >
+                {confirming ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Wand2 className="mr-2 h-4 w-4" />
+                )}
+                Write full script
+              </Button>
+            </div>
+          ) : null}
+          {!awaitingAnalysisConfirm && session.status !== "applied" && !isInspiration ? (
             <div className="border-t border-slate-100 p-3">
               <div className="flex gap-2">
                 <textarea
@@ -255,7 +348,38 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                 )}
               </div>
             </div>
-          )}
+          ) : null}
+          {canRefine ? (
+            <div className="space-y-2 border-t border-slate-100 p-3">
+              <p className="text-xs text-slate-500">One optional refinement</p>
+              <div className="flex gap-2">
+                <textarea
+                  value={refineInput}
+                  onChange={(e) => setRefineInput(e.target.value)}
+                  placeholder="e.g. Shorter dialogue, darker ending…"
+                  rows={2}
+                  className="min-h-[44px] flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-300/20"
+                />
+                <Button
+                  type="button"
+                  size="touch"
+                  disabled={refining || !refineInput.trim()}
+                  onClick={() => void refine()}
+                >
+                  {refining ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {session.refineUsed ? (
+            <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+              Refinement used — start a new session for bigger changes.
+            </p>
+          ) : null}
         </section>
 
         <section className="flex min-h-[480px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -282,13 +406,27 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                   <h3 className="font-serif text-lg font-bold text-slate-900">{script.title}</h3>
                   <p className="mt-1 text-sm text-slate-600">{script.logline}</p>
                 </div>
-                <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-800">
-                  {script.fountain}
-                </pre>
+                <ScriptProductionPackView script={script} />
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Screenplay
+                  </h4>
+                  <pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-800">
+                    {script.fountain}
+                  </pre>
+                </div>
               </div>
             ) : (
               <p className="text-sm text-slate-500">
-                Chat with the writer first, then click <strong>Write script</strong>.
+                {awaitingAnalysisConfirm
+                  ? "Confirm the analysis to generate your script."
+                  : isInspiration
+                    ? "Your production script will appear here after you confirm."
+                    : (
+                        <>
+                          Chat with the writer first, then click <strong>Write script</strong>.
+                        </>
+                      )}
               </p>
             )}
           </div>

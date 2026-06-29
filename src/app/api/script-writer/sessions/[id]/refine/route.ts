@@ -10,7 +10,7 @@ import { stripUndefined } from "@/lib/firebase/firestore";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
 import { getScriptSessionForUser } from "@/lib/scriptWriter/adminApply";
 import { inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
-import { resolveSessionBrief, scriptWriterGenerate } from "@/lib/scriptWriter/scriptWriterAi";
+import { resolveSessionBrief, scriptWriterRefineScript } from "@/lib/scriptWriter/scriptWriterAi";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 
 export const runtime = "nodejs";
@@ -23,6 +23,12 @@ export async function POST(
     const { uid, appUser } = await requireAuthUser(request);
     assertCanUseScriptWriter(appUser);
     const { id } = await params;
+    const body = (await request.json()) as { message?: string };
+
+    const message = body.message?.trim();
+    if (!message) {
+      return NextResponse.json({ error: "Refinement note is required" }, { status: 400 });
+    }
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
@@ -31,30 +37,37 @@ export async function POST(
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
+    if (session.status !== "script_ready" || !session.script) {
+      return NextResponse.json({ error: "Generate a script before refining" }, { status: 400 });
+    }
+    if (session.refineUsed) {
+      return NextResponse.json({ error: "One refinement already used for this session" }, { status: 400 });
+    }
 
     const brief = resolveSessionBrief(session.brief, session.initialIdea);
     const detailLevel = session.detailLevel ?? inferScriptDetailLevel(brief);
     const inspiration =
-      session.inspirationAnalysis
+      session.workflowMode === "inspiration" && session.inspirationAnalysis
         ? {
             analysis: session.inspirationAnalysis,
             images: session.inspirationImages ?? [],
             video: session.inspirationVideo ?? null,
             urls: session.inspirationUrls ?? [],
-            confirmNotes: session.inspirationAnalysis.userNotes,
           }
         : undefined;
 
-    const script = await scriptWriterGenerate(brief, session.messages, {
-      detailLevel,
-      inspiration,
-    });
+    const script = await scriptWriterRefineScript(
+      brief,
+      session.script as ScriptDocument,
+      message,
+      { detailLevel, inspiration }
+    );
 
     await db.collection(SCRIPT_WRITER_SESSIONS_COLLECTION).doc(id).update(
       stripUndefined({
         script,
         title: script.title,
-        status: "script_ready",
+        refineUsed: true,
         updatedAt: FieldValue.serverTimestamp(),
       })
     );
@@ -62,7 +75,7 @@ export async function POST(
     const updated = await getScriptSessionForUser(db, id, uid);
     return NextResponse.json({ session: updated });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Script generation failed";
+    const message = err instanceof Error ? err.message : "Refinement failed";
     return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
   }
 }

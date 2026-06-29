@@ -156,11 +156,18 @@ export function resolveRuntimeLabel(brief: Pick<ScriptWriterBrief, "runtime" | "
   return SCRIPT_RUNTIME_LABELS[brief.runtime];
 }
 
-export function isBriefComplete(brief: ScriptWriterBrief): boolean {
-  if (!brief.concept.trim()) return false;
+export function isBriefComplete(brief: ScriptWriterBrief, hasInspiration = false): boolean {
+  if (!brief.concept.trim() && !hasInspiration) return false;
   if (brief.mood === "custom" && !brief.customMood?.trim()) return false;
   if (brief.runtime === "custom" && !brief.customRuntime?.trim()) return false;
   return true;
+}
+
+export function inferScriptDetailLevel(brief: ScriptWriterBrief): "standard" | "production" | "trailer" {
+  const runtime = brief.runtime;
+  if (runtime === "30s" || runtime === "60s" || runtime === "90s") return "trailer";
+  if (runtime === "2_3min" || runtime === "5_10min") return "production";
+  return "standard";
 }
 
 export function formatBriefForPrompt(brief: ScriptWriterBrief): string {

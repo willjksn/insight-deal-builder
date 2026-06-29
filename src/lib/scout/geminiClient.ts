@@ -100,12 +100,19 @@ function extractJson(text: string): unknown {
 export async function fetchImageInlineData(
   url: string
 ): Promise<{ mimeType: string; data: string } | null> {
+  return fetchMediaInlineData(url, 8 * 1024 * 1024);
+}
+
+export async function fetchMediaInlineData(
+  url: string,
+  maxBytes = 8 * 1024 * 1024
+): Promise<{ mimeType: string; data: string } | null> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) return null;
-    const contentType = res.headers.get("content-type")?.split(";")[0] ?? "image/jpeg";
+    const contentType = res.headers.get("content-type")?.split(";")[0] ?? "application/octet-stream";
     const buffer = Buffer.from(await res.arrayBuffer());
-    if (buffer.length > 8 * 1024 * 1024) return null;
+    if (buffer.length > maxBytes) return null;
     return { mimeType: contentType, data: buffer.toString("base64") };
   } catch {
     return null;
@@ -325,4 +332,37 @@ export async function callGeminiJsonWithImages(
     throw new Error("Could not load uploaded location photos for vision analysis");
   }
   return callGeminiJson(systemPrompt, parts, model);
+}
+
+export type GeminiMediaInput = {
+  url: string;
+  kind: "image" | "video";
+  label?: string;
+};
+
+export async function callGeminiJsonWithMedia(
+  systemPrompt: string,
+  userPrompt: string,
+  media: GeminiMediaInput[],
+  options?: { model?: string; temperature?: number }
+): Promise<unknown> {
+  const parts: GeminiPart[] = [{ text: userPrompt }];
+  for (const item of media) {
+    const maxBytes = item.kind === "video" ? 20 * 1024 * 1024 : 8 * 1024 * 1024;
+    const inline = await fetchMediaInlineData(item.url, maxBytes);
+    if (inline) {
+      if (item.label) {
+        parts.push({ text: `[${item.kind}: ${item.label}]` });
+      }
+      parts.push({ inlineData: inline });
+    }
+  }
+  const text = await callGeminiGenerate({
+    systemPrompt,
+    userParts: parts,
+    json: true,
+    model: options?.model,
+    temperature: options?.temperature,
+  });
+  return extractJson(text);
 }

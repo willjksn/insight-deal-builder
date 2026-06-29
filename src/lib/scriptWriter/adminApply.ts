@@ -8,6 +8,7 @@ import { ScoutShotList } from "@/lib/scout/types";
 import {
   castFromScript,
   filmingNotesFromScript,
+  locationsFromInspirationImages,
   locationsFromScript,
   productionShotsFromScript,
   sceneNumbersFromScript,
@@ -88,11 +89,15 @@ export async function applyScriptToProject(params: {
   ];
 
   const newLocations = locationsFromScript(script);
-  const existingLoc = new Set(board.locations.map((l) => l.name.toLowerCase()));
-  const mergedLocations = [
-    ...board.locations,
-    ...newLocations.filter((l) => !existingLoc.has(l.name.toLowerCase())),
-  ];
+  const inspirationLocations = locationsFromInspirationImages(session.inspirationImages ?? []);
+  const locSet = new Set(board.locations.map((l) => l.name.toLowerCase()));
+  const mergedLocations = [...board.locations];
+  for (const loc of [...newLocations, ...inspirationLocations]) {
+    const key = loc.name.toLowerCase();
+    if (locSet.has(key)) continue;
+    locSet.add(key);
+    mergedLocations.push(loc);
+  }
 
   const dayOne = board.productionDays[0];
   const updatedDays = board.productionDays.length

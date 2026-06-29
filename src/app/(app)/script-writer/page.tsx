@@ -12,8 +12,13 @@ import {
   DEFAULT_SCRIPT_BRIEF,
   ScriptWriterIntakeForm,
 } from "@/components/scriptWriter/ScriptWriterIntakeForm";
+import { InspirationUploadSection } from "@/components/scriptWriter/InspirationUploadSection";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  PendingInspirationImage,
+  PendingInspirationUrl,
+  PendingInspirationVideo,
+  scriptWriterAnalyzeInspiration,
   scriptWriterCreateSession,
   scriptWriterListSessions,
 } from "@/lib/scriptWriter/apiClient";
@@ -21,7 +26,8 @@ import {
   isBriefComplete,
   ScriptWriterBrief,
 } from "@/lib/scriptWriter/brief";
-import { ScriptWriterSession } from "@/lib/scriptWriter/types";
+import { uploadScriptWriterFile } from "@/lib/scriptWriter/storage";
+import { ScriptInspirationImage, ScriptInspirationVideo, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { canUseShotScout } from "@/lib/utils/permissions";
 
 function ScriptWriterPageContent() {
@@ -37,6 +43,13 @@ function ScriptWriterPageContent() {
   const [linkedProjectId, setLinkedProjectId] = useState<string>();
   const [linkedScoutProjectId, setLinkedScoutProjectId] = useState<string>();
   const [title, setTitle] = useState<string>();
+  const [pendingImages, setPendingImages] = useState<PendingInspirationImage[]>([]);
+  const [pendingVideo, setPendingVideo] = useState<PendingInspirationVideo | null>(null);
+  const [pendingUrls, setPendingUrls] = useState<PendingInspirationUrl[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+
+  const hasInspiration =
+    pendingImages.length > 0 || pendingVideo !== null || pendingUrls.length > 0;
 
   useEffect(() => {
     const idea = searchParams.get("idea")?.trim();
@@ -61,22 +74,73 @@ function ScriptWriterPageContent() {
   }, [user, allowed]);
 
   const start = async () => {
-    if (!user || !isBriefComplete(brief)) return;
+    if (!user || !isBriefComplete(brief, hasInspiration)) return;
     setCreating(true);
     setError(null);
+    setUploadProgress(null);
     try {
       const { id } = await scriptWriterCreateSession(() => user.getIdToken(), {
         brief,
-        initialIdea: brief.concept.trim(),
-        title: title ?? brief.concept.trim().slice(0, 60),
+        initialIdea: brief.concept.trim() || "Inspired script",
+        title: title ?? (brief.concept.trim().slice(0, 60) || "Inspired script"),
         linkedProjectId,
         linkedScoutProjectId,
+        workflowMode: hasInspiration ? "inspiration" : "text",
       });
+
+      if (hasInspiration) {
+        const images: ScriptInspirationImage[] = [];
+        for (let i = 0; i < pendingImages.length; i++) {
+          const img = pendingImages[i];
+          setUploadProgress(`Uploading photo ${i + 1} of ${pendingImages.length}…`);
+          const uploaded = await uploadScriptWriterFile(user.uid, id, img.id, img.file);
+          images.push({
+            id: img.id,
+            storageUrl: uploaded.storageUrl,
+            storagePath: uploaded.storagePath,
+            tag: img.tag,
+            label: img.label.trim() || undefined,
+          });
+        }
+
+        let video: ScriptInspirationVideo | null = null;
+        if (pendingVideo) {
+          setUploadProgress("Uploading clip…");
+          const uploaded = await uploadScriptWriterFile(
+            user.uid,
+            id,
+            pendingVideo.id,
+            pendingVideo.file
+          );
+          video = {
+            id: pendingVideo.id,
+            storageUrl: uploaded.storageUrl,
+            storagePath: uploaded.storagePath,
+            referenceMode: pendingVideo.referenceMode,
+            fileName: pendingVideo.file.name,
+          };
+        }
+
+        setUploadProgress("Analyzing inspiration…");
+        await scriptWriterAnalyzeInspiration(() => user.getIdToken(), id, {
+          images,
+          video,
+          urls: pendingUrls.map((u) => ({
+            id: u.id,
+            url: u.url,
+            tag: u.tag,
+            label: u.label.trim() || undefined,
+            referenceMode: u.tag === "reference_clip" ? u.referenceMode : undefined,
+          })),
+        });
+      }
+
       router.push(`/script-writer/${id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start session");
     } finally {
       setCreating(false);
+      setUploadProgress(null);
     }
   };
 
@@ -104,16 +168,31 @@ function ScriptWriterPageContent() {
       <Card className="mb-8">
         <CardBody className="space-y-5">
           <ScriptWriterIntakeForm brief={brief} onChange={setBrief} />
-          <div className="flex justify-end border-t border-slate-100 pt-4">
+          <InspirationUploadSection
+            images={pendingImages}
+            video={pendingVideo}
+            urls={pendingUrls}
+            onImagesChange={setPendingImages}
+            onVideoChange={setPendingVideo}
+            onUrlsChange={setPendingUrls}
+          />
+          <div className="flex flex-col items-end gap-2 border-t border-slate-100 pt-4">
+            {uploadProgress ? (
+              <p className="text-xs text-violet-700">{uploadProgress}</p>
+            ) : null}
             <Button
               type="button"
               size="lg"
-              disabled={creating || !isBriefComplete(brief)}
+              disabled={creating || !isBriefComplete(brief, hasInspiration)}
               onClick={() => void start()}
               className="bg-gradient-to-b from-violet-500 to-violet-600 shadow-violet-500/25 hover:from-violet-600 hover:to-violet-700 focus:ring-violet-400"
             >
               <PenLine className="mr-2 h-4 w-4" />
-              {creating ? "Opening writer…" : "Begin script"}
+              {creating
+                ? uploadProgress || "Working…"
+                : hasInspiration
+                  ? "Analyze & write script"
+                  : "Begin script"}
             </Button>
           </div>
         </CardBody>
@@ -145,7 +224,9 @@ function ScriptWriterPageContent() {
                         ? "Applied to project"
                         : s.status === "script_ready"
                           ? "Script ready"
-                          : "In progress"}
+                          : s.status === "analysis_ready"
+                            ? "Review analysis"
+                            : "In progress"}
                     </p>
                   </div>
                 </Link>

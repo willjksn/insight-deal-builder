@@ -118,6 +118,22 @@ export function filmingNotesFromScript(script: ScriptDocument): string {
     script.genre ? `Genre: ${script.genre}` : null,
     script.idealRuntime ? `Runtime: ${script.idealRuntime}` : null,
     script.logline ? `Logline: ${script.logline}` : null,
+    script.productionPack?.premise ? `Premise: ${script.productionPack.premise}` : null,
+    script.productionPack?.tone ? `Tone: ${script.productionPack.tone}` : null,
   ].filter(Boolean);
   return parts.join("\n");
+}
+
+export function locationsFromInspirationImages(
+  images: { tag: string; label?: string; storageUrl?: string }[]
+): ProductionLocationEntry[] {
+  return images
+    .filter((img) => img.tag === "location")
+    .map((img, index) => ({
+      id: crypto.randomUUID(),
+      name: img.label?.trim() || `Location ${index + 1}`,
+      status: "needed" as const,
+      notes: img.storageUrl ? "Reference photo from script writer" : undefined,
+      photoUrl: img.storageUrl,
+    }));
 }

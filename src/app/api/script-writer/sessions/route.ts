@@ -8,7 +8,7 @@ import {
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
-import { ScriptWriterBrief, buildInitialUserMessage } from "@/lib/scriptWriter/brief";
+import { ScriptWriterBrief, buildInitialUserMessage, inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
 import {
   resolveSessionBrief,
   scriptWriterChat,
@@ -91,26 +91,35 @@ export async function POST(request: NextRequest) {
       title?: string;
       linkedProjectId?: string;
       linkedScoutProjectId?: string;
+      workflowMode?: "text" | "inspiration";
     };
 
+    const workflowMode = body.workflowMode ?? "text";
     const brief = resolveSessionBrief(body.brief, body.initialIdea?.trim() ?? "");
-    if (!brief.concept.trim()) {
+    const hasConcept = Boolean(brief.concept.trim());
+    if (!hasConcept && workflowMode !== "inspiration") {
       return NextResponse.json({ error: "Describe your concept first" }, { status: 400 });
     }
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
 
-    const userMessage = newMessage("user", buildInitialUserMessage(brief));
-    const chat = await scriptWriterChat(brief, [userMessage]);
-    const assistantContent = chat.questions?.length
-      ? `${chat.message}\n\n${chat.questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}`
-      : chat.message;
-    const assistantMessage = newMessage("assistant", assistantContent);
+    let messages: ScriptWriterMessage[] = [];
+    let readyToWrite = false;
+
+    if (workflowMode === "text" && hasConcept) {
+      const userMessage = newMessage("user", buildInitialUserMessage(brief));
+      const chat = await scriptWriterChat(brief, [userMessage]);
+      const assistantContent = chat.questions?.length
+        ? `${chat.message}\n\n${chat.questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}`
+        : chat.message;
+      messages = [userMessage, newMessage("assistant", assistantContent)];
+      readyToWrite = chat.readyToWrite;
+    }
 
     const title =
       body.title?.trim() ||
-      brief.concept.slice(0, 60) + (brief.concept.length > 60 ? "…" : "");
+      (brief.concept ? brief.concept.slice(0, 60) + (brief.concept.length > 60 ? "…" : "") : "Inspired script");
 
     const ref = await db.collection(SCRIPT_WRITER_SESSIONS_COLLECTION).add(
       stripUndefined({
@@ -118,9 +127,15 @@ export async function POST(request: NextRequest) {
         title,
         initialIdea: brief.concept,
         brief,
-        status: "interviewing",
-        messages: [userMessage, assistantMessage],
+        workflowMode,
+        detailLevel: inferScriptDetailLevel(brief),
+        status: workflowMode === "inspiration" ? "interviewing" : "interviewing",
+        messages,
         script: null,
+        inspirationImages: [],
+        inspirationVideo: null,
+        inspirationAnalysis: null,
+        refineUsed: false,
         linkedProjectId: body.linkedProjectId,
         linkedScoutProjectId: body.linkedScoutProjectId,
         createdAt: FieldValue.serverTimestamp(),
@@ -130,7 +145,7 @@ export async function POST(request: NextRequest) {
 
     const snap = await ref.get();
     const session = serializeScriptSession(ref.id, snap.data()!);
-    return NextResponse.json({ ok: true, id: ref.id, session, readyToWrite: chat.readyToWrite });
+    return NextResponse.json({ ok: true, id: ref.id, session, readyToWrite });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create session";
     return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
