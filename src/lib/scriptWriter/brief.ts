@@ -6,6 +6,7 @@ export type ScriptContentType =
   | "documentary"
   | "social_reel"
   | "interview"
+  | "trailer"
   | "other";
 
 export type ScriptMood =
@@ -89,6 +90,7 @@ export const SCRIPT_CONTENT_TYPE_LABELS: Record<ScriptContentType, string> = {
   documentary: "Documentary",
   social_reel: "Social / reel",
   interview: "Interview / talking head",
+  trailer: "Trailer",
   other: "Other",
 };
 
@@ -164,6 +166,7 @@ export function isBriefComplete(brief: ScriptWriterBrief, hasInspiration = false
 }
 
 export function inferScriptDetailLevel(brief: ScriptWriterBrief): "standard" | "production" | "trailer" {
+  if (brief.contentType === "trailer") return "trailer";
   const runtime = brief.runtime;
   if (runtime === "30s" || runtime === "60s" || runtime === "90s") return "trailer";
   if (runtime === "2_3min" || runtime === "5_10min") return "production";

@@ -18,6 +18,8 @@ import {
 interface ScriptWriterIntakeFormProps {
   brief: ScriptWriterBrief;
   onChange: (brief: ScriptWriterBrief) => void;
+  researchTrends?: boolean;
+  onResearchTrendsChange?: (value: boolean) => void;
 }
 
 function selectOptions<T extends string>(labels: Record<T, string>) {
@@ -93,7 +95,12 @@ function SelectWithCustomSlot({
   );
 }
 
-export function ScriptWriterIntakeForm({ brief, onChange }: ScriptWriterIntakeFormProps) {
+export function ScriptWriterIntakeForm({
+  brief,
+  onChange,
+  researchTrends,
+  onResearchTrendsChange,
+}: ScriptWriterIntakeFormProps) {
   const patch = (partial: Partial<ScriptWriterBrief>) => onChange({ ...brief, ...partial });
 
   return (
@@ -201,6 +208,26 @@ export function ScriptWriterIntakeForm({ brief, onChange }: ScriptWriterIntakeFo
           </div>
         </div>
       </div>
+
+      {onResearchTrendsChange ? (
+        <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-4 py-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={researchTrends ?? false}
+              onChange={(e) => onResearchTrendsChange(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-400"
+            />
+            <span className="text-sm text-slate-700">
+              <span className="font-medium text-slate-900">Research current trends</span>
+              <span className="mt-0.5 block text-xs text-slate-500">
+                Uses the weekly trend cache when fresh (under 7 days), or Tavily live on refresh.
+                Requires <code className="text-[10px]">TAVILY_API_KEY</code> on the server.
+              </span>
+            </span>
+          </label>
+        </div>
+      ) : null}
     </div>
   );
 }

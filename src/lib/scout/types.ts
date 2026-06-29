@@ -445,6 +445,18 @@ export interface ScoutPreview {
   createdAt: Timestamp;
 }
 
+/** On-demand DP technique research via Tavily, summarized by Gemini. */
+export interface ScoutTechniqueLookup {
+  query: string;
+  provider: "tavily";
+  searchedAt: string;
+  summary: string;
+  techniques: string[];
+  gearTips: string[];
+  commonMistakes: string[];
+  sourceTitles: string[];
+}
+
 export interface ScoutProjectImage {
   id: string;
   storagePath: string;
@@ -495,6 +507,8 @@ export interface ScoutProject {
   latestDpPlan?: ScoutDpPlan;
   latestShotList?: ScoutShotList;
   latestPreviews?: ScoutPreview[];
+  /** Latest on-demand technique lookup (Tavily + Gemini). */
+  latestTechniqueLookup?: ScoutTechniqueLookup;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

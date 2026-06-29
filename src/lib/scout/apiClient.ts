@@ -120,3 +120,17 @@ export async function scoutSuggestGear(
   if (!res.ok) throw new Error(body.error ?? "Gear suggestion failed");
   return body.suggestion as ScoutGearSuggestion;
 }
+
+export async function scoutTechniqueLookup(
+  scoutProjectId: string,
+  query?: string
+): Promise<{ lookup: unknown; project: unknown }> {
+  const res = await fetch(`/api/scout/${scoutProjectId}/technique-lookup`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify(query ? { query } : {}),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "Technique lookup failed");
+  return body;
+}

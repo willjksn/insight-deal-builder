@@ -29,7 +29,9 @@ import {
   ScriptInspirationVideo,
   ScriptWriterChatResponse,
   ScriptWriterMessage,
+  ScriptTrendsResearch,
 } from "@/lib/scriptWriter/types";
+import { formatTrendsForPrompt } from "@/lib/scriptWriter/trendsResearch";
 import { SCRIPT_VIDEO_MODE_LABELS } from "@/lib/scriptWriter/constants";
 
 function toGeminiHistory(messages: ScriptWriterMessage[]) {
@@ -289,6 +291,7 @@ export async function scriptWriterGenerate(
       urls?: ScriptInspirationUrl[];
       confirmNotes?: string;
     };
+    trendsResearch?: ScriptTrendsResearch | null;
   }
 ): Promise<ScriptDocument> {
   if (scoutAiUsesMock()) {
@@ -304,6 +307,8 @@ export async function scriptWriterGenerate(
       inspirationContext(brief, analysis, images, video, confirmNotes, urls),
       "",
       ...contextLines,
+      "",
+      options?.trendsResearch ? formatTrendsForPrompt(options.trendsResearch) : "",
       "",
       `Detail level: ${detailLevel}`,
       "",
@@ -324,13 +329,17 @@ export async function scriptWriterGenerate(
   const payload = [
     formatBriefForPrompt(brief),
     "",
+    options?.trendsResearch ? formatTrendsForPrompt(options.trendsResearch) : "",
+    "",
     "Conversation:",
     ...messages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`),
     "",
     `Detail level: ${detailLevel}`,
     "",
     "Write the complete, production-ready script now. Match the brief exactly.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const raw = await callGeminiJsonWithHistory(
     SCRIPT_WRITER_GENERATE_SYSTEM,
@@ -352,6 +361,7 @@ export async function scriptWriterRefineScript(
       video?: ScriptInspirationVideo | null;
       urls?: ScriptInspirationUrl[];
     };
+    trendsResearch?: ScriptTrendsResearch | null;
   }
 ): Promise<ScriptDocument> {
   if (scoutAiUsesMock()) {
@@ -380,6 +390,7 @@ export async function scriptWriterRefineScript(
           urls
         )
       : "",
+    options?.trendsResearch ? formatTrendsForPrompt(options.trendsResearch) : "",
     ...contextLines,
     "",
     "CURRENT SCRIPT JSON:",

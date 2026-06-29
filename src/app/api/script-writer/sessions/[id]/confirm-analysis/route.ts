@@ -54,6 +54,7 @@ export async function POST(
         urls: session.inspirationUrls ?? [],
         confirmNotes,
       },
+      trendsResearch: session.trendsResearch ?? null,
     });
 
     await db.collection(SCRIPT_WRITER_SESSIONS_COLLECTION).doc(id).update(

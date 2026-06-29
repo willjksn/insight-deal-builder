@@ -5,6 +5,7 @@ import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { DataTable, DataRow } from "@/components/ui/DataTable";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
+import { ListSearchField } from "@/components/ui/ListSearchField";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -58,7 +59,12 @@ export default function ClientsPage() {
         </div>
       } />
 
-      <div className="mb-4"><Input label="Search clients" value={search} onChange={(e) => setSearch(e.target.value)} touch placeholder="Search by name..." /></div>
+      <ListSearchField
+        label="Search clients"
+        value={search}
+        onChange={setSearch}
+        placeholder="Search by name…"
+      />
 
       {showForm && (
         <Card className="mb-6"><CardHeader><h2 className="text-lg font-semibold">{editingId ? "Edit" : "New"} Client</h2></CardHeader>

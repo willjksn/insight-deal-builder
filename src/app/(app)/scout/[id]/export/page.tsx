@@ -31,6 +31,7 @@ export default function ScoutExportPage() {
   const [project, setProject] = useState<ScoutProject | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingRecipe, setSavingRecipe] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   useEffect(() => {
     getScoutProject(id)
@@ -109,14 +110,17 @@ export default function ScoutExportPage() {
             <li>{dp?.fixtureAwareLighting ? "✓ Fixture assignment table" : "○ Fixture lighting"}</li>
             <li>{shots ? "✓ Shot list" : "○ Shot list"}</li>
             <li>{dp?.onSetWorkflow?.length ? "✓ Rehearsal / on-set checklist" : "○ Checklist"}</li>
-            <li>{previews.length ? "✓ Previs prompts" : "○ Previs prompts"}</li>
+            <li>{previews.some((p) => p.imageUrl) ? "✓ Previs images" : previews.length ? "○ Previs (prompts only)" : "○ Previs"}</li>
           </ul>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button
-              disabled={!dp}
-              onClick={() => downloadScoutPdf(project)}
+              disabled={!dp || pdfLoading}
+              onClick={() => {
+                setPdfLoading(true);
+                void downloadScoutPdf(project).finally(() => setPdfLoading(false));
+              }}
             >
-              Download PDF packet
+              {pdfLoading ? "Building PDF…" : "Download PDF packet"}
             </Button>
             <Button
               variant="outline"

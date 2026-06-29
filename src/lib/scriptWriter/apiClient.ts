@@ -126,6 +126,19 @@ export async function scriptWriterGenerateScript(
   return parseJson<{ session: unknown }>(res);
 }
 
+export async function scriptWriterResearchTrends(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  options?: { forceRefresh?: boolean }
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/trends`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ forceRefresh: options?.forceRefresh ?? false }),
+  });
+  return parseJson<{ session: unknown; trendsResearch: unknown }>(res);
+}
+
 export async function scriptWriterApplyToProject(
   getToken: () => Promise<string | null>,
   sessionId: string,

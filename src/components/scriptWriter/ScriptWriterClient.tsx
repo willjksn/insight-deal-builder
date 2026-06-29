@@ -24,6 +24,7 @@ import {
   scriptWriterGenerateScript,
   scriptWriterGetSession,
   scriptWriterRefineScript,
+  scriptWriterResearchTrends,
   scriptWriterSendMessage,
 } from "@/lib/scriptWriter/apiClient";
 import {
@@ -35,6 +36,7 @@ import {
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { cn } from "@/lib/utils/cn";
 import { ScriptProductionPackView } from "@/components/scriptWriter/ScriptProductionPackView";
+import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPanel";
 
 interface ScriptWriterClientProps {
   sessionId: string;
@@ -56,6 +58,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const [confirming, setConfirming] = useState(false);
   const [refineInput, setRefineInput] = useState("");
   const [refining, setRefining] = useState(false);
+  const [researchingTrends, setResearchingTrends] = useState(false);
   const [projectId, setProjectId] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -157,6 +160,24 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
     }
   };
 
+  const researchTrends = async () => {
+    if (!user || researchingTrends) return;
+    setResearchingTrends(true);
+    setError(null);
+    try {
+      const { session: updated } = await scriptWriterResearchTrends(
+        () => user.getIdToken(),
+        sessionId,
+        { forceRefresh: true }
+      );
+      setSession(updated as ScriptWriterSession);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Trend research failed");
+    } finally {
+      setResearchingTrends(false);
+    }
+  };
+
   const apply = async () => {
     if (!user || !projectId || applying) return;
     setApplying(true);
@@ -241,6 +262,12 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           ))}
         </div>
       ) : null}
+
+      <TrendsResearchPanel
+        trends={session.trendsResearch}
+        loading={researchingTrends}
+        onResearch={session.status !== "applied" ? () => void researchTrends() : undefined}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="flex min-h-[480px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">

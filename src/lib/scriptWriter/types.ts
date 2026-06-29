@@ -1,5 +1,5 @@
 import { Timestamp } from "firebase/firestore";
-import { ScriptWriterBrief } from "@/lib/scriptWriter/brief";
+import { ScriptWriterBrief, ScriptContentType } from "@/lib/scriptWriter/brief";
 
 export type ScriptWriterSessionStatus =
   | "interviewing"
@@ -150,6 +150,22 @@ export interface ScriptWriterChatResponse {
   readyToWrite: boolean;
 }
 
+/** Web trend research via Tavily, summarized by Gemini for script generation. */
+export interface ScriptTrendsResearch {
+  query: string;
+  provider: "tavily";
+  searchedAt: string;
+  /** Weekly snapshot vs session-specific live search */
+  source?: "cache" | "live";
+  contentType?: ScriptContentType;
+  summary: string;
+  hooks: string[];
+  pacingNotes: string[];
+  framingIdeas: string[];
+  avoid?: string[];
+  sourceTitles: string[];
+}
+
 export interface ScriptWriterSession {
   id: string;
   userId: string;
@@ -165,6 +181,7 @@ export interface ScriptWriterSession {
   inspirationVideo?: ScriptInspirationVideo | null;
   inspirationUrls?: ScriptInspirationUrl[];
   inspirationAnalysis?: ScriptInspirationAnalysis | null;
+  trendsResearch?: ScriptTrendsResearch | null;
   refineUsed?: boolean;
   linkedProjectId?: string;
   linkedScoutProjectId?: string;

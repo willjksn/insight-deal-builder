@@ -5,6 +5,7 @@ import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { DataTable, DataRow } from "@/components/ui/DataTable";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
+import { ListSearchField } from "@/components/ui/ListSearchField";
 import { Input } from "@/components/ui/Input";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { Select } from "@/components/ui/Select";
@@ -34,7 +35,11 @@ export default function CrewPage() {
   return (
     <div>
       <PageHeader title="Crew" subtitle="Assistants, creators, talent, and contractors" action={canManageCrew(appUser) ? <Button size="touch" onClick={() => { setEditingId(null); setForm(emptyCrew); setShowForm(true); }}>Add Crew Member</Button> : undefined} />
-      <div className="mb-4"><Input label="Search" value={search} onChange={(e) => setSearch(e.target.value)} touch /></div>
+      <ListSearchField
+        value={search}
+        onChange={setSearch}
+        placeholder="Search by name…"
+      />
 
       {showForm && (
         <Card className="mb-6"><CardHeader><h2 className="text-lg font-semibold">{editingId ? "Edit" : "New"} Crew Member</h2></CardHeader>

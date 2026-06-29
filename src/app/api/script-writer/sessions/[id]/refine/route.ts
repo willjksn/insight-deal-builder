@@ -60,7 +60,7 @@ export async function POST(
       brief,
       session.script as ScriptDocument,
       message,
-      { detailLevel, inspiration }
+      { detailLevel, inspiration, trendsResearch: session.trendsResearch ?? null }
     );
 
     await db.collection(SCRIPT_WRITER_SESSIONS_COLLECTION).doc(id).update(

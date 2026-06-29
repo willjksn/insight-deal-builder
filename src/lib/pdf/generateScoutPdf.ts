@@ -1,5 +1,5 @@
 import jsPDF from "jspdf";
-import { ScoutProject } from "@/lib/scout/types";
+import { ScoutProject, ScoutPreview } from "@/lib/scout/types";
 import { APP_NAME } from "@/lib/brand";
 import { MOOD_LABEL, SCENE_TYPE_LABEL } from "@/lib/scout/constants";
 import { formatDate } from "@/lib/utils/format";
@@ -17,6 +17,13 @@ type PdfContext = {
   margin: number;
   maxWidth: number;
   y: number;
+};
+
+type PdfImage = {
+  dataUrl: string;
+  width: number;
+  height: number;
+  format: "JPEG" | "PNG";
 };
 
 function createContext(doc: jsPDF): PdfContext {
@@ -69,13 +76,81 @@ function addKeyValue(ctx: PdfContext, label: string, value: string) {
   addText(ctx, `${label}: ${value || "—"}`, 10);
 }
 
-export function generateScoutPdf(project: ScoutProject): jsPDF {
+async function loadImageForPdf(url: string): Promise<PdfImage | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      return await new Promise<PdfImage>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx2d = canvas.getContext("2d");
+          if (!ctx2d || !img.naturalWidth || !img.naturalHeight) {
+            reject(new Error("canvas"));
+            return;
+          }
+          ctx2d.drawImage(img, 0, 0);
+          const usePng = blob.type.includes("png");
+          const format: PdfImage["format"] = usePng ? "PNG" : "JPEG";
+          resolve({
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+            dataUrl: canvas.toDataURL(usePng ? "image/png" : "image/jpeg", 0.92),
+            format,
+          });
+        };
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  } catch {
+    return null;
+  }
+}
+
+function addImage(ctx: PdfContext, image: PdfImage, maxHeight = 240) {
+  if (!image.width || !image.height) return;
+  const scale = Math.min(ctx.maxWidth / image.width, maxHeight / image.height, 1);
+  const w = image.width * scale;
+  const h = image.height * scale;
+  ensureSpace(ctx, h + 16);
+  const format = image.format;
+  try {
+    ctx.doc.addImage(image.dataUrl, format, ctx.margin, ctx.y, w, h);
+    ctx.y += h + 12;
+  } catch {
+    addText(ctx, "(Image could not be embedded)", 9);
+  }
+}
+
+async function loadPreviewImages(previews: ScoutPreview[]): Promise<Map<string, PdfImage>> {
+  const map = new Map<string, PdfImage>();
+  await Promise.all(
+    previews.map(async (preview) => {
+      if (!preview.imageUrl) return;
+      const loaded = await loadImageForPdf(preview.imageUrl);
+      if (loaded) map.set(preview.id, loaded);
+    })
+  );
+  return map;
+}
+
+async function buildScoutPdf(project: ScoutProject): Promise<jsPDF> {
   const doc = new jsPDF({ unit: "pt", format: "letter" });
   const ctx = createContext(doc);
   const analysis = project.latestAnalysis;
   const dp = project.latestDpPlan;
   const shots = project.latestShotList;
   const previews = project.latestPreviews ?? [];
+  const previewImages = await loadPreviewImages(previews);
 
   addText(ctx, APP_NAME, 9, true);
   ctx.y += 4;
@@ -221,12 +296,28 @@ export function generateScoutPdf(project: ScoutProject): jsPDF {
   }
 
   if (previews.length) {
-    addSectionTitle(ctx, "Previs prompts");
+    addSectionTitle(ctx, "Previs");
     for (const p of previews) {
       const label = p.shotLabel || p.type.replace(/_/g, " ");
+      const typeLabel = p.type.replace(/_/g, " ");
       addText(ctx, label, 10, true);
-      addText(ctx, p.prompt, 9);
-      ctx.y += 4;
+      if (p.shotNumber) addKeyValue(ctx, "Shot", String(p.shotNumber));
+      addKeyValue(ctx, "Type", typeLabel);
+
+      const image = previewImages.get(p.id);
+      if (image) {
+        addImage(ctx, image);
+      } else if (p.imageUrl) {
+        addText(ctx, "(Image could not be loaded for PDF)", 9);
+      } else if (p.imageGenerationError) {
+        addText(ctx, `Image generation failed: ${p.imageGenerationError}`, 9);
+      }
+
+      if (p.prompt) {
+        addText(ctx, "Prompt:", 9, true);
+        addText(ctx, p.prompt, 9);
+      }
+      ctx.y += 6;
     }
   }
 
@@ -247,10 +338,16 @@ export function generateScoutPdf(project: ScoutProject): jsPDF {
   return doc;
 }
 
-export function downloadScoutPdf(project: ScoutProject) {
-  generateScoutPdf(project).save(getScoutPdfFilename(project));
+export async function generateScoutPdf(project: ScoutProject): Promise<jsPDF> {
+  return buildScoutPdf(project);
 }
 
-export function getScoutPdfBlob(project: ScoutProject): Blob {
-  return generateScoutPdf(project).output("blob");
+export async function downloadScoutPdf(project: ScoutProject) {
+  const doc = await generateScoutPdf(project);
+  doc.save(getScoutPdfFilename(project));
+}
+
+export async function getScoutPdfBlob(project: ScoutProject): Promise<Blob> {
+  const doc = await generateScoutPdf(project);
+  return doc.output("blob");
 }

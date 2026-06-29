@@ -266,6 +266,11 @@ service cloud.firestore {
       allow update, delete: if canUseShotScout() && resource.data.userId == request.auth.uid;
     }
 
+    // Weekly script trend snapshots — server-only (Admin SDK + cron)
+    match /trendSnapshots/{contentType} {
+      allow read, write: if false;
+    }
+
     // Client signing links — server-only (Firebase Admin SDK)
     match /signingLinks/{docId} {
       allow read, write: if false;

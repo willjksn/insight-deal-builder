@@ -21,6 +21,7 @@ import {
   scriptWriterAnalyzeInspiration,
   scriptWriterCreateSession,
   scriptWriterListSessions,
+  scriptWriterResearchTrends,
 } from "@/lib/scriptWriter/apiClient";
 import {
   isBriefComplete,
@@ -47,6 +48,7 @@ function ScriptWriterPageContent() {
   const [pendingVideo, setPendingVideo] = useState<PendingInspirationVideo | null>(null);
   const [pendingUrls, setPendingUrls] = useState<PendingInspirationUrl[]>([]);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [researchTrends, setResearchTrends] = useState(false);
 
   const hasInspiration =
     pendingImages.length > 0 || pendingVideo !== null || pendingUrls.length > 0;
@@ -135,6 +137,11 @@ function ScriptWriterPageContent() {
         });
       }
 
+      if (researchTrends) {
+        setUploadProgress("Researching current trends…");
+        await scriptWriterResearchTrends(() => user.getIdToken(), id);
+      }
+
       router.push(`/script-writer/${id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start session");
@@ -167,7 +174,12 @@ function ScriptWriterPageContent() {
 
       <Card className="mb-8">
         <CardBody className="space-y-5">
-          <ScriptWriterIntakeForm brief={brief} onChange={setBrief} />
+          <ScriptWriterIntakeForm
+            brief={brief}
+            onChange={setBrief}
+            researchTrends={researchTrends}
+            onResearchTrendsChange={setResearchTrends}
+          />
           <InspirationUploadSection
             images={pendingImages}
             video={pendingVideo}

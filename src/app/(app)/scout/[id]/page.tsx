@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Camera, Sparkles, Film, List, ImageIcon, FileDown, RefreshCw, ScrollText } from "lucide-react";
+import { ArrowLeft, Camera, Sparkles, Film, List, ImageIcon, FileDown, RefreshCw, ScrollText, Globe, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -20,6 +20,7 @@ import {
   scoutGeneratePreview,
   scoutGenerateShotList,
   scoutRegisterImage,
+  scoutTechniqueLookup,
 } from "@/lib/scout/apiClient";
 import {
   SCOUT_IMAGE_LABELS,
@@ -56,6 +57,9 @@ export default function ScoutProjectPage() {
   const [tab, setTab] = useState<Tab>("upload");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [techniqueQuery, setTechniqueQuery] = useState("");
+  const [techniqueLoading, setTechniqueLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadLabel, setUploadLabel] = useState<ScoutImageLabel>("unlabeled");
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -204,6 +208,20 @@ export default function ScoutProjectPage() {
       setError(err instanceof Error ? err.message : "Regeneration failed");
     } finally {
       setBusy(null);
+    }
+  };
+
+  const runTechniqueLookup = async () => {
+    if (techniqueLoading) return;
+    setTechniqueLoading(true);
+    setError(null);
+    try {
+      const { project: updated } = await scoutTechniqueLookup(id, techniqueQuery.trim() || undefined);
+      setProject(updated as ScoutProject);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Technique lookup failed");
+    } finally {
+      setTechniqueLoading(false);
     }
   };
 
@@ -485,6 +503,67 @@ export default function ScoutProjectPage() {
 
         {tab === "plan" && dp && (
           <div className="space-y-6">
+            <ScoutCard className="border-sky-200/80 bg-sky-50/30">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+                    <Globe className="h-4 w-4 text-sky-600" />
+                    Technique lookup
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Tavily searches the web; Gemini summarizes techniques for your gear and this scene.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  value={techniqueQuery}
+                  onChange={(e) => setTechniqueQuery(e.target.value)}
+                  placeholder="Optional: e.g. interview backlight with FX3 and Aputure 600d"
+                  className="min-h-[44px] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/20"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={techniqueLoading}
+                  onClick={() => void runTechniqueLookup()}
+                >
+                  {techniqueLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Globe className="mr-2 h-4 w-4" />
+                  )}
+                  Look up techniques
+                </Button>
+              </div>
+              {project.latestTechniqueLookup ? (
+                <div className="mt-4 space-y-3 border-t border-sky-100 pt-4 text-sm text-slate-700">
+                  <p>{project.latestTechniqueLookup.summary}</p>
+                  {project.latestTechniqueLookup.techniques.length > 0 ? (
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-slate-500">Techniques</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                        {project.latestTechniqueLookup.techniques.map((t) => (
+                          <li key={t}>{t}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {project.latestTechniqueLookup.gearTips.length > 0 ? (
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-slate-500">Gear tips</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                        {project.latestTechniqueLookup.gearTips.map((t) => (
+                          <li key={t}>{t}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </ScoutCard>
+
             {isBeginner && (
               <ScoutCard className="border-sky-200 bg-sky-50/50">
                 <p className="text-sm text-sky-900">{dp.beginnerExplanation}</p>
@@ -730,7 +809,7 @@ export default function ScoutProjectPage() {
           <ScoutCard>
             <h2 className="font-semibold text-slate-900">Export packet</h2>
             <p className="mt-2 text-sm text-slate-600">
-              Download a printable PDF or JSON packet for the crew. Includes analysis, DP plan, fixture table, and shot list.
+              Download a printable PDF or JSON packet for the crew. Includes analysis, DP plan, fixture table, shot list, and previs images.
             </p>
             <ul className="mt-4 space-y-2 text-sm text-slate-700">
               <li>{analysis ? "✓ Location analysis" : "○ Location analysis"}</li>
@@ -740,8 +819,14 @@ export default function ScoutProjectPage() {
               <li>{previews.length ? "✓ Scene previs + lighting diagram" : "○ Scene previs"}</li>
             </ul>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button disabled={!dp} onClick={() => downloadScoutPdf(project)}>
-                Download PDF
+              <Button
+                disabled={!dp || pdfLoading}
+                onClick={() => {
+                  setPdfLoading(true);
+                  void downloadScoutPdf(project).finally(() => setPdfLoading(false));
+                }}
+              >
+                {pdfLoading ? "Building PDF…" : "Download PDF"}
               </Button>
               <Link href={`/scout/${id}/export`}>
                 <Button variant="outline">Open export page</Button>

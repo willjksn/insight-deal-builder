@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/trend-snapshots",
+      "schedule": "0 14 * * 1"
+    }
+  ]
+}
