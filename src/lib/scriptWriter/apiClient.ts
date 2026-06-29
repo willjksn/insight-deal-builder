@@ -161,6 +161,42 @@ export async function scriptWriterApplyToProject(
   }>(res);
 }
 
+export async function scriptWriterSaveScript(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  script: Partial<import("@/lib/scriptWriter/types").ScriptDocument>
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/script`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ script }),
+  });
+  return parseJson<{ session: unknown }>(res);
+}
+
+export async function scriptWriterListScriptVersions(
+  getToken: () => Promise<string | null>,
+  sessionId: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/versions`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ versions: import("@/lib/scriptWriter/scriptVersionLabels").ScriptVersionRecord[] }>(res);
+}
+
+export async function scriptWriterRestoreScriptVersion(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  versionId: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/versions`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ versionId }),
+  });
+  return parseJson<{ session: unknown }>(res);
+}
+
 export type PendingInspirationImage = {
   id: string;
   file: File;

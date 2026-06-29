@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Firestore, CollectionReference } from "firebase-admin/firestore";
-import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus } from "@/lib/api/routeAuth";
+import { requireScoutOwner } from "@/lib/scout/scoutRouteAuth";
 import { getAdminApp, getAdminDb, getAdminStorage } from "@/lib/firebase/admin";
 
 export const runtime = "nodejs";
@@ -40,22 +41,18 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { uid, appUser } = await requireAuthUser(_request);
-    assertCanUseShotScout(appUser);
+    const { uid, project } = await requireScoutOwner(_request, id);
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
 
     const ref = db.collection("shotScoutProjects").doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) throw new Error("Scout session not found");
-    if (snap.data()?.userId !== uid) throw new Error("Not authorized");
 
     for (const sub of SUBCOLLECTIONS) {
       await deleteQueryBatch(db, ref.collection(sub));
     }
 
-    await deleteStoragePrefix(uid, id);
+    await deleteStoragePrefix(project.userId, id);
     await ref.delete();
 
     return NextResponse.json({ ok: true });

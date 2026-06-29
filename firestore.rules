@@ -124,9 +124,17 @@ service cloud.firestore {
     }
 
     match /projects/{docId} {
-      allow read: if canReadInsightSetup();
-      allow create, update: if isInsightOrg() && hasPerm('manageProjects');
+      allow read: if canReadInsightSetup()
+        || isProjectMember(docId)
+        || isProjectOwner(docId);
+      allow create: if isInsightOrg() && hasPerm('manageProjects');
+      allow update: if isInsightOrg() && hasPerm('manageProjects');
       allow delete: if isInsightOrg() && hasPerm('manageProjects');
+
+      match /members/{memberId} {
+        allow read: if canManageProjectTeam(docId) || request.auth.uid == memberId;
+        allow write: if false;
+      }
     }
 
     match /servicePackages/{docId} {
@@ -196,36 +204,86 @@ service cloud.firestore {
       );
     }
 
+    function isProjectMember(projectId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid));
+    }
+
+    function projectMemberData(projectId) {
+      return get(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid)).data;
+    }
+
+    function isProjectOwner(projectId) {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUserId == request.auth.uid;
+    }
+
+    function hasProjectArea(projectId, area) {
+      return hasPerm('manageProjects')
+        || canManageUsers()
+        || isProjectOwner(projectId)
+        || (
+          isProjectMember(projectId)
+          && projectMemberData(projectId).permissions[area] == true
+        );
+    }
+
+    function canManageProjectTeam(projectId) {
+      return hasPerm('manageProjects')
+        || canManageUsers()
+        || isProjectOwner(projectId);
+    }
+
+    function isScoutDirectMember(scoutId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/shotScoutProjects/$(scoutId)/members/$(request.auth.uid));
+    }
+
+    function canAccessScout(scoutId) {
+      let scout = get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data;
+      return (isSignedIn() && scout.userId == request.auth.uid)
+        || isScoutDirectMember(scoutId)
+        || (
+          scout.linkedProjectId != null
+          && hasProjectArea(scout.linkedProjectId, 'scout')
+        );
+    }
+
+    function canWriteScout(scoutId) {
+      return canAccessScout(scoutId);
+    }
+
     match /shotScoutProjects/{scoutId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if canAccessScout(scoutId);
       allow create: if canUseShotScout()
         && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if canUseShotScout()
+      allow update: if canWriteScout(scoutId);
+      allow delete: if canUseShotScout()
         && resource.data.userId == request.auth.uid;
 
       match /images/{imageId} {
-        allow read, write: if canUseShotScout()
-          && get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data.userId == request.auth.uid;
+        allow read, write: if canWriteScout(scoutId);
       }
 
       match /analysis/{docId} {
-        allow read, write: if canUseShotScout()
-          && get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data.userId == request.auth.uid;
+        allow read, write: if canWriteScout(scoutId);
       }
 
       match /dpPlans/{docId} {
-        allow read, write: if canUseShotScout()
-          && get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data.userId == request.auth.uid;
+        allow read, write: if canWriteScout(scoutId);
       }
 
       match /shotLists/{docId} {
-        allow read, write: if canUseShotScout()
-          && get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data.userId == request.auth.uid;
+        allow read, write: if canWriteScout(scoutId);
       }
 
       match /previews/{docId} {
-        allow read, write: if canUseShotScout()
-          && get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data.userId == request.auth.uid;
+        allow read, write: if canWriteScout(scoutId);
+      }
+
+      match /members/{memberId} {
+        allow read: if canWriteScout(scoutId) || request.auth.uid == memberId;
+        allow write: if false;
       }
     }
 
@@ -251,19 +309,37 @@ service cloud.firestore {
     }
 
     match /productionBoards/{boardId} {
-      allow read: if canReadInsightSetup() || canUseProductionBoard();
+      allow read: if canReadInsightSetup()
+        || canUseProductionBoard()
+        || (
+          resource.data.projectId != null
+          && (
+            hasProjectArea(resource.data.projectId, 'production')
+            || hasProjectArea(resource.data.projectId, 'shots')
+          )
+        );
       allow create: if canUseProductionBoard()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.projectId is string;
-      allow update: if canUseProductionBoard();
+      allow update: if canUseProductionBoard()
+        || (
+          resource.data.projectId != null
+          && (
+            hasProjectArea(resource.data.projectId, 'production')
+            || hasProjectArea(resource.data.projectId, 'shots')
+          )
+        );
       allow delete: if canUseProductionBoard()
         && (resource.data.userId == request.auth.uid || hasPerm('manageProjects'));
     }
 
     match /scriptWriterSessions/{sessionId} {
-      allow read: if canUseShotScout() && resource.data.userId == request.auth.uid;
-      allow create: if canUseShotScout() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if canUseShotScout() && resource.data.userId == request.auth.uid;
+      allow read, write: if false;
+
+      match /members/{memberId} {
+        allow read: if request.auth.uid == memberId;
+        allow write: if false;
+      }
     }
 
     // Weekly script trend snapshots — server-only (Admin SDK + cron)

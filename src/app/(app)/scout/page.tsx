@@ -24,7 +24,7 @@ export default function ScoutDashboardPage() {
   const canLinkProjects = canLinkScoutToProject(appUser);
   const { data: projects } = useConditionalCollection<Project>("projects", canLinkProjects);
   const linkableProjects = projectsForScoutLinkDisplay(projects);
-  const { data, loading, refresh } = useScoutProjects(user?.uid);
+  const { data, loading, error, refresh } = useScoutProjects(user?.uid, user ? () => user.getIdToken() : undefined);
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -65,7 +65,8 @@ export default function ScoutDashboardPage() {
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
 
-  if (!canUseShotScout(appUser)) {
+  if (loading) return <LoadingSpinner className="py-20" />;
+  if (!canUseShotScout(appUser) && data.length === 0 && error) {
     return (
       <div className="py-20 text-center">
         <h2 className="text-xl font-semibold text-slate-900">Shot Scout</h2>

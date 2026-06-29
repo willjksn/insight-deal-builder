@@ -33,6 +33,8 @@ import { ScoutImageLabel, ScoutProject, ScoutProjectImage } from "@/lib/scout/ty
 import { canLinkScoutToProject, canUseShotScout } from "@/lib/utils/permissions";
 import { downloadScoutPdf } from "@/lib/pdf/generateScoutPdf";
 import { LightingAssignmentTable } from "@/components/scout/LightingAssignmentTable";
+import { ScoutShotListEditor } from "@/components/scout/ScoutShotListEditor";
+import { ScoutVersionHistory } from "@/components/scout/ScoutVersionHistory";
 import { ScoutLinkToProjectCard } from "@/components/scout/ScoutLinkToProjectCard";
 import { useConditionalCollection } from "@/hooks/useConditionalCollection";
 import { Project } from "@/lib/types";
@@ -498,6 +500,8 @@ export default function ScoutProjectPage() {
                 {busy === "analyze" ? "Re-analyzing…" : "Re-analyze location"}
               </Button>
             )}
+
+            <ScoutVersionHistory scoutId={id} kind="analysis" onRestored={() => void refresh()} />
           </div>
         )}
 
@@ -646,35 +650,21 @@ export default function ScoutProjectPage() {
             >
               {busy === "dp" ? "Regenerating…" : "Regenerate DP plan"}
             </Button>
+
+            <ScoutVersionHistory scoutId={id} kind="dpPlans" onRestored={() => void refresh()} />
           </div>
         )}
 
         {tab === "shots" && shots && (
           <ScoutCard className="overflow-x-auto p-0">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">#</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Lens</th>
-                  <th className="px-4 py-3">Movement</th>
-                  <th className="px-4 py-3">Action</th>
-                  <th className="px-4 py-3">Priority</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shots.shots.map((s) => (
-                  <tr key={s.shotNumber} className="border-t border-slate-100">
-                    <td className="px-4 py-3 tabular-nums">{s.shotNumber}</td>
-                    <td className="px-4 py-3">{s.shotType.replace(/_/g, " ")}</td>
-                    <td className="px-4 py-3">{s.lens}</td>
-                    <td className="px-4 py-3">{s.cameraMovement}</td>
-                    <td className="px-4 py-3 max-w-xs">{s.subjectAction}</td>
-                    <td className="px-4 py-3 capitalize">{s.priority.replace(/_/g, " ")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="p-4">
+              <ScoutShotListEditor
+                scoutId={id}
+                shots={shots.shots}
+                onSaved={() => void refresh()}
+              />
+            </div>
+            <ScoutVersionHistory scoutId={id} kind="shotLists" onRestored={() => void refresh()} />
             {!previews.length && (
               <div className="p-4 border-t border-slate-100">
                 <p className="mb-3 text-xs text-slate-500">

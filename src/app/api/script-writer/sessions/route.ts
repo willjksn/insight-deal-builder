@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   apiErrorStatus,
-  assertCanUseScriptWriter,
+  assertApprovedUser,
   requireAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
+import {
+  assertScriptWriterAppAccess,
+  hasProjectAreaAccess,
+  listAccessibleScriptSessions,
+} from "@/lib/projectAccess/server";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
 import { ScriptWriterBrief, buildInitialUserMessage, inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
 import {
@@ -15,6 +20,7 @@ import {
 } from "@/lib/scriptWriter/scriptWriterAi";
 import { ScriptWriterMessage } from "@/lib/scriptWriter/types";
 import { serializeScriptSession } from "@/lib/scriptWriter/adminApply";
+import { canUseShotScout } from "@/lib/utils/permissions";
 
 export const runtime = "nodejs";
 
@@ -27,53 +33,18 @@ function newMessage(role: ScriptWriterMessage["role"], content: string): ScriptW
   };
 }
 
-function sortSessionsByUpdated(
-  sessions: ReturnType<typeof serializeScriptSession>[]
-) {
-  return sessions.sort((a, b) => {
-    const aTime =
-      typeof a.updatedAt === "object" && a.updatedAt && "toMillis" in a.updatedAt
-        ? (a.updatedAt as { toMillis: () => number }).toMillis()
-        : 0;
-    const bTime =
-      typeof b.updatedAt === "object" && b.updatedAt && "toMillis" in b.updatedAt
-        ? (b.updatedAt as { toMillis: () => number }).toMillis()
-        : 0;
-    return bTime - aTime;
-  });
-}
-
 export async function GET(request: NextRequest) {
   try {
     const { uid, appUser } = await requireAuthUser(request);
-    assertCanUseScriptWriter(appUser);
+    assertApprovedUser(appUser);
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
 
-    let snap;
-    try {
-      snap = await db
-        .collection(SCRIPT_WRITER_SESSIONS_COLLECTION)
-        .where("userId", "==", uid)
-        .orderBy("updatedAt", "desc")
-        .limit(50)
-        .get();
-    } catch (indexErr) {
-      const msg = indexErr instanceof Error ? indexErr.message : String(indexErr);
-      if (!msg.includes("index") && !msg.includes("FAILED_PRECONDITION")) {
-        throw indexErr;
-      }
-      snap = await db
-        .collection(SCRIPT_WRITER_SESSIONS_COLLECTION)
-        .where("userId", "==", uid)
-        .limit(50)
-        .get();
-    }
-
-    const sessions = sortSessionsByUpdated(
-      snap.docs.map((d) => serializeScriptSession(d.id, d.data()))
-    );
-    return NextResponse.json({ sessions });
+    await assertScriptWriterAppAccess(db, uid, appUser);
+    const sessions = await listAccessibleScriptSessions(db, uid, appUser);
+    return NextResponse.json({
+      sessions: sessions.map((s) => serializeScriptSession(s.id, s as unknown as Record<string, unknown>)),
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to list sessions";
     return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
@@ -83,7 +54,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { uid, appUser } = await requireAuthUser(request);
-    assertCanUseScriptWriter(appUser);
+    assertApprovedUser(appUser);
 
     const body = (await request.json()) as {
       initialIdea?: string;
@@ -94,15 +65,30 @@ export async function POST(request: NextRequest) {
       workflowMode?: "text" | "inspiration";
     };
 
+    const db = getAdminDb();
+    if (!db) throw new Error("Firebase Admin is not configured");
+
+    if (body.linkedProjectId) {
+      const canLink = await hasProjectAreaAccess(
+        db,
+        body.linkedProjectId,
+        uid,
+        appUser,
+        "scripts"
+      );
+      if (!canLink && !canUseShotScout(appUser)) {
+        return NextResponse.json({ error: "Not authorized for this project" }, { status: 401 });
+      }
+    } else {
+      await assertScriptWriterAppAccess(db, uid, appUser);
+    }
+
     const workflowMode = body.workflowMode ?? "text";
     const brief = resolveSessionBrief(body.brief, body.initialIdea?.trim() ?? "");
     const hasConcept = Boolean(brief.concept.trim());
     if (!hasConcept && workflowMode !== "inspiration") {
       return NextResponse.json({ error: "Describe your concept first" }, { status: 400 });
     }
-
-    const db = getAdminDb();
-    if (!db) throw new Error("Firebase Admin is not configured");
 
     let messages: ScriptWriterMessage[] = [];
     let readyToWrite = false;

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
-import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { cineScoutGeneratePreviews } from "@/lib/scout/cineScoutAi";
 import { loadScoutGearContext } from "@/lib/scout/scoutAdminGear";
+import { requireScoutProjectAccess } from "@/lib/scout/scoutRouteAuth";
 import { uploadScoutPreviewImage } from "@/lib/scout/previewStorage";
 import { ScoutDpPlan, ScoutProject, ScoutProjectImage } from "@/lib/scout/types";
 
@@ -28,22 +29,17 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertCanUseShotScout(appUser);
+    const { project } = await requireScoutProjectAccess(request, id);
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
     const ref = db.collection("shotScoutProjects").doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) throw new Error("Scout session not found");
-    const project = { id: snap.id, ...snap.data() } as ScoutProject;
-    if (project.userId !== uid) throw new Error("Not authorized");
     if (!project.latestDpPlan) {
       return NextResponse.json({ error: "Generate DP plan first" }, { status: 400 });
     }
 
     const images = await loadImages(id);
-    const { gearProfile, gearList } = await loadScoutGearContext(uid, project);
+    const { gearProfile, gearList } = await loadScoutGearContext(project.userId, project);
     const previewPayloads = await cineScoutGeneratePreviews(
       project,
       project.latestDpPlan as ScoutDpPlan,
@@ -59,7 +55,7 @@ export async function POST(
       let imageUrl: string | undefined;
       if (p.imageBuffer) {
         imageUrl = await uploadScoutPreviewImage(
-          uid,
+          project.userId,
           id,
           p.id,
           p.imageBuffer,

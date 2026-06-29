@@ -38,8 +38,9 @@ import {
   ProductionDayShot,
   ProductionLocationEntry,
 } from "@/lib/production/types";
-import { canManageProjects, canUseShotScout } from "@/lib/utils/permissions";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { cn } from "@/lib/utils/cn";
+import { canManageProjects, canUseShotScout } from "@/lib/utils/permissions";
 
 export default function CallSheetDayPage() {
   const params = useParams();
@@ -48,6 +49,7 @@ export default function CallSheetDayPage() {
   const dayId = params.dayId as string;
   const { appUser } = useAuth();
   const { data: project, loading: projectLoading } = useDocument<Project>("projects", projectId);
+  const projectAccess = useProjectAccess(projectId, project?.ownerUserId);
   const [board, setBoard] = useState<ProductionBoard | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,7 +58,20 @@ export default function CallSheetDayPage() {
   const savingRef = useRef(false);
   const contactsSyncedRef = useRef(false);
 
-  const allowed = canUseShotScout(appUser) || canManageProjects(appUser);
+  const allowed =
+    canUseShotScout(appUser) ||
+    canManageProjects(appUser) ||
+    projectAccess.canAccessProduction ||
+    projectAccess.canAccessShots;
+  const canEditShots =
+    canUseShotScout(appUser) ||
+    canManageProjects(appUser) ||
+    projectAccess.canAccessProduction ||
+    projectAccess.canAccessShots;
+  const canEditSchedule =
+    canUseShotScout(appUser) ||
+    canManageProjects(appUser) ||
+    projectAccess.canAccessProduction;
 
   useEffect(() => {
     savingRef.current = saving;
@@ -188,7 +203,7 @@ export default function CallSheetDayPage() {
     persistDay({ ...day, ...patch });
   };
 
-  if (projectLoading || loading) return <LoadingSpinner className="py-20" />;
+  if (projectLoading || loading || projectAccess.loading) return <LoadingSpinner className="py-20" />;
 
   if (!allowed) {
     return (
@@ -348,11 +363,13 @@ export default function CallSheetDayPage() {
             blocks={day.schedule}
             boardLocations={boardBookedLocations}
             onChange={(schedule) => patchDay({ schedule })}
+            readOnly={!canEditSchedule}
           />
 
           <ShotsEditor
             shots={day.shots}
             onChange={(shots) => patchDay({ shots })}
+            readOnly={!canEditShots}
           />
         </div>
 
@@ -368,10 +385,12 @@ function ScheduleEditor({
   blocks,
   boardLocations,
   onChange,
+  readOnly,
 }: {
   blocks: ProductionDayScheduleBlock[];
   boardLocations: ProductionLocationEntry[];
   onChange: (blocks: ProductionDayScheduleBlock[]) => void;
+  readOnly?: boolean;
 }) {
   const sorted = [...blocks].sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -411,15 +430,17 @@ function ScheduleEditor({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">Schedule</h2>
         <div className="flex flex-wrap gap-2">
-          {boardLocations.length > 0 && (
+          {!readOnly && boardLocations.length > 0 && (
             <Button type="button" size="sm" variant="outline" onClick={addFromBoard}>
               Add board locations
             </Button>
           )}
-          <Button type="button" size="sm" variant="outline" onClick={add}>
-            <Plus className="mr-1 h-4 w-4" />
-            Add block
-          </Button>
+          {!readOnly && (
+            <Button type="button" size="sm" variant="outline" onClick={add}>
+              <Plus className="mr-1 h-4 w-4" />
+              Add block
+            </Button>
+          )}
         </div>
       </div>
       {sorted.map((block) => (
@@ -429,7 +450,9 @@ function ScheduleEditor({
               value={block.label}
               onChange={(e) => update(block.id, { label: e.target.value })}
               placeholder="Block label"
+              disabled={readOnly}
             />
+            {!readOnly && (
             <button
               type="button"
               className="text-slate-400 hover:text-red-500"
@@ -437,14 +460,15 @@ function ScheduleEditor({
             >
               <Trash2 className="h-4 w-4" />
             </button>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Input value={block.startTime ?? ""} onChange={(e) => update(block.id, { startTime: e.target.value })} placeholder="Start" />
-            <Input value={block.endTime ?? ""} onChange={(e) => update(block.id, { endTime: e.target.value })} placeholder="End" />
+            <Input value={block.startTime ?? ""} onChange={(e) => update(block.id, { startTime: e.target.value })} placeholder="Start" disabled={readOnly} />
+            <Input value={block.endTime ?? ""} onChange={(e) => update(block.id, { endTime: e.target.value })} placeholder="End" disabled={readOnly} />
           </div>
-          <Input value={block.locationName ?? ""} onChange={(e) => update(block.id, { locationName: e.target.value })} placeholder="Location" />
-          <Input value={block.address ?? ""} onChange={(e) => update(block.id, { address: e.target.value })} placeholder="Address" />
-          <Textarea value={block.notes ?? ""} onChange={(e) => update(block.id, { notes: e.target.value })} placeholder="Notes" rows={2} />
+          <Input value={block.locationName ?? ""} onChange={(e) => update(block.id, { locationName: e.target.value })} placeholder="Location" disabled={readOnly} />
+          <Input value={block.address ?? ""} onChange={(e) => update(block.id, { address: e.target.value })} placeholder="Address" disabled={readOnly} />
+          <Textarea value={block.notes ?? ""} onChange={(e) => update(block.id, { notes: e.target.value })} placeholder="Notes" rows={2} disabled={readOnly} />
         </div>
       ))}
       {sorted.length === 0 && <p className="text-sm text-slate-500">No schedule blocks yet.</p>}
@@ -455,9 +479,11 @@ function ScheduleEditor({
 function ShotsEditor({
   shots,
   onChange,
+  readOnly,
 }: {
   shots: ProductionDayShot[];
   onChange: (shots: ProductionDayShot[]) => void;
+  readOnly?: boolean;
 }) {
   const sorted = [...shots].sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -465,6 +491,7 @@ function ShotsEditor({
     <section id="shots" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold">Shot checklist</h2>
+        {!readOnly && (
         <Button
           type="button"
           size="sm"
@@ -479,12 +506,14 @@ function ShotsEditor({
           <Plus className="mr-1 h-4 w-4" />
           Add shot
         </Button>
+        )}
       </div>
       {sorted.map((shot) => (
         <div key={shot.id} className="flex items-center gap-2">
           <input
             type="checkbox"
             checked={shot.done}
+            disabled={readOnly}
             onChange={(e) =>
               onChange(
                 shots.map((s) => (s.id === shot.id ? { ...s, done: e.target.checked } : s))
@@ -494,6 +523,7 @@ function ShotsEditor({
           />
           <Input
             value={shot.label}
+            disabled={readOnly}
             onChange={(e) =>
               onChange(
                 shots.map((s) => (s.id === shot.id ? { ...s, label: e.target.value } : s))
@@ -501,6 +531,7 @@ function ShotsEditor({
             }
             className="flex-1"
           />
+          {!readOnly && (
           <button
             type="button"
             className="text-slate-400 hover:text-red-500"
@@ -508,6 +539,7 @@ function ShotsEditor({
           >
             <Trash2 className="h-4 w-4" />
           </button>
+          )}
         </div>
       ))}
       {sorted.length === 0 && <p className="text-sm text-slate-500">Import shots from the board or Scout.</p>}

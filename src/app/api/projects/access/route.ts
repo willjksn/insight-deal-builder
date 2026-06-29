@@ -1,0 +1,37 @@
+import { NextRequest, NextResponse } from "next/server";
+import { apiErrorStatus, assertApprovedUser, requireAuthUser } from "@/lib/api/routeAuth";
+import { getAdminDb } from "@/lib/firebase/admin";
+import { getProjectIdsForMember, hasGlobalProjectAdmin } from "@/lib/projectAccess/server";
+import { Project } from "@/lib/types";
+
+export const runtime = "nodejs";
+
+export async function GET(request: NextRequest) {
+  try {
+    const { uid, appUser } = await requireAuthUser(request);
+    assertApprovedUser(appUser);
+
+    const db = getAdminDb();
+    if (!db) throw new Error("Firebase Admin is not configured");
+
+    if (hasGlobalProjectAdmin(appUser)) {
+      const snap = await db.collection("projects").orderBy("updatedAt", "desc").limit(100).get();
+      const projects = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Project);
+      return NextResponse.json({ projects });
+    }
+
+    const projectIds = await getProjectIdsForMember(db, uid);
+    const projects: Project[] = [];
+    for (const projectId of projectIds) {
+      const snap = await db.collection("projects").doc(projectId).get();
+      if (snap.exists) {
+        projects.push({ id: snap.id, ...snap.data() } as Project);
+      }
+    }
+
+    return NextResponse.json({ projects });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to list projects";
+    return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
+  }
+}

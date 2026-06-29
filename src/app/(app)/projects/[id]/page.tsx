@@ -21,6 +21,8 @@ import { getScoutProjectsForLinkedProject } from "@/lib/firebase/scoutFirestore"
 import { getProductionBoardByProject } from "@/lib/firebase/productionFirestore";
 import { scriptWriterListSessions } from "@/lib/scriptWriter/apiClient";
 import { ProjectSpine } from "@/components/projects/ProjectSpine";
+import { ProjectTeamPanel } from "@/components/projects/ProjectTeamPanel";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { canCreateQuotes, canUseShotScout, canManageProjects } from "@/lib/utils/permissions";
 
 function pickProjectScriptSession(
@@ -63,8 +65,14 @@ export default function ProjectDetailPage() {
         .sort((a, b) => (b.updatedAt?.toMillis?.() ?? 0) - (a.updatedAt?.toMillis?.() ?? 0)),
     [agreements, id]
   );
-  const showScout = canUseShotScout(appUser);
-  const showProduction = showScout || canManageProjects(appUser);
+  const projectAccess = useProjectAccess(id, project?.ownerUserId);
+  const showScout =
+    canUseShotScout(appUser) || projectAccess.canAccessScout;
+  const showProduction =
+    canManageProjects(appUser) ||
+    canUseShotScout(appUser) ||
+    projectAccess.canAccessProduction ||
+    projectAccess.canAccessShots;
   const canCreateDeal = canCreateQuotes(appUser);
 
   const primaryScript = useMemo(
@@ -90,13 +98,13 @@ export default function ProjectDetailPage() {
   }, [id, showProduction]);
 
   useEffect(() => {
-    if (!user || !showScout) return;
+    if (!user || (!showScout && !projectAccess.canAccessScripts)) return;
     setSpineLoading(true);
     scriptWriterListSessions(() => user.getIdToken())
       .then((res) => setScriptSessions(res.sessions as ScriptWriterSession[]))
       .catch(() => setScriptSessions([]))
       .finally(() => setSpineLoading(false));
-  }, [user, showScout]);
+  }, [user, showScout, projectAccess.canAccessScripts]);
 
   if (loading) return <LoadingSpinner className="py-20" />;
   if (!project) {
@@ -357,6 +365,8 @@ export default function ProjectDetailPage() {
           </Card>
         )}
       </div>
+
+      <ProjectTeamPanel projectId={project.id} />
     </div>
   );
 }

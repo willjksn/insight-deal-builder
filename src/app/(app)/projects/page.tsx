@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { useAccessibleProjects } from "@/hooks/useAccessibleProjects";
 import { useCollection } from "@/hooks/useCollection";
 import { useMutations } from "@/hooks/useMutations";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,10 +27,10 @@ const emptyProject: Omit<Project, "id" | "createdAt" | "updatedAt"> = {
 };
 
 export default function ProjectsPage() {
-  const { data, loading, refresh } = useCollection<Project>("projects");
+  const { projects, loading, refresh } = useAccessibleProjects();
   const { data: clients } = useCollection<Client>("clients");
   const { create, update, remove, saving } = useMutations("projects");
-  const { appUser } = useAuth();
+  const { appUser, user } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyProject);
@@ -44,7 +45,7 @@ export default function ProjectsPage() {
     <div>
       <PageHeader title="Projects" subtitle="Video/photo production projects" action={
         <div className="flex gap-2 flex-wrap">
-          {data.length === 0 && canManageProjects(appUser) && <Button size="touch" variant="outline" onClick={seedProject}>Load Demo Project</Button>}
+          {projects.length === 0 && canManageProjects(appUser) && <Button size="touch" variant="outline" onClick={seedProject}>Load Demo Project</Button>}
           {canManageProjects(appUser) && (
             <Button size="touch" onClick={() => { setEditingId(null); setForm(emptyProject); setShowForm(true); }}>New Project</Button>
           )}
@@ -54,7 +55,7 @@ export default function ProjectsPage() {
       {showForm && (
         <Card className="mb-6"><CardHeader><h2 className="text-lg font-semibold">{editingId ? "Edit" : "New"} Project</h2></CardHeader>
           <CardBody>
-            <form onSubmit={async (e) => { e.preventDefault(); if (editingId) await update(editingId, form); else await create(form); setShowForm(false); refresh(); }} className="grid gap-4 md:grid-cols-2">
+            <form onSubmit={async (e) => { e.preventDefault(); if (editingId) await update(editingId, form); else await create({ ...form, ...(user ? { ownerUserId: user.uid } : {}) }); setShowForm(false); refresh(); }} className="grid gap-4 md:grid-cols-2">
               <Input label="Project Name" value={form.projectName} onChange={(e) => setForm({ ...form, projectName: e.target.value })} required touch />
               <Select label="Client" value={form.clientId || ""} onChange={(e) => { const c = clients.find((x) => x.id === e.target.value); setForm({ ...form, clientId: e.target.value, clientName: c?.businessName || "" }); }} options={[{ value: "", label: "Select..." }, ...clients.map((c) => ({ value: c.id, label: c.businessName }))]} touch />
               <Select label="Agreement Type" value={form.agreementType} onChange={(e) => setForm({ ...form, agreementType: e.target.value as Project["agreementType"] })} options={[{ value: "client_project", label: "Client Project" }, { value: "internal_collaboration", label: "Internal Collaboration" }]} touch />
@@ -71,11 +72,11 @@ export default function ProjectsPage() {
         </Card>
       )}
 
-      {loading ? <LoadingSpinner className="py-20" /> : data.length === 0 ? (
+      {loading ? <LoadingSpinner className="py-20" /> : projects.length === 0 ? (
         <EmptyState title="No projects yet" description="Create a project to start building agreements." actionLabel="New Project" actionHref="#" />
       ) : (
         <DataTable headers={["Project", "Client", "Type", "Fee", "Status", "Actions"]}>
-          {data.map((p) => (
+          {projects.map((p) => (
             <DataRow key={p.id} href={`/projects/${p.id}`} actionCellIndex={5} cells={[
               p.projectName, p.clientName || "—", p.projectType,
               `$${p.totalProjectFee.toLocaleString()}`,

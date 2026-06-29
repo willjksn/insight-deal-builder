@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
-import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { cineScoutGenerateDpPlan } from "@/lib/scout/cineScoutAi";
 import { loadScoutGearContext } from "@/lib/scout/scoutAdminGear";
-import { ScoutLocationAnalysis, ScoutProject, LightFixture } from "@/lib/scout/types";
+import { requireScoutProjectAccess } from "@/lib/scout/scoutRouteAuth";
+import { ScoutLocationAnalysis, LightFixture } from "@/lib/scout/types";
 import { WINDOW_DAYLIGHT_FIXTURE, WINDOW_DAYLIGHT_ID } from "@/lib/scout/mockFixtures";
 
 export const runtime = "nodejs";
@@ -16,23 +17,18 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertCanUseShotScout(appUser);
+    const { project } = await requireScoutProjectAccess(request, id);
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
     const ref = db.collection("shotScoutProjects").doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) throw new Error("Scout session not found");
-    const project = { id: snap.id, ...snap.data() } as ScoutProject;
-    if (project.userId !== uid) throw new Error("Not authorized");
     if (!project.latestAnalysis) {
       return NextResponse.json({ error: "Run location analysis first" }, { status: 400 });
     }
 
     const fixtureSnap = await db
       .collection("users")
-      .doc(uid)
+      .doc(project.userId)
       .collection("lightFixtures")
       .get();
     const allFixtures = fixtureSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as LightFixture);
@@ -44,7 +40,7 @@ export async function POST(
       fixtures = [...fixtures, WINDOW_DAYLIGHT_FIXTURE];
     }
 
-    const { gearProfile, gearList } = await loadScoutGearContext(uid, project);
+    const { gearProfile, gearList } = await loadScoutGearContext(project.userId, project);
     const dpPayload = await cineScoutGenerateDpPlan(
       project,
       project.latestAnalysis as ScoutLocationAnalysis,
@@ -55,6 +51,8 @@ export async function POST(
     const dpRef = await ref.collection("dpPlans").add(
       stripUndefined({
         ...dpPayload,
+        source: "ai",
+        label: "AI DP plan",
         createdAt: FieldValue.serverTimestamp(),
       })
     );

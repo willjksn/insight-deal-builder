@@ -29,13 +29,14 @@ import {
 } from "@/lib/scriptWriter/brief";
 import { uploadScriptWriterFile } from "@/lib/scriptWriter/storage";
 import { ScriptInspirationImage, ScriptInspirationVideo, ScriptWriterSession } from "@/lib/scriptWriter/types";
-import { canUseShotScout } from "@/lib/utils/permissions";
+import { canUseShotScout, canManageProjects } from "@/lib/utils/permissions";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 
 function ScriptWriterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, appUser } = useAuth();
-  const allowed = canUseShotScout(appUser);
+  const [allowed, setAllowed] = useState<boolean | null>(null);
   const [brief, setBrief] = useState<ScriptWriterBrief>(DEFAULT_SCRIPT_BRIEF);
   const [creating, setCreating] = useState(false);
   const [sessions, setSessions] = useState<ScriptWriterSession[]>([]);
@@ -65,6 +66,17 @@ function ScriptWriterPageContent() {
     if (projectId) setLinkedProjectId(projectId);
     if (scoutId) setLinkedScoutProjectId(scoutId);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (canUseShotScout(appUser)) {
+      setAllowed(true);
+      return;
+    }
+    scriptWriterListSessions(() => user.getIdToken())
+      .then(() => setAllowed(true))
+      .catch(() => setAllowed(false));
+  }, [user, appUser]);
 
   useEffect(() => {
     if (!user || !allowed) return;
@@ -151,6 +163,7 @@ function ScriptWriterPageContent() {
     }
   };
 
+  if (allowed === null) return <LoadingSpinner className="py-20" />;
   if (!allowed) {
     return (
       <div className="py-20 text-center text-slate-500">

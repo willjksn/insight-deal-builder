@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
-import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { lookupScoutTechniques } from "@/lib/scout/techniqueLookup";
-import { ScoutProject } from "@/lib/scout/types";
+import { requireScoutProjectAccess } from "@/lib/scout/scoutRouteAuth";
 import { tavilyAvailable } from "@/lib/search/tavilyClient";
 
 export const runtime = "nodejs";
@@ -15,8 +15,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertCanUseShotScout(appUser);
+    await requireScoutProjectAccess(request, id);
 
     if (!tavilyAvailable()) {
       return NextResponse.json(
@@ -33,10 +32,7 @@ export async function POST(
 
     const ref = db.collection("shotScoutProjects").doc(id);
     const snap = await ref.get();
-    if (!snap.exists) throw new Error("Scout session not found");
-
-    const project = { id: snap.id, ...snap.data() } as ScoutProject;
-    if (project.userId !== uid) throw new Error("Not authorized");
+    const project = { id: snap.id, ...snap.data() } as import("@/lib/scout/types").ScoutProject;
     if (!project.latestDpPlan) {
       return NextResponse.json({ error: "Generate a DP plan first" }, { status: 400 });
     }

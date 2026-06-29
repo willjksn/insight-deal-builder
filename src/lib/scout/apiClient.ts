@@ -88,6 +88,44 @@ export async function scoutGeneratePreview(scoutProjectId: string) {
   return body;
 }
 
+export async function scoutSaveShotList(
+  scoutProjectId: string,
+  shots: import("./types").ScoutShotListItem[]
+) {
+  const res = await fetch(`/api/scout/${scoutProjectId}/shot-list`, {
+    method: "PATCH",
+    headers: await authHeaders(),
+    body: JSON.stringify({ shots }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "Failed to save shot list");
+  return body as { ok: true; shotList: import("./types").ScoutShotList; project: unknown };
+}
+
+export async function scoutFetchHistory(scoutProjectId: string, kind: import("./scoutHistory").ScoutHistoryKind) {
+  const res = await fetch(`/api/scout/${scoutProjectId}/history?kind=${encodeURIComponent(kind)}`, {
+    headers: await authHeaders(),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "Failed to load history");
+  return body as { entries: import("./scoutHistoryLabels").ScoutHistoryEntry[] };
+}
+
+export async function scoutRestoreHistory(
+  scoutProjectId: string,
+  kind: import("./scoutHistory").ScoutHistoryKind,
+  documentId: string
+) {
+  const res = await fetch(`/api/scout/${scoutProjectId}/history`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify({ kind, documentId }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "Failed to restore");
+  return body as { ok: true; project: unknown };
+}
+
 export type ScoutGearSuggestion = {
   cameraBody: string;
   lensOptions: string;

@@ -1,24 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
-import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { cineScoutAnalyzeLocation } from "@/lib/scout/cineScoutAi";
 import { loadScoutGearContext } from "@/lib/scout/scoutAdminGear";
+import { requireScoutProjectAccess } from "@/lib/scout/scoutRouteAuth";
 import { ScoutProject, ScoutProjectImage } from "@/lib/scout/types";
 
 export const runtime = "nodejs";
-
-async function loadScoutProject(scoutId: string, uid: string) {
-  const db = getAdminDb();
-  if (!db) throw new Error("Firebase Admin is not configured");
-  const ref = db.collection("shotScoutProjects").doc(scoutId);
-  const snap = await ref.get();
-  if (!snap.exists) throw new Error("Scout session not found");
-  const data = snap.data()!;
-  if (data.userId !== uid) throw new Error("Not authorized");
-  return { ref, data };
-}
 
 async function loadImages(scoutId: string): Promise<ScoutProjectImage[]> {
   const db = getAdminDb();
@@ -38,21 +28,23 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertCanUseShotScout(appUser);
+    const { project } = await requireScoutProjectAccess(request, id);
 
-    const { ref, data } = await loadScoutProject(id, uid);
+    const db = getAdminDb();
+    if (!db) throw new Error("Firebase Admin is not configured");
+    const ref = db.collection("shotScoutProjects").doc(id);
     const images = await loadImages(id);
     if (images.length < 1) {
       return NextResponse.json({ error: "Upload at least one location photo first" }, { status: 400 });
     }
 
-    const project = { id, ...data } as ScoutProject;
-    const { gearProfile, gearList } = await loadScoutGearContext(uid, project);
+    const { gearProfile, gearList } = await loadScoutGearContext(project.userId, project);
     const analysisPayload = await cineScoutAnalyzeLocation(project, images, gearProfile, gearList);
     const analysisRef = await ref.collection("analysis").add(
       stripUndefined({
         ...analysisPayload,
+        source: "ai",
+        label: "AI analysis",
         createdAt: FieldValue.serverTimestamp(),
       })
     );

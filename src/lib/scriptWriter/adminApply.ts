@@ -27,17 +27,7 @@ export function serializeScriptSession(
   };
 }
 
-export async function getScriptSessionForUser(
-  db: Firestore,
-  sessionId: string,
-  uid: string
-): Promise<(ScriptWriterSession & { id: string }) | null> {
-  const snap = await db.collection(SCRIPT_WRITER_SESSIONS_COLLECTION).doc(sessionId).get();
-  if (!snap.exists) return null;
-  const data = snap.data()!;
-  if (data.userId !== uid) return null;
-  return serializeScriptSession(snap.id, data);
-}
+export { getScriptSessionForUser } from "@/lib/projectAccess/server";
 
 async function getBoardForProject(
   db: Firestore,

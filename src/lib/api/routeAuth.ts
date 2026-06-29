@@ -58,6 +58,10 @@ export function assertCanUseScriptWriter(appUser: AppUser): void {
   assertCanUseShotScout(appUser);
 }
 
+export function assertApprovedUser(appUser: AppUser): void {
+  if (!appUser.approved) throw new Error("Not authorized");
+}
+
 export function apiErrorStatus(message: string): number {
   if (
     message.includes("token") ||

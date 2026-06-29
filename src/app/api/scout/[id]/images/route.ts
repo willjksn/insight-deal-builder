@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
-import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
+import { requireScoutProjectAccess } from "@/lib/scout/scoutRouteAuth";
 import { ScoutImageLabel } from "@/lib/scout/types";
 
 export const runtime = "nodejs";
@@ -13,8 +14,7 @@ export async function POST(
 ) {
   try {
     const { id: scoutProjectId } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertCanUseShotScout(appUser);
+    await requireScoutProjectAccess(request, scoutProjectId);
 
     const body = (await request.json()) as {
       imageId: string;
@@ -34,9 +34,6 @@ export async function POST(
     const projectSnap = await projectRef.get();
     if (!projectSnap.exists) {
       return NextResponse.json({ error: "Scout session not found" }, { status: 404 });
-    }
-    if (projectSnap.data()?.userId !== uid) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
     await projectRef.collection("images").doc(body.imageId).set(

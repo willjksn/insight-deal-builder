@@ -165,6 +165,8 @@ export interface Project {
   deliveryDate?: string;
   location?: string;
   status: ProjectStatus;
+  /** User who created the project — can manage team access without global manageProjects */
+  ownerUserId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

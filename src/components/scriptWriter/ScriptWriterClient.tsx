@@ -35,7 +35,8 @@ import {
 } from "@/lib/scriptWriter/brief";
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { cn } from "@/lib/utils/cn";
-import { ScriptProductionPackView } from "@/components/scriptWriter/ScriptProductionPackView";
+import { ScriptEditorPanel } from "@/components/scriptWriter/ScriptEditorPanel";
+import { ScriptSharePanel } from "@/components/scriptWriter/ScriptSharePanel";
 import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPanel";
 
 interface ScriptWriterClientProps {
@@ -240,6 +241,11 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         </p>
       )}
 
+      <ScriptSharePanel
+        sessionId={sessionId}
+        isOwner={Boolean(user && session.userId === user.uid)}
+      />
+
       {session.brief ? (
         <div className="mb-4 flex flex-wrap gap-2">
           <BriefChip label={SCRIPT_CONTENT_TYPE_LABELS[session.brief.contentType]} />
@@ -428,21 +434,14 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4">
             {script ? (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-serif text-lg font-bold text-slate-900">{script.title}</h3>
-                  <p className="mt-1 text-sm text-slate-600">{script.logline}</p>
-                </div>
-                <ScriptProductionPackView script={script} />
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Screenplay
-                  </h4>
-                  <pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-800">
-                    {script.fountain}
-                  </pre>
-                </div>
-              </div>
+              <ScriptEditorPanel
+                sessionId={sessionId}
+                script={script}
+                getToken={() => user!.getIdToken()}
+                onUpdated={(updated) =>
+                  setSession((s) => (s ? { ...s, script: updated, title: updated.title } : s))
+                }
+              />
             ) : (
               <p className="text-sm text-slate-500">
                 {awaitingAnalysisConfirm
