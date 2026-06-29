@@ -1,3 +1,5 @@
+import { logTavilyUsage } from "@/lib/ai/usageLog";
+
 export type TavilySearchResult = {
   title: string;
   url: string;
@@ -55,6 +57,8 @@ export async function tavilySearch(
       score?: number;
     }>;
   };
+
+  logTavilyUsage(options?.searchDepth ?? "basic");
 
   return {
     query: data.query ?? query,

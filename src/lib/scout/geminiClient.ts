@@ -1,5 +1,6 @@
 import { scoutImageProvider } from "@/lib/scout/imageConfig";
 import { throwGeminiApiError } from "@/lib/scout/geminiErrors";
+import { logGeminiImageUsage, logGeminiTextUsage } from "@/lib/ai/usageLog";
 import {
   canFallbackToVertexGemini,
   shouldPreferVertexGemini,
@@ -84,9 +85,20 @@ async function callGeminiApiKeyGenerate(params: {
 
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
+    usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+      totalTokenCount?: number;
+    };
   };
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error("Empty response from Gemini");
+  logGeminiTextUsage({
+    provider: "gemini_api",
+    model,
+    inputTokens: data.usageMetadata?.promptTokenCount,
+    outputTokens: data.usageMetadata?.candidatesTokenCount,
+  });
   return text;
 }
 
@@ -247,10 +259,19 @@ async function callGeminiApiKeyGenerateImage(params: {
         }>;
       };
     }[];
+    usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+    };
   };
 
   const buffer = extractGeminiImageBuffer(data);
   if (!buffer) throw new Error("Gemini returned no image data");
+  logGeminiImageUsage({
+    provider: "gemini_api",
+    model,
+    inputTokens: data.usageMetadata?.promptTokenCount,
+  });
   return buffer;
 }
 

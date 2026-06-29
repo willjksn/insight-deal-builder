@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
-import { hasPermission, isInsightOrgUser, resolvePermissions, canManageProjects, canManageUsers } from "@/lib/utils/permissions";
+import { bindAiUsageRequest } from "@/lib/ai/usageContext";
+import { isUserApproved } from "@/lib/users/approval";
+import { hasPermission, isInsightOrgUser, resolvePermissions } from "@/lib/utils/permissions";
 import { AppUser } from "@/lib/types";
 
 export async function verifyAuthToken(authHeader: string | null): Promise<string> {
@@ -25,6 +27,7 @@ export async function loadAppUser(uid: string): Promise<AppUser> {
 export async function requireAuthUser(request: NextRequest): Promise<{ uid: string; appUser: AppUser }> {
   const uid = await verifyAuthToken(request.headers.get("authorization"));
   const appUser = await loadAppUser(uid);
+  bindAiUsageRequest(request, uid);
   return { uid, appUser };
 }
 
@@ -59,10 +62,9 @@ export function assertCanUseScriptWriter(appUser: AppUser): void {
 }
 
 export function assertApprovedUser(appUser: AppUser): void {
-  if (appUser.approved) return;
-  // Staff who manage users/projects may lack approved on legacy docs but use Admin APIs.
-  if (canManageUsers(appUser) || canManageProjects(appUser)) return;
-  throw new Error("Not authorized");
+  if (!isUserApproved(appUser)) {
+    throw new Error("Not authorized");
+  }
 }
 
 export function apiErrorStatus(message: string): number {

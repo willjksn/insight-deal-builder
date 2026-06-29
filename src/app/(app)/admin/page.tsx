@@ -20,6 +20,7 @@ import {
   resolvePermissions,
 } from "@/lib/utils/permissions";
 import { ProjectAccessHub } from "@/components/projectAccess/ProjectAccessHub";
+import { AiUsagePanel } from "@/components/admin/AiUsagePanel";
 import { isUserPendingApproval, shouldApproveOnAdminSave } from "@/lib/users/approval";
 import {
   EMPTY_PERMISSIONS,
@@ -330,6 +331,8 @@ export default function AdminPage() {
         </InfoCallout>
         </div>
       )}
+
+      {isOrgAdmin && <AiUsagePanel />}
 
       <PageSection
         className="mb-6"

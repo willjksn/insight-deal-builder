@@ -570,7 +570,6 @@ export async function assertScoutAppAccess(
   uid: string,
   appUser: AppUser
 ): Promise<void> {
-  if (!appUser.approved) throw new Error("Not authorized");
   if (hasGlobalProjectAdmin(appUser)) return;
 
   if (canUseShotScout(appUser)) return;

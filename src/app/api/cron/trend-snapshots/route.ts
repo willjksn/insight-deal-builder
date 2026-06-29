@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { bindAiUsageCron } from "@/lib/ai/usageContext";
 import { refreshAllTrendSnapshots } from "@/lib/search/trendSnapshots";
 import { tavilyAvailable } from "@/lib/search/tavilyClient";
 
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    bindAiUsageCron("cron.trends");
     const result = await refreshAllTrendSnapshots(db);
     return NextResponse.json({
       ok: true,

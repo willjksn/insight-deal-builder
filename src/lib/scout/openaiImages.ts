@@ -1,3 +1,5 @@
+import { logOpenAiImageUsage } from "@/lib/ai/usageLog";
+
 export function scoutImageGenEnabled(): boolean {
   if (process.env.SCOUT_USE_MOCK_AI === "true") return false;
   return Boolean(process.env.OPENAI_API_KEY);
@@ -153,8 +155,14 @@ async function generateOpenAiImageWithModel(
 
   const data = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
   const item = data.data?.[0];
-  if (item?.b64_json) return Buffer.from(item.b64_json, "base64");
-  if (item?.url) return fetchImageBufferFromUrl(item.url);
+  if (item?.b64_json) {
+    logOpenAiImageUsage();
+    return Buffer.from(item.b64_json, "base64");
+  }
+  if (item?.url) {
+    logOpenAiImageUsage();
+    return fetchImageBufferFromUrl(item.url);
+  }
   throw new Error(`OpenAI (${model}) returned no image data`);
 }
 
@@ -208,5 +216,6 @@ export async function generateOpenAiImageFromReference(
   }
 
   const data = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
+  logOpenAiImageUsage();
   return extractB64FromOpenAiResponse(data);
 }

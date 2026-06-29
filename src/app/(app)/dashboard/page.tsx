@@ -35,11 +35,11 @@ export default function DashboardPage() {
   const { user, appUser } = useAuth();
   const { data: agreements, loading: aLoading } = useAgreements();
   const { data: projects, loading: pLoading } = useCollection<Project>("projects");
-  const { data: scoutSessions, loading: sLoading } = useScoutProjects(user?.uid);
+  const showProduction = canUseShotScout(appUser);
+  const { data: scoutSessions, loading: sLoading } = useScoutProjects(user?.uid, showProduction);
   const [scriptSessions, setScriptSessions] = useState<ScriptWriterSession[]>([]);
   const [scriptsLoading, setScriptsLoading] = useState(false);
 
-  const showProduction = canUseShotScout(appUser);
   const loading = aLoading || pLoading || (showProduction && sLoading);
 
   useEffect(() => {

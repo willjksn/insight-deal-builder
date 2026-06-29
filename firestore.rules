@@ -347,6 +347,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // AI usage aggregates — server-only (Admin SDK)
+    match /aiUsageMonthly/{monthKey} {
+      allow read, write: if false;
+    }
+
     // Client signing links — server-only (Firebase Admin SDK)
     match /signingLinks/{docId} {
       allow read, write: if false;

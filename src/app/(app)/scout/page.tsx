@@ -24,7 +24,7 @@ export default function ScoutDashboardPage() {
   const canLinkProjects = canLinkScoutToProject(appUser);
   const { data: projects } = useConditionalCollection<Project>("projects", canLinkProjects);
   const linkableProjects = projectsForScoutLinkDisplay(projects);
-  const { data, loading, error, refresh } = useScoutProjects(user?.uid, user ? () => user.getIdToken() : undefined);
+  const { data, loading, error, refresh } = useScoutProjects(user?.uid);
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 

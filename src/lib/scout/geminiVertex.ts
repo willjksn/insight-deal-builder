@@ -1,5 +1,6 @@
 import { GoogleAuth } from "google-auth-library";
 import { getServiceAccountCredentials } from "@/lib/firebase/admin";
+import { logGeminiImageUsage, logGeminiTextUsage } from "@/lib/ai/usageLog";
 import type { GeminiChatTurn, GeminiPart } from "@/lib/scout/geminiClient";
 
 /** Default Vertex model (2.0 flash retired 2026-06-01). */
@@ -178,7 +179,15 @@ async function vertexGenerateOnce(
   model: string,
   token: string,
   body: Record<string, unknown>
-): Promise<{ ok: true; text: string } | { ok: false; status: number; errText: string }> {
+): Promise<
+  | {
+      ok: true;
+      text: string;
+      model: string;
+      usage?: { promptTokenCount?: number; candidatesTokenCount?: number };
+    }
+  | { ok: false; status: number; errText: string }
+> {
   const url = vertexGenerateUrl(projectId, location, model);
   const res = await fetch(url, {
     method: "POST",
@@ -195,12 +204,21 @@ async function vertexGenerateOnce(
 
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
+    usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+    };
   };
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
     return { ok: false, status: 500, errText: "Empty response from Vertex AI Gemini" };
   }
-  return { ok: true, text };
+  return {
+    ok: true,
+    text,
+    model,
+    usage: data.usageMetadata,
+  };
 }
 
 function extractImageBufferFromVertexResponse(data: {
@@ -226,7 +244,15 @@ async function vertexGenerateImageOnce(
   model: string,
   token: string,
   body: Record<string, unknown>
-): Promise<{ ok: true; buffer: Buffer } | { ok: false; status: number; errText: string }> {
+): Promise<
+  | {
+      ok: true;
+      buffer: Buffer;
+      model: string;
+      usage?: { promptTokenCount?: number; candidatesTokenCount?: number };
+    }
+  | { ok: false; status: number; errText: string }
+> {
   const url = vertexGenerateUrl(projectId, location, model);
   const res = await fetch(url, {
     method: "POST",
@@ -250,12 +276,16 @@ async function vertexGenerateImageOnce(
         }>;
       };
     }[];
+    usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+    };
   };
   const buffer = extractImageBufferFromVertexResponse(data);
   if (!buffer) {
     return { ok: false, status: 500, errText: "Vertex AI returned no image data" };
   }
-  return { ok: true, buffer };
+  return { ok: true, buffer, model, usage: data.usageMetadata };
 }
 
 function vertexImageModelId(): string {
@@ -328,6 +358,11 @@ export async function vertexGeminiGenerateImage(params: {
       if (model !== preferredModel || location !== vertexLocation()) {
         console.info(`[Scout] Vertex image using ${model} @ ${location}`);
       }
+      logGeminiImageUsage({
+        provider: "vertex",
+        model: result.model,
+        inputTokens: result.usage?.promptTokenCount,
+      });
       return result.buffer;
     }
     lastError = { status: result.status, errText: result.errText, location, model };
@@ -378,6 +413,12 @@ export async function vertexGeminiGenerate(params: {
       if (model !== preferredModel || location !== vertexLocation()) {
         console.info(`[Scout] Vertex using ${model} @ ${location}`);
       }
+      logGeminiTextUsage({
+        provider: "vertex",
+        model: result.model,
+        inputTokens: result.usage?.promptTokenCount,
+        outputTokens: result.usage?.candidatesTokenCount,
+      });
       return result.text;
     }
     lastError = { status: result.status, errText: result.errText, location, model };
