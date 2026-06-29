@@ -1,4 +1,5 @@
 import { auth } from "@/lib/firebase/config";
+import { MarketPricingResearch } from "@/lib/agreement/pricingResearchTypes";
 import { QuoteScopeSuggestion } from "@/lib/agreement/scopeSuggestTypes";
 import { AgreementType } from "@/lib/types";
 
@@ -20,4 +21,22 @@ export async function suggestAgreementScope(
   const body = await res.json();
   if (!res.ok) throw new Error(body.error ?? "Scope suggestion failed");
   return body.suggestion as QuoteScopeSuggestion;
+}
+
+export async function researchAgreementPricing(input: {
+  jobDescription: string;
+  city?: string;
+  zip?: string;
+  state?: string;
+  agreementType?: AgreementType;
+  yourQuotedFee?: number;
+}): Promise<MarketPricingResearch> {
+  const res = await fetch("/api/agreements/pricing-research", {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify(input),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "Pricing research failed");
+  return body.research as MarketPricingResearch;
 }

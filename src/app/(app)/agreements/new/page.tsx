@@ -84,6 +84,11 @@ import {
 import { QuoteScopeAssistant } from "@/components/agreements/QuoteScopeAssistant";
 import { applyScopeSuggestionToAgreement } from "@/lib/agreement/applyScopeSuggestion";
 import { QuoteScopeSuggestion } from "@/lib/agreement/scopeSuggestTypes";
+import {
+  applyQuickQuoteToAgreement,
+  clearQuickQuoteDraft,
+  loadQuickQuoteDraft,
+} from "@/lib/quickQuote/apply";
 import { cn } from "@/lib/utils/cn";
 
 const STEPS = WIZARD_STEP_DEFS.map((s) => ({ id: s.id, label: s.label }));
@@ -115,6 +120,7 @@ function WizardContent() {
   const [signPartyId, setSignPartyId] = useState("");
   const [consentChecked, setConsentChecked] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(false);
+  const [quickQuoteApplied, setQuickQuoteApplied] = useState(false);
 
   const isInternal = agreement.agreementType === "internal_collaboration";
   const isRental = agreement.agreementType === "equipment_rental";
@@ -172,6 +178,7 @@ function WizardContent() {
   useEffect(() => {
     const projectId = searchParams.get("projectId");
     if (!projectId) return;
+    if (searchParams.get("fromQuickQuote") === "1") return;
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
     setAgreement((prev) => ({
@@ -196,6 +203,43 @@ function WizardContent() {
         : undefined,
     }));
   }, [searchParams, projects]);
+
+  useEffect(() => {
+    if (quickQuoteApplied) return;
+    if (searchParams.get("fromQuickQuote") !== "1") return;
+    const draft = loadQuickQuoteDraft();
+    if (!draft) return;
+
+    const projectId = searchParams.get("projectId") ?? undefined;
+
+    setAgreement((prev) => {
+      let base = prev;
+      if (base.agreementType !== "client_project") {
+        const empty = createEmptyAgreement("client_project");
+        base = {
+          ...empty,
+          parties: prev.parties,
+          title: prev.title || empty.title,
+        };
+        base = { ...base, ...applyTemplateToAgreement(base, "client_project", customTemplates) };
+      }
+      if (projectId) {
+        base = { ...base, projectId };
+      }
+      const { patch, selectedPackageId: pkgId } = applyQuickQuoteToAgreement(
+        base as Agreement,
+        draft,
+        servicePackages
+      );
+      if (pkgId) setSelectedPackageId(pkgId);
+      return { ...base, ...patch };
+    });
+
+    setSelectedTemplateId("client_project");
+    clearQuickQuoteDraft();
+    setQuickQuoteApplied(true);
+    setStep(2);
+  }, [quickQuoteApplied, searchParams, servicePackages, customTemplates]);
 
   useEffect(() => {
     if (!isInternal) return;
@@ -440,6 +484,17 @@ function WizardContent() {
     },
     [servicePackages, isPartner, appUser?.company, companies, customTemplates]
   );
+
+  const handleApplySuggestedFee = useCallback((fee: number) => {
+    setAgreement((prev) => {
+      if (!prev.payoutDetails) return prev;
+      return {
+        ...prev,
+        payoutDetails: syncPayoutAmounts({ ...prev.payoutDetails, totalProjectFee: fee }),
+        paymentTerms: suggestPaymentTerms(fee),
+      };
+    });
+  }, []);
 
   const renderStep = () => {
     switch (step) {
@@ -1009,7 +1064,9 @@ function WizardContent() {
         {!loadingDraft && (
           <QuoteScopeAssistant
             agreementType={agreement.agreementType}
+            yourQuotedFee={agreement.payoutDetails?.totalProjectFee}
             onApply={handleApplyScopeSuggestion}
+            onApplySuggestedFee={handleApplySuggestedFee}
           />
         )}
         {loadingDraft ? <LoadingSpinner className="py-12" /> : (

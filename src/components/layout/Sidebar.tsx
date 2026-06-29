@@ -19,6 +19,7 @@ import {
   BarChart3,
   Clapperboard,
   ScrollText,
+  Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -82,6 +83,12 @@ const navGroups: NavGroup[] = [
   {
     label: "Business",
     items: [
+      {
+        href: "/quick-quote",
+        label: "Quick quote",
+        icon: Calculator,
+        canAccess: canCreateQuotes,
+      },
       { href: "/agreements", label: "Agreements", icon: FileText },
       {
         href: "/templates",
