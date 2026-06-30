@@ -32,6 +32,7 @@ export async function scriptWriterCreateSession(
     linkedProjectId?: string;
     linkedScoutProjectId?: string;
     workflowMode?: "text" | "inspiration";
+    detailedShotList?: boolean;
   }
 ) {
   const res = await fetch("/api/script-writer/sessions", {
@@ -62,12 +63,13 @@ export async function scriptWriterAnalyzeInspiration(
 export async function scriptWriterConfirmAnalysis(
   getToken: () => Promise<string | null>,
   sessionId: string,
-  notes?: string
+  notes?: string,
+  options?: { detailedShotList?: boolean }
 ) {
   const res = await fetch(`/api/script-writer/sessions/${sessionId}/confirm-analysis`, {
     method: "POST",
     headers: await authHeaders(getToken),
-    body: JSON.stringify({ notes }),
+    body: JSON.stringify({ notes, detailedShotList: options?.detailedShotList }),
   });
   return parseJson<{ session: unknown }>(res);
 }
@@ -75,12 +77,13 @@ export async function scriptWriterConfirmAnalysis(
 export async function scriptWriterRefineScript(
   getToken: () => Promise<string | null>,
   sessionId: string,
-  message: string
+  message: string,
+  options?: { detailedShotList?: boolean }
 ) {
   const res = await fetch(`/api/script-writer/sessions/${sessionId}/refine`, {
     method: "POST",
     headers: await authHeaders(getToken),
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, detailedShotList: options?.detailedShotList }),
   });
   return parseJson<{ session: unknown }>(res);
 }
@@ -117,11 +120,13 @@ export async function scriptWriterSendMessage(
 
 export async function scriptWriterGenerateScript(
   getToken: () => Promise<string | null>,
-  sessionId: string
+  sessionId: string,
+  options?: { detailedShotList?: boolean }
 ) {
   const res = await fetch(`/api/script-writer/sessions/${sessionId}/generate`, {
     method: "POST",
     headers: await authHeaders(getToken),
+    body: JSON.stringify({ detailedShotList: options?.detailedShotList }),
   });
   return parseJson<{ session: unknown }>(res);
 }

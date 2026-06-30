@@ -1,4 +1,5 @@
 import { Project } from "@/lib/types";
+import { defaultChecklistForProject } from "@/lib/production/checklist";
 import { ProductionBoard, ProductionDay } from "@/lib/production/types";
 
 export function createEmptyProductionDay(dayNumber: number, title?: string): ProductionDay {
@@ -52,5 +53,6 @@ export function createProductionBoardFromProject(
     budgetLink: "",
     productionDays: [createEmptyProductionDay(1)],
     linkedScoutProjectIds: [],
+    ...defaultChecklistForProject(project),
   };
 }

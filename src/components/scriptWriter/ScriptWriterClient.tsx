@@ -36,6 +36,8 @@ import {
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { cn } from "@/lib/utils/cn";
 import { ScriptEditorPanel } from "@/components/scriptWriter/ScriptEditorPanel";
+import { ScriptSuggestedShotsPanel } from "@/components/scriptWriter/ScriptSuggestedShotsPanel";
+import { DetailedShotListToggle } from "@/components/scriptWriter/DetailedShotListToggle";
 import { canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPanel";
 
@@ -61,6 +63,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const [refining, setRefining] = useState(false);
   const [researchingTrends, setResearchingTrends] = useState(false);
   const [projectId, setProjectId] = useState("");
+  const [detailedShotList, setDetailedShotList] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -72,6 +75,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
       const s = loaded as ScriptWriterSession;
       setSession(s);
       setProjectId(s.linkedProjectId ?? s.appliedProjectId ?? "");
+      setDetailedShotList(s.detailedShotList !== false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load session");
     } finally {
@@ -114,7 +118,8 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
     try {
       const { session: updated } = await scriptWriterGenerateScript(
         () => user.getIdToken(),
-        sessionId
+        sessionId,
+        { detailedShotList }
       );
       setSession(updated as ScriptWriterSession);
     } catch (e) {
@@ -132,7 +137,8 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
       const { session: updated } = await scriptWriterConfirmAnalysis(
         () => user.getIdToken(),
         sessionId,
-        confirmNotes.trim() || undefined
+        confirmNotes.trim() || undefined,
+        { detailedShotList }
       );
       setSession(updated as ScriptWriterSession);
     } catch (e) {
@@ -150,7 +156,8 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
       const { session: updated } = await scriptWriterRefineScript(
         () => user.getIdToken(),
         sessionId,
-        refineInput.trim()
+        refineInput.trim(),
+        { detailedShotList }
       );
       setSession(updated as ScriptWriterSession);
       setRefineInput("");
@@ -330,6 +337,11 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           </div>
           {awaitingAnalysisConfirm && session.status !== "applied" ? (
             <div className="space-y-3 border-t border-slate-100 p-3">
+              <DetailedShotListToggle
+                checked={detailedShotList}
+                onChange={setDetailedShotList}
+                compact
+              />
               <textarea
                 value={confirmNotes}
                 onChange={(e) => setConfirmNotes(e.target.value)}
@@ -381,7 +393,13 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                   )}
                 </Button>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2 space-y-2">
+                <DetailedShotListToggle
+                  checked={detailedShotList}
+                  onChange={setDetailedShotList}
+                  compact
+                />
+                <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   size="sm"
@@ -401,12 +419,18 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                     Ready when you are — or keep refining.
                   </span>
                 )}
+                </div>
               </div>
             </div>
           ) : null}
           {canRefine ? (
             <div className="space-y-2 border-t border-slate-100 p-3">
               <p className="text-xs text-slate-500">One optional refinement</p>
+              <DetailedShotListToggle
+                checked={detailedShotList}
+                onChange={setDetailedShotList}
+                compact
+              />
               <div className="flex gap-2">
                 <textarea
                   value={refineInput}
@@ -445,8 +469,10 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
             </h2>
             {script ? (
               <p className="mt-0.5 text-xs text-slate-500">
-                {script.scenes.length} scenes · {script.suggestedShots.length} suggested shots ·{" "}
-                {script.characters.length} characters
+                {script.scenes.length} scenes · {script.suggestedShots.length} shot
+                {script.suggestedShots.length === 1 ? "" : "s"}
+                {detailedShotList ? " (detailed coverage)" : ""} · {script.characters.length}{" "}
+                characters
               </p>
             ) : (
               <p className="mt-0.5 text-xs text-slate-500">
@@ -454,6 +480,9 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
               </p>
             )}
           </div>
+          {script && script.suggestedShots.length > 0 ? (
+            <ScriptSuggestedShotsPanel shots={script.suggestedShots} />
+          ) : null}
           <div className="flex-1 overflow-y-auto px-4 py-4">
             {script ? (
               <ScriptEditorPanel

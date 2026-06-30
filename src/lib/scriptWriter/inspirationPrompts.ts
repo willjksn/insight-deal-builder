@@ -25,7 +25,12 @@ Respond JSON only:
   "inferredSettings": "optional — what settings the media suggests vs brief"
 }`;
 
-export function scriptWriterInspirationGenerateSystem(detailLevel: "standard" | "production" | "trailer"): string {
+import { shotListPromptRules } from "@/lib/scriptWriter/detailedShotListPrompt";
+
+export function scriptWriterInspirationGenerateSystem(
+  detailLevel: "standard" | "production" | "trailer",
+  detailedShotList = true
+): string {
   const packInstructions =
     detailLevel === "trailer"
       ? `Include a rich productionPack with:
@@ -54,7 +59,7 @@ REFERENCE RULES:
 
 ${packInstructions}
 
-suggestedShots must be DETAILED for production: include lens, lighting, purpose fields where relevant.
+${shotListPromptRules(detailedShotList)}
 
 Output JSON only:
 {

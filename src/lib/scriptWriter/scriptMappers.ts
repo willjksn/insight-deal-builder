@@ -4,6 +4,7 @@ import {
   ProductionLocationEntry,
   ProductionPerson,
 } from "@/lib/production/types";
+import { formatShotTypeLabel } from "@/lib/production/shotLabels";
 import { ScriptDocument, ScriptSuggestedShot } from "@/lib/scriptWriter/types";
 
 const SHOT_TYPES = new Set<string>([
@@ -60,19 +61,48 @@ function scriptShotToScout(shot: ScriptSuggestedShot): ScoutShotListItem {
 
 export function productionShotsFromScript(script: ScriptDocument): ProductionDayShot[] {
   return script.suggestedShots.map((shot, index) => {
+    const shotType = normalizeShotType(shot.shotType);
+    const typeLabel = formatShotTypeLabel(shotType);
+    const name = shot.shotName?.trim();
+    const subject = shot.subjectAction?.trim();
     const entry: ProductionDayShot = {
       id: crypto.randomUUID(),
-      label: shot.shotName?.trim()
-        ? `${shot.shotNumber}. ${shot.shotName.trim()}`
-        : `${shot.shotNumber}. ${shot.description.trim().slice(0, 60)}`,
+      label: name
+        ? `${shot.shotNumber}. ${name}`
+        : `${shot.shotNumber}. ${typeLabel}${subject ? ` — ${subject.slice(0, 56)}` : ""}`,
       done: false,
       scoutShotNumber: shot.shotNumber,
       sortOrder: index,
+      shotType,
+      shotName: name,
+      subjectAction: subject,
+      cameraMovement: shot.cameraMovement?.trim(),
     };
     if (shot.sceneNumber?.trim()) entry.sceneRef = shot.sceneNumber.trim();
-    const notes = [shot.description, shot.cameraMovement].filter(Boolean).join(" · ");
+    const notes = [shot.description, shot.lens, shot.lighting, shot.purpose]
+      .filter(Boolean)
+      .join(" · ");
     if (notes) entry.notes = notes;
     return entry;
+  });
+}
+
+/** Refresh shot list from script while preserving checkbox state by shot number. */
+export function mergeProductionShotsFromScript(
+  existing: ProductionDayShot[],
+  script: ScriptDocument
+): ProductionDayShot[] {
+  const doneByNumber = new Map<number, boolean>();
+  for (const shot of existing) {
+    if (shot.scoutShotNumber != null) {
+      doneByNumber.set(shot.scoutShotNumber, shot.done);
+    }
+  }
+  return productionShotsFromScript(script).map((shot) => {
+    if (shot.scoutShotNumber == null || !doneByNumber.has(shot.scoutShotNumber)) {
+      return shot;
+    }
+    return { ...shot, done: doneByNumber.get(shot.scoutShotNumber)! };
   });
 }
 

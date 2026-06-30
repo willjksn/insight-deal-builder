@@ -187,6 +187,8 @@ export interface ScriptWriterSession {
   linkedScoutProjectId?: string;
   appliedProjectId?: string;
   appliedScoutProjectId?: string;
+  /** When true, Gemini outputs full WS/MS/CU coverage per scene */
+  detailedShotList?: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

@@ -25,6 +25,9 @@ export async function POST(
     assertCanUseScriptWriter(appUser);
     const { id } = await params;
 
+    const body = (await request.json().catch(() => ({}))) as { detailedShotList?: boolean };
+    const detailedShotList = body.detailedShotList !== false;
+
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
 
@@ -50,6 +53,7 @@ export async function POST(
       detailLevel,
       inspiration,
       trendsResearch: session.trendsResearch ?? null,
+      detailedShotList,
     });
 
     if (session.script) {
@@ -61,6 +65,7 @@ export async function POST(
         script,
         title: script.title,
         status: "script_ready",
+        detailedShotList,
         updatedAt: FieldValue.serverTimestamp(),
       })
     );

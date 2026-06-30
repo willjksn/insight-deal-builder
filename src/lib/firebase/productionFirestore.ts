@@ -17,6 +17,7 @@ import { stripUndefined } from "@/lib/firebase/firestore";
 import { Project } from "@/lib/types";
 import { ProductionBoard } from "@/lib/production/types";
 import { createProductionBoardFromProject } from "@/lib/production/defaults";
+import { defaultChecklistForProject } from "@/lib/production/checklist";
 import { normalizeStoryLinks } from "@/lib/production/storyLinks";
 
 export const PRODUCTION_BOARDS_COLLECTION = "productionBoards";
@@ -81,9 +82,26 @@ export async function ensureProductionBoard(
   const existing = await getProductionBoardByProject(project.id);
   if (existing) {
     const { links, changed } = normalizeStoryLinks(existing.storyLinks ?? []);
-    if (changed) {
-      await saveProductionBoard(existing.id, { storyLinks: links });
-      return { ...existing, storyLinks: links };
+    const checklistMissing = !existing.checklistItems?.length;
+    if (changed || checklistMissing) {
+      const patch: Partial<Omit<ProductionBoard, "id" | "createdAt">> = {};
+      if (changed) patch.storyLinks = links;
+      if (checklistMissing) {
+        const checklist = defaultChecklistForProject(project);
+        patch.checklistMode = checklist.mode;
+        patch.checklistItems = checklist.items;
+      }
+      await saveProductionBoard(existing.id, patch);
+      return {
+        ...existing,
+        ...(changed ? { storyLinks: links } : {}),
+        ...(checklistMissing
+          ? {
+              checklistMode: patch.checklistMode!,
+              checklistItems: patch.checklistItems!,
+            }
+          : {}),
+      };
     }
     return existing;
   }

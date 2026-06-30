@@ -21,6 +21,7 @@ import { getScoutProjectsForLinkedProject } from "@/lib/firebase/scoutFirestore"
 import { getProductionBoardByProject } from "@/lib/firebase/productionFirestore";
 import { scriptWriterListSessions } from "@/lib/scriptWriter/apiClient";
 import { ProjectSpine } from "@/components/projects/ProjectSpine";
+import { ProjectShotProgressCard } from "@/components/projects/ProjectShotProgressCard";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { canCreateQuotes, canUseShotScout, canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 
@@ -197,6 +198,12 @@ export default function ProjectDetailPage() {
           showScout={showScout}
           canCreateDeal={canCreateDeal}
         />
+      )}
+
+      {showProduction && board && (
+        <div className="mb-8">
+          <ProjectShotProgressCard projectId={project.id} board={board} />
+        </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">

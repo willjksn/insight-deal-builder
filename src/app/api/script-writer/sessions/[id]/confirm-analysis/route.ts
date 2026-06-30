@@ -24,7 +24,8 @@ export async function POST(
     const { uid, appUser } = await requireAuthUser(request);
     assertCanUseScriptWriter(appUser);
     const { id } = await params;
-    const body = (await request.json()) as { notes?: string };
+    const body = (await request.json()) as { notes?: string; detailedShotList?: boolean };
+    const detailedShotList = body.detailedShotList !== false;
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
@@ -57,6 +58,7 @@ export async function POST(
         confirmNotes,
       },
       trendsResearch: session.trendsResearch ?? null,
+      detailedShotList,
     });
 
     if (session.script) {
@@ -69,6 +71,7 @@ export async function POST(
         script,
         title: script.title,
         status: "script_ready",
+        detailedShotList,
         updatedAt: FieldValue.serverTimestamp(),
       })
     );

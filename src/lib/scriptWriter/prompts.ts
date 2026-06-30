@@ -70,10 +70,13 @@ Output JSON only matching this schema:
       "sceneNumber": "1",
       "shotNumber": 1,
       "shotType": "master_wide|medium_shot|close_up|insert_shot|reaction_shot|movement_shot|vertical_social_shot",
-      "shotName": "optional short label",
+      "shotName": "optional short label e.g. WS — Gym exterior",
       "description": "what we see",
       "subjectAction": "subject action",
-      "cameraMovement": "static|pan|dolly|handheld|etc"
+      "cameraMovement": "static|pan|dolly|handheld|etc",
+      "lens": "optional e.g. 24mm",
+      "lighting": "optional brief note",
+      "purpose": "optional story/coverage purpose"
     }
   ]
 }

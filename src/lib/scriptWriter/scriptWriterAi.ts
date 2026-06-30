@@ -16,6 +16,7 @@ import {
   SCRIPT_WRITER_GENERATE_SYSTEM,
   SCRIPT_WRITER_INTERVIEW_SYSTEM,
 } from "@/lib/scriptWriter/prompts";
+import { shotListPromptRules } from "@/lib/scriptWriter/detailedShotListPrompt";
 import {
   buildInspirationMediaBundle,
   hasInspirationInput,
@@ -105,7 +106,7 @@ function mockChatResponse(brief: ScriptWriterBrief, messages: ScriptWriterMessag
   };
 }
 
-function mockScript(brief: ScriptWriterBrief): ScriptDocument {
+function mockScript(brief: ScriptWriterBrief, detailedShotList = true): ScriptDocument {
   const title = brief.concept.slice(0, 48) || "Untitled Script";
   const logline = brief.concept.slice(0, 200) || "A compelling visual story.";
   const fountain = `Title: ${title}
@@ -140,17 +141,51 @@ THE END
       },
     ],
     characters: [{ name: "Character", role: "lead", description: "On-camera lead" }],
-    suggestedShots: [
-      {
-        sceneNumber: "1",
-        shotNumber: 1,
-        shotType: "master_wide",
-        shotName: "Establishing",
-        description: "Wide establishing shot",
-        subjectAction: "Subject enters",
-        cameraMovement: "static",
-      },
-    ],
+    suggestedShots: detailedShotList
+      ? [
+          {
+            sceneNumber: "1",
+            shotNumber: 1,
+            shotType: "master_wide",
+            shotName: "WS — Establish location",
+            description: "Wide establishing shot of the space",
+            subjectAction: "Subject enters frame",
+            cameraMovement: "static",
+            lens: "24mm",
+            lighting: "Natural key with fill",
+          },
+          {
+            sceneNumber: "1",
+            shotNumber: 2,
+            shotType: "medium_shot",
+            shotName: "MS — Subject introduction",
+            description: "Medium on subject waist-up",
+            subjectAction: "Subject delivers opening beat",
+            cameraMovement: "static",
+            lens: "50mm",
+          },
+          {
+            sceneNumber: "1",
+            shotNumber: 3,
+            shotType: "close_up",
+            shotName: "CU — Reaction",
+            description: "Close on face or key detail",
+            subjectAction: "Emotional beat or prop detail",
+            cameraMovement: "static",
+            lens: "85mm",
+          },
+        ]
+      : [
+          {
+            sceneNumber: "1",
+            shotNumber: 1,
+            shotType: "master_wide",
+            shotName: "Establishing",
+            description: "Wide establishing shot",
+            subjectAction: "Subject enters",
+            cameraMovement: "static",
+          },
+        ],
     productionPack: {
       premise: logline,
       tone: resolveMoodLabel(brief),
@@ -292,10 +327,13 @@ export async function scriptWriterGenerate(
       confirmNotes?: string;
     };
     trendsResearch?: ScriptTrendsResearch | null;
+    detailedShotList?: boolean;
   }
 ): Promise<ScriptDocument> {
+  const detailedShotList = options?.detailedShotList !== false;
+
   if (scoutAiUsesMock()) {
-    return mockScript(brief);
+    return mockScript(brief, detailedShotList);
   }
 
   const detailLevel = options?.detailLevel ?? inferScriptDetailLevel(brief);
@@ -312,13 +350,15 @@ export async function scriptWriterGenerate(
       "",
       `Detail level: ${detailLevel}`,
       "",
+      shotListPromptRules(detailedShotList),
+      "",
       "Write the complete production-ready script now.",
     ]
       .filter(Boolean)
       .join("\n");
 
     const raw = await callGeminiJsonWithMedia(
-      scriptWriterInspirationGenerateSystem(detailLevel),
+      scriptWriterInspirationGenerateSystem(detailLevel, detailedShotList),
       prompt,
       media,
       { temperature: 0.58 }
@@ -336,13 +376,15 @@ export async function scriptWriterGenerate(
     "",
     `Detail level: ${detailLevel}`,
     "",
+    shotListPromptRules(detailedShotList),
+    "",
     "Write the complete, production-ready script now. Match the brief exactly.",
   ]
     .filter(Boolean)
     .join("\n");
 
   const raw = await callGeminiJsonWithHistory(
-    SCRIPT_WRITER_GENERATE_SYSTEM,
+    `${SCRIPT_WRITER_GENERATE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}`,
     [{ role: "user", parts: [{ text: payload }] }],
     { temperature: 0.58 }
   );
@@ -362,8 +404,11 @@ export async function scriptWriterRefineScript(
       urls?: ScriptInspirationUrl[];
     };
     trendsResearch?: ScriptTrendsResearch | null;
+    detailedShotList?: boolean;
   }
 ): Promise<ScriptDocument> {
+  const detailedShotList = options?.detailedShotList !== false;
+
   if (scoutAiUsesMock()) {
     return { ...currentScript, title: currentScript.title };
   }
@@ -399,6 +444,7 @@ export async function scriptWriterRefineScript(
     `REFINEMENT NOTE: ${refineNote.trim()}`,
     "",
     `Detail level: ${detailLevel}`,
+    shotListPromptRules(detailedShotList),
     "Return the full revised script JSON.",
   ]
     .filter(Boolean)
@@ -406,11 +452,16 @@ export async function scriptWriterRefineScript(
 
   const raw =
     media.length > 0
-      ? await callGeminiJsonWithMedia(SCRIPT_WRITER_REFINE_SYSTEM, payload, media, {
-          temperature: 0.55,
-        })
+      ? await callGeminiJsonWithMedia(
+          `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}`,
+          payload,
+          media,
+          {
+            temperature: 0.55,
+          }
+        )
       : await callGeminiJsonWithHistory(
-          SCRIPT_WRITER_REFINE_SYSTEM,
+          `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}`,
           [{ role: "user", parts: [{ text: payload }] }],
           { temperature: 0.55 }
         );

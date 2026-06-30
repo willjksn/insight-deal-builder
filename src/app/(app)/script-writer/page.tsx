@@ -13,6 +13,7 @@ import {
   ScriptWriterIntakeForm,
 } from "@/components/scriptWriter/ScriptWriterIntakeForm";
 import { InspirationUploadSection } from "@/components/scriptWriter/InspirationUploadSection";
+import { DetailedShotListToggle } from "@/components/scriptWriter/DetailedShotListToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   PendingInspirationImage,
@@ -50,6 +51,7 @@ function ScriptWriterPageContent() {
   const [pendingUrls, setPendingUrls] = useState<PendingInspirationUrl[]>([]);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [researchTrends, setResearchTrends] = useState(false);
+  const [detailedShotList, setDetailedShotList] = useState(true);
 
   const hasInspiration =
     pendingImages.length > 0 || pendingVideo !== null || pendingUrls.length > 0;
@@ -100,6 +102,7 @@ function ScriptWriterPageContent() {
         linkedProjectId,
         linkedScoutProjectId,
         workflowMode: hasInspiration ? "inspiration" : "text",
+        detailedShotList,
       });
 
       if (hasInspiration) {
@@ -201,7 +204,12 @@ function ScriptWriterPageContent() {
             onVideoChange={setPendingVideo}
             onUrlsChange={setPendingUrls}
           />
-          <div className="flex flex-col items-end gap-2 border-t border-slate-100 pt-4">
+          <DetailedShotListToggle
+            checked={detailedShotList}
+            onChange={setDetailedShotList}
+            className="border-t border-slate-100 pt-4"
+          />
+          <div className="flex flex-col items-end gap-2">
             {uploadProgress ? (
               <p className="text-xs text-violet-700">{uploadProgress}</p>
             ) : null}

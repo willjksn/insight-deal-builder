@@ -33,6 +33,7 @@ import {
   PersonDetailModal,
 } from "@/components/production/ProductionPersonModals";
 import { ScoutSessionsCard } from "@/components/production/ScoutSessionsCard";
+import { ProductionBoardChecklistSection } from "@/components/production/ProductionBoardChecklistSection";
 import { PersonAvatar } from "@/components/production/PersonAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgreements } from "@/hooks/useAgreements";
@@ -228,7 +229,15 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-5 lg:gap-6">
+      <ProductionBoardChecklistSection
+        project={project}
+        board={board}
+        scoutSessions={scoutSessions}
+        primaryAgreement={primaryAgreement ?? undefined}
+        onPatch={(partial) => patch(partial)}
+      />
+
+      <div className="mt-6 grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-5 lg:gap-6">
           {/* Column 1 — About + Cast */}
           <BoardColumn>
             <AboutCard board={board} onPatch={patch} />
@@ -1618,16 +1627,16 @@ function FilmingCard({
           {sorted.map((day) => (
             <li key={`shots-${day.id}`}>
               <Link
-                href={`/projects/${projectId}/production/days/${day.id}#shots`}
+                href={`/projects/${projectId}/production/days/${day.id}/shots`}
                 className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-800 transition-colors hover:bg-slate-50"
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-800">
                   <Clapperboard className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="font-medium">Shot list / schedule — Day {day.dayNumber}</span>
+                  <span className="font-medium">Shot list — Day {day.dayNumber}</span>
                   <p className="truncate text-xs text-slate-500">
-                    {day.shots.length} shots · {day.schedule.length} schedule blocks
+                    {day.shots.length} shots · check off on set
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
@@ -1761,6 +1770,11 @@ function FilmingCard({
                     <Link href={`/projects/${projectId}/production/days/${day.id}`}>
                       <Button size="sm" variant="outline" className="h-7 px-2 text-xs">
                         Call sheet
+                      </Button>
+                    </Link>
+                    <Link href={`/projects/${projectId}/production/days/${day.id}/shots`}>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs">
+                        Shots
                       </Button>
                     </Link>
                   </div>

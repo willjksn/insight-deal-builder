@@ -24,7 +24,7 @@ export async function POST(
     const { uid, appUser } = await requireAuthUser(request);
     assertCanUseScriptWriter(appUser);
     const { id } = await params;
-    const body = (await request.json()) as { message?: string };
+    const body = (await request.json()) as { message?: string; detailedShotList?: boolean };
 
     const message = body.message?.trim();
     if (!message) {
@@ -57,11 +57,14 @@ export async function POST(
           }
         : undefined;
 
+    const detailedShotList =
+      body.detailedShotList ?? session.detailedShotList !== false;
+
     const script = await scriptWriterRefineScript(
       brief,
       session.script as ScriptDocument,
       message,
-      { detailLevel, inspiration, trendsResearch: session.trendsResearch ?? null }
+      { detailLevel, inspiration, trendsResearch: session.trendsResearch ?? null, detailedShotList }
     );
 
     await archiveScriptVersion(db, id, session.script as ScriptDocument, "refine", message.slice(0, 120));
@@ -71,6 +74,7 @@ export async function POST(
         script,
         title: script.title,
         refineUsed: true,
+        detailedShotList,
         updatedAt: FieldValue.serverTimestamp(),
       })
     );

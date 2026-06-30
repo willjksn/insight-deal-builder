@@ -1,4 +1,5 @@
 import { Timestamp } from "firebase/firestore";
+import { ProductionChecklistItem, ProductionChecklistMode } from "@/lib/production/checklist";
 
 export type ProductionPersonGroup = "cast" | "production_team" | "camera_department";
 
@@ -67,6 +68,11 @@ export interface ProductionDayShot {
   scoutShotNumber?: number;
   notes?: string;
   sortOrder: number;
+  /** e.g. master_wide, medium_shot, close_up */
+  shotType?: string;
+  shotName?: string;
+  subjectAction?: string;
+  cameraMovement?: string;
 }
 
 export interface ProductionDay {
@@ -115,6 +121,9 @@ export interface ProductionBoard {
   /** Linked script writer session when applied from AI script */
   scriptSessionId?: string;
   scriptFountain?: string;
+  /** Pre-production → post checklist (portfolio vs client template) */
+  checklistMode?: ProductionChecklistMode;
+  checklistItems?: ProductionChecklistItem[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

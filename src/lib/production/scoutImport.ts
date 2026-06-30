@@ -11,6 +11,10 @@ export function shotsFromScoutList(items: ScoutShotListItem[]): ProductionDaySho
       done: shot.status === "shot" || shot.status === "captured",
       scoutShotNumber: shot.shotNumber,
       sortOrder: index,
+      shotType: shot.shotType,
+      shotName: shot.shotName?.trim(),
+      subjectAction: shot.subjectAction?.trim(),
+      cameraMovement: shot.cameraMovement?.trim(),
     };
     if (sceneRef) entry.sceneRef = sceneRef;
     if (notes) entry.notes = notes;

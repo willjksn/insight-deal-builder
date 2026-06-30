@@ -120,30 +120,6 @@ export function CallSheetView({ board, day, className, printMode }: CallSheetVie
       {crew.length > 0 && (
         <PeopleTable title="Crew" people={crew} />
       )}
-
-      {day.shots.length > 0 && (
-        <section className="mb-2">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">Shot list</h2>
-          <ul className="space-y-1">
-            {[...day.shots].sort((a, b) => a.sortOrder - b.sortOrder).map((shot) => (
-              <li key={shot.id} className="flex items-start gap-2">
-                <span
-                  className={cn(
-                    "mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px]",
-                    shot.done ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-300"
-                  )}
-                >
-                  {shot.done ? "✓" : ""}
-                </span>
-                <span className={cn(shot.done && "line-through text-slate-400")}>
-                  {shot.label}
-                  {shot.sceneRef && <span className="text-slate-500"> ({shot.sceneRef})</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }
