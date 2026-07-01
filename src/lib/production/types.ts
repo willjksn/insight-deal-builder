@@ -1,5 +1,6 @@
 import { Timestamp } from "firebase/firestore";
 import { ProductionChecklistItem, ProductionChecklistMode } from "@/lib/production/checklist";
+import { CrewPrintoutPacket } from "@/lib/production/crewPacketTypes";
 
 export type ProductionPersonGroup = "cast" | "production_team" | "camera_department";
 
@@ -103,6 +104,8 @@ export interface ProductionDay {
   shots: ProductionDayShot[];
   /** Scene-level storyboard cards (one per scene). */
   sceneFrames?: ProductionSceneFrame[];
+  /** Generated crew printout packet (master list + per-role sections). */
+  crewPacket?: CrewPrintoutPacket;
   crewCall?: string;
   breakfast?: string;
   lunch?: string;

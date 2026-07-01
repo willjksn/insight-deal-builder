@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { REFERENCE_CATEGORIES } from "@/lib/reference/categories";
@@ -67,6 +67,9 @@ export function ReferenceGuideView({
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("all");
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const sectionNavRef = useRef<HTMLDivElement>(null);
+  const activeNavButtonRef = useRef<HTMLButtonElement>(null);
 
   const filtered = useMemo(() => {
     if (!guide) return [];
@@ -78,6 +81,57 @@ export function ReferenceGuideView({
       return hay.includes(q);
     });
   }, [guide, query, category]);
+
+  const activeCategory = useMemo(() => {
+    if (!guide || !activeSectionId) return null;
+    return guide.sections.find((s) => s.id === activeSectionId)?.category ?? null;
+  }, [guide, activeSectionId]);
+
+  useEffect(() => {
+    if (filtered.length === 0) {
+      setActiveSectionId(null);
+      return;
+    }
+    const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
+    if (hash && filtered.some((s) => s.id === hash)) {
+      setActiveSectionId(hash);
+      return;
+    }
+    setActiveSectionId(filtered[0].id);
+  }, [filtered]);
+
+  useEffect(() => {
+    if (filtered.length === 0) return;
+
+    const ids = filtered.map((s) => s.id);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (visible[0]?.target.id) {
+          setActiveSectionId(visible[0].target.id);
+        }
+      },
+      { rootMargin: "-15% 0px -60% 0px", threshold: [0, 0.15, 0.35, 0.55] }
+    );
+
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [filtered]);
+
+  useEffect(() => {
+    activeNavButtonRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeSectionId]);
+
+  const scrollToSection = (id: string) => {
+    setActiveSectionId(id);
+    window.history.replaceState(null, "", `#${id}`);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   if (loading) return <LoadingSpinner className="py-20" />;
   if (!guide) return <p className="text-slate-500">Could not load reference guide.</p>;
@@ -107,22 +161,58 @@ export function ReferenceGuideView({
             >
               All sections
             </button>
-            {REFERENCE_CATEGORIES.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={cn(
-                  "rounded-lg px-2 py-1.5 text-left text-xs font-medium lg:w-full",
-                  category === c.id ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"
-                )}
-                onClick={() => setCategory(c.id)}
-              >
-                {c.label}
-              </button>
-            ))}
+            {REFERENCE_CATEGORIES.map((c) => {
+              const isFilter = category === c.id;
+              const isScrollActive = category === "all" && activeCategory === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={cn(
+                    "rounded-lg px-2 py-1.5 text-left text-xs font-medium lg:w-full",
+                    isFilter
+                      ? "bg-slate-900 text-white"
+                      : isScrollActive
+                        ? "bg-sky-50 text-sky-900 ring-1 ring-sky-200"
+                        : "text-slate-600 hover:bg-slate-50"
+                  )}
+                  onClick={() => setCategory(c.id)}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+          <div
+            ref={sectionNavRef}
+            className="max-h-[min(40vh,280px)] space-y-0.5 overflow-y-auto border-t border-slate-100 pt-2"
+          >
+            {filtered.map((section) => {
+              const isActive = activeSectionId === section.id;
+              return (
+                <button
+                  key={section.id}
+                  ref={isActive ? activeNavButtonRef : undefined}
+                  type="button"
+                  onClick={() => scrollToSection(section.id)}
+                  className={cn(
+                    "w-full rounded-lg px-2 py-1.5 text-left text-[11px] leading-snug transition-colors",
+                    isActive
+                      ? "bg-sky-50 font-semibold text-sky-900 ring-1 ring-sky-200"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  )}
+                >
+                  {section.title}
+                </button>
+              );
+            })}
           </div>
           <a
             href="#quick-matrix"
+            onClick={(e) => {
+              e.preventDefault();
+              scrollToSection("quick-matrix");
+            }}
             className="block text-xs font-medium text-sky-700 hover:underline"
           >
             Jump to quick matrix →

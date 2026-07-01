@@ -22,6 +22,7 @@ import {
   Calculator,
   BookOpen,
   LayoutGrid,
+  CircleHelp,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,6 +41,7 @@ import {
   canAccessReports,
   canUseShotScout,
 } from "@/lib/utils/permissions";
+import { canAccessHowToUseGuide } from "@/lib/guide/access";
 import { AppUser } from "@/lib/types";
 
 type NavItem = {
@@ -235,6 +237,12 @@ export function Sidebar() {
               <NavLink item={{ href: "/settings", label: "Settings", icon: Settings }} active={pathname === "/settings"} />
               {canManageUsers(appUser) || canManageProjects(appUser) ? (
                 <NavLink item={{ href: "/admin", label: "Admin", icon: Shield }} active={pathname.startsWith("/admin")} />
+              ) : null}
+              {canAccessHowToUseGuide(appUser) ? (
+                <NavLink
+                  item={{ href: "/how-to-use", label: "How to use", icon: CircleHelp }}
+                  active={pathname.startsWith("/how-to-use")}
+                />
               ) : null}
             </div>
           </div>

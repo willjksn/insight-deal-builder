@@ -21,6 +21,7 @@ import {
   MapPin,
   Calculator,
   BarChart3,
+  CircleHelp,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,6 +37,7 @@ import {
   canAccessReports,
   canUseShotScout,
 } from "@/lib/utils/permissions";
+import { canAccessHowToUseGuide } from "@/lib/guide/access";
 
 type MoreNavItem = {
   href: string;
@@ -77,6 +79,7 @@ export function MobileNav() {
     { href: "/crew", label: "Crew", icon: UserCircle, canAccess: canManageCrew },
     { href: "/templates", label: "Templates", icon: FileStack, canAccess: canManageTemplates },
     { href: "/admin", label: "Admin", icon: Shield, canAccess: canManageUsers },
+    { href: "/how-to-use", label: "How to use", icon: CircleHelp, canAccess: canAccessHowToUseGuide },
   ];
 
   const visibleMoreItems = moreItems.filter(

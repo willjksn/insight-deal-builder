@@ -14,6 +14,7 @@ import {
   mergeKeyContacts,
 } from "@/lib/production/callSheetContacts";
 import { bookedLocations } from "@/lib/production/locationSync";
+import { moveShotBetweenDays } from "@/lib/production/splitShotsAcrossDays";
 import { ProductionBoard, ProductionDay } from "@/lib/production/types";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useDocument } from "@/hooks/useDocument";
@@ -116,6 +117,25 @@ export function useProductionDayPage(projectId: string, dayId: string) {
     [board]
   );
 
+  const persistBoard = useCallback(
+    (nextBoard: ProductionBoard) => {
+      localEditRef.current = true;
+      setBoard(nextBoard);
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(async () => {
+        setSaving(true);
+        try {
+          const { id, createdAt, updatedAt: _updatedAt, ...rest } = nextBoard;
+          await saveProductionBoard(id, rest);
+        } finally {
+          setSaving(false);
+          localEditRef.current = false;
+        }
+      }, 600);
+    },
+    []
+  );
+
   const patchDay = useCallback(
     (patch: Partial<ProductionDay>) => {
       if (!day) return;
@@ -155,7 +175,15 @@ export function useProductionDayPage(projectId: string, dayId: string) {
 
   const removeProductionDay = async (id: string) => {
     if (!board || board.productionDays.length <= 1) return;
-    if (!window.confirm("Remove this production day and its call sheet?")) return;
+    const removing = board.productionDays.find((d) => d.id === id);
+    if (removing && removing.shots.length > 0) {
+      const ok = window.confirm(
+        `Remove Day ${removing.dayNumber}? It has ${removing.shots.length} shot(s) — they will be lost unless you move them first. Continue?`
+      );
+      if (!ok) return;
+    } else if (!window.confirm("Remove this production day and its call sheet?")) {
+      return;
+    }
 
     const remaining = board.productionDays
       .filter((d) => d.id !== id)
@@ -170,6 +198,24 @@ export function useProductionDayPage(projectId: string, dayId: string) {
     }
   };
 
+  const moveShotToDay = useCallback(
+    (shotId: string, targetDayId: string) => {
+      if (!board || !day) return;
+      const nextDays = moveShotBetweenDays(board, shotId, day.id, targetDayId);
+      if (!nextDays) return;
+      persistBoard({ ...board, productionDays: nextDays });
+    },
+    [board, day, persistBoard]
+  );
+
+  const applyProductionDays = useCallback(
+    (nextDays: ProductionDay[]) => {
+      if (!board) return;
+      persistBoard({ ...board, productionDays: nextDays });
+    },
+    [board, persistBoard]
+  );
+
   return {
     project,
     board,
@@ -183,6 +229,9 @@ export function useProductionDayPage(projectId: string, dayId: string) {
     canEditSchedule,
     patchDay,
     persistDay,
+    persistBoard,
+    moveShotToDay,
+    applyProductionDays,
     addProductionDay,
     removeProductionDay,
   };
