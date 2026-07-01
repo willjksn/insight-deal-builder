@@ -113,7 +113,7 @@ export async function sendClientAgreementEmail(params: {
     throw new Error("RESEND_API_KEY is not configured — add it to .env.local to send emails");
   }
 
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: FROM_EMAIL,
     to: params.to.trim(),
     subject: params.subject,
@@ -130,6 +130,8 @@ export async function sendClientAgreementEmail(params: {
   if (error) {
     throw new Error(error.message || "Failed to send email");
   }
+
+  return { id: data?.id };
 }
 
 export async function sendAgreementSignedPush(

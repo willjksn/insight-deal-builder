@@ -6,6 +6,7 @@ export type SendToClientResult = {
   signingUrl: string;
   expiresAt: string;
   emailPreview: string;
+  resendEmailId?: string;
 };
 
 export async function sendAgreementToClient(

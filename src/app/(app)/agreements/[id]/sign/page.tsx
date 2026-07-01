@@ -13,15 +13,20 @@ import { StickyActionBar } from "@/components/layout/WizardNav";
 import { useDocument } from "@/hooks/useDocument";
 import { useMutations } from "@/hooks/useMutations";
 import { downloadAgreementPdf } from "@/lib/pdf/generateAgreementPdf";
-import { getMailtoLink } from "@/lib/email/agreementEmail";
+import { SendToClientPanel } from "@/components/agreements/SendToClientPanel";
+import {
+  getExternalSigningParty,
+  getSendToPartyLabel,
+  canSendAgreementExternally,
+} from "@/lib/agreement/payeeParties";
 import { upsertPartyInitials } from "@/lib/agreement/signing";
 import { uploadStaffIdentityCapture } from "@/lib/identity/client";
 import { isPartyIdentityComplete, partyRequiresIdVerification } from "@/lib/identity/verification";
 import { triggerClientSignedNotifications } from "@/lib/agreement/notifyClientSigned";
 import { useAuth } from "@/contexts/AuthContext";
-import { canSignQuotes } from "@/lib/utils/permissions";
+import { canEmailQuotes, canSignQuotes } from "@/lib/utils/permissions";
 import { Agreement, SignatureRecord } from "@/lib/types";
-import { ArrowLeft, Download, Mail, CheckCircle } from "lucide-react";
+import { ArrowLeft, Download, Send, CheckCircle } from "lucide-react";
 
 export default function SignAgreementPage() {
   const params = useParams();
@@ -32,6 +37,7 @@ export default function SignAgreementPage() {
   const { appUser } = useAuth();
 
   const [partyId, setPartyId] = useState("");
+  const [showSendPanel, setShowSendPanel] = useState(false);
 
   useEffect(() => {
     setPartyId("");
@@ -39,6 +45,15 @@ export default function SignAgreementPage() {
 
   const selectedParty = agreement?.parties.find((p) => p.id === partyId);
   const isLocked = agreement?.status === "signed" || agreement?.status === "completed";
+  const externalSigningParty = agreement ? getExternalSigningParty(agreement) : undefined;
+  const sendLabel = agreement ? getSendToPartyLabel(agreement) : "client";
+  const clientEmail = externalSigningParty?.email;
+  const canSendExternally =
+    !!agreement &&
+    canEmailQuotes(appUser) &&
+    !!externalSigningParty &&
+    !isLocked &&
+    canSendAgreementExternally(agreement);
 
   if (loading) return <LoadingSpinner className="py-20" />;
   if (!agreement) {
@@ -59,8 +74,6 @@ export default function SignAgreementPage() {
       </div>
     );
   }
-
-  const clientEmail = agreement.parties.find((p) => p.type === "client")?.email;
 
   const persistInitial = async (clauseId: string, initialsDataUrl: string) => {
     if (!selectedParty) return;
@@ -161,16 +174,28 @@ export default function SignAgreementPage() {
       )}
 
       <StickyActionBar>
+        {canSendExternally && (
+          <Button size="touch" onClick={() => setShowSendPanel(true)}>
+            <Send className="mr-2 h-5 w-5" /> Send to {sendLabel}
+          </Button>
+        )}
         <Button size="touch" variant="secondary" onClick={() => downloadAgreementPdf(agreement)}>
           <Download className="mr-2 h-5 w-5" /> Download PDF
-        </Button>
-        <Button size="touch" variant="outline" onClick={() => { window.location.href = getMailtoLink(agreement, clientEmail); }}>
-          <Mail className="mr-2 h-5 w-5" /> Email
         </Button>
         <Button size="touch" onClick={() => router.push(`/agreements/${id}`)} disabled={saving}>
           Done
         </Button>
       </StickyActionBar>
+
+      {showSendPanel && externalSigningParty && (
+        <SendToClientPanel
+          agreement={agreement}
+          agreementId={id}
+          defaultEmail={clientEmail || ""}
+          onClose={() => setShowSendPanel(false)}
+          onSent={() => refresh()}
+        />
+      )}
     </div>
   );
 }

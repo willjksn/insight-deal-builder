@@ -71,7 +71,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const pdfFilename = getPdfFilename(agreement);
     const pdfBase64 = getAgreementPdfBase64(agreement);
 
-    await sendClientAgreementEmail({
+    const emailResult = await sendClientAgreementEmail({
       to,
       subject: emailContent.subject,
       html: emailContent.html,
@@ -91,6 +91,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({
       sent: true,
       to,
+      resendEmailId: emailResult.id,
       signingUrl,
       expiresAt: expiresAt.toISOString(),
       emailPreview: emailContent.text,

@@ -80,7 +80,8 @@ export function AgreementSigningFlow({
   const [capturedInitials, setCapturedInitials] = useState<string | null>(null);
   const [activeFieldIndex, setActiveFieldIndex] = useState(0);
   const [persistError, setPersistError] = useState<string | null>(null);
-  const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [setupHint, setSetupHint] = useState<string | null>(null);
+  const fieldRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   /** True once the user has entered the document step — prevents reverting to setup after saves. */
   const documentEnteredRef = useRef(false);
   const bootstrappedRef = useRef(false);
@@ -146,13 +147,19 @@ export function AgreementSigningFlow({
     return () => window.clearTimeout(timer);
   }, [phase, activeField?.id, activeField]);
 
-  const registerFieldRef = useCallback((fieldId: string, el: HTMLDivElement | null) => {
+  const registerFieldRef = useCallback((fieldId: string, el: HTMLButtonElement | null) => {
     fieldRefs.current[fieldId] = el;
   }, []);
+
+  const goToSetupForCapture = () => {
+    setSetupHint("Draw your signature and initials, tap Save on each pad, then return to the document.");
+    returnToSetup();
+  };
 
   const enterDocument = () => {
     bootstrappedRef.current = true;
     documentEnteredRef.current = true;
+    setSetupHint(null);
     setPhase("document");
     syncActiveFieldIndex();
   };
@@ -176,7 +183,7 @@ export function AgreementSigningFlow({
 
   const persistSignature = async (signatureDataUrl: string) => {
     if (!consent) {
-      alert("Agree to electronic signature consent before signing.");
+      setPersistError("Check the electronic signature consent box above before signing.");
       return;
     }
     if (idRequired && !isPartyIdentityComplete(agreement, partyId)) {
@@ -236,6 +243,12 @@ export function AgreementSigningFlow({
       {persistError && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           {persistError}
+        </div>
+      )}
+
+      {setupHint && phase === "setup" && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          {setupHint}
         </div>
       )}
 
@@ -382,6 +395,7 @@ export function AgreementSigningFlow({
               if (index >= 0) setActiveFieldIndex(index);
             }}
             onApplyField={handleApplyField}
+            onNeedsCapture={goToSetupForCapture}
             registerFieldRef={registerFieldRef}
           />
         </>

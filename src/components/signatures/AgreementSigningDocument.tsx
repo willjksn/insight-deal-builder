@@ -23,7 +23,8 @@ interface AgreementSigningDocumentProps {
   disabled?: boolean;
   onFieldFocus: (fieldId: string) => void;
   onApplyField: (field: SigningField) => void;
-  registerFieldRef: (fieldId: string, el: HTMLDivElement | null) => void;
+  onNeedsCapture?: () => void;
+  registerFieldRef: (fieldId: string, el: HTMLButtonElement | null) => void;
 }
 
 export function AgreementSigningDocument({
@@ -36,6 +37,7 @@ export function AgreementSigningDocument({
   disabled,
   onFieldFocus,
   onApplyField,
+  onNeedsCapture,
   registerFieldRef,
 }: AgreementSigningDocumentProps) {
   const meta = getAgreementDocumentMeta(agreement);
@@ -63,6 +65,7 @@ export function AgreementSigningDocument({
         disabled={disabled}
         onApply={() => onApplyField(field)}
         onFocus={() => onFieldFocus(field.id)}
+        onNeedsCapture={onNeedsCapture}
         fieldRef={(el) => registerFieldRef(field.id, el)}
       />
     );

@@ -30,7 +30,12 @@ export function SendToClientPanel({
   const [email, setEmail] = useState(defaultEmail);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ signingUrl: string; expiresAt: string; to: string } | null>(null);
+  const [success, setSuccess] = useState<{
+    signingUrl: string;
+    expiresAt: string;
+    to: string;
+    resendEmailId?: string;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const handleSend = async () => {
@@ -46,6 +51,7 @@ export function SendToClientPanel({
         signingUrl: result.signingUrl,
         expiresAt: result.expiresAt,
         to: result.to,
+        resendEmailId: result.resendEmailId,
       });
       onSent?.();
     } catch (err) {
@@ -85,7 +91,7 @@ export function SendToClientPanel({
           <div>
             <h2 className="text-lg font-semibold">Send to client</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Email the agreement PDF and a secure signing link via Resend.
+              Sends the agreement PDF and a secure signing link from notifications@shootspine.com.
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
@@ -100,6 +106,11 @@ export function SendToClientPanel({
                 <CheckCircle className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
                   <p className="font-medium">Sent to {success.to}</p>
+                  {success.resendEmailId && (
+                    <p className="mt-1 text-xs text-emerald-700">
+                      Resend ID: {success.resendEmailId}
+                    </p>
+                  )}
                   <p className="mt-1 text-emerald-800">
                     Signing link expires {formatDate(success.expiresAt)}.
                   </p>
@@ -143,7 +154,7 @@ export function SendToClientPanel({
 
               <div className="border-t border-slate-200 pt-4">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Manual fallback
+                  Manual fallback (does not send from ShootSpine)
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={() => downloadAgreementPdf(agreement)}>

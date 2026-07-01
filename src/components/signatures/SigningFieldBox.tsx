@@ -14,7 +14,9 @@ interface SigningFieldBoxProps {
   disabled?: boolean;
   onApply: () => void;
   onFocus?: () => void;
-  fieldRef?: (el: HTMLDivElement | null) => void;
+  /** Called when the field is active but signature/initials were not saved in setup yet. */
+  onNeedsCapture?: () => void;
+  fieldRef?: (el: HTMLButtonElement | null) => void;
 }
 
 export function SigningFieldBox({
@@ -27,39 +29,58 @@ export function SigningFieldBox({
   disabled,
   onApply,
   onFocus,
+  onNeedsCapture,
   fieldRef,
 }: SigningFieldBoxProps) {
   const isInitial = type === "initial";
   const isApplied = isComplete && !!appliedImage;
-  const canApply = !isComplete && !!capturedImage && !disabled && isActive;
+  const hasCapture = !!capturedImage;
+  const canApply = !isComplete && hasCapture && !disabled && isActive;
 
-  const handleClick = () => {
+  const handleActivate = () => {
+    if (disabled || isComplete) return;
     onFocus?.();
-    if (canApply) onApply();
+    if (canApply) {
+      onApply();
+      return;
+    }
+    if (isActive && !hasCapture) {
+      onNeedsCapture?.();
+    }
   };
 
+  const hintText = isApplied
+    ? null
+    : isActive
+      ? hasCapture
+        ? "Tap to apply"
+        : isInitial
+          ? "Add initials"
+          : "Add signature"
+      : null;
+
   return (
-    <div
+    <button
+      type="button"
       ref={fieldRef}
-      onClick={handleClick}
-      role="button"
-      tabIndex={0}
+      onClick={handleActivate}
+      disabled={disabled || isComplete}
       aria-label={
         isApplied
           ? `${label} initialed`
           : isActive
-            ? `${label} — tap to apply`
+            ? hasCapture
+              ? `${label} — tap to apply`
+              : `${label} — set up ${isInitial ? "initials" : "signature"} first`
             : `${label} — waiting`
       }
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") handleClick();
-      }}
       className={cn(
-        "relative flex shrink-0 flex-col overflow-hidden rounded-md border-2 transition-all",
+        "relative flex shrink-0 flex-col overflow-hidden rounded-md border-2 text-left transition-all",
         isInitial ? "h-14 w-14" : "h-16 w-44 sm:w-52",
         isApplied && "border-emerald-500 bg-emerald-50",
         isActive && !isComplete && "cursor-pointer border-sky-500 bg-sky-50 ring-2 ring-sky-400",
-        !isActive && !isComplete && "border-slate-300 border-dashed bg-slate-50"
+        !isActive && !isComplete && "border-slate-300 border-dashed bg-slate-50",
+        disabled && !isComplete && "cursor-not-allowed opacity-60"
       )}
     >
       <p
@@ -87,11 +108,11 @@ export function SigningFieldBox({
         ) : (
           <span
             className={cn(
-              "text-[9px] font-medium leading-none",
+              "px-0.5 text-center text-[9px] font-medium leading-tight",
               isActive ? "text-sky-600" : "text-slate-300"
             )}
           >
-            {isActive ? "Tap" : ""}
+            {hintText ?? ""}
           </span>
         )}
       </div>
@@ -102,6 +123,6 @@ export function SigningFieldBox({
           aria-hidden
         />
       )}
-    </div>
+    </button>
   );
 }
