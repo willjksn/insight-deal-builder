@@ -20,6 +20,17 @@ function getResendClient(): Resend | null {
   return resendClient;
 }
 
+export function isEmailDeliveryConfigured(): boolean {
+  return getResendClient() !== null;
+}
+
+export type EmailDeliveryResult = {
+  sent: number;
+  failed: number;
+  skipped: number;
+  resendConfigured: boolean;
+};
+
 const FROM_EMAIL = APP_NOTIFICATION_FROM;
 
 export function buildAgreementSignedEmail(params: {
@@ -49,11 +60,12 @@ View the signed agreement: ${agreementUrl}
 export async function sendAgreementSignedEmails(
   recipients: NotificationRecipient[],
   emailContent: { subject: string; html: string; text: string }
-): Promise<{ sent: number; skipped: number }> {
+): Promise<EmailDeliveryResult> {
   const resend = getResendClient();
+  const resendConfigured = Boolean(resend);
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping agreement signed emails");
-    return { sent: 0, skipped: recipients.length };
+    return { sent: 0, failed: 0, skipped: recipients.length, resendConfigured: false };
   }
 
   const emails = [
@@ -62,9 +74,12 @@ export async function sendAgreementSignedEmails(
     ),
   ];
 
-  if (!emails.length) return { sent: 0, skipped: recipients.length };
+  if (!emails.length) {
+    return { sent: 0, failed: 0, skipped: recipients.length, resendConfigured: true };
+  }
 
   let sent = 0;
+  let failed = 0;
   for (const to of emails) {
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
@@ -74,13 +89,15 @@ export async function sendAgreementSignedEmails(
       text: emailContent.text,
     });
     if (error) {
+      failed++;
       console.error("Resend error for", to, error);
     } else {
       sent++;
     }
   }
 
-  return { sent, skipped: recipients.length - sent };
+  const skipped = Math.max(0, recipients.length - sent - failed);
+  return { sent, failed, skipped, resendConfigured: true };
 }
 
 export async function sendClientAgreementEmail(params: {
@@ -158,7 +175,7 @@ export async function sendAgreementSignedPush(
 export async function sendSignupPendingEmails(
   recipients: NotificationRecipient[],
   emailContent: { subject: string; html: string; text: string }
-): Promise<{ sent: number; skipped: number }> {
+): Promise<EmailDeliveryResult> {
   return sendAgreementSignedEmails(recipients, emailContent);
 }
 

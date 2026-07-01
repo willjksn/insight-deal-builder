@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorStatus, assertApprovedUser, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus, requireApprovedAuthUser } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getProjectIdsForMember, hasGlobalProjectAdmin } from "@/lib/projectAccess/server";
 import { Project } from "@/lib/types";
@@ -8,8 +8,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   try {
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");

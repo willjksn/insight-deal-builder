@@ -75,6 +75,34 @@ export async function requireApprovedAuthUser(
   return result;
 }
 
+export function getHealthCheckSecret(): string | null {
+  const raw = process.env.HEALTH_CHECK_SECRET || process.env.CRON_SECRET;
+  return raw?.trim() || null;
+}
+
+/** Admin session or shared secret for uptime monitors (CRON_SECRET / HEALTH_CHECK_SECRET). */
+export async function requireAdminOrHealthSecret(request: NextRequest): Promise<void> {
+  const secret = getHealthCheckSecret();
+  if (secret) {
+    const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+    const headerSecret = bearer || request.headers.get("x-health-secret")?.trim();
+    if (headerSecret === secret) return;
+  }
+
+  const { appUser } = await requireAuthUser(request);
+  assertApprovedUser(appUser);
+  if (!hasPermission(appUser, "manageUsers")) {
+    throw new Error("Not authorized");
+  }
+}
+
+export function isResendConfigured(): boolean {
+  const raw = process.env.RESEND_API_KEY;
+  if (!raw) return false;
+  const key = raw.replace(/^Bearer\s+/i, "").replace(/\s+/g, "").trim();
+  return key.length > 0;
+}
+
 export function apiErrorStatus(message: string): number {
   if (
     message.includes("token") ||

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   apiErrorStatus,
   assertCanUseScriptWriter,
-  requireAuthUser,
+  requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getPublishedReferenceGuide } from "@/lib/reference/referenceGuideStore";
@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   try {
-    const { appUser } = await requireAuthUser(request);
+    const { appUser } = await requireApprovedAuthUser(request);
     assertCanUseScriptWriter(appUser);
 
     const db = getAdminDb();

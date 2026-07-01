@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   apiErrorStatus,
-  assertApprovedUser,
-  requireAuthUser,
+  requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
@@ -24,8 +23,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
@@ -49,8 +47,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const body = (await request.json()) as { versionId?: string };
     if (!body.versionId) {

@@ -4,9 +4,11 @@ From script and scout through pre-production, agreements, and client sign-off �
 
 ## What it covers
 
-- **Script writer** — text or inspiration-driven scripts with production packs
-- **Pre-production boards** — cast, crew, shoot days, locations, and budgets per project
+- **Script writer** — text or inspiration-driven scripts with production packs and optional storyboard mode
+- **Pre-production boards** — cast, crew, shoot days, locations, call sheets, and shot lists per project
 - **Shot Scout** — location photos, AI analysis, DP plans, and shot lists
+- **Stage planner** — top-down lighting diagrams with props, walls, and notes
+- **Reference guide** — iPad-friendly FX6 / lens quick reference (admin can draft with Gemini + Tavily)
 - **Agreements** — quotes, signatures, payouts, gear use, and client sign-off
 - **Catalogs** — clients, companies, crew, packages, equipment, and locations
 
@@ -17,6 +19,7 @@ From script and scout through pre-production, agreements, and client sign-off �
 - Google Gemini (Vertex) for Script writer and Shot Scout AI
 - jsPDF for PDF generation
 - react-signature-canvas for iPad/Apple Pencil signatures
+- Resend for transactional email
 
 ## Setup
 
@@ -26,14 +29,20 @@ From script and scout through pre-production, agreements, and client sign-off �
    ```
 
 2. **Environment**
-   Copy `.env.local.example` to `.env.local` and fill in Firebase, Gemini/Vertex, and optional Resend keys.
+   Copy `.env.local.example` to `.env.local` and fill in Firebase, Gemini/Vertex, and Resend keys.
 
 3. **Run locally**
    ```bash
    npm run dev
    ```
 
-4. **Firebase rules**
+4. **Tests & lint**
+   ```bash
+   npm test
+   npm run lint
+   ```
+
+5. **Firebase rules**
    Deploy Firestore rules, indexes, and Storage rules when collections change:
    ```bash
    firebase deploy --only firestore:rules,firestore:indexes,storage
@@ -45,15 +54,40 @@ From script and scout through pre-production, agreements, and client sign-off �
 |------|--------|
 | Command center | `/dashboard` |
 | Projects & boards | `/projects`, `/projects/[id]/production` |
+| Shot list & call sheet | `/projects/[id]/production/days/[dayId]/shots` |
+| Stage planner | `/stage`, `/projects/[id]/stage` |
+| Reference guide | `/reference` |
 | Script writer | `/script-writer`, `/script-writer/[id]` |
 | Shot Scout | `/scout`, `/scout/[id]` |
 | Agreements | `/agreements`, `/agreements/new`, `/agreements/[id]` |
 | Scout settings | `/settings/scout-gear`, `/settings/lights` |
+| Admin | `/admin` |
 
 ## Permissions
 
 Access is role- and checkbox-based. Production tools (Script writer, Shot Scout) require the Shot Scout permission. Agreement creation requires quote permissions. Admins manage users from `/admin`.
 
-## Deploy
+**Legacy users:** profiles imported before the approval flow may omit the `approved` field — those users are treated as already approved. New signups stay pending until an admin assigns company and permissions.
 
-The app is designed for Vercel with Firebase backend. Set production env vars in Vercel and ensure `SCOUT_USE_MOCK_AI=false` when real Gemini analysis is required.
+**Partner org preset:** use the “Partner org” permission preset in Admin when onboarding external production partners (own quotes only, no IMG client/company/crew browse).
+
+## Deploy checklist (Vercel + Firebase)
+
+1. Set production env vars in Vercel (see `.env.local.example`).
+2. Required for real AI: `GEMINI_API_KEY`, `SCOUT_USE_MOCK_AI=false`, `FIREBASE_SERVICE_ACCOUNT_JSON`.
+3. Required for email: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `NEXT_PUBLIC_APP_URL`.
+4. Optional uptime monitors: `HEALTH_CHECK_SECRET` or reuse `CRON_SECRET` for `/api/health/firebase` and `/api/health/email` (Bearer or `x-health-secret` header).
+5. Deploy Firebase rules/indexes/storage after rule changes.
+6. Verify admin health endpoints after deploy:
+   - `GET /api/health/scout-ai` (admin auth)
+   - `GET /api/health/email` (admin auth or health secret)
+7. CI runs on push/PR to `main`: lint, tests, and production build.
+
+## Health endpoints
+
+| Route | Access | Purpose |
+|-------|--------|---------|
+| `/api/health` | Public | Liveness (`ok`, timestamp only) |
+| `/api/health/firebase` | Admin or health secret | Firebase Admin connectivity |
+| `/api/health/email` | Admin or health secret | Resend configuration |
+| `/api/health/scout-ai` | Admin auth | Gemini / Vertex probe |

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorStatus, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus, requireApprovedAuthUser } from "@/lib/api/routeAuth";
 import { loadAiUsageMonthly } from "@/lib/ai/usageLog";
 import { canManageUsers } from "@/lib/utils/permissions";
 
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   try {
-    const { appUser } = await requireAuthUser(request);
+    const { appUser } = await requireApprovedAuthUser(request);
     if (!canManageUsers(appUser)) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }

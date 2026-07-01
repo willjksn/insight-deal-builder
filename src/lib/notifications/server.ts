@@ -1,3 +1,4 @@
+import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminAuth, getAdminDb, getAdminMessaging } from "@/lib/firebase/admin";
 import { INSIGHT_MEDIA_GROUP_LLC } from "@/lib/utils/permissions";
@@ -8,6 +9,26 @@ import {
   sendAgreementSignedPush,
 } from "@/lib/notifications/delivery";
 import { Agreement, AgreementParty } from "@/lib/types";
+
+async function notifyAdminsEmailDeliveryIssue(params: {
+  db: Firestore;
+  agreement: Agreement;
+  reason: string;
+}): Promise<void> {
+  const { db, agreement, reason } = params;
+  const project = agreement.projectDetails.projectName || agreement.title;
+  await db.collection("notifications").add({
+    type: "email_delivery_failed",
+    agreementId: agreement.id,
+    agreementTitle: agreement.title,
+    projectName: project,
+    message: reason,
+    companyRecipient: INSIGHT_MEDIA_GROUP_LLC,
+    read: false,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
 
 export async function deliverClientSignedNotifications(params: {
   agreement: Agreement;
@@ -55,7 +76,23 @@ export async function deliverClientSignedNotifications(params: {
 
   const recipients = await resolveAgreementSignRecipients(db, agreement, signerUserId);
   const emailContent = buildAgreementSignedEmail({ agreement, signingParty, appUrl });
-  const { sent: emailsSent } = await sendAgreementSignedEmails(recipients, emailContent);
+  const emailResult = await sendAgreementSignedEmails(recipients, emailContent);
+  const emailsSent = emailResult.sent;
+
+  const wantsEmail = recipients.some((r) => r.notifyEmail && r.email);
+  if (wantsEmail && !emailResult.resendConfigured) {
+    await notifyAdminsEmailDeliveryIssue({
+      db,
+      agreement,
+      reason: "RESEND_API_KEY is not configured — signed agreement emails were not sent",
+    });
+  } else if (emailResult.failed > 0) {
+    await notifyAdminsEmailDeliveryIssue({
+      db,
+      agreement,
+      reason: `${emailResult.failed} signed agreement email(s) failed to send via Resend`,
+    });
+  }
 
   let pushSent = 0;
   const messaging = getAdminMessaging();

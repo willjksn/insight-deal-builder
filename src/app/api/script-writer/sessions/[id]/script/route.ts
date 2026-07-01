@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   apiErrorStatus,
-  assertApprovedUser,
-  requireAuthUser,
+  requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
@@ -20,8 +19,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const body = (await request.json()) as { script?: Partial<ScriptDocument> };
     if (!body.script || typeof body.script !== "object") {

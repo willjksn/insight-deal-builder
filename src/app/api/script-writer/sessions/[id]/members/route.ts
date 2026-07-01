@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   apiErrorStatus,
-  assertApprovedUser,
-  requireAuthUser,
+  requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
@@ -25,7 +24,7 @@ async function assertCanManageScriptShares(
   db: ReturnType<typeof getAdminDb>,
   sessionId: string,
   uid: string,
-  appUser: Awaited<ReturnType<typeof requireAuthUser>>["appUser"]
+  appUser: Awaited<ReturnType<typeof requireApprovedAuthUser>>["appUser"]
 ) {
   if (!db) throw new Error("Firebase Admin is not configured");
   const session = await loadScriptSession(db, sessionId);
@@ -40,8 +39,7 @@ export async function GET(
 ) {
   try {
     const { id: sessionId } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
@@ -83,8 +81,7 @@ export async function POST(
 ) {
   try {
     const { id: sessionId } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const body = (await request.json()) as { userId?: string; email?: string };
 
@@ -140,8 +137,7 @@ export async function DELETE(
 ) {
   try {
     const { id: sessionId } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const userId = request.nextUrl.searchParams.get("userId");
     if (!userId) {

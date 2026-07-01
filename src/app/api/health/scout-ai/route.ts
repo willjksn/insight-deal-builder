@@ -15,14 +15,14 @@ import {
   vertexGeminiAvailable,
   vertexServiceAccountEmail,
 } from "@/lib/scout/geminiVertex";
-import { apiErrorStatus, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus, requireApprovedAuthUser } from "@/lib/api/routeAuth";
 import { hasPermission } from "@/lib/utils/permissions";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   try {
-    const { appUser } = await requireAuthUser(request);
+    const { appUser } = await requireApprovedAuthUser(request);
     if (!hasPermission(appUser, "manageUsers")) {
       return Response.json({ error: "Not authorized" }, { status: 401 });
     }

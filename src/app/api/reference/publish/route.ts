@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   apiErrorStatus,
-  assertApprovedUser,
-  requireAuthUser,
+  requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { canManageUsers } from "@/lib/utils/permissions";
@@ -18,8 +17,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
     if (!canManageUsers(appUser)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }

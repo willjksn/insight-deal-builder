@@ -1,9 +1,13 @@
+import { NextRequest } from "next/server";
 import { getAdminApp } from "@/lib/firebase/admin";
+import { apiErrorStatus, requireAdminOrHealthSecret } from "@/lib/api/routeAuth";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAdminOrHealthSecret(request);
+
     const app = getAdminApp();
     return Response.json({
       ok: Boolean(app),
@@ -13,6 +17,6 @@ export async function GET() {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Firebase Admin failed to load";
-    return Response.json({ ok: false, error: message }, { status: 500 });
+    return Response.json({ ok: false, error: message }, { status: apiErrorStatus(message) });
   }
 }

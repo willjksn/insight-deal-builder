@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   apiErrorStatus,
-  assertApprovedUser,
-  requireAuthUser,
+  requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
@@ -31,8 +30,7 @@ export async function GET(
 ) {
   try {
     const { id: projectId } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
@@ -76,8 +74,7 @@ export async function POST(
 ) {
   try {
     const { id: projectId } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const body = (await request.json()) as {
       userId?: string;
@@ -152,8 +149,7 @@ export async function PATCH(
 ) {
   try {
     const { id: projectId } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const body = (await request.json()) as {
       userId?: string;
@@ -194,8 +190,7 @@ export async function DELETE(
 ) {
   try {
     const { id: projectId } = await params;
-    const { uid, appUser } = await requireAuthUser(request);
-    assertApprovedUser(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
 
     const userId = request.nextUrl.searchParams.get("userId");
     if (!userId) {

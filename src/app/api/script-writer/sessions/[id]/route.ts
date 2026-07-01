@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   apiErrorStatus,
   assertCanUseScriptWriter,
-  requireAuthUser,
+  requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getScriptSessionForUser } from "@/lib/projectAccess/server";
@@ -14,7 +14,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { uid, appUser } = await requireAuthUser(request);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
     assertCanUseScriptWriter(appUser);
     const { id } = await params;
 

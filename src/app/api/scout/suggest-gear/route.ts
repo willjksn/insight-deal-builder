@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorStatus, assertCanUseShotScout, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus, assertCanUseShotScout, requireApprovedAuthUser } from "@/lib/api/routeAuth";
 import { cineScoutSuggestGear } from "@/lib/scout/cineScoutAi";
 import { ScoutSessionFormValues } from "@/lib/scout/sessionForm";
 import { loadGearList, loadGearProfileForProject } from "@/lib/scout/scoutAdminGear";
@@ -25,7 +25,7 @@ type SuggestGearBody = {
 
 export async function POST(request: NextRequest) {
   try {
-    const { uid, appUser } = await requireAuthUser(request);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
     assertCanUseShotScout(appUser);
 
     const body = (await request.json()) as SuggestGearBody;

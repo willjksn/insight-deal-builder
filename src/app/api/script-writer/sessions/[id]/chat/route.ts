@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import {
   apiErrorStatus,
   assertCanUseScriptWriter,
-  requireAuthUser,
+  requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
@@ -28,7 +28,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { uid, appUser } = await requireAuthUser(request);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
     assertCanUseScriptWriter(appUser);
     const { id } = await params;
     const body = (await request.json()) as { message?: string };

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   apiErrorStatus,
   assertCanUseScriptWriter,
-  requireAuthUser,
+  requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { applyScriptToProject } from "@/lib/scriptWriter/adminApply";
@@ -16,7 +16,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { uid, appUser } = await requireAuthUser(request);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
     assertCanUseScriptWriter(appUser);
     const { id } = await params;
     const body = (await request.json()) as {
