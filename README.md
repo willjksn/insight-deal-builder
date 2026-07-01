@@ -1,6 +1,8 @@
-# Insight Production Hub
+# ShootSpine
 
-From script and scout through pre-production, agreements, and client sign-off — one workspace for **Insight Media Group**.
+**[shootspine.com](https://shootspine.com)** · Script. Scout. Shoot. Sign.
+
+The project spine for video production — script, scout, shoot, and sign — built for **Insight Media Group** and partner teams.
 
 ## What it covers
 
@@ -75,7 +77,7 @@ Access is role- and checkbox-based. Production tools (Script writer, Shot Scout)
 
 1. Set production env vars in Vercel (see `.env.local.example`).
 2. Required for real AI: `GEMINI_API_KEY`, `SCOUT_USE_MOCK_AI=false`, `FIREBASE_SERVICE_ACCOUNT_JSON`.
-3. Required for email: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `NEXT_PUBLIC_APP_URL`.
+3. Required for email: `RESEND_API_KEY`, `RESEND_FROM_EMAIL=ShootSpine <notifications@shootspine.com>`, `NEXT_PUBLIC_APP_URL`.
 4. Optional uptime monitors: `HEALTH_CHECK_SECRET` or reuse `CRON_SECRET` for `/api/health/firebase` and `/api/health/email` (Bearer or `x-health-secret` header).
 5. Deploy Firebase rules/indexes/storage after rule changes.
 6. Verify admin health endpoints after deploy:

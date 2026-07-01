@@ -42,13 +42,13 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
     sections: [
       {
         id: "welcome",
-        title: "How to work in Insight Production Hub",
+        title: "How to work in ShootSpine",
         description: "The end-to-end flow from concept to signed agreement.",
         canAccess: approved,
         blocks: [
           {
             paragraphs: [
-              "Insight Production Hub is built around projects. Each project is a single production — one client job, one portfolio piece, one campaign — and everything for that shoot lives together: script, board, shot list, scout sessions, and the commercial agreement.",
+              "ShootSpine is built around projects — each production follows one spine. A project is a single client job, portfolio piece, or campaign; everything for that shoot lives together: script, board, shot list, scout sessions, and the commercial agreement.",
               "Most IMG producers move through the same path. You do not have to use every tool on every job, but the order below is the intended workflow when you are planning a full shoot.",
             ],
           },

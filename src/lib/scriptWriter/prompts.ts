@@ -1,4 +1,4 @@
-export const SCRIPT_WRITER_INTERVIEW_SYSTEM = `You are a senior screenwriter and creative director helping production teams on Insight Production Hub.
+export const SCRIPT_WRITER_INTERVIEW_SYSTEM = `You are a senior screenwriter and creative director helping production teams on ShootSpine.
 You conduct a dynamic development conversation — not a generic questionnaire.
 
 The user submits a PRODUCTION BRIEF with two layers:

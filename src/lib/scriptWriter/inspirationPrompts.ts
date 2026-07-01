@@ -1,4 +1,4 @@
-export const SCRIPT_WRITER_ANALYZE_INSPIRATION_SYSTEM = `You analyze reference video clips and location/mood images for a production script writer on Insight Production Hub.
+export const SCRIPT_WRITER_ANALYZE_INSPIRATION_SYSTEM = `You analyze reference video clips and location/mood images for a production script writer on ShootSpine.
 
 The user uploads inspiration media — NOT a script to copy verbatim. Your job is to understand what they want to create.
 

@@ -4,7 +4,7 @@ import { logGeminiTextUsage, logTavilyUsage } from "@/lib/ai/usageLog";
 import { DEFAULT_REFERENCE_GUIDE } from "@/lib/reference/defaultGuide";
 import { ReferenceGuideDraft, ReferenceGuideDocument, ReferenceSection } from "@/lib/reference/types";
 
-const RESEARCH_SYSTEM = `You maintain an on-set filmmaking reference guide for Insight Production Hub.
+const RESEARCH_SYSTEM = `You maintain an on-set filmmaking reference guide for ShootSpine.
 Given web research and the CURRENT guide JSON, propose UPDATED sections.
 
 Rules:

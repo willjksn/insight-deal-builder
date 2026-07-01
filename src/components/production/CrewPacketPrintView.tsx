@@ -1,6 +1,7 @@
 "use client";
 
 import { CrewPrintoutPacket } from "@/lib/production/crewPacketTypes";
+import { APP_NAME } from "@/lib/brand";
 
 function PageBreak({ screen }: { screen?: boolean }) {
   if (screen) {
@@ -235,7 +236,7 @@ export function CrewPacketPrintView({
       ))}
 
       <footer className="mt-8 border-t border-slate-300 pt-2 text-[9px] text-slate-500">
-        Generated {new Date(packet.generatedAt).toLocaleString()} · Insight Production Hub
+        Generated {new Date(packet.generatedAt).toLocaleString()} · {APP_NAME}
       </footer>
     </div>
   );
