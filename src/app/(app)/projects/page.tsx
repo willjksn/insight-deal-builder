@@ -73,7 +73,20 @@ export default function ProjectsPage() {
       )}
 
       {loading ? <LoadingSpinner className="py-20" /> : projects.length === 0 ? (
-        <EmptyState title="No projects yet" description="Create a project to start building agreements." actionLabel="New Project" actionHref="#" />
+        <EmptyState
+          title="No projects yet"
+          description="Create a project to start building agreements."
+          actionLabel={canManageProjects(appUser) ? "New Project" : undefined}
+          onAction={
+            canManageProjects(appUser)
+              ? () => {
+                  setEditingId(null);
+                  setForm(emptyProject);
+                  setShowForm(true);
+                }
+              : undefined
+          }
+        />
       ) : (
         <DataTable headers={["Project", "Client", "Type", "Fee", "Status", "Actions"]}>
           {projects.map((p) => (

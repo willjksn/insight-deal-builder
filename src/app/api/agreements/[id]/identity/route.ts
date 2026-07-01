@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorStatus, requireAuthUser } from "@/lib/api/routeAuth";
+import { loadAgreementForUser } from "@/lib/agreement/serverAccess";
+import { apiErrorStatus, requireApprovedAuthUser } from "@/lib/api/routeAuth";
 import { applyStaffIdentityCapture } from "@/lib/signing/server";
 import { hasPermission, isInsightOrgUser, resolvePermissions } from "@/lib/utils/permissions";
 import { AppUser } from "@/lib/types";
@@ -22,10 +23,12 @@ function assertCanCaptureIdentity(appUser: AppUser): void {
 
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
-    const { uid, appUser } = await requireAuthUser(request);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
     assertCanCaptureIdentity(appUser);
 
     const { id: agreementId } = await context.params;
+    await loadAgreementForUser(agreementId, appUser);
+
     const body = await request.json();
     const partyId = typeof body.partyId === "string" ? body.partyId : "";
     const idFrontDataUrl = typeof body.idFrontDataUrl === "string" ? body.idFrontDataUrl : "";

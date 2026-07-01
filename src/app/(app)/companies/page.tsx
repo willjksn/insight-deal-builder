@@ -101,7 +101,12 @@ export default function CompaniesPage() {
       )}
 
       {loading ? <LoadingSpinner className="py-20" /> : data.length === 0 ? (
-        <EmptyState title="No companies yet" description="Load Insight Media Group LLC, then add production partners." actionLabel="Load Default Company" actionHref="#" />
+        <EmptyState
+          title="No companies yet"
+          description="Load Insight Media Group LLC, then add production partners."
+          actionLabel={canManageCompanies(appUser) ? "Load Default Company" : undefined}
+          onAction={canManageCompanies(appUser) ? seedCompanies : undefined}
+        />
       ) : (
         <DataTable headers={["Display Name", "Legal Name", "Signer", "Producer %", "Actions"]}>
           {data.map((c) => (

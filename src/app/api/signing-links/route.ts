@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase/admin";
-import { verifyAuthToken } from "@/lib/notifications/server";
+import { loadAgreementForUser } from "@/lib/agreement/serverAccess";
+import { apiErrorStatus, requireApprovedAuthUser } from "@/lib/api/routeAuth";
 import { createSigningLink, getSigningLinkUrl } from "@/lib/signing/server";
 import { hasPermission, resolvePermissions } from "@/lib/utils/permissions";
 import { AppUser } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-async function assertCanManageLinks(uid: string): Promise<void> {
-  const db = getAdminDb();
-  if (!db) throw new Error("Server not configured");
-
-  const userSnap = await db.collection("users").doc(uid).get();
-  if (!userSnap.exists) throw new Error("User not found");
-
-  const appUser = { id: userSnap.id, ...userSnap.data() } as AppUser;
+async function assertCanManageLinks(appUser: AppUser): Promise<void> {
   const perms = resolvePermissions(appUser);
   if (!hasPermission(appUser, "editQuotes") && !hasPermission(appUser, "createQuotes")) {
     throw new Error("Not authorized to create signing links");
@@ -23,8 +16,8 @@ async function assertCanManageLinks(uid: string): Promise<void> {
 
 export async function POST(request: NextRequest) {
   try {
-    const uid = await verifyAuthToken(request.headers.get("authorization"));
-    await assertCanManageLinks(uid);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
+    await assertCanManageLinks(appUser);
 
     const body = await request.json();
     const { agreementId, partyId } = body as { agreementId?: string; partyId?: string };
@@ -32,6 +25,8 @@ export async function POST(request: NextRequest) {
     if (!agreementId || !partyId) {
       return NextResponse.json({ error: "agreementId and partyId are required" }, { status: 400 });
     }
+
+    await loadAgreementForUser(agreementId, appUser);
 
     const { token, expiresAt } = await createSigningLink({
       agreementId,
@@ -50,8 +45,6 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("create signing link error:", err);
     const message = err instanceof Error ? err.message : "Failed to create signing link";
-    const status =
-      message.includes("token") || message.includes("authorization") ? 401 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
   }
 }

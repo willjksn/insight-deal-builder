@@ -13,6 +13,7 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase/config";
@@ -32,6 +33,7 @@ interface AuthContextType {
     role?: UserRole
   ) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -115,6 +117,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await firebaseSignOut(auth);
   };
 
+  const resetPassword = async (email: string) => {
+    if (!auth) throw new Error("Firebase Auth not configured");
+    const trimmed = email.trim();
+    if (!trimmed) throw new Error("Enter your email address first");
+    await sendPasswordResetEmail(auth, trimmed);
+  };
+
   const refreshProfile = async () => {
     if (!user || !db) return;
     try {
@@ -137,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         signOut,
+        resetPassword,
         refreshProfile,
       }}
     >

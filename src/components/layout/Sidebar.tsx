@@ -20,6 +20,8 @@ import {
   Clapperboard,
   ScrollText,
   Calculator,
+  BookOpen,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -76,6 +78,18 @@ const navGroups: NavGroup[] = [
         href: "/scout",
         label: "Shot Scout",
         icon: Clapperboard,
+        canAccess: canUseShotScout,
+      },
+      {
+        href: "/reference",
+        label: "Reference guide",
+        icon: BookOpen,
+        canAccess: canUseShotScout,
+      },
+      {
+        href: "/stage",
+        label: "Stage planner",
+        icon: LayoutGrid,
         canAccess: canUseShotScout,
       },
     ],

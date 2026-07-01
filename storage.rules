@@ -2,6 +2,56 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    function userData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isLegacyInsightAdmin() {
+      return userData().role == 'admin'
+        && userData().company == 'Insight Media Group LLC';
+    }
+
+    function hasPerm(field) {
+      return isLegacyInsightAdmin()
+        || (userData().permissions != null && userData().permissions[field] == true);
+    }
+
+    function canManageUsers() {
+      return hasPerm('manageUsers');
+    }
+
+    function isProjectOwner(projectId) {
+      return firestore.get(/databases/(default)/documents/projects/$(projectId)).data.ownerUserId
+        == request.auth.uid;
+    }
+
+    function isProjectMember(projectId) {
+      return firestore.exists(
+        /databases/(default)/documents/projects/$(projectId)/members/$(request.auth.uid)
+      );
+    }
+
+    function projectMemberData(projectId) {
+      return firestore.get(
+        /databases/(default)/documents/projects/$(projectId)/members/$(request.auth.uid)
+      ).data;
+    }
+
+    function hasProjectArea(projectId, area) {
+      return hasPerm('manageProjects')
+        || canManageUsers()
+        || isProjectOwner(projectId)
+        || (
+          isProjectMember(projectId)
+          && projectMemberData(projectId).permissions[area] == true
+        );
+    }
+
+    function canAccessProductionStorage(projectId) {
+      return hasProjectArea(projectId, 'production')
+        || hasProjectArea(projectId, 'shots');
+    }
+
     // Identity verification images — server-only via Admin SDK signed URLs
     match /identity-verification/{allPaths=**} {
       allow read, write: if false;
@@ -20,8 +70,9 @@ service firebase.storage {
     }
 
     match /production/{projectId}/{allPaths=**} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && canAccessProductionStorage(projectId);
       allow write: if request.auth != null
+        && canAccessProductionStorage(projectId)
         && request.resource.size < 25 * 1024 * 1024
         && (
           request.resource.contentType.matches('image/.*')

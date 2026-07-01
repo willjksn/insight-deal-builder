@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorStatus, assertCanCreateQuotes, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus, assertCanCreateQuotes, requireApprovedAuthUser } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { suggestQuoteScope } from "@/lib/agreement/scopeSuggestAi";
 import { presetToServicePackage } from "@/lib/agreement/packages";
@@ -33,7 +33,7 @@ async function loadServicePackages(): Promise<ServicePackage[]> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { appUser } = await requireAuthUser(request);
+    const { appUser } = await requireApprovedAuthUser(request);
     assertCanCreateQuotes(appUser);
 
     const body = (await request.json()) as SuggestScopeBody;

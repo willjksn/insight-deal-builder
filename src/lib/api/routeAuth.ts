@@ -67,6 +67,14 @@ export function assertApprovedUser(appUser: AppUser): void {
   }
 }
 
+export async function requireApprovedAuthUser(
+  request: NextRequest
+): Promise<{ uid: string; appUser: AppUser }> {
+  const result = await requireAuthUser(request);
+  assertApprovedUser(result.appUser);
+  return result;
+}
+
 export function apiErrorStatus(message: string): number {
   if (
     message.includes("token") ||

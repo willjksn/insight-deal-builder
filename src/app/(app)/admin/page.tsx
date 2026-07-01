@@ -21,6 +21,7 @@ import {
 } from "@/lib/utils/permissions";
 import { ProjectAccessHub } from "@/components/projectAccess/ProjectAccessHub";
 import { AiUsagePanel } from "@/components/admin/AiUsagePanel";
+import { ReferenceGuideAdminPanel } from "@/components/admin/ReferenceGuideAdminPanel";
 import { isUserPendingApproval, shouldApproveOnAdminSave } from "@/lib/users/approval";
 import {
   EMPTY_PERMISSIONS,
@@ -333,6 +334,7 @@ export default function AdminPage() {
       )}
 
       {isOrgAdmin && <AiUsagePanel />}
+      {isOrgAdmin && <ReferenceGuideAdminPanel />}
 
       <PageSection
         className="mb-6"

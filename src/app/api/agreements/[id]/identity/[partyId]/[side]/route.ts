@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorStatus, assertCanViewIdentity, requireAuthUser } from "@/lib/api/routeAuth";
+import { loadAgreementForUser } from "@/lib/agreement/serverAccess";
+import { apiErrorStatus, assertCanViewIdentity, requireApprovedAuthUser } from "@/lib/api/routeAuth";
 import { downloadIdentityImage } from "@/lib/identity/storage";
 import { getPartyIdentityMetadata } from "@/lib/identity/server";
 
@@ -9,10 +10,11 @@ type RouteContext = { params: Promise<{ id: string; partyId: string; side: strin
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { appUser } = await requireAuthUser(request);
+    const { appUser } = await requireApprovedAuthUser(request);
     assertCanViewIdentity(appUser);
 
     const { id: agreementId, partyId, side } = await context.params;
+    await loadAgreementForUser(agreementId, appUser);
     if (side !== "front" && side !== "back") {
       return NextResponse.json({ error: "Invalid side" }, { status: 400 });
     }

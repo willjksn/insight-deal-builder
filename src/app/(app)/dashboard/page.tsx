@@ -11,6 +11,7 @@ import {
   ScrollText,
   LayoutGrid,
   PenLine,
+  BookOpen,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -96,7 +97,7 @@ export default function DashboardPage() {
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Production</h2>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 <QuickAction
                   href="/script-writer"
                   icon={ScrollText}
@@ -118,6 +119,20 @@ export default function DashboardPage() {
                   description="Open a project board"
                   accent="indigo"
                 />
+                <QuickAction
+                  href="/reference"
+                  icon={BookOpen}
+                  label="Reference guide"
+                  description="FX6 & lens lookup"
+                  accent="sky"
+                />
+                <QuickAction
+                  href="/stage"
+                  icon={LayoutGrid}
+                  label="Stage planner"
+                  description="Lighting diagram"
+                  accent="indigo"
+                />
               </div>
             </section>
           ) : null}
@@ -132,7 +147,19 @@ export default function DashboardPage() {
                   actionLabel="All projects"
                 />
                 {projects.length === 0 ? (
-                  <EmptyHint text="Start from Projects — script, board, scout, and deals live there." />
+                  <EmptyPanel
+                    text="Start from Projects — script, board, scout, and deals live there."
+                    action={
+                      canManageProjects(appUser) ? (
+                        <Link href="/projects">
+                          <Button size="sm" variant="outline">
+                            <FolderKanban className="mr-1.5 h-4 w-4" />
+                            Create a project
+                          </Button>
+                        </Link>
+                      ) : undefined
+                    }
+                  />
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {projects.slice(0, 6).map((p) => (
@@ -165,7 +192,19 @@ export default function DashboardPage() {
                   actionLabel="All deals"
                 />
                 {agreements.length === 0 ? (
-                  <EmptyHint text="No agreements yet." />
+                  <EmptyPanel
+                    text="No agreements yet."
+                    action={
+                      canCreateQuotes(appUser) ? (
+                        <Link href="/agreements/new">
+                          <Button size="sm" variant="outline">
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            New agreement
+                          </Button>
+                        </Link>
+                      ) : undefined
+                    }
+                  />
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {agreements.slice(0, 6).map((a) => (
@@ -205,7 +244,17 @@ export default function DashboardPage() {
                     {scriptsLoading ? (
                       <LoadingSpinner className="py-6" />
                     ) : scriptSessions.length === 0 ? (
-                      <EmptyHint text="No scripts yet — start with an idea or reference clip." />
+                      <EmptyPanel
+                        text="No scripts yet — start with an idea or reference clip."
+                        action={
+                          <Link href="/script-writer">
+                            <Button size="sm" variant="outline">
+                              <PenLine className="mr-1.5 h-4 w-4" />
+                              New script
+                            </Button>
+                          </Link>
+                        }
+                      />
                     ) : (
                       <ul className="divide-y divide-slate-100">
                         {scriptSessions.map((s) => (
@@ -236,7 +285,17 @@ export default function DashboardPage() {
                   <CardBody>
                     <SectionHeader title="Recent scout sessions" icon={Clapperboard} href="/scout" actionLabel="Shot Scout" />
                     {scoutSessions.length === 0 ? (
-                      <EmptyHint text="No scout sessions — add location photos to build a shot list." />
+                      <EmptyPanel
+                        text="No scout sessions — add location photos to build a shot list."
+                        action={
+                          <Link href="/scout/new">
+                            <Button size="sm" variant="outline">
+                              <Clapperboard className="mr-1.5 h-4 w-4" />
+                              New scout session
+                            </Button>
+                          </Link>
+                        }
+                      />
                     ) : (
                       <ul className="divide-y divide-slate-100">
                         {scoutSessions.slice(0, 5).map((s) => (
@@ -289,8 +348,13 @@ function SectionHeader({
   );
 }
 
-function EmptyHint({ text }: { text: string }) {
-  return <p className="py-4 text-sm text-slate-500">{text}</p>;
+function EmptyPanel({ text, action }: { text: string; action?: React.ReactNode }) {
+  return (
+    <div className="py-4">
+      <p className="text-sm text-slate-500">{text}</p>
+      {action ? <div className="mt-3">{action}</div> : null}
+    </div>
+  );
 }
 
 function StatCard({

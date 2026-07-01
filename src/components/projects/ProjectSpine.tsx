@@ -7,6 +7,8 @@ import {
   LayoutGrid,
   ScrollText,
   ArrowRight,
+  BookOpen,
+  ListOrdered,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Badge } from "@/components/ui/Badge";
@@ -101,6 +103,26 @@ function agreementSummary(agreements: Agreement[]): string {
   return parts.join(" · ");
 }
 
+function shotsStatus(board: ProductionBoard | null | undefined): SpineStep["status"] {
+  if (!board?.productionDays.length) return "empty";
+  const withShots = board.productionDays.some((d) => (d.shots?.length ?? 0) > 0);
+  if (withShots) return "ready";
+  return board.productionDays.length > 0 ? "progress" : "empty";
+}
+
+function shotsSummary(board: ProductionBoard | null | undefined): string {
+  if (!board?.productionDays.length) return "Add shoot days on the pre-production board";
+  const total = board.productionDays.reduce((n, d) => n + (d.shots?.length ?? 0), 0);
+  if (total) return `${total} shot${total === 1 ? "" : "s"} across ${board.productionDays.length} day${board.productionDays.length === 1 ? "" : "s"}`;
+  return `${board.productionDays.length} shoot day${board.productionDays.length === 1 ? "" : "s"} — add shots`;
+}
+
+function shotsHref(projectId: string, board: ProductionBoard | null | undefined): string {
+  const firstDay = board?.productionDays?.[0];
+  if (firstDay) return `/projects/${projectId}/production/days/${firstDay.id}/shots`;
+  return `/projects/${projectId}/production`;
+}
+
 interface ProjectSpineProps {
   projectId: string;
   projectName: string;
@@ -151,6 +173,33 @@ export function ProjectSpine({
       status: boardStatus(board),
       summary: boardSummary(board),
     });
+
+    steps.push({
+      key: "shots",
+      label: "Shot list",
+      icon: ListOrdered,
+      href: shotsHref(projectId, board),
+      status: shotsStatus(board),
+      summary: shotsSummary(board),
+    });
+
+    steps.push({
+      key: "stage",
+      label: "Stage planner",
+      icon: LayoutGrid,
+      href: `/projects/${projectId}/stage`,
+      status: board ? "progress" : "empty",
+      summary: "Top-down lighting diagram for this project",
+    });
+
+    steps.push({
+      key: "reference",
+      label: "Reference guide",
+      icon: BookOpen,
+      href: "/reference",
+      status: "ready",
+      summary: "FX6, lenses, and on-set quick reference",
+    });
   }
 
   if (showScout) {
@@ -185,8 +234,7 @@ export function ProjectSpine({
       <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Project spine</p>
       <div
         className={cn(
-          "grid gap-3",
-          steps.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2"
+          "grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         )}
       >
         {steps.map((step) => {

@@ -44,6 +44,14 @@ body {
     linear-gradient(160deg, #0f172a 0%, #1e293b 45%, #0f172a 100%);
 }
 
+.stage-grid-bg {
+  background-color: #f8fafc;
+  background-image:
+    linear-gradient(to right, rgba(148, 163, 184, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.35) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
 .safe-area-pb {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }

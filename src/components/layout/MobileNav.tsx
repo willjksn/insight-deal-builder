@@ -14,19 +14,35 @@ import {
   Shield,
   Clapperboard,
   ScrollText,
+  BookOpen,
+  LayoutGrid,
+  Package,
+  HardDrive,
+  MapPin,
+  Calculator,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
 import { APP_NAME, APP_SHORT_TAGLINE } from "@/lib/brand";
 import {
+  canCreateQuotes,
   canManageClients,
   canManageCompanies,
   canManageCrew,
   canManageProjects,
   canManageTemplates,
   canManageUsers,
+  canAccessReports,
   canUseShotScout,
 } from "@/lib/utils/permissions";
+
+type MoreNavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  canAccess?: (user: ReturnType<typeof useAuth>["appUser"]) => boolean;
+};
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -42,30 +58,43 @@ export function MobileNav() {
       ? [
           { href: "/script-writer", label: "Script", icon: ScrollText },
           { href: "/scout", label: "Scout", icon: Clapperboard },
+          { href: "/reference", label: "Guide", icon: BookOpen },
+          { href: "/stage", label: "Stage", icon: LayoutGrid },
         ]
       : []),
     { href: "/agreements", label: "Deals", icon: FileText },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
-  const visibleMoreItems = [
+  const moreItems: MoreNavItem[] = [
+    { href: "/quick-quote", label: "Quick quote", icon: Calculator, canAccess: canCreateQuotes },
+    { href: "/reports", label: "Reports", icon: BarChart3, canAccess: canAccessReports },
+    { href: "/packages", label: "Packages", icon: Package, canAccess: canManageProjects },
+    { href: "/equipment", label: "Equipment", icon: HardDrive, canAccess: canManageProjects },
+    { href: "/locations", label: "Locations", icon: MapPin, canAccess: canManageProjects },
     { href: "/companies", label: "Companies", icon: Building2, canAccess: canManageCompanies },
     { href: "/clients", label: "Clients", icon: Users, canAccess: canManageClients },
     { href: "/crew", label: "Crew", icon: UserCircle, canAccess: canManageCrew },
     { href: "/templates", label: "Templates", icon: FileStack, canAccess: canManageTemplates },
     { href: "/admin", label: "Admin", icon: Shield, canAccess: canManageUsers },
-  ].filter((item) => !item.canAccess || item.canAccess(appUser));
+  ];
+
+  const visibleMoreItems = moreItems.filter(
+    (item) => !item.canAccess || item.canAccess(appUser)
+  );
 
   return (
     <>
-      <header className="lg:hidden sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-md shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-bold text-slate-900">{APP_NAME}</h1>
-            <p className="truncate text-[10px] font-medium text-sky-700/90">{APP_SHORT_TAGLINE}</p>
+      <header className="lg:hidden sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md shadow-sm">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-bold text-slate-900">{APP_NAME}</h1>
+              <p className="truncate text-[10px] font-medium text-sky-700/90">{APP_SHORT_TAGLINE}</p>
+            </div>
           </div>
           {visibleMoreItems.length > 0 ? (
-            <nav className="hidden md:flex shrink-0 items-center gap-1">
+            <nav className="mt-2 flex gap-1 overflow-x-auto pb-1 scrollbar-none">
               {visibleMoreItems.map((item) => {
                 const Icon = item.icon;
                 const active = pathname.startsWith(item.href);
@@ -74,7 +103,7 @@ export function MobileNav() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors",
+                      "flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors",
                       active
                         ? "bg-sky-50 text-sky-900 ring-1 ring-sky-200"
                         : "text-slate-500 hover:bg-slate-100"
@@ -91,7 +120,7 @@ export function MobileNav() {
       </header>
 
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/80 bg-white/95 backdrop-blur-md safe-area-pb shadow-[0_-4px_20px_rgba(15,23,42,0.06)]">
-        <div className="flex items-center justify-around px-1 py-2">
+        <div className="flex items-center justify-around px-1 py-2 overflow-x-auto scrollbar-none">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active =
@@ -103,7 +132,7 @@ export function MobileNav() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-xl px-2 py-2 min-w-[56px] min-h-[52px] justify-center transition-colors",
+                  "flex shrink-0 flex-col items-center gap-0.5 rounded-xl px-2 py-2 min-w-[52px] min-h-[52px] justify-center transition-colors",
                   active ? "text-sky-600" : "text-slate-400"
                 )}
               >

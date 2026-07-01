@@ -125,6 +125,14 @@ export default function ProjectDetailPage() {
         action={
           <div className="flex flex-wrap gap-2">
             {showProduction && (
+              <Link href={`/projects/${project.id}/stage`}>
+                <Button size="touch" variant="outline">
+                  <LayoutGrid className="mr-2 h-5 w-5" />
+                  Stage planner
+                </Button>
+              </Link>
+            )}
+            {showProduction && (
               <Link href={`/projects/${project.id}/production`}>
                 <Button size="touch" variant="outline">
                   <LayoutGrid className="mr-2 h-5 w-5" />

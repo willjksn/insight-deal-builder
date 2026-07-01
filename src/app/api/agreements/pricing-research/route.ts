@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorStatus, assertCanCreateQuotes, requireAuthUser } from "@/lib/api/routeAuth";
+import { apiErrorStatus, assertCanCreateQuotes, requireApprovedAuthUser } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { researchMarketPricing } from "@/lib/agreement/pricingResearch";
 import { presetToServicePackage } from "@/lib/agreement/packages";
@@ -43,20 +43,20 @@ async function loadServicePackages(): Promise<ServicePackage[]> {
 async function loadEquipment(): Promise<EquipmentCatalogItem[]> {
   const db = getAdminDb();
   if (!db) return [];
-  const snap = await db.collection("equipment").limit(40).get();
+  const snap = await db.collection("equipmentCatalog").limit(40).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as EquipmentCatalogItem);
 }
 
 async function loadLocations(): Promise<LocationCatalogItem[]> {
   const db = getAdminDb();
   if (!db) return [];
-  const snap = await db.collection("locations").limit(20).get();
+  const snap = await db.collection("locationCatalog").limit(20).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as LocationCatalogItem);
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { appUser } = await requireAuthUser(request);
+    const { appUser } = await requireApprovedAuthUser(request);
     assertCanCreateQuotes(appUser);
 
     if (!tavilyAvailable() && !scoutAiUsesMock()) {
