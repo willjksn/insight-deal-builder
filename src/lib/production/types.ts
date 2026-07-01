@@ -75,6 +75,24 @@ export interface ProductionDayShot {
   cameraMovement?: string;
 }
 
+export type ProductionSceneFrameImageSource = "inspiration" | "upload" | "script_match";
+
+/** One storyboard card per scene — grid view and client print. */
+export interface ProductionSceneFrame {
+  id: string;
+  sceneRef: string;
+  sceneHeading?: string;
+  shotType?: string;
+  shotName?: string;
+  caption?: string;
+  audioCue?: string;
+  referenceImageUrl?: string;
+  referenceImageStoragePath?: string;
+  referenceImageSource?: ProductionSceneFrameImageSource;
+  inspirationImageId?: string;
+  sortOrder: number;
+}
+
 export interface ProductionDay {
   id: string;
   title: string;
@@ -83,6 +101,8 @@ export interface ProductionDay {
   scenes: string[];
   schedule: ProductionDayScheduleBlock[];
   shots: ProductionDayShot[];
+  /** Scene-level storyboard cards (one per scene). */
+  sceneFrames?: ProductionSceneFrame[];
   crewCall?: string;
   breakfast?: string;
   lunch?: string;

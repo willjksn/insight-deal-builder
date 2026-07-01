@@ -17,6 +17,7 @@ import {
   SCRIPT_WRITER_INTERVIEW_SYSTEM,
 } from "@/lib/scriptWriter/prompts";
 import { shotListPromptRules } from "@/lib/scriptWriter/detailedShotListPrompt";
+import { storyboardPromptRules } from "@/lib/scriptWriter/storyboardPrompt";
 import {
   buildInspirationMediaBundle,
   hasInspirationInput,
@@ -31,6 +32,7 @@ import {
   ScriptWriterChatResponse,
   ScriptWriterMessage,
   ScriptTrendsResearch,
+  ScriptStoryboardFrame,
 } from "@/lib/scriptWriter/types";
 import { formatTrendsForPrompt } from "@/lib/scriptWriter/trendsResearch";
 import { SCRIPT_VIDEO_MODE_LABELS } from "@/lib/scriptWriter/constants";
@@ -87,6 +89,7 @@ function parseScriptDocument(raw: unknown): ScriptDocument {
     scenes: Array.isArray(data.scenes) ? data.scenes : [],
     characters: Array.isArray(data.characters) ? data.characters : [],
     suggestedShots: Array.isArray(data.suggestedShots) ? data.suggestedShots : [],
+    storyboardFrames: Array.isArray(data.storyboardFrames) ? data.storyboardFrames : undefined,
     productionPack: data.productionPack,
   };
 }
@@ -106,7 +109,11 @@ function mockChatResponse(brief: ScriptWriterBrief, messages: ScriptWriterMessag
   };
 }
 
-function mockScript(brief: ScriptWriterBrief, detailedShotList = true): ScriptDocument {
+function mockScript(
+  brief: ScriptWriterBrief,
+  detailedShotList = true,
+  storyboardMode = false
+): ScriptDocument {
   const title = brief.concept.slice(0, 48) || "Untitled Script";
   const logline = brief.concept.slice(0, 200) || "A compelling visual story.";
   const fountain = `Title: ${title}
@@ -190,6 +197,18 @@ THE END
       premise: logline,
       tone: resolveMoodLabel(brief),
     },
+    storyboardFrames: storyboardMode
+      ? [
+          {
+            sceneNumber: "1",
+            sceneHeading: "INT. LOCATION - DAY",
+            shotType: "master_wide",
+            shotName: "Long shot — Establish location",
+            caption: brief.concept || "Story opens on the primary location.",
+            audioCue: "Cue in background music",
+          } satisfies ScriptStoryboardFrame,
+        ]
+      : undefined,
   };
 }
 
@@ -241,8 +260,10 @@ function inspirationContext(
   }
   if (images.length) {
     lines.push(
-      "Image tags:",
-      ...images.map((i) => `- ${i.tag}${i.label ? `: ${i.label}` : ""}`)
+      "Inspiration images (reference by id in storyboardFrames.inspirationImageId when applicable):",
+      ...images.map(
+        (i) => `- id: ${i.id} | tag: ${i.tag}${i.label ? ` | label: ${i.label}` : ""}`
+      )
     );
   }
   if (urls?.length) {
@@ -328,12 +349,14 @@ export async function scriptWriterGenerate(
     };
     trendsResearch?: ScriptTrendsResearch | null;
     detailedShotList?: boolean;
+    storyboardMode?: boolean;
   }
 ): Promise<ScriptDocument> {
   const detailedShotList = options?.detailedShotList !== false;
+  const storyboardMode = options?.storyboardMode ?? false;
 
   if (scoutAiUsesMock()) {
-    return mockScript(brief, detailedShotList);
+    return mockScript(brief, detailedShotList, storyboardMode);
   }
 
   const detailLevel = options?.detailLevel ?? inferScriptDetailLevel(brief);
@@ -351,6 +374,7 @@ export async function scriptWriterGenerate(
       `Detail level: ${detailLevel}`,
       "",
       shotListPromptRules(detailedShotList),
+      storyboardPromptRules(storyboardMode),
       "",
       "Write the complete production-ready script now.",
     ]
@@ -358,7 +382,7 @@ export async function scriptWriterGenerate(
       .join("\n");
 
     const raw = await callGeminiJsonWithMedia(
-      scriptWriterInspirationGenerateSystem(detailLevel, detailedShotList),
+      scriptWriterInspirationGenerateSystem(detailLevel, detailedShotList, storyboardMode),
       prompt,
       media,
       { temperature: 0.58 }
@@ -377,6 +401,7 @@ export async function scriptWriterGenerate(
     `Detail level: ${detailLevel}`,
     "",
     shotListPromptRules(detailedShotList),
+    storyboardPromptRules(storyboardMode),
     "",
     "Write the complete, production-ready script now. Match the brief exactly.",
   ]
@@ -384,7 +409,7 @@ export async function scriptWriterGenerate(
     .join("\n");
 
   const raw = await callGeminiJsonWithHistory(
-    `${SCRIPT_WRITER_GENERATE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}`,
+    `${SCRIPT_WRITER_GENERATE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`,
     [{ role: "user", parts: [{ text: payload }] }],
     { temperature: 0.58 }
   );
@@ -405,9 +430,11 @@ export async function scriptWriterRefineScript(
     };
     trendsResearch?: ScriptTrendsResearch | null;
     detailedShotList?: boolean;
+    storyboardMode?: boolean;
   }
 ): Promise<ScriptDocument> {
   const detailedShotList = options?.detailedShotList !== false;
+  const storyboardMode = options?.storyboardMode ?? false;
 
   if (scoutAiUsesMock()) {
     return { ...currentScript, title: currentScript.title };
@@ -445,6 +472,7 @@ export async function scriptWriterRefineScript(
     "",
     `Detail level: ${detailLevel}`,
     shotListPromptRules(detailedShotList),
+    storyboardPromptRules(storyboardMode),
     "Return the full revised script JSON.",
   ]
     .filter(Boolean)
@@ -453,7 +481,7 @@ export async function scriptWriterRefineScript(
   const raw =
     media.length > 0
       ? await callGeminiJsonWithMedia(
-          `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}`,
+          `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`,
           payload,
           media,
           {
@@ -461,7 +489,7 @@ export async function scriptWriterRefineScript(
           }
         )
       : await callGeminiJsonWithHistory(
-          `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}`,
+          `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`,
           [{ role: "user", parts: [{ text: payload }] }],
           { temperature: 0.55 }
         );

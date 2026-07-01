@@ -12,6 +12,7 @@ import { getScriptSessionForUser } from "@/lib/projectAccess/server";
 import { inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
 import { resolveSessionBrief, scriptWriterGenerate } from "@/lib/scriptWriter/scriptWriterAi";
 import { archiveScriptVersion } from "@/lib/scriptWriter/scriptVersions";
+import { resolveScriptGenerationOptions } from "@/lib/scriptWriter/generationOptions";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 
 export const runtime = "nodejs";
@@ -24,8 +25,11 @@ export async function POST(
     const { uid, appUser } = await requireAuthUser(request);
     assertCanUseScriptWriter(appUser);
     const { id } = await params;
-    const body = (await request.json()) as { notes?: string; detailedShotList?: boolean };
-    const detailedShotList = body.detailedShotList !== false;
+    const body = (await request.json()) as {
+      notes?: string;
+      detailedShotList?: boolean;
+      storyboardMode?: boolean;
+    };
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
@@ -34,6 +38,8 @@ export async function POST(
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
+
+    const { detailedShotList, storyboardMode } = resolveScriptGenerationOptions(body, session);
     if (!session.inspirationAnalysis) {
       return NextResponse.json({ error: "Run inspiration analysis first" }, { status: 400 });
     }
@@ -59,6 +65,7 @@ export async function POST(
       },
       trendsResearch: session.trendsResearch ?? null,
       detailedShotList,
+      storyboardMode,
     });
 
     if (session.script) {
@@ -72,6 +79,7 @@ export async function POST(
         title: script.title,
         status: "script_ready",
         detailedShotList,
+        storyboardMode,
         updatedAt: FieldValue.serverTimestamp(),
       })
     );

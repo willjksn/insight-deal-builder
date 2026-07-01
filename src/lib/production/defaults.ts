@@ -11,6 +11,7 @@ export function createEmptyProductionDay(dayNumber: number, title?: string): Pro
     scenes: [],
     schedule: [],
     shots: [],
+    sceneFrames: [],
     crewCall: "7:00 AM",
     lunch: "1:00 PM",
     wrapTime: "6:00 PM",

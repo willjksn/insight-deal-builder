@@ -99,6 +99,18 @@ export interface ScriptSuggestedShot {
   purpose?: string;
 }
 
+/** One storyboard panel per scene — hero frame for grid view / client PDF. */
+export interface ScriptStoryboardFrame {
+  sceneNumber: string;
+  sceneHeading?: string;
+  shotType: string;
+  shotName?: string;
+  caption: string;
+  audioCue?: string;
+  /** Id from session inspirationImages when AI matches a reference. */
+  inspirationImageId?: string;
+}
+
 export interface ScriptTimedBeat {
   startSec: number;
   endSec: number;
@@ -141,6 +153,7 @@ export interface ScriptDocument {
   scenes: ScriptScene[];
   characters: ScriptCharacter[];
   suggestedShots: ScriptSuggestedShot[];
+  storyboardFrames?: ScriptStoryboardFrame[];
   productionPack?: ScriptProductionPack;
 }
 
@@ -189,6 +202,8 @@ export interface ScriptWriterSession {
   appliedScoutProjectId?: string;
   /** When true, Gemini outputs full WS/MS/CU coverage per scene */
   detailedShotList?: boolean;
+  /** When true, Gemini outputs scene storyboardFrames and applies reference images */
+  storyboardMode?: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

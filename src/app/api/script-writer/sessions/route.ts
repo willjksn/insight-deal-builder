@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
       linkedScoutProjectId?: string;
       workflowMode?: "text" | "inspiration";
       detailedShotList?: boolean;
+      storyboardMode?: boolean;
     };
 
     const db = getAdminDb();
@@ -126,6 +127,7 @@ export async function POST(request: NextRequest) {
         linkedProjectId: body.linkedProjectId,
         linkedScoutProjectId: body.linkedScoutProjectId,
         detailedShotList: body.detailedShotList !== false,
+        storyboardMode: body.storyboardMode ?? false,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       })

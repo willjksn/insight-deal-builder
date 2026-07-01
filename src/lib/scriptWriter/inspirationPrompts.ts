@@ -26,10 +26,12 @@ Respond JSON only:
 }`;
 
 import { shotListPromptRules } from "@/lib/scriptWriter/detailedShotListPrompt";
+import { storyboardPromptRules } from "@/lib/scriptWriter/storyboardPrompt";
 
 export function scriptWriterInspirationGenerateSystem(
   detailLevel: "standard" | "production" | "trailer",
-  detailedShotList = true
+  detailedShotList = true,
+  storyboardMode = false
 ): string {
   const packInstructions =
     detailLevel === "trailer"
@@ -60,6 +62,7 @@ REFERENCE RULES:
 ${packInstructions}
 
 ${shotListPromptRules(detailedShotList)}
+${storyboardPromptRules(storyboardMode)}
 
 Output JSON only:
 {
@@ -75,6 +78,9 @@ Output JSON only:
   "suggestedShots": [{
     "sceneNumber", "shotNumber", "shotType", "shotName?", "description",
     "subjectAction?", "cameraMovement?", "lens?", "lighting?", "purpose?"
+  }],
+  "storyboardFrames": [{
+    "sceneNumber", "sceneHeading?", "shotType", "shotName?", "caption", "audioCue?", "inspirationImageId?"
   }],
   "productionPack": {
     "premise": "string",

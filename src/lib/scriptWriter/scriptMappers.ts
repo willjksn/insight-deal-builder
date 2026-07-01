@@ -1,11 +1,23 @@
 import { ScoutShotListItem, ScoutShotType } from "@/lib/scout/types";
 import {
   ProductionDayShot,
+  ProductionInspirationImage,
   ProductionLocationEntry,
   ProductionPerson,
+  ProductionSceneFrame,
 } from "@/lib/production/types";
+import {
+  buildInspirationPool,
+  InspirationPoolItem,
+  pickInspirationForFrame,
+} from "@/lib/production/storyboardMatch";
 import { formatShotTypeLabel } from "@/lib/production/shotLabels";
-import { ScriptDocument, ScriptSuggestedShot } from "@/lib/scriptWriter/types";
+import {
+  ScriptDocument,
+  ScriptInspirationImage,
+  ScriptStoryboardFrame,
+  ScriptSuggestedShot,
+} from "@/lib/scriptWriter/types";
 
 const SHOT_TYPES = new Set<string>([
   "master_wide",
@@ -166,4 +178,122 @@ export function locationsFromInspirationImages(
       notes: img.storageUrl ? "Reference photo from script writer" : undefined,
       photoUrl: img.storageUrl,
     }));
+}
+
+function heroShotForScene(
+  sceneNumber: string,
+  shots: ScriptSuggestedShot[]
+): ScriptSuggestedShot | undefined {
+  const sceneShots = shots.filter((s) => s.sceneNumber === sceneNumber);
+  return (
+    sceneShots.find((s) => normalizeShotType(s.shotType) === "master_wide") ?? sceneShots[0]
+  );
+}
+
+function audioFromScene(script: ScriptDocument, sceneNumber: string): string | undefined {
+  const beat = script.productionPack?.timedBeats?.find((b) => b.audio?.trim());
+  if (beat?.audio?.trim()) return beat.audio.trim();
+  const row = script.productionPack?.editTimeline?.find((r) => r.audio?.trim());
+  return row?.audio?.trim();
+}
+
+/** Build scene frames from script when AI omitted storyboardFrames. */
+export function deriveStoryboardFramesFromScript(script: ScriptDocument): ScriptStoryboardFrame[] {
+  return script.scenes.map((scene) => {
+    const hero = heroShotForScene(scene.sceneNumber, script.suggestedShots);
+    const shotType = hero ? normalizeShotType(hero.shotType) : "master_wide";
+    const typeLabel = formatShotTypeLabel(shotType);
+    return {
+      sceneNumber: scene.sceneNumber,
+      sceneHeading: scene.heading,
+      shotType,
+      shotName: hero?.shotName ?? `${typeLabel} — Scene ${scene.sceneNumber}`,
+      caption: hero?.description?.trim() || scene.action.trim() || scene.heading,
+      audioCue: audioFromScene(script, scene.sceneNumber),
+    };
+  });
+}
+
+function scriptFrameToProduction(
+  frame: ScriptStoryboardFrame,
+  index: number,
+  pool: InspirationPoolItem[],
+  usedIds: Set<string>
+): ProductionSceneFrame {
+  const img = pickInspirationForFrame(frame, pool, usedIds);
+  if (img) usedIds.add(img.id);
+  return {
+    id: crypto.randomUUID(),
+    sceneRef: frame.sceneNumber.trim(),
+    sceneHeading: frame.sceneHeading?.trim(),
+    shotType: normalizeShotType(frame.shotType),
+    shotName: frame.shotName?.trim(),
+    caption: frame.caption.trim(),
+    audioCue: frame.audioCue?.trim(),
+    referenceImageUrl: img?.imageUrl,
+    referenceImageStoragePath: img?.storagePath,
+    referenceImageSource: img ? "script_match" : undefined,
+    inspirationImageId: img?.id,
+    sortOrder: index,
+  };
+}
+
+export function productionSceneFramesFromScript(
+  script: ScriptDocument,
+  sessionImages: ScriptInspirationImage[] = [],
+  boardImages: ProductionInspirationImage[] = []
+): ProductionSceneFrame[] {
+  const frames =
+    script.storyboardFrames?.length
+      ? script.storyboardFrames
+      : deriveStoryboardFramesFromScript(script);
+  const pool = buildInspirationPool(sessionImages, boardImages);
+  const usedIds = new Set<string>();
+  return frames.map((frame, index) => scriptFrameToProduction(frame, index, pool, usedIds));
+}
+
+/** Refresh scene frames from script; keep user-uploaded images per scene. */
+export function mergeProductionSceneFramesFromScript(
+  existing: ProductionSceneFrame[],
+  script: ScriptDocument,
+  sessionImages: ScriptInspirationImage[] = [],
+  boardImages: ProductionInspirationImage[] = []
+): ProductionSceneFrame[] {
+  const uploadByScene = new Map<string, ProductionSceneFrame>();
+  for (const frame of existing) {
+    if (frame.referenceImageSource === "upload" && frame.referenceImageUrl) {
+      uploadByScene.set(frame.sceneRef, frame);
+    }
+  }
+  return productionSceneFramesFromScript(script, sessionImages, boardImages).map((frame) => {
+    const kept = uploadByScene.get(frame.sceneRef);
+    if (!kept) return frame;
+    return {
+      ...frame,
+      referenceImageUrl: kept.referenceImageUrl,
+      referenceImageStoragePath: kept.referenceImageStoragePath,
+      referenceImageSource: "upload",
+      inspirationImageId: kept.inspirationImageId,
+    };
+  });
+}
+
+export function inspirationImagesFromSession(
+  sessionImages: ScriptInspirationImage[],
+  existing: ProductionInspirationImage[]
+): ProductionInspirationImage[] {
+  const urls = new Set(existing.map((i) => i.imageUrl));
+  const merged = [...existing];
+  for (const img of sessionImages) {
+    if (urls.has(img.storageUrl)) continue;
+    urls.add(img.storageUrl);
+    merged.push({
+      id: img.id,
+      imageUrl: img.storageUrl,
+      storagePath: img.storagePath,
+      caption: img.label,
+      sortOrder: merged.length,
+    });
+  }
+  return merged;
 }

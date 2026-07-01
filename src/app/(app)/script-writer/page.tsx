@@ -13,7 +13,7 @@ import {
   ScriptWriterIntakeForm,
 } from "@/components/scriptWriter/ScriptWriterIntakeForm";
 import { InspirationUploadSection } from "@/components/scriptWriter/InspirationUploadSection";
-import { DetailedShotListToggle } from "@/components/scriptWriter/DetailedShotListToggle";
+import { ShotListOptions } from "@/components/scriptWriter/StoryboardModeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   PendingInspirationImage,
@@ -52,6 +52,7 @@ function ScriptWriterPageContent() {
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [researchTrends, setResearchTrends] = useState(false);
   const [detailedShotList, setDetailedShotList] = useState(true);
+  const [storyboardMode, setStoryboardMode] = useState(false);
 
   const hasInspiration =
     pendingImages.length > 0 || pendingVideo !== null || pendingUrls.length > 0;
@@ -103,6 +104,7 @@ function ScriptWriterPageContent() {
         linkedScoutProjectId,
         workflowMode: hasInspiration ? "inspiration" : "text",
         detailedShotList,
+        storyboardMode,
       });
 
       if (hasInspiration) {
@@ -204,9 +206,11 @@ function ScriptWriterPageContent() {
             onVideoChange={setPendingVideo}
             onUrlsChange={setPendingUrls}
           />
-          <DetailedShotListToggle
-            checked={detailedShotList}
-            onChange={setDetailedShotList}
+          <ShotListOptions
+            storyboardMode={storyboardMode}
+            onStoryboardChange={setStoryboardMode}
+            detailedShotList={detailedShotList}
+            onDetailedChange={setDetailedShotList}
             className="border-t border-slate-100 pt-4"
           />
           <div className="flex flex-col items-end gap-2">

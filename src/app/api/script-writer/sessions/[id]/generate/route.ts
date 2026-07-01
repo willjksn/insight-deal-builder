@@ -10,6 +10,7 @@ import { stripUndefined } from "@/lib/firebase/firestore";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
 import { getScriptSessionForUser } from "@/lib/projectAccess/server";
 import { inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
+import { resolveScriptGenerationOptions } from "@/lib/scriptWriter/generationOptions";
 import { resolveSessionBrief, scriptWriterGenerate } from "@/lib/scriptWriter/scriptWriterAi";
 import { archiveScriptVersion } from "@/lib/scriptWriter/scriptVersions";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
@@ -25,8 +26,10 @@ export async function POST(
     assertCanUseScriptWriter(appUser);
     const { id } = await params;
 
-    const body = (await request.json().catch(() => ({}))) as { detailedShotList?: boolean };
-    const detailedShotList = body.detailedShotList !== false;
+    const body = (await request.json().catch(() => ({}))) as {
+      detailedShotList?: boolean;
+      storyboardMode?: boolean;
+    };
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
@@ -35,6 +38,8 @@ export async function POST(
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
+
+    const { detailedShotList, storyboardMode } = resolveScriptGenerationOptions(body, session);
 
     const brief = resolveSessionBrief(session.brief, session.initialIdea);
     const detailLevel = session.detailLevel ?? inferScriptDetailLevel(brief);
@@ -54,6 +59,7 @@ export async function POST(
       inspiration,
       trendsResearch: session.trendsResearch ?? null,
       detailedShotList,
+      storyboardMode,
     });
 
     if (session.script) {
@@ -66,6 +72,7 @@ export async function POST(
         title: script.title,
         status: "script_ready",
         detailedShotList,
+        storyboardMode,
         updatedAt: FieldValue.serverTimestamp(),
       })
     );

@@ -3,24 +3,34 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, Printer, RefreshCw } from "lucide-react";
+import { ArrowLeft, LayoutGrid, List, Printer, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ProductionDayNav } from "@/components/production/ProductionDayNav";
 import { ProductionShotListEditor } from "@/components/production/ProductionShotListEditor";
+import { ProductionStoryboardGridView } from "@/components/production/ProductionStoryboardGridView";
 import { ShotListPrintView } from "@/components/production/ShotListPrintView";
+import { StoryboardPrintView } from "@/components/production/StoryboardPrintView";
 import { useProductionDayPage } from "@/hooks/useProductionDayPage";
 import { useAuth } from "@/contexts/AuthContext";
 import { scriptWriterGetSession } from "@/lib/scriptWriter/apiClient";
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
-import { mergeProductionShotsFromScript } from "@/lib/scriptWriter/scriptMappers";
+import {
+  mergeProductionSceneFramesFromScript,
+  mergeProductionShotsFromScript,
+  productionSceneFramesFromScript,
+} from "@/lib/scriptWriter/scriptMappers";
+import { cn } from "@/lib/utils/cn";
+
+type ViewMode = "list" | "grid";
 
 export default function ShotListDayPage() {
   const params = useParams();
   const projectId = params.id as string;
   const dayId = params.dayId as string;
   const { user } = useAuth();
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
 
@@ -68,13 +78,15 @@ export default function ShotListDayPage() {
 
   const doneCount = day.shots.filter((s) => s.done).length;
   const scriptSessionId = board.scriptSessionId;
+  const sceneFrames = day.sceneFrames ?? [];
+  const hasStoryboard = sceneFrames.length > 0;
 
   const refreshFromScript = async () => {
     if (!user || !scriptSessionId) return;
     if (
-      day.shots.length > 0 &&
+      (day.shots.length > 0 || sceneFrames.length > 0) &&
       !window.confirm(
-        "Replace the shot list from the linked script? Checkmarks are kept for matching shot numbers."
+        "Replace the shot list and storyboard from the linked script? Shot checkmarks and uploaded storyboard images are kept where possible."
       )
     ) {
       return;
@@ -86,14 +98,59 @@ export default function ShotListDayPage() {
         () => user.getIdToken(),
         scriptSessionId
       );
-      const script = (loaded as ScriptWriterSession).script as ScriptDocument | null;
+      const session = loaded as ScriptWriterSession;
+      const script = session.script as ScriptDocument | null;
       if (!script?.suggestedShots?.length) {
-        setRefreshError("Linked script has no suggested shots. Regenerate the script with detailed shot list enabled.");
+        setRefreshError(
+          "Linked script has no suggested shots. Regenerate with Storyboard or detailed shot list enabled."
+        );
         return;
       }
-      patchDay({ shots: mergeProductionShotsFromScript(day.shots, script) });
+      const sessionImages = session.inspirationImages ?? [];
+      patchDay({
+        shots: mergeProductionShotsFromScript(day.shots, script),
+        sceneFrames:
+          session.storyboardMode || script.storyboardFrames?.length
+            ? mergeProductionSceneFramesFromScript(
+                sceneFrames,
+                script,
+                sessionImages,
+                board.inspirationImages
+              )
+            : sceneFrames,
+      });
     } catch (e) {
       setRefreshError(e instanceof Error ? e.message : "Could not refresh from script");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const buildSceneFramesFromScript = async () => {
+    if (!user || !scriptSessionId) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const { session: loaded } = await scriptWriterGetSession(
+        () => user.getIdToken(),
+        scriptSessionId
+      );
+      const session = loaded as ScriptWriterSession;
+      const script = session.script as ScriptDocument | null;
+      if (!script) {
+        setRefreshError("No script on linked session.");
+        return;
+      }
+      patchDay({
+        sceneFrames: productionSceneFramesFromScript(
+          script,
+          session.inspirationImages ?? [],
+          board.inspirationImages
+        ),
+      });
+      setViewMode("grid");
+    } catch (e) {
+      setRefreshError(e instanceof Error ? e.message : "Could not build storyboard");
     } finally {
       setRefreshing(false);
     }
@@ -118,9 +175,13 @@ export default function ShotListDayPage() {
                 Refresh from script
               </Button>
             )}
-            <Button size="touch" variant="outline" onClick={() => window.print()}>
+            <Button
+              size="touch"
+              variant="outline"
+              onClick={() => window.print()}
+            >
               <Printer className="mr-2 h-5 w-5" />
-              Print shot list
+              {viewMode === "grid" ? "Print storyboard" : "Print shot list"}
             </Button>
             <Link href={`/projects/${projectId}/production/days/${dayId}`}>
               <Button size="touch" variant="outline">
@@ -146,17 +207,44 @@ export default function ShotListDayPage() {
         onRemoveDay={(id) => void removeProductionDay(id)}
       />
 
-      <p className="mb-4 rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 text-sm text-violet-950 print:hidden">
-        <strong>Shot list</strong> is your coverage checklist — wide, medium, close-up, inserts.
-        Check each row on set. Crew times and schedule are on the{" "}
-        <Link
-          href={`/projects/${projectId}/production/days/${dayId}`}
-          className="font-medium underline"
-        >
-          call sheet
-        </Link>
-        .
-      </p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <p className="max-w-xl rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 text-sm text-violet-950">
+          {viewMode === "grid" ? (
+            <>
+              <strong>Storyboard</strong> — one reference frame per scene for clients and pre-pro.
+              Coverage checkboxes stay in <strong>List</strong> view.
+            </>
+          ) : (
+            <>
+              <strong>Shot list</strong> — wide, medium, close-up coverage. Check each row on set.
+            </>
+          )}
+        </p>
+        <div className="flex rounded-xl border border-slate-200 bg-white p-1">
+          <button
+            type="button"
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium",
+              viewMode === "list" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"
+            )}
+            onClick={() => setViewMode("list")}
+          >
+            <List className="h-4 w-4" />
+            List
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium",
+              viewMode === "grid" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"
+            )}
+            onClick={() => setViewMode("grid")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Storyboard
+          </button>
+        </div>
+      </div>
 
       {refreshError && (
         <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 print:hidden">
@@ -171,15 +259,54 @@ export default function ShotListDayPage() {
         </p>
       )}
 
-      <ProductionShotListEditor
-        shots={day.shots}
-        onChange={(shots) => patchDay({ shots })}
-        readOnly={!canEditShots}
-        className="print:hidden"
-      />
+      {viewMode === "list" ? (
+        <ProductionShotListEditor
+          shots={day.shots}
+          onChange={(shots) => patchDay({ shots })}
+          readOnly={!canEditShots}
+          className="print:hidden"
+        />
+      ) : (
+        <>
+          {!hasStoryboard && scriptSessionId && canEditShots && (
+            <p className="mb-4 text-sm text-slate-600 print:hidden">
+              No storyboard frames yet.{" "}
+              <button
+                type="button"
+                className="font-medium text-amber-700 underline"
+                onClick={() => void buildSceneFramesFromScript()}
+              >
+                Build from linked script
+              </button>
+            </p>
+          )}
+          <ProductionStoryboardGridView
+            projectId={projectId}
+            projectTitle={board.filmTitle || project.projectName}
+            frames={sceneFrames}
+            shots={day.shots}
+            inspirationImages={board.inspirationImages}
+            onChange={(frames) => patchDay({ sceneFrames: frames })}
+            readOnly={!canEditShots}
+            className="print:hidden"
+          />
+        </>
+      )}
 
       <div className="hidden print:block">
-        <ShotListPrintView projectName={project.projectName} day={day} boardTitle={board.filmTitle} />
+        {viewMode === "grid" ? (
+          <StoryboardPrintView
+            projectName={project.projectName}
+            day={day}
+            boardTitle={board.filmTitle}
+          />
+        ) : (
+          <ShotListPrintView
+            projectName={project.projectName}
+            day={day}
+            boardTitle={board.filmTitle}
+          />
+        )}
       </div>
     </div>
   );

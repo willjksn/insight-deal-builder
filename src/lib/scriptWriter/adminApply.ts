@@ -8,8 +8,10 @@ import { ScoutShotList } from "@/lib/scout/types";
 import {
   castFromScript,
   filmingNotesFromScript,
+  inspirationImagesFromSession,
   locationsFromInspirationImages,
   locationsFromScript,
+  productionSceneFramesFromScript,
   productionShotsFromScript,
   sceneNumbersFromScript,
   scoutShotsFromScript,
@@ -90,6 +92,13 @@ export async function applyScriptToProject(params: {
   }
 
   const dayOne = board.productionDays[0];
+  const sessionImages = session.inspirationImages ?? [];
+  const mergedInspiration = inspirationImagesFromSession(sessionImages, board.inspirationImages);
+  const sceneFrames =
+    session.storyboardMode || script.storyboardFrames?.length
+      ? productionSceneFramesFromScript(script, sessionImages, mergedInspiration)
+      : dayOne?.sceneFrames ?? [];
+
   const updatedDays = board.productionDays.length
     ? board.productionDays.map((day, index) =>
         index === 0
@@ -98,6 +107,7 @@ export async function applyScriptToProject(params: {
               title: script.title || day.title,
               scenes: sceneNumbersFromScript(script),
               shots: productionShotsFromScript(script),
+              sceneFrames,
             }
           : day
       )
@@ -177,6 +187,7 @@ export async function applyScriptToProject(params: {
       filmingNotes,
       people: mergedPeople,
       locations: mergedLocations,
+      inspirationImages: mergedInspiration,
       productionDays: updatedDays,
       scriptSessionId: session.id,
       scriptFountain: script.fountain,

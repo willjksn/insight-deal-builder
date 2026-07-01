@@ -12,6 +12,7 @@ import { getScriptSessionForUser } from "@/lib/projectAccess/server";
 import { inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
 import { resolveSessionBrief, scriptWriterRefineScript } from "@/lib/scriptWriter/scriptWriterAi";
 import { archiveScriptVersion } from "@/lib/scriptWriter/scriptVersions";
+import { resolveScriptGenerationOptions } from "@/lib/scriptWriter/generationOptions";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 
 export const runtime = "nodejs";
@@ -24,7 +25,11 @@ export async function POST(
     const { uid, appUser } = await requireAuthUser(request);
     assertCanUseScriptWriter(appUser);
     const { id } = await params;
-    const body = (await request.json()) as { message?: string; detailedShotList?: boolean };
+    const body = (await request.json()) as {
+      message?: string;
+      detailedShotList?: boolean;
+      storyboardMode?: boolean;
+    };
 
     const message = body.message?.trim();
     if (!message) {
@@ -57,14 +62,13 @@ export async function POST(
           }
         : undefined;
 
-    const detailedShotList =
-      body.detailedShotList ?? session.detailedShotList !== false;
+    const { detailedShotList, storyboardMode } = resolveScriptGenerationOptions(body, session);
 
     const script = await scriptWriterRefineScript(
       brief,
       session.script as ScriptDocument,
       message,
-      { detailLevel, inspiration, trendsResearch: session.trendsResearch ?? null, detailedShotList }
+      { detailLevel, inspiration, trendsResearch: session.trendsResearch ?? null, detailedShotList, storyboardMode }
     );
 
     await archiveScriptVersion(db, id, session.script as ScriptDocument, "refine", message.slice(0, 120));
@@ -75,6 +79,7 @@ export async function POST(
         title: script.title,
         refineUsed: true,
         detailedShotList,
+        storyboardMode,
         updatedAt: FieldValue.serverTimestamp(),
       })
     );

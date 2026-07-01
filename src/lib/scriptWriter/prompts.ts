@@ -78,6 +78,17 @@ Output JSON only matching this schema:
       "lighting": "optional brief note",
       "purpose": "optional story/coverage purpose"
     }
+  ],
+  "storyboardFrames": [
+    {
+      "sceneNumber": "1",
+      "sceneHeading": "INT. LOCATION - DAY",
+      "shotType": "master_wide",
+      "shotName": "Long shot — Cafe exterior",
+      "caption": "What we see in the hero frame",
+      "audioCue": "Cue in background music",
+      "inspirationImageId": "optional id from inspiration images list"
+    }
   ]
 }
 
