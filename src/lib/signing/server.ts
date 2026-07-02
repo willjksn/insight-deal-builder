@@ -55,6 +55,11 @@ export function getSigningLinkUrl(token: string, appUrl: string): string {
   return `${base}/sign/${token}`;
 }
 
+export function getClientPaymentUrl(token: string, appUrl: string): string {
+  const base = appUrl.replace(/\/$/, "");
+  return `${base}/pay/${token}`;
+}
+
 export async function createSigningLink(params: {
   agreementId: string;
   partyId: string;
@@ -101,6 +106,37 @@ export async function createSigningLink(params: {
   });
 
   return { token, expiresAt };
+}
+
+/** Latest non-revoked signing link for a party (for client payment URLs). */
+export async function findActiveSigningToken(
+  agreementId: string,
+  partyId: string
+): Promise<string | null> {
+  const db = getAdminDb();
+  if (!db) throw new Error("Firebase Admin is not configured");
+
+  const snap = await db
+    .collection("signingLinks")
+    .where("agreementId", "==", agreementId)
+    .limit(50)
+    .get();
+
+  const now = Date.now();
+  let best: { token: string; expiresAt: number } | null = null;
+
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    if (data.partyId !== partyId) continue;
+    if (data.revoked) continue;
+    const expiresAt = (data.expiresAt as Timestamp).toMillis();
+    if (expiresAt < now) continue;
+    if (!best || expiresAt > best.expiresAt) {
+      best = { token: doc.id, expiresAt };
+    }
+  }
+
+  return best?.token ?? null;
 }
 
 export type SigningSession = {

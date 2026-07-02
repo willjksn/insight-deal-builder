@@ -60,10 +60,15 @@ export function SendToClientPanel({
         agreementId,
         signingParty.id
       );
+      const paymentUrl =
+        agreement.agreementType === "client_project" && agreement.paymentTerms.totalFee > 0
+          ? url.replace("/sign/", "/pay/")
+          : null;
       const content = buildClientAgreementSendEmail({
         agreement,
         signingUrl: url,
         expiresAt: formatDate(expiresAt),
+        paymentUrl,
       });
       const ok = await copyToClipboard(`Subject: ${content.subject}\n\n${content.text}`);
       setCopied(ok);
@@ -85,7 +90,8 @@ export function SendToClientPanel({
           <div>
             <h2 className="text-lg font-semibold">Send to client</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Sends the agreement PDF and a secure signing link from notifications@shootspine.com.
+              Sends the agreement PDF, a secure signing link, and a card payment link (when Stripe is
+              configured) from notifications@shootspine.com.
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">

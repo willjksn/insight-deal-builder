@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -21,7 +21,9 @@ import {
   resolvePaymentInstallments,
 } from "@/lib/analytics/paymentTracking";
 import { formatDate } from "@/lib/utils/format";
-import { ArrowDownLeft, ArrowUpRight, Banknote, Check, RotateCcw } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, Check, CreditCard, Loader2, RotateCcw } from "lucide-react";
+import { agreementAcceptsStripePayments } from "@/lib/stripe/eligibility";
+import { createAgreementCheckout, fetchStripeConfig } from "@/lib/stripe/apiClient";
 
 const TRACKABLE_STATUSES = new Set(["signed", "completed", "partially_signed"]);
 
@@ -37,6 +39,8 @@ interface PaymentTrackingSectionProps {
   agreement: Agreement;
   agreementId: string;
   onUpdated?: () => void;
+  /** Client signing token — enables copyable /pay/{token} link for card payments */
+  clientSigningToken?: string | null;
 }
 
 function isReceivable(agreement: Agreement): boolean {
@@ -47,8 +51,13 @@ function formatMoney(amount: number): string {
   return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-export function PaymentTrackingSection({ agreement, agreementId, onUpdated }: PaymentTrackingSectionProps) {
-  const { appUser } = useAuth();
+export function PaymentTrackingSection({
+  agreement,
+  agreementId,
+  onUpdated,
+  clientSigningToken,
+}: PaymentTrackingSectionProps) {
+  const { appUser, user } = useAuth();
   const { update, saving, error: saveError } = useMutations("agreements");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<InstallmentPaymentMode>("add");
@@ -56,6 +65,13 @@ export function PaymentTrackingSection({ agreement, agreementId, onUpdated }: Pa
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [stripeEnabled, setStripeEnabled] = useState(false);
+  const [checkoutBusyId, setCheckoutBusyId] = useState<string | null>(null);
+  const [copiedPayLink, setCopiedPayLink] = useState(false);
+
+  useEffect(() => {
+    void fetchStripeConfig().then((cfg) => setStripeEnabled(cfg.enabled));
+  }, []);
 
   const canRecord = canRecordPayments(appUser);
   const showSection =
@@ -74,6 +90,35 @@ export function PaymentTrackingSection({ agreement, agreementId, onUpdated }: Pa
   const totalDue = agreement.paymentTerms.totalFee;
   const totalPaid = agreementTotalPaid(agreement);
   const outstanding = agreementOutstanding(agreement);
+  const stripeEligible = stripeEnabled && receivable && agreementAcceptsStripePayments(agreement);
+  const clientPayUrl =
+    clientSigningToken && typeof window !== "undefined"
+      ? `${window.location.origin}/pay/${clientSigningToken}`
+      : clientSigningToken
+        ? `/pay/${clientSigningToken}`
+        : null;
+
+  const startStripeCheckout = async (installmentId: string) => {
+    if (!user) return;
+    setCheckoutBusyId(installmentId);
+    setLocalError(null);
+    try {
+      const { url } = await createAgreementCheckout(() => user.getIdToken(), agreementId, installmentId);
+      window.location.href = url;
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "Could not start Stripe checkout");
+      setCheckoutBusyId(null);
+    }
+  };
+
+  const copyClientPayLink = async () => {
+    if (!clientPayUrl) return;
+    const absolute =
+      clientPayUrl.startsWith("http") ? clientPayUrl : `${window.location.origin}${clientPayUrl}`;
+    await navigator.clipboard.writeText(absolute);
+    setCopiedPayLink(true);
+    window.setTimeout(() => setCopiedPayLink(false), 2000);
+  };
 
   const openEditor = (id: string, defaultAmount: number, mode: InstallmentPaymentMode) => {
     setEditingId(id);
@@ -139,6 +184,7 @@ export function PaymentTrackingSection({ agreement, agreementId, onUpdated }: Pa
             <p className="mt-1 text-sm text-slate-500">
               Record cash {receivable ? "received from the client" : "paid to the payee"} against this
               agreement&apos;s payment schedule.
+              {stripeEligible ? " Clients can also pay by card via Stripe." : ""}
             </p>
           </div>
           <div className="flex flex-wrap gap-2 text-sm">
@@ -160,6 +206,15 @@ export function PaymentTrackingSection({ agreement, agreementId, onUpdated }: Pa
             Payment recording is available to accounting staff and admins.
           </p>
         )}
+        {stripeEligible && clientPayUrl && canRecord && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            <span>Client card payment page:</span>
+            <code className="rounded bg-white px-2 py-0.5 text-xs">{clientPayUrl}</code>
+            <Button type="button" size="sm" variant="outline" onClick={() => void copyClientPayLink()}>
+              {copiedPayLink ? "Copied" : "Copy link"}
+            </Button>
+          </div>
+        )}
         {(localError || saveError) && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
             {localError || saveError}
@@ -175,7 +230,7 @@ export function PaymentTrackingSection({ agreement, agreementId, onUpdated }: Pa
                 <th className="px-4 py-3">Paid</th>
                 <th className="px-4 py-3">Outstanding</th>
                 <th className="px-4 py-3">Status</th>
-                {canRecord && <th className="px-4 py-3">Actions</th>}
+                {canRecord || stripeEligible ? <th className="px-4 py-3">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -204,11 +259,32 @@ export function PaymentTrackingSection({ agreement, agreementId, onUpdated }: Pa
                       {row.notes && (
                         <p className="mt-1 text-xs text-slate-500">{row.notes}</p>
                       )}
+                      {row.paymentSource === "stripe" && (
+                        <Badge variant="default" className="mt-1">
+                          Paid via Stripe
+                        </Badge>
+                      )}
                     </td>
-                    {canRecord && (
+                    {(canRecord || stripeEligible) && (
                       <td className="px-4 py-3">
                         {!isEditing ? (
                           <div className="flex flex-wrap gap-2">
+                            {stripeEligible && remaining > 0 && (
+                              <Button
+                                size="sm"
+                                disabled={saving || checkoutBusyId != null}
+                                onClick={() => void startStripeCheckout(row.id)}
+                              >
+                                {checkoutBusyId === row.id ? (
+                                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <CreditCard className="mr-1 h-4 w-4" />
+                                )}
+                                Pay with card
+                              </Button>
+                            )}
+                            {canRecord && (
+                              <>
                             <Button
                               size="sm"
                               variant="outline"
@@ -236,6 +312,8 @@ export function PaymentTrackingSection({ agreement, agreementId, onUpdated }: Pa
                               >
                                 <RotateCcw className="h-4 w-4" />
                               </Button>
+                            )}
+                              </>
                             )}
                           </div>
                         ) : (

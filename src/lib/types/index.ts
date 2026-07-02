@@ -511,6 +511,9 @@ export interface PaymentInstallmentRecord {
   paidAt?: string;
   recordedBy?: string;
   notes?: string;
+  paymentSource?: "manual" | "stripe";
+  stripeCheckoutSessionId?: string;
+  stripePaymentIntentId?: string;
 }
 
 /** Cash received (client), paid out (payee), or partner splits on internal deals */

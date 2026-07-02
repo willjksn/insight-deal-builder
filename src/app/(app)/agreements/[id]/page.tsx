@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -44,12 +44,30 @@ export default function AgreementDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { appUser } = useAuth();
+  const { appUser, user } = useAuth();
   const { data: agreement, loading, refresh } = useDocument<Agreement>("agreements", id);
   const { data: servicePackages } = useServicePackages();
   const { create, update, saving } = useMutations("agreements");
   const [showSendPanel, setShowSendPanel] = useState(false);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
+  const [clientSigningToken, setClientSigningToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user || agreement?.agreementType !== "client_project") return;
+    void (async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/agreements/${id}/client-signing-token`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { token?: string | null };
+        setClientSigningToken(data.token ?? null);
+      } catch {
+        /* optional */
+      }
+    })();
+  }, [id, user, agreement?.agreementType]);
 
   if (loading) return <LoadingSpinner className="py-20" />;
   if (!agreement) {
@@ -207,7 +225,12 @@ export default function AgreementDetailPage() {
       <InternalPayoutBreakdown agreement={agreement} />
 
       <PartyIdentitySection agreement={agreement} agreementId={id} onUpdated={refresh} />
-      <PaymentTrackingSection agreement={agreement} agreementId={id} onUpdated={refresh} />
+      <PaymentTrackingSection
+        agreement={agreement}
+        agreementId={id}
+        onUpdated={refresh}
+        clientSigningToken={clientSigningToken}
+      />
       <PartnerPayoutTrackingSection agreement={agreement} agreementId={id} onUpdated={refresh} />
 
       <Card className="mt-6"><CardBody>
@@ -269,6 +292,8 @@ export default function AgreementDetailPage() {
           onClose={() => setShowSendPanel(false)}
           onSent={(result) => {
             refresh();
+            const tokenMatch = result.signingUrl.match(/\/sign\/([^/?#]+)/);
+            if (tokenMatch?.[1]) setClientSigningToken(tokenMatch[1]);
             setSendNotice(`Agreement sent to ${result.to}. The client can sign from the email link.`);
           }}
         />

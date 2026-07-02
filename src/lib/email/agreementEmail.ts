@@ -100,16 +100,31 @@ export function buildClientAgreementSendEmail(params: {
   signingUrl: string;
   expiresAt: string;
   productionCompany?: string;
+  /** Same signing token — client pays deposit/balance after signing */
+  paymentUrl?: string | null;
 }): { subject: string; html: string; text: string } {
-  const { agreement, signingUrl, expiresAt } = params;
+  const { agreement, signingUrl, expiresAt, paymentUrl } = params;
   const productionCompany = params.productionCompany || "Insight Media Group LLC";
   const subject = getEmailSubject(agreement);
   const intro = getEmailBody(agreement, productionCompany);
 
+  const showPaymentLink =
+    Boolean(paymentUrl) &&
+    agreement.agreementType === "client_project" &&
+    agreement.paymentTerms.totalFee > 0;
+
+  const paymentText = showPaymentLink
+    ? `\n\nAfter you sign, pay your deposit or balance by card here:\n${paymentUrl}`
+    : "";
+
+  const paymentHtml = showPaymentLink
+    ? `<p>After you sign, <strong><a href="${paymentUrl}">pay your deposit or balance by card</a></strong> (secure Stripe checkout).</p>`
+    : "";
+
   const text = `${intro}
 
 Review and sign electronically here (link expires ${expiresAt}):
-${signingUrl}
+${signingUrl}${paymentText}
 
 The agreement PDF is attached for your records.
 
@@ -119,6 +134,7 @@ ${productionCompany}`;
   const html = `
     <p>${intro.replace(/\n/g, "<br/>")}</p>
     <p><strong><a href="${signingUrl}">Review and sign your agreement</a></strong></p>
+    ${paymentHtml}
     <p style="color:#64748b;font-size:13px;">This signing link expires ${expiresAt}. The agreement PDF is attached.</p>
     <p>Thank you,<br/>${productionCompany}</p>
   `;

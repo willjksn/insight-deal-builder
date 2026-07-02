@@ -7,9 +7,10 @@ import { sendClientAgreementEmail } from "@/lib/notifications/delivery";
 import { buildClientAgreementSendEmail } from "@/lib/email/agreementEmail";
 import { getPdfFilename } from "@/lib/agreement/preview";
 import { getAgreementPdfBase64 } from "@/lib/pdf/pdfBase64";
-import { createSigningLink, getSigningLinkUrl, serializeAgreement } from "@/lib/signing/server";
+import { createSigningLink, getClientPaymentUrl, getSigningLinkUrl, serializeAgreement } from "@/lib/signing/server";
 import { getExternalSigningParty } from "@/lib/agreement/payeeParties";
 import { hasPermission } from "@/lib/utils/permissions";
+import { isStripeConfigured } from "@/lib/stripe/config";
 import { AppUser } from "@/lib/types";
 import { formatDate } from "@/lib/utils/format";
 
@@ -61,11 +62,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
     const signingUrl = getSigningLinkUrl(token, appUrl);
     const expiresLabel = formatDate(expiresAt.toISOString());
+    const paymentUrl =
+      isStripeConfigured() &&
+      agreement.agreementType === "client_project" &&
+      agreement.paymentTerms.totalFee > 0
+        ? getClientPaymentUrl(token, appUrl)
+        : null;
 
     const emailContent = buildClientAgreementSendEmail({
       agreement,
       signingUrl,
       expiresAt: expiresLabel,
+      paymentUrl,
     });
 
     const pdfFilename = getPdfFilename(agreement);
@@ -93,6 +101,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       to,
       resendEmailId: emailResult.id,
       signingUrl,
+      paymentUrl,
       expiresAt: expiresAt.toISOString(),
       emailPreview: emailContent.text,
     });

@@ -433,5 +433,10 @@ service cloud.firestore {
     match /signingLinks/{docId} {
       allow read, write: if false;
     }
+
+    // Stripe webhook idempotency — server-only
+    match /stripeWebhookEvents/{eventId} {
+      allow read, write: if false;
+    }
   }
 }

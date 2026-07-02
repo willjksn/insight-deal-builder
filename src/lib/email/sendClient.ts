@@ -4,6 +4,7 @@ export type SendToClientResult = {
   sent: boolean;
   to: string;
   signingUrl: string;
+  paymentUrl?: string | null;
   expiresAt: string;
   emailPreview: string;
   resendEmailId?: string;
