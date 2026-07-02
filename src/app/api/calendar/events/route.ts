@@ -9,11 +9,11 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(request: NextRequest) {
   try {
-    const { uid, appUser, email } = await requireApprovedAuthUser(request);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
     const start = request.nextUrl.searchParams.get("start")?.trim();
     const end = request.nextUrl.searchParams.get("end")?.trim();
 
-    const events = await loadCalendarEventsForUser({ uid, appUser, email });
+    const events = await loadCalendarEventsForUser({ uid, appUser, email: appUser.email });
 
     if (start && end && ISO_DATE.test(start) && ISO_DATE.test(end)) {
       return NextResponse.json({ events: eventsInRange(events, start, end) });

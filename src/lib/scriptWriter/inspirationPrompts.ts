@@ -72,7 +72,10 @@ Output JSON only:
   "references": "string",
   "idealRuntime": "string",
   "genre": "string",
-  "fountain": "string — FULL Fountain screenplay",
+  "elements": [
+    { "type": "scene_heading" | "action" | "character" | "dialogue" | "parenthetical" | "transition" | "shot" | "note", "text": "string" }
+  ],
+  "fountain": "string — FULL Fountain screenplay synced with elements",
   "scenes": [{ "sceneNumber", "heading", "action", "dialogue": [{ "character", "parenthetical?", "line" }] }],
   "characters": [{ "name", "role", "description" }],
   "suggestedShots": [{

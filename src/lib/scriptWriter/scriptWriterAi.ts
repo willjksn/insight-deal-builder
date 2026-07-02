@@ -36,6 +36,8 @@ import {
 } from "@/lib/scriptWriter/types";
 import { formatTrendsForPrompt } from "@/lib/scriptWriter/trendsResearch";
 import { SCRIPT_VIDEO_MODE_LABELS } from "@/lib/scriptWriter/constants";
+import { normalizeScriptDocument } from "@/lib/screenplay/normalize";
+import { createScriptElement } from "@/lib/screenplay/elements";
 
 function toGeminiHistory(messages: ScriptWriterMessage[]) {
   return messages.map((m) => ({
@@ -74,24 +76,34 @@ function parseAnalysis(raw: unknown): ScriptInspirationAnalysis {
 }
 
 function parseScriptDocument(raw: unknown): ScriptDocument {
-  const data = raw as Partial<ScriptDocument>;
-  if (!data.title?.trim() || !data.fountain?.trim()) {
+  const data = raw as Partial<ScriptDocument & { elements?: unknown; tone?: string; estimatedRuntime?: string }>;
+  if (!data.title?.trim()) {
     throw new Error("Script generation returned incomplete data");
   }
-  return {
+
+  const draft: ScriptDocument = {
     title: data.title.trim(),
     logline: data.logline?.trim() ?? "",
-    lookAndFeel: data.lookAndFeel?.trim(),
+    author: data.author?.trim(),
+    draftLabel: data.draftLabel?.trim(),
+    lookAndFeel: data.lookAndFeel?.trim() ?? (typeof data.tone === "string" ? data.tone.trim() : undefined),
     references: data.references?.trim(),
-    idealRuntime: data.idealRuntime?.trim(),
+    idealRuntime: data.idealRuntime?.trim() ?? (typeof data.estimatedRuntime === "string" ? data.estimatedRuntime.trim() : undefined),
     genre: data.genre?.trim(),
-    fountain: data.fountain.trim(),
+    fountain: data.fountain?.trim() ?? "",
+    elements: Array.isArray(data.elements) ? (data.elements as ScriptDocument["elements"]) : undefined,
     scenes: Array.isArray(data.scenes) ? data.scenes : [],
     characters: Array.isArray(data.characters) ? data.characters : [],
     suggestedShots: Array.isArray(data.suggestedShots) ? data.suggestedShots : [],
     storyboardFrames: Array.isArray(data.storyboardFrames) ? data.storyboardFrames : undefined,
     productionPack: data.productionPack,
   };
+
+  const normalized = normalizeScriptDocument(draft);
+  if (!normalized.fountain?.trim() && !normalized.elements?.length) {
+    throw new Error("Script generation returned incomplete data");
+  }
+  return normalized;
 }
 
 function mockChatResponse(brief: ScriptWriterBrief, messages: ScriptWriterMessage[]): ScriptWriterChatResponse {
@@ -132,13 +144,22 @@ FADE OUT.
 
 THE END
 `;
-  return {
+  const elements = [
+    createScriptElement("scene_heading", "INT. LOCATION - DAY", 0),
+    createScriptElement("action", brief.concept || "Our subject enters frame.", 1),
+    createScriptElement("character", "CHARACTER", 2),
+    createScriptElement("parenthetical", "(engaging)", 3),
+    createScriptElement("dialogue", "This is where the story begins.", 4),
+    createScriptElement("transition", "FADE OUT.", 5),
+  ];
+  return normalizeScriptDocument({
     title,
     logline,
     lookAndFeel: resolveMoodLabel(brief),
     idealRuntime: resolveRuntimeLabel(brief),
     genre: brief.contentType.replace("_", " "),
     fountain,
+    elements,
     scenes: [
       {
         sceneNumber: "1",
@@ -209,7 +230,7 @@ THE END
           } satisfies ScriptStoryboardFrame,
         ]
       : undefined,
-  };
+  });
 }
 
 function mockAnalysis(

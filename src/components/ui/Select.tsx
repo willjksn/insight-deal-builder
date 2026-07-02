@@ -5,13 +5,14 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   options: { value: string; label: string; disabled?: boolean }[];
   touch?: boolean;
+  wrapperClassName?: string;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, options, touch, id, ...props }, ref) => {
+  ({ className, label, options, touch, wrapperClassName, id, ...props }, ref) => {
     const selectId = id || label?.toLowerCase().replace(/\s+/g, "-");
     return (
-      <div className="w-full">
+      <div className={cn("w-full", wrapperClassName)}>
         {label && (
           <label
             htmlFor={selectId}

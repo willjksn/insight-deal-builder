@@ -1,5 +1,6 @@
 import { Timestamp } from "firebase/firestore";
 import { ScriptWriterBrief, ScriptContentType } from "@/lib/scriptWriter/brief";
+import { ScriptElement } from "@/lib/screenplay/types";
 
 export type ScriptWriterSessionStatus =
   | "interviewing"
@@ -145,11 +146,17 @@ export interface ScriptProductionPack {
 export interface ScriptDocument {
   title: string;
   logline: string;
+  author?: string;
+  draftLabel?: string;
   lookAndFeel?: string;
   references?: string;
   idealRuntime?: string;
   genre?: string;
+  /** Legacy Fountain string — kept in sync with structured elements. */
   fountain: string;
+  /** Industry-standard screenplay blocks for edit, preview, and export. */
+  elements?: ScriptElement[];
+  showPageOneNumber?: boolean;
   scenes: ScriptScene[];
   characters: ScriptCharacter[];
   suggestedShots: ScriptSuggestedShot[];

@@ -1,6 +1,6 @@
 import { FieldValue, Firestore } from "firebase-admin/firestore";
 import { stripUndefined } from "@/lib/firebase/firestore";
-import { DEFAULT_REFERENCE_GUIDE } from "@/lib/reference/defaultGuide";
+import { DEFAULT_REFERENCE_GUIDE, mergeReferenceSections } from "@/lib/reference/defaultGuide";
 import {
   REFERENCE_GUIDE_COLLECTION,
   REFERENCE_GUIDE_DOC_ID,
@@ -19,11 +19,11 @@ export async function getPublishedReferenceGuide(db: Firestore): Promise<Referen
   if (!data.published?.sections?.length) {
     return DEFAULT_REFERENCE_GUIDE;
   }
-  return {
+  return mergeReferenceSections(DEFAULT_REFERENCE_GUIDE, {
     ...DEFAULT_REFERENCE_GUIDE,
     ...data.published,
     sections: data.published.sections,
-  };
+  });
 }
 
 export async function getReferenceGuideAdminState(db: Firestore) {

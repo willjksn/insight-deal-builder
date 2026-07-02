@@ -301,7 +301,7 @@ export default function AgreementDetailPage() {
           onSent={(result) => {
             refresh();
             const tokenMatch = result.signingUrl.match(/\/sign\/([^/?#]+)/);
-            if (tokenMatch?.[1]) setClientSigningToken(tokenMatch[1]);
+            if (tokenMatch?.[1]) setPaymentSigningToken(tokenMatch[1]);
             setSendNotice(`Agreement sent to ${result.to}. The client can sign from the email link.`);
           }}
         />

@@ -45,7 +45,7 @@ export default function ReferenceGuidePage() {
     <div className="pb-24">
       <PageHeader
         title="Reference guide"
-        subtitle="Lighting ratios, IRE, Sony FX6/FX3/FX30/a7IV, lenses — iPad-friendly on-set reference."
+        subtitle="Lighting, cameras, lenses, scripts & writing, and on-set workflow — iPad-friendly reference for ShootSpine crews."
       />
       {error && (
         <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">

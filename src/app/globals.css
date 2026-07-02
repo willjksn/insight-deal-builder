@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -88,4 +89,120 @@ button {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+.screenplay-workspace {
+  font-family: "Courier Prime", "Courier New", Courier, monospace;
+}
+
+.screenplay-page {
+  width: 8.5in;
+  min-height: 11in;
+  padding-top: 1in;
+  padding-bottom: 1in;
+  padding-left: 1.5in;
+  padding-right: 1in;
+  background: white;
+  color: black;
+  font-family: "Courier Prime", "Courier New", Courier, monospace;
+  font-size: 12pt;
+  line-height: 1;
+  letter-spacing: 0;
+  box-sizing: border-box;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+.script-element {
+  white-space: pre-wrap;
+  margin-bottom: 12pt;
+}
+
+.script-scene-heading {
+  text-transform: uppercase;
+  text-align: left;
+  margin-top: 12pt;
+  margin-bottom: 12pt;
+}
+
+.script-action {
+  text-align: left;
+  margin-bottom: 12pt;
+}
+
+.script-character {
+  text-transform: uppercase;
+  margin-left: 1in;
+  width: 3.5in;
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.script-dialogue {
+  margin-left: 1in;
+  width: 3.5in;
+  text-align: left;
+  margin-bottom: 12pt;
+}
+
+.script-parenthetical {
+  margin-left: 1.6in;
+  width: 2in;
+  text-align: left;
+  margin-bottom: 0;
+}
+
+.script-transition {
+  text-transform: uppercase;
+  text-align: right;
+  margin-bottom: 12pt;
+}
+
+.script-shot {
+  text-transform: uppercase;
+  text-align: left;
+  margin-bottom: 12pt;
+}
+
+.script-note {
+  color: #64748b;
+  font-style: italic;
+  border-left: 2px solid #cbd5e1;
+  padding-left: 0.5rem;
+  margin-bottom: 12pt;
+}
+
+.page-number {
+  position: absolute;
+  top: 0.5in;
+  right: 1in;
+  font-family: "Courier Prime", "Courier New", Courier, monospace;
+  font-size: 12pt;
+}
+
+.screenplay-editor-block textarea {
+  width: 100%;
+  resize: none;
+  overflow: hidden;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12pt;
+  line-height: 1.35;
+  color: inherit;
+  padding: 0.125rem 0;
+}
+
+.screenplay-editor-block:focus-within {
+  outline: 2px solid rgba(14, 165, 233, 0.35);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media print {
+  .screenplay-page {
+    box-shadow: none;
+    page-break-after: always;
+  }
 }

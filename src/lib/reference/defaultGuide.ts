@@ -3,9 +3,9 @@ import { ReferenceGuideDocument } from "@/lib/reference/types";
 /** Baseline on-set reference — seeded from Master Filmmaking Reference Guide + FX6 + lens expansion. */
 export const DEFAULT_REFERENCE_GUIDE: ReferenceGuideDocument = {
   version: 1,
-  title: "Master Filmmaking Reference Guide",
+  title: "ShootSpine production reference",
   subtitle:
-    "Lighting ratios · IRE · LIT DUO · Sony FX6 / FX3 / FX30 / a7IV · Lenses · On-set workflow",
+    "Lighting, cameras, lenses, scripts & writing, and on-set workflow — iPad-friendly reference for ShootSpine crews.",
   sections: [
     {
       id: "how-to-use",
@@ -517,6 +517,735 @@ Camera settings do not create the look by themselves. Lighting ratio, white bala
         },
       ],
     },
+    {
+      id: "screenplay-overview",
+      category: "screenplay",
+      title: "Why screenplay format matters",
+      summary: "Format is a shared language for story and production — not decoration.",
+      body: `A screenplay is not a novel or essay. It is an instruction document for making a motion picture. Your text must read consistently for producers, directors, editors, cinematographers, and actors.
+
+Format serves two goals at once:
+• Storytelling — pace, tone, and emotion on the page
+• Logistics — scheduling, budgeting, locations, and department handoffs
+
+Industry conventions — spacing, caps, indentation, and element types — communicate time, place, and emphasis efficiently. They are not arbitrary; they keep hundreds of collaborators aligned.
+
+The production document
+Every department reads structure differently. ADs build schedules from slug lines. Art identifies locations from headings. Editors estimate pacing from page count. Bad format creates misreads: indoor vs outdoor, continuous vs time jump, off-screen vs voiceover.
+
+The reader’s perspective
+Development readers scan hundreds of scripts. Misaligned dialogue, lowercase slug lines, and random transitions signal inexperience. Professional format disappears — the reader focuses on story.
+
+Format and rhythm
+White space controls tempo. Short action blocks feel like quick cuts. Long blocks slow the read. Treat the page like a score: layout tells others how to perform the story.
+
+The page-minute rule
+Rough guide: one formatted page ≈ one minute of screen time. A 100-page script targets ~100 minutes. ShootSpine Preview and PDF export follow this spacing model.`,
+      tables: [
+        {
+          headers: ["Element", "Left", "Right", "Font", "Spacing"],
+          rows: [
+            ["Action", "1.5\"", "1.0\"", "Courier 12 pt", "Single"],
+            ["Dialogue", "2.5\"", "2.0\"", "Courier 12 pt", "Single"],
+            ["Parenthetical", "3.1\"", "2.5\"", "Courier 12 pt", "Single"],
+            ["Transition", "5.5\"", "1.0\"", "Courier 12 pt", "Single"],
+          ],
+        },
+        {
+          headers: ["Page setup", "Value"],
+          rows: [
+            ["Paper", "US Letter 8.5 × 11 in"],
+            ["Top / bottom margin", "1.0 in"],
+            ["Lines per page (approx.)", "~55 including blank lines"],
+            ["Page numbers", "Top-right from page 2"],
+          ],
+        },
+      ],
+      tips: [
+        "Courier (or Courier Prime) stays standard because monospaced characters keep timing predictable",
+        "ShootSpine Script Writer uses structured elements — preview before export",
+      ],
+    },
+    {
+      id: "screenplay-page-anatomy",
+      category: "screenplay",
+      title: "Anatomy of a screenplay page",
+      summary: "How elements stack so the eye knows where it is in a scene.",
+      body: `Core components on every page:
+
+1. Scene heading (slug line) — where and when
+2. Action lines — visible and audible events, present tense
+3. Character cue — who speaks
+4. Parenthetical — brief delivery note (optional)
+5. Dialogue — spoken lines
+6. Transition — editorial scene change (use sparingly)
+
+Visual hierarchy:
+• Scene headings — ALL CAPS, flush left
+• Action — flush left, full width between margins
+• Character — centered over the dialogue column
+• Dialogue — narrow column under the character
+• Transitions — ALL CAPS, flush right
+
+White space and eye flow
+A professional page breathes. Alternate short and long action blocks. Scatter dialogue. Avoid unbroken walls of text — the script should feel like it moves.
+
+Common technical errors:
+• Wrong font (use Courier 12 pt only)
+• Justified text (left-align only)
+• Slug line buried mid-paragraph (always its own line)
+• Lowercase slug lines, character names, or transitions
+• Widows/orphans — lone words stranded at page breaks
+
+Professional consistency
+Even spacing between dialogue blocks, uniform indentation, and stable slug naming signal competence before anyone reads a single line of story.`,
+      tips: [
+        "Print one page and view it from arm’s length — it should resemble a produced script",
+        "Script Writer Preview shows the same hierarchy as PDF export",
+      ],
+    },
+    {
+      id: "screenplay-elements",
+      category: "screenplay",
+      title: "Element types at a glance",
+      summary: "What each block means and when to use it.",
+      tables: [
+        {
+          headers: ["Element", "Purpose", "Format"],
+          rows: [
+            ["Scene heading", "Location and time", "ALL CAPS — INT./EXT. PLACE - TIME"],
+            ["Action", "What we see and hear", "Present tense, visual, left-aligned"],
+            ["Character", "Speaker", "ALL CAPS, centered over dialogue"],
+            ["Parenthetical", "Brief acting direction", "Lowercase in (parentheses)"],
+            ["Dialogue", "Spoken lines", "Narrow column — no quotation marks"],
+            ["Transition", "Scene change", "ALL CAPS, right-aligned"],
+            ["Shot", "Key visual beat", "ALL CAPS — CLOSE ON:, INSERT:, POV:"],
+            ["Note", "Production note", "Hidden from export unless enabled"],
+          ],
+        },
+        {
+          headers: ["Element", "Left margin", "Right margin", "Notes"],
+          rows: [
+            ["Scene heading", "1.5\"", "1.0\"", "ALL CAPS, flush left"],
+            ["Action", "1.5\"", "1.0\"", "Single-spaced"],
+            ["Character cue", "Centered", "—", "Over dialogue column (~3.7\" from left)"],
+            ["Dialogue", "2.5\"", "2.0\"", "Indented block"],
+            ["Parenthetical", "3.1\"", "2.5\"", "Optional, brief"],
+            ["Transition", "5.5\"", "1.0\"", "Flush right"],
+          ],
+        },
+      ],
+      body: "In Script Writer Edit mode, pick the element type from the dropdown or use Tab / Cmd+Ctrl+1–7 shortcuts.",
+    },
+    {
+      id: "screenplay-scene-headings",
+      category: "screenplay",
+      title: "Scene headings and locations",
+      summary: "Slug lines tell the crew where to be and when to light.",
+      body: `Standard slug format:
+
+INT./EXT. LOCATION - TIME
+
+Examples (ShootSpine sample locations):
+INT. WAREHOUSE STUDIO - DAY
+EXT. LOADING DOCK - NIGHT
+INT./EXT. PRODUCTION VAN - MOVING - DAY
+
+Interior / exterior cues:
+• INT. — interior
+• EXT. — exterior
+• INT./EXT. — action crosses inside and outside (car, doorway, porch)
+
+Time of day — use one standard label:
+DAY · NIGHT · DAWN · DUSK · LATER · CONTINUOUS · SAME
+
+Avoid clock labels like AFTERNOON or MID-MORNING. Crews schedule by daylight buckets, not exact hours.
+
+Secondary headings (mini-slugs)
+Within one location, mark small moves without a full slug:
+
+AT THE MONITOR - Marcus checks exposure.
+BACK TO SET - Elena resets tape marks.
+
+Each new slug line means a location or time change. Too many fragment flow; too few confuse the reader.
+
+Flashbacks and dream sequences
+
+FLASHBACK
+INT. CLASSROOM - DAY
+...
+END FLASHBACK
+
+Or: FLASHBACK - INT. CLASSROOM - DAY
+
+DREAM SEQUENCE - EXT. COASTLINE - NIGHT
+...
+END DREAM SEQUENCE
+
+Continuity
+Name locations consistently. If scene one is EXT. BEACON WAREHOUSE - DAY, do not later call the same place EXT. PARKING LOT without reason.
+
+Production scene numbers
+Spec scripts omit scene numbers. Production drafts add sequential numbers in the margin — writers leave numbering to production.`,
+      tips: [
+        "Checklist: ALL CAPS slugs · logical time words · consistent place names · hyphens only (no extra punctuation)",
+        "Lines starting with INT., EXT., or EST. auto-detect as scene headings in Script Writer",
+      ],
+    },
+    {
+      id: "screenplay-action",
+      category: "screenplay",
+      title: "Action and scene description",
+      summary: "Show what the camera can see and the audience can hear — nothing else.",
+      body: `Action lines are the narrative backbone. They are not prose fiction: no internal thoughts, backstory dumps, or abstract commentary unless spoken or shown.
+
+Four principles of visual writing:
+1. Show, don’t tell — not “She feels betrayed,” but “Her jaw tightens; she looks away.”
+2. Present tense — “He walks,” not “He was walking.”
+3. Economy — every sentence earns its place
+4. Clarity before poetry — vivid but precise
+
+Mechanics
+Keep blocks to one–five lines. Each block = one visual moment or shift.
+
+INT. HOTEL ROOM - NIGHT
+
+Curtains billow from an open balcony door. A half-empty water glass sweats on the table.
+
+NORA lies awake, staring at the ceiling fan.
+
+Pacing through paragraphs
+Paragraph breaks act like edits.
+
+Fast:
+DEV bolts for the loading dock. The door slams. Silence.
+
+Slow:
+DEV pauses at the door, hand on the knob. He listens. Nothing. Then he turns it.
+
+Avoid camera directions in spec scripts
+Terms like “close-up,” “pan,” and “angle on” belong in shooting scripts. Imply the shot through pacing instead.
+
+Instead of: CLOSE ON THE CLOCK as it strikes midnight.
+Write: The clock strikes midnight.
+
+Visual emphasis
+Isolate a line for impact — sparingly:
+
+The slate clacks shut.
+
+Sound in action
+Minor effects in CAPS inside action:
+
+The WALKIE CRACKLES — sharp, insistent.
+
+Montages
+Single-location:
+
+MONTAGE - REESE PREPS GEAR
+- Reese checks batteries
+- Reese labels cards
+- Reese tests lav mics
+END MONTAGE
+
+Multi-location:
+
+MONTAGE - CITY WAKES FOR SHOOT DAY
+EXT. STUDIO LOT - DAWN - Trucks roll in.
+INT. CRAFT SERVICES - Coffee brews.
+EXT. LOADING DOCK - Crew unloads cases.
+END MONTAGE
+
+Alternate labels: SERIES OF SHOTS or SEQUENCE when appropriate.
+
+Voice consistency
+Keep a neutral but evocative tone throughout. Do not swing between literary flourish and telegraphic fragments page to page.`,
+      tips: [
+        "Press Enter after a scene heading → new action block in Script Writer",
+        "Action tightening exercise: cut interior monologue — replace with a gesture or prop beat",
+      ],
+    },
+    {
+      id: "screenplay-characters-dialogue",
+      category: "screenplay",
+      title: "Characters and dialogue",
+      summary: "Names, speech, extensions, and rhythm on the page.",
+      body: `Introducing characters
+First appearance: name in ALL CAPS plus a short active description.
+
+REESE, early 30s, sound mixer, methodical, swaps a dead battery without looking up.
+
+Two lines max. Save biography for story, not the intro block.
+
+Name consistency
+Spell names identically every time. Similar names (Sam / Simon) confuse readers — rename one.
+
+Dialogue layout
+Character centered over a narrow dialogue column (~2.5\" left, ~2.0\" right). Standard capitalization — not ALL CAPS in dialogue itself.
+
+                    NORA
+    I said I'd call, didn't I?
+
+Parentheticals
+Optional cue under the character name, before dialogue:
+
+                    NORA
+        (quietly)
+    I said I'd call, didn't I?
+
+Use sparingly — overuse suggests you do not trust the actor or director.
+
+Extensions
+Clarify off-screen, voiceover, or continued speech:
+
+MARCUS (V.O.)
+Never thought I'd say this on a corporate shoot.
+
+ELENA (O.S.)
+Say what?
+
+MARCUS (CONT'D)
+That I missed the quiet days.
+
+O.S. vs V.O.
+• O.S. — speaker is in the scene but not on screen (another room, behind camera)
+• V.O. — narration or voice not physically present (memory, phone message, omniscient narrator)
+
+Subtext and brevity
+Cut filler: “Well,” “You know,” “I mean.” One parenthetical when tone shifts — not after every line.
+
+Dual dialogue (simultaneous speech):
+
+PRIYA          SAM
+Don't!           You first!
+
+Interruption — em dash:
+
+DEV
+I just think we should—
+
+NORA
+Don't start again.
+
+Dialogue rhythm
+Most speeches under four lines. Heavy dialogue blocks slow the read. White space = pace.
+
+Reappearance after many pages
+Subtle re-intro:
+
+REESE, the mixer from the warehouse shoot, now wears a studio lanyard.
+
+Accent and dialect
+Note accent once in description. Do not phonetic-spell dialect — write natural cadence instead.`,
+      tables: [
+        {
+          headers: ["Extension", "Meaning", "Example use"],
+          rows: [
+            ["(V.O.)", "Voiceover / non-present voice", "Narration, phone message"],
+            ["(O.S.)", "Off-screen in scene", "Character in next room"],
+            ["(CONT'D)", "Same speaker after action", "Dialogue resumes after beat"],
+          ],
+        },
+      ],
+      tips: [
+        "Exercise: write one line per character expressing the same idea — voices should sound distinct",
+        "Cmd/Ctrl+3 character · Cmd/Ctrl+4 dialogue · Cmd/Ctrl+5 parenthetical in Script Writer",
+      ],
+    },
+    {
+      id: "screenplay-transitions-flow",
+      category: "screenplay",
+      title: "Transitions and scene flow",
+      summary: "Editorial cues — use when the cut itself carries meaning.",
+      body: `Transitions are production/editorial instructions. In modern spec scripts they are sparse — white space between scenes often implies CUT TO:.
+
+Placement: ALL CAPS, flush right.
+
+                                                        CUT TO:
+
+Common transitions:
+
+                                                        DISSOLVE TO:
+                                                        SMASH CUT TO:
+                                                        MATCH CUT TO:
+                                                        FADE IN:
+                                                        FADE OUT.
+                                                        FADE TO BLACK.
+
+When to use:
+• Major act breaks or tone shifts
+• Deliberate time passage (dissolve)
+• Shock contrast (smash cut)
+• Opening (FADE IN:) and closing (FADE OUT.)
+
+FADE IN: typically top-left on page one. FADE OUT. ends the script.
+
+Time jumps without a full slug:
+
+LATER
+
+Nora stares at the same monitor. The coffee is cold.
+
+Rhythm without transitions
+Skilled writers cut with slug cadence alone:
+
+INT. WAREHOUSE STUDIO - DAY
+
+Elena opens a equipment case.
+
+EXT. LOADING DOCK - DAY
+
+Marcus checks lens cases alone.
+
+No CUT TO: required — the reader feels the edit.
+
+Scene endings
+End on an image, sound, or question that pulls the next scene forward.
+
+Wrong vs right:
+❌ CUT TO: after every scene — redundant noise
+✅ Transitions only when rhythm or impact needs a label`,
+      tables: [
+        {
+          headers: ["Transition", "Typical purpose"],
+          rows: [
+            ["CUT TO:", "Standard scene change"],
+            ["DISSOLVE TO:", "Time passage or soft link"],
+            ["SMASH CUT TO:", "Abrupt contrast or shock"],
+            ["MATCH CUT TO:", "Visual echo between scenes"],
+            ["FADE IN: / FADE OUT.", "Open and close the script"],
+            ["FADE TO BLACK.", "Emotional closure"],
+          ],
+        },
+      ],
+      tips: [
+        "Press Enter after a transition → new scene heading in Script Writer",
+        "Think like an editor: what image connects these two moments?",
+      ],
+    },
+    {
+      id: "screenplay-shots",
+      category: "screenplay",
+      title: "Shots and visual beats",
+      summary: "Optional emphasis lines — use when the visual is story-critical.",
+      body: `Shot lines mark important visual moments. ALL CAPS, left-aligned (ShootSpine supports these as a distinct element):
+
+CLOSE ON: Clapperboard slate
+INSERT - RECORDER LEVEL METERS
+POV: Through camera monitor
+ANGLE ON: Tape mark on floor
+WIDE SHOT: Empty warehouse set
+
+In spec scripts, prefer strong action over camera vocabulary. Use shot elements when the exact visual is essential to story or production handoff — product insert, evidence detail, POV gag.
+
+Lines starting with CLOSE ON:, INSERT, POV:, or ANGLE ON: auto-detect as shots in Script Writer.`,
+      tips: [
+        "Generated scripts can map suggested shots to shot lists and storyboards in ShootSpine",
+        "Cmd/Ctrl+7 inserts a shot element",
+      ],
+    },
+    {
+      id: "screenplay-television",
+      category: "screenplay",
+      title: "Television and streaming format",
+      summary: "Act structure, teasers, tags, and multi-cam differences.",
+      body: `Television divides story into acts — commercial breaks or streaming beats with the same rhythm.
+
+Common script types:
+
+Half-hour single-cam — film-style, one column, ~28–35 pages
+Half-hour multi-cam — stage-style, double-spaced dialogue, ~45–52 pages
+One-hour drama — numbered acts, ~52–60 pages
+Limited / streaming — hybrid; flexible page count
+
+TV-specific elements:
+• Teaser / cold open — hook before titles
+• Acts — usually four to six labeled blocks
+• Tag — closing beat after the final act
+
+Act formatting — centered, caps, often new page per act:
+
+ACT ONE
+
+INT. PRECINCT - NIGHT
+...
+
+END OF ACT ONE
+
+Multi-cam note: action may appear as stage directions above dialogue, caps, double-spaced speeches. Example:
+
+INT. LIVING ROOM - DAY
+
+(PRIYA ENTERS WITH GEAR CASES)
+
+PRIYA
+Did anyone charge the wireless kit?
+
+Scene numbers appear in production drafts only — omit in specs.
+
+Streaming platforms dropped fixed ad breaks, but act rhythm remains: aim for a strong turn every 10–15 pages even when acts are unlabeled.`,
+      tables: [
+        {
+          headers: ["Medium", "Approx. pages", "Runtime", "Notes"],
+          rows: [
+            ["Feature film", "90–120", "90–120 min", "Standard feature"],
+            ["Half-hour TV", "28–35", "22–25 min", "Single-cam"],
+            ["Hour drama", "52–60", "44–48 min", "Five-act common"],
+            ["Short film", "1–40", "1–40 min", "Flexible"],
+            ["Web series", "5–20", "5–20 min", "Hybrid format"],
+          ],
+        },
+      ],
+      tips: [
+        "Checklist: acts labeled · slugs consistent · teaser/tag purposeful · no scene numbers in spec drafts",
+      ],
+    },
+    {
+      id: "screenplay-polish",
+      category: "screenplay",
+      title: "Polish, title page, and submission",
+      summary: "Presentation signals professionalism before page one of story.",
+      body: `Title page — centered, Courier 12 pt:
+
+BEACON AUDIO LAUNCH
+by
+Your Name
+email · phone (optional)
+
+No page number, header, or watermark on the title page.
+
+Proofing pass:
+1. Grammar and punctuation
+2. Read aloud for rhythm
+3. Spacing and indentation
+4. Consistent character names and slug lines
+
+Page numbers start on page 2, upper-right. No running header required.
+
+Revision colors (production only): blue, pink, yellow, green, etc. Spec submissions use white pages only.
+
+PDF submission:
+• PDF only · Courier embedded · under ~2 MB when possible
+• Filename: Title_Author_Year.pdf
+• No passwords or tracking links
+
+Email etiquette — brief and respectful:
+
+Attached is my screenplay [Title] for your consideration. Thank you for your time.
+
+Register copyright with your national office; WGA registration adds a dated record where applicable.
+
+Before sending, export from Script Writer Preview and open on phone or tablet — layout should hold without horizontal scroll.`,
+      tips: [
+        "Common mistakes: mixed fonts · lowercase slugs · camera directions · long unbroken action · overused ellipses",
+        "Presentation builds trust in the first three seconds of reading",
+      ],
+    },
+    {
+      id: "screenplay-workflow",
+      category: "screenplay",
+      title: "Modern writing workflow",
+      summary: "Tools, versions, collaboration, and ShootSpine Script Writer.",
+      body: `Industry tools: Final Draft (FDX), Fade In, WriterDuet, Highland (Fountain). Each preserves standard margins on export.
+
+File hygiene:
+
+/Projects
+  /BeaconAudioLaunch
+    Draft_01
+    Draft_02
+    Notes
+
+Date-stamp exports: Title_v06_2026-06-30.pdf
+
+Collaboration: track notes in comments or side documents — not inline in the script body. Label drafts by purpose: v03_submission, v04_network_notes.
+
+ShootSpine Script Writer:
+• Structured elements with live preview and PDF export
+• AI draft → editable blocks → production handoff
+• Scene headings feed locations; characters feed cast; action feeds props and shot suggestions
+
+Script security: share only with trusted contacts or under NDA. Do not post unreleased scripts on public forums.
+
+AI assistance: use for proofing, layout checks, and outline expansion — creative authorship stays human. Review every generated line before client or studio delivery.
+
+When notes arrive, separate craft issues from taste. If multiple readers flag the same problem, fix it; otherwise protect your voice.`,
+      tips: [
+        "Workflow checklist: recognized export · version control · clean PDF · IP protected · notes handled professionally",
+        "Tab cycles element types · Shift+Tab cycles backward in the editor",
+      ],
+    },
+    {
+      id: "screenplay-glossary-checklists",
+      category: "screenplay",
+      title: "Glossary, mistakes, and checklists",
+      summary: "Quick reference for terms, fixes, and pre-export QA.",
+      tables: [
+        {
+          headers: ["Term", "Definition"],
+          rows: [
+            ["ACT", "Major story division, especially in TV"],
+            ["ACTION", "Present-tense description of visible events"],
+            ["BEAT", "Smallest rhythm unit — pause or shift"],
+            ["COLD OPEN", "Scene before title sequence"],
+            ["CONT'D", "Same character continues after interruption"],
+            ["CUT TO:", "Standard scene-change transition"],
+            ["DUAL DIALOGUE", "Two speakers simultaneous, side by side"],
+            ["FADE IN: / FADE OUT.", "Script open and close"],
+            ["FLASHBACK", "Scene in an earlier time"],
+            ["INTERCUT", "Alternating between simultaneous locations"],
+            ["MONTAGE", "Compressed series of related shots"],
+            ["O.S.", "Off-screen dialogue"],
+            ["PARENTHETICAL", "Brief delivery note under character"],
+            ["SPEC SCRIPT", "Uncommissioned script written on spec"],
+            ["SUPER:", "On-screen text (title cards, locations)"],
+            ["V.O.", "Voiceover"],
+          ],
+        },
+        {
+          headers: ["Mistake", "Why it hurts", "Fix"],
+          rows: [
+            ["Over-describing action", "Slows pace", "Filmable visuals only"],
+            ["Long dialogue blocks", "Feels stagey", "Trim or break into beats"],
+            ["Bad slug lines", "Location confusion", "INT./EXT. + PLACE + TIME"],
+            ["Transition spam", "Distracting", "Omit unless necessary"],
+            ["Non-Courier font", "Timing skew", "Courier 12 pt throughout"],
+            ["Camera directions", "Director’s domain", "Imply through action"],
+            ["Passive voice", "Weak read", "Present active verbs"],
+          ],
+        },
+        {
+          headers: ["Formatting checklist", "Pre-submission checklist"],
+          rows: [
+            ["☑ Courier 12 pt", "☑ Spelling and grammar"],
+            ["☑ 1.5\" / 1\" margins", "☑ Consistent names and slugs"],
+            ["☑ Slugs ALL CAPS", "☑ Logical scene order"],
+            ["☑ Dialogue centered column", "☑ Clean title page"],
+            ["☑ Transitions flush right", "☑ Page numbers from page 2"],
+            ["☑ Brief parentheticals", "☑ PDF under ~2 MB"],
+            ["☑ No camera directions", "☑ Polite cover email"],
+          ],
+        },
+      ],
+      body: `Evolving standards: streaming blurs film and TV — stay format-bilingual. Stylization (bold SUPER text, stacked staccato lines) is fine when readability stays intact.
+
+Global notes: UK BBC scripts sometimes use underlined slugs and scene numbers; US layout is the ShootSpine default. Fountain and Markdown-based open formats remain useful for version control.
+
+Read one produced script weekly — spacing and dialogue density vary by genre. Format is discipline and respect for collaborators, not a substitute for story.`,
+      tips: [
+        "Self-check: purpose of Courier? ~55 lines per page? O.S. vs V.O.? When to transition?",
+        "Strong story with weak format gets rejected; weak story with perfect format still fails — aim for both",
+      ],
+    },
+    {
+      id: "screenplay-examples",
+      category: "screenplay",
+      title: "Additional sample pages",
+      summary: "Feature opening, TV act break, and montage — original ShootSpine examples.",
+      body: `Feature opening:
+
+FADE IN:
+
+EXT. STUDIO LOT - DAY
+
+Heat shimmers off asphalt. A production van idles. MARCUS steps out, call sheet in hand.
+
+                    MARCUS
+    Not today.
+
+He crosses toward the warehouse — five missed calls from "NORA" on his phone. He silences it.
+
+                                                        CUT TO:
+
+Television act break:
+
+ACT TWO
+
+INT. PRECINCT - NIGHT
+
+Detectives argue over a whiteboard. Red string crosses photos.
+
+                    CAPTAIN
+    We're out of time.
+
+                    DETECTIVE
+    Then we change the rules.
+
+END OF ACT TWO
+
+Montage:
+
+MONTAGE - CREW PREP FOR SHOOT DAY
+- Elena marks floor tape
+- Marcus white-balances under LED panels
+- Reese routes lav cables
+- The director nods once — enough
+END MONTAGE`,
+      tips: [
+        "All sample names and locations are original ShootSpine reference copy",
+        "Copy structure, not these story beats, into your own projects",
+      ],
+    },
+    {
+      id: "screenplay-example",
+      category: "screenplay",
+      title: "ShootSpine sample page",
+      summary: "Original example showing how a formatted page should look in Script Writer.",
+      body: `FADE IN:
+
+INT. WAREHOUSE STUDIO - DAY
+
+Haze catches the morning light. A small crew builds a simple interview set.
+
+ELENA, 40s, producer, lays tape on the floor. MARCUS, 30s, DP, checks framing on a monitor.
+
+                    ELENA
+    Talk me through the first setup.
+
+                    MARCUS
+        (into coms)
+    Mark is set. Give me ten seconds for focus.
+
+INSERT - CLAPPERBOARD: BEACON AUDIO / SCENE 3
+
+                    ELENA
+    Rolling.
+
+                                                        CUT TO:`,
+      tips: [
+        "Sample scene is original ShootSpine reference copy — use your own project names in real scripts",
+        "This layout is what Script Writer Preview and PDF export target",
+      ],
+    },
+    {
+      id: "screenplay-script-writer",
+      category: "screenplay",
+      title: "Script Writer shortcuts",
+      summary: "Keyboard flow in the ShootSpine screenplay editor.",
+      tables: [
+        {
+          headers: ["From", "Enter creates", "Shortcut"],
+          rows: [
+            ["Scene heading", "Action", "Cmd/Ctrl+1"],
+            ["Action", "Action", "Cmd/Ctrl+2"],
+            ["Character", "Dialogue", "Cmd/Ctrl+3"],
+            ["Dialogue", "Action", "Cmd/Ctrl+4"],
+            ["Parenthetical", "Dialogue", "Cmd/Ctrl+5"],
+            ["Transition", "Scene heading", "Cmd/Ctrl+6"],
+            ["Shot", "Action", "Cmd/Ctrl+7"],
+          ],
+        },
+      ],
+      body: `Tab cycles element type forward · Shift+Tab cycles backward.
+
+Generated scripts feed production: scene headings → locations, characters → cast, action → props, suggested shots → shot list and storyboard.
+
+Practice exercises (on your own draft):
+• Action tightening — replace internal thought with a gesture (two lines max)
+• Dialogue compression — cut filler from a speech
+• Slug practice — three headings for one location at different times
+• Rhythm — break a monologue with line breaks and watch page pace change`,
+    },
   ],
 };
 
@@ -524,13 +1253,25 @@ export function mergeReferenceSections(
   base: ReferenceGuideDocument,
   overrides: ReferenceGuideDocument
 ): ReferenceGuideDocument {
-  const byId = new Map(base.sections.map((s) => [s.id, s]));
-  for (const section of overrides.sections) {
-    byId.set(section.id, section);
+  const overrideById = new Map(overrides.sections.map((s) => [s.id, s]));
+  const sections: ReferenceGuideDocument["sections"] = [];
+
+  for (const section of base.sections) {
+    sections.push(overrideById.get(section.id) ?? section);
+    overrideById.delete(section.id);
   }
+
+  for (const section of overrides.sections) {
+    if (overrideById.has(section.id)) {
+      sections.push(section);
+    }
+  }
+
   return {
     ...base,
     ...overrides,
-    sections: Array.from(byId.values()),
+    title: overrides.title?.trim() || base.title,
+    subtitle: base.subtitle,
+    sections,
   };
 }

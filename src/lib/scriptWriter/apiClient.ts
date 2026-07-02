@@ -116,6 +116,17 @@ export async function scriptWriterListSessions(getToken: () => Promise<string | 
   return parseJson<{ sessions: unknown[] }>(res);
 }
 
+export async function scriptWriterDeleteSession(
+  getToken: () => Promise<string | null>,
+  sessionId: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: true }>(res);
+}
+
 export async function scriptWriterSendMessage(
   getToken: () => Promise<string | null>,
   sessionId: string,

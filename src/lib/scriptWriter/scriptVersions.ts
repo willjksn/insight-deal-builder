@@ -2,6 +2,7 @@ import { FieldValue, Firestore } from "firebase-admin/firestore";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
+import { prepareScriptDocumentForFirestore } from "@/lib/screenplay/serialize";
 
 export const SCRIPT_VERSIONS_SUBCOLLECTION = "scriptVersions";
 
@@ -33,7 +34,7 @@ export async function archiveScriptVersion(
     .collection(SCRIPT_VERSIONS_SUBCOLLECTION)
     .add(
       stripUndefined({
-        script,
+        script: prepareScriptDocumentForFirestore(script),
         source,
         label,
         title: script.title,

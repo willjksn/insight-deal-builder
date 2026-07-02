@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { REFERENCE_CATEGORIES } from "@/lib/reference/categories";
+import { DEFAULT_REFERENCE_GUIDE, mergeReferenceSections } from "@/lib/reference/defaultGuide";
 import { ReferenceGuideDocument, ReferenceSection } from "@/lib/reference/types";
 import { cn } from "@/lib/utils/cn";
 
@@ -71,21 +72,26 @@ export function ReferenceGuideView({
   const sectionNavRef = useRef<HTMLDivElement>(null);
   const activeNavButtonRef = useRef<HTMLButtonElement>(null);
 
+  const displayGuide = useMemo(
+    () => (guide ? mergeReferenceSections(DEFAULT_REFERENCE_GUIDE, guide) : null),
+    [guide]
+  );
+
   const filtered = useMemo(() => {
-    if (!guide) return [];
+    if (!displayGuide) return [];
     const q = query.trim().toLowerCase();
-    return guide.sections.filter((s) => {
+    return displayGuide.sections.filter((s) => {
       if (category !== "all" && s.category !== category) return false;
       if (!q) return true;
       const hay = [s.title, s.summary, s.body, ...(s.tips ?? [])].join(" ").toLowerCase();
       return hay.includes(q);
     });
-  }, [guide, query, category]);
+  }, [displayGuide, query, category]);
 
   const activeCategory = useMemo(() => {
-    if (!guide || !activeSectionId) return null;
-    return guide.sections.find((s) => s.id === activeSectionId)?.category ?? null;
-  }, [guide, activeSectionId]);
+    if (!displayGuide || !activeSectionId) return null;
+    return displayGuide.sections.find((s) => s.id === activeSectionId)?.category ?? null;
+  }, [displayGuide, activeSectionId]);
 
   useEffect(() => {
     if (filtered.length === 0) {
@@ -134,7 +140,7 @@ export function ReferenceGuideView({
   };
 
   if (loading) return <LoadingSpinner className="py-20" />;
-  if (!guide) return <p className="text-slate-500">Could not load reference guide.</p>;
+  if (!displayGuide) return <p className="text-slate-500">Could not load reference guide.</p>;
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -176,7 +182,10 @@ export function ReferenceGuideView({
                         ? "bg-sky-50 text-sky-900 ring-1 ring-sky-200"
                         : "text-slate-600 hover:bg-slate-50"
                   )}
-                  onClick={() => setCategory(c.id)}
+                  onClick={() => {
+                    setCategory(c.id);
+                    if (query.trim()) setQuery("");
+                  }}
                 >
                   {c.label}
                 </button>
@@ -208,9 +217,23 @@ export function ReferenceGuideView({
             })}
           </div>
           <a
+            href="#screenplay-overview"
+            onClick={(e) => {
+              e.preventDefault();
+              setCategory("screenplay");
+              setQuery("");
+              scrollToSection("screenplay-overview");
+            }}
+            className="block text-xs font-medium text-sky-700 hover:underline"
+          >
+            Jump to scripts & writing →
+          </a>
+          <a
             href="#quick-matrix"
             onClick={(e) => {
               e.preventDefault();
+              setCategory("templates");
+              setQuery("");
               scrollToSection("quick-matrix");
             }}
             className="block text-xs font-medium text-sky-700 hover:underline"
@@ -223,11 +246,11 @@ export function ReferenceGuideView({
       <div className="min-w-0 flex-1 space-y-4">
         <header className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-widest text-sky-300">On-set reference</p>
-          <h1 className="mt-1 text-2xl font-bold">{guide.title}</h1>
-          <p className="mt-2 text-sm text-slate-300">{guide.subtitle}</p>
-          {guide.updatedAt && (
+          <h1 className="mt-1 text-2xl font-bold">{displayGuide.title}</h1>
+          <p className="mt-2 text-sm text-slate-300">{displayGuide.subtitle}</p>
+          {displayGuide.updatedAt && (
             <p className="mt-2 text-xs text-slate-400">
-              Updated {new Date(guide.updatedAt).toLocaleString()}
+              Updated {new Date(displayGuide.updatedAt).toLocaleString()}
             </p>
           )}
         </header>
@@ -237,7 +260,11 @@ export function ReferenceGuideView({
         ))}
 
         {filtered.length === 0 && (
-          <p className="text-center text-sm text-slate-500">No sections match your search.</p>
+          <p className="text-center text-sm text-slate-500">
+            {query.trim()
+              ? "No sections match your search. Clear the search box or pick another category."
+              : "No sections in this category yet."}
+          </p>
         )}
       </div>
     </div>

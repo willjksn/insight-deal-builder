@@ -8,4 +8,5 @@ export const REFERENCE_CATEGORIES = [
   { id: "movement", label: "Movement & shots" },
   { id: "audio", label: "Audio & set habits" },
   { id: "templates", label: "Logs & templates" },
+  { id: "screenplay", label: "Scripts & writing" },
 ] as const;

@@ -11,7 +11,7 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
       {pack.premise ? (
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Premise</h4>
-          <p className="mt-1 text-sm text-slate-700">{pack.premise}</p>
+          <p className="mt-1 break-words text-sm text-slate-700">{pack.premise}</p>
         </div>
       ) : null}
       {pack.tone ? (

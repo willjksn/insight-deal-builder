@@ -109,7 +109,7 @@ export function ScriptWriterIntakeForm({
         label="Story idea"
         value={brief.concept}
         onChange={(e) => patch({ concept: e.target.value })}
-        placeholder="A coffee shop owner realizes her regular customer is a time traveler…"
+        placeholder="A founder films a product launch in a warehouse studio, but the first take keeps getting interrupted…"
         rows={4}
       />
       <Textarea

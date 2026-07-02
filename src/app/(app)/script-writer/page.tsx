@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { PenLine, ScrollText } from "lucide-react";
+import { Loader2, PenLine, ScrollText, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Card, CardBody } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -21,6 +22,7 @@ import {
   PendingInspirationVideo,
   scriptWriterAnalyzeInspiration,
   scriptWriterCreateSession,
+  scriptWriterDeleteSession,
   scriptWriterListSessions,
   scriptWriterResearchTrends,
 } from "@/lib/scriptWriter/apiClient";
@@ -53,6 +55,8 @@ function ScriptWriterPageContent() {
   const [researchTrends, setResearchTrends] = useState(false);
   const [detailedShotList, setDetailedShotList] = useState(true);
   const [storyboardMode, setStoryboardMode] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ScriptWriterSession | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const hasInspiration =
     pendingImages.length > 0 || pendingVideo !== null || pendingUrls.length > 0;
@@ -89,6 +93,21 @@ function ScriptWriterPageContent() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   }, [user, allowed]);
+
+  const confirmDeleteScript = async () => {
+    if (!user || !deleteTarget) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await scriptWriterDeleteSession(() => user.getIdToken(), deleteTarget.id);
+      setSessions((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const start = async () => {
     if (!user || !isBriefComplete(brief, hasInspiration)) return;
@@ -245,33 +264,67 @@ function ScriptWriterPageContent() {
           <p className="text-sm text-slate-500">No scripts yet.</p>
         ) : (
           <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
-            {sessions.map((s) => (
-              <li key={s.id}>
-                <Link
-                  href={`/script-writer/${s.id}`}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
-                    <ScrollText className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-slate-900">{s.title}</p>
-                    <p className="truncate text-xs text-slate-500">
-                      {s.status === "applied"
-                        ? "Applied to project"
-                        : s.status === "script_ready"
-                          ? "Script ready"
-                          : s.status === "analysis_ready"
-                            ? "Review analysis"
-                            : "In progress"}
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            ))}
+            {sessions.map((s) => {
+              const isOwner = user?.uid === s.userId;
+              return (
+                <li key={s.id} className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50">
+                  <Link href={`/script-writer/${s.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                      <ScrollText className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-900">{s.title}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {s.status === "applied"
+                          ? "Applied to project"
+                          : s.status === "script_ready"
+                            ? "Script ready"
+                            : s.status === "analysis_ready"
+                              ? "Review analysis"
+                              : "In progress"}
+                      </p>
+                    </div>
+                  </Link>
+                  {isOwner ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label="Delete script"
+                      title="Delete script"
+                      disabled={deleting && deleteTarget?.id === s.id}
+                      onClick={() => setDeleteTarget(s)}
+                    >
+                      {deleting && deleteTarget?.id === s.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      )}
+                    </Button>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete this script?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.title}" and all versions, chat history, and inspiration files will be permanently removed. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete script"
+        cancelLabel="Keep script"
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+        onConfirm={() => void confirmDeleteScript()}
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { resolveScriptGenerationOptions } from "@/lib/scriptWriter/generationOpt
 import { resolveSessionBrief, scriptWriterGenerate } from "@/lib/scriptWriter/scriptWriterAi";
 import { archiveScriptVersion } from "@/lib/scriptWriter/scriptVersions";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
+import { prepareScriptDocumentForFirestore } from "@/lib/screenplay/serialize";
 
 export const runtime = "nodejs";
 
@@ -68,7 +69,7 @@ export async function POST(
 
     await db.collection(SCRIPT_WRITER_SESSIONS_COLLECTION).doc(id).update(
       stripUndefined({
-        script,
+        script: prepareScriptDocumentForFirestore(script),
         title: script.title,
         status: "script_ready",
         detailedShotList,

@@ -9,9 +9,11 @@ import {
   ScrollText,
   Send,
   Sparkles,
+  Trash2,
   Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Select } from "@/components/ui/Select";
@@ -21,6 +23,7 @@ import { Project } from "@/lib/types";
 import {
   scriptWriterApplyToProject,
   scriptWriterConfirmAnalysis,
+  scriptWriterDeleteSession,
   scriptWriterGenerateScript,
   scriptWriterGetSession,
   scriptWriterRefineScript,
@@ -68,6 +71,8 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const [projectId, setProjectId] = useState("");
   const [detailedShotList, setDetailedShotList] = useState(true);
   const [storyboardMode, setStoryboardMode] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -232,6 +237,22 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const awaitingAnalysisConfirm = session.status === "analysis_ready";
   const canRefine = Boolean(script && session.status === "script_ready" && !session.refineUsed);
   const adminReadOnly = adminOpen && !!user && session.userId !== user.uid;
+  const canDelete = Boolean(user && session.userId === user.uid && !adminReadOnly);
+
+  const deleteScript = async () => {
+    if (!user) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await scriptWriterDeleteSession(() => user.getIdToken(), sessionId);
+      router.push("/script-writer");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed");
+      setShowDeleteConfirm(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="pb-24">
@@ -248,12 +269,26 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
             : "Refine in chat, then generate a screenplay tied to your board, shot list, and call sheets."
         }
         action={
-          <Link href="/script-writer">
-            <Button size="touch" variant="outline">
-              <ArrowLeft className="mr-2 h-5 w-5" />
-              All scripts
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {canDelete ? (
+              <Button
+                type="button"
+                size="touch"
+                variant="outline"
+                className="border-red-200 text-red-600 hover:bg-red-50"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="mr-2 h-5 w-5" />
+                Delete script
+              </Button>
+            ) : null}
+            <Link href="/script-writer">
+              <Button size="touch" variant="outline">
+                <ArrowLeft className="mr-2 h-5 w-5" />
+                All scripts
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -319,8 +354,8 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         onResearch={session.status !== "applied" ? () => void researchTrends() : undefined}
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="flex min-h-[480px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex min-w-0 flex-col gap-6">
+        <section className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-4 py-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <Sparkles className="h-4 w-4 text-violet-600" />
@@ -334,7 +369,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                   : "Follow-ups only for what's still unclear."}
             </p>
           </div>
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+          <div className="max-h-[min(420px,45vh)] space-y-3 overflow-y-auto px-4 py-4">
             {session.messages.map((msg) => (
               <div
                 key={msg.id}
@@ -482,7 +517,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           ) : null}
         </section>
 
-        <section className="flex min-h-[480px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <section className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-4 py-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <ScrollText className="h-4 w-4 text-violet-600" />
@@ -508,7 +543,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           {script && script.suggestedShots.length > 0 ? (
             <ScriptSuggestedShotsPanel shots={script.suggestedShots} />
           ) : null}
-          <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="min-w-0 overflow-x-auto px-4 py-4">
             {script ? (
               <ScriptEditorPanel
                 sessionId={sessionId}
@@ -571,6 +606,23 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           )}
         </section>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete this script?"
+        description={`"${session.title || "Untitled script"}" and all versions, chat history, and inspiration files will be permanently removed. This cannot be undone.${
+          session.appliedProjectId
+            ? " The pre-production board will keep its data, but will no longer link to this script."
+            : ""
+        }`}
+        confirmLabel="Delete script"
+        cancelLabel="Keep script"
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) setShowDeleteConfirm(false);
+        }}
+        onConfirm={() => void deleteScript()}
+      />
 
       <SharedNotesPanel
         resourceType="script"

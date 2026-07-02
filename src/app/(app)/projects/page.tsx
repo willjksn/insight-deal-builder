@@ -19,6 +19,7 @@ import { formatDate } from "@/lib/utils/format";
 import { PROJECT_TYPES, SHOOT_TYPES, SEED_PROJECT } from "@/lib/constants/presets";
 import { Client, Project, ProjectStatus } from "@/lib/types";
 import { Trash2, FileText } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const emptyProject: Omit<Project, "id" | "createdAt" | "updatedAt"> = {
   projectName: "", clientId: "", clientName: "", agreementType: "client_project",
@@ -34,11 +35,25 @@ export default function ProjectsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyProject);
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const seedProject = async () => {
     const client = clients.find((c) => c.businessName === "Demo Fitness Studio");
     await create({ ...SEED_PROJECT, clientId: client?.id, clientName: client?.businessName || "Demo Fitness Studio" });
     refresh();
+  };
+
+  const confirmDeleteProject = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await remove(deleteTarget.id);
+      setDeleteTarget(null);
+      refresh();
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -107,11 +122,9 @@ export default function ProjectsPage() {
                     variant="ghost"
                     aria-label="Delete project"
                     title="Delete project"
-                    onClick={async () => {
-                      if (confirm("Delete?")) {
-                        await remove(p.id);
-                        refresh();
-                      }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget(p);
                     }}
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
@@ -122,6 +135,23 @@ export default function ProjectsPage() {
           ))}
         </DataTable>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete this project?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.projectName}" will be permanently removed, including linked production data. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete project"
+        cancelLabel="Keep project"
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+        onConfirm={() => void confirmDeleteProject()}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { History, Loader2, Pencil, Save } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -13,6 +13,19 @@ import {
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 import { ScriptVersionRecord, scriptVersionLabel } from "@/lib/scriptWriter/scriptVersionLabels";
 import { ScriptProductionPackView } from "@/components/scriptWriter/ScriptProductionPackView";
+import { ScreenplayEditor } from "@/components/screenplay/ScreenplayEditor";
+import {
+  ScreenplayPreview,
+  ScreenplayPreviewControls,
+  useScreenplayPreviewState,
+} from "@/components/screenplay/ScreenplayPreview";
+import { ScreenplayExportMenu } from "@/components/screenplay/ScreenplayExportMenu";
+import {
+  applyElementsToScript,
+  getScriptElements,
+  normalizeScriptDocument,
+} from "@/lib/screenplay/normalize";
+import { cn } from "@/lib/utils/cn";
 
 interface ScriptEditorPanelProps {
   sessionId: string;
@@ -22,6 +35,8 @@ interface ScriptEditorPanelProps {
   readOnly?: boolean;
 }
 
+type ScriptViewMode = "preview" | "edit";
+
 export function ScriptEditorPanel({
   sessionId,
   script,
@@ -29,17 +44,20 @@ export function ScriptEditorPanel({
   onUpdated,
   readOnly,
 }: ScriptEditorPanelProps) {
+  const normalizedScript = useMemo(() => normalizeScriptDocument(script), [script]);
+  const [viewMode, setViewMode] = useState<ScriptViewMode>("preview");
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(script);
+  const [draft, setDraft] = useState(normalizedScript);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [versions, setVersions] = useState<ScriptVersionRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const previewState = useScreenplayPreviewState(editing ? draft : normalizedScript);
 
   useEffect(() => {
-    if (!editing) setDraft(script);
+    if (!editing) setDraft(normalizeScriptDocument(script));
   }, [script, editing]);
 
   const loadHistory = useCallback(async () => {
@@ -62,18 +80,26 @@ export function ScriptEditorPanel({
     setSaving(true);
     setError(null);
     try {
+      const next = normalizeScriptDocument(draft);
       const { session } = await scriptWriterSaveScript(getToken, sessionId, {
-        title: draft.title,
-        logline: draft.logline,
-        lookAndFeel: draft.lookAndFeel,
-        references: draft.references,
-        idealRuntime: draft.idealRuntime,
-        genre: draft.genre,
-        fountain: draft.fountain,
+        title: next.title,
+        logline: next.logline,
+        author: next.author,
+        draftLabel: next.draftLabel,
+        lookAndFeel: next.lookAndFeel,
+        references: next.references,
+        idealRuntime: next.idealRuntime,
+        genre: next.genre,
+        fountain: next.fountain,
+        elements: next.elements,
+        scenes: next.scenes,
+        characters: next.characters,
+        showPageOneNumber: next.showPageOneNumber,
       });
-      const updated = (session as { script: ScriptDocument }).script;
+      const updated = normalizeScriptDocument((session as { script: ScriptDocument }).script);
       onUpdated(updated);
       setEditing(false);
+      setViewMode("preview");
       if (showHistory) await loadHistory();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
@@ -88,7 +114,7 @@ export function ScriptEditorPanel({
     setError(null);
     try {
       const { session } = await scriptWriterRestoreScriptVersion(getToken, sessionId, versionId);
-      const updated = (session as { script: ScriptDocument }).script;
+      const updated = normalizeScriptDocument((session as { script: ScriptDocument }).script);
       onUpdated(updated);
       setEditing(false);
       await loadHistory();
@@ -99,38 +125,66 @@ export function ScriptEditorPanel({
     }
   };
 
+  const activeScript = editing ? draft : normalizedScript;
+  const elements = getScriptElements(activeScript);
+
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {!readOnly && (
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+          {(["preview", "edit"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => {
+                setViewMode(mode);
+                if (mode === "edit" && !readOnly) setEditing(true);
+              }}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium capitalize",
+                viewMode === mode ? "bg-sky-600 text-white" : "text-slate-600"
+              )}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+
+        {!readOnly && editing ? (
           <>
-            {editing ? (
-              <>
-                <Button type="button" size="sm" disabled={saving} onClick={() => void save()}>
-                  {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-                  Save edits
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={saving}
-                  onClick={() => {
-                    setDraft(script);
-                    setEditing(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>
-                <Pencil className="mr-1.5 h-4 w-4" />
-                Edit script
-              </Button>
-            )}
+            <Button type="button" size="sm" disabled={saving} onClick={() => void save()}>
+              {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+              Save edits
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={saving}
+              onClick={() => {
+                setDraft(normalizedScript);
+                setEditing(false);
+                setViewMode("preview");
+              }}
+            >
+              Cancel
+            </Button>
           </>
-        )}
+        ) : !readOnly ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setEditing(true);
+              setViewMode("edit");
+            }}
+          >
+            <Pencil className="mr-1.5 h-4 w-4" />
+            Edit script
+          </Button>
+        ) : null}
+
         <Button
           type="button"
           size="sm"
@@ -142,11 +196,11 @@ export function ScriptEditorPanel({
         </Button>
       </div>
 
-      {error && (
+      {error ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      )}
+      ) : null}
 
-      {showHistory && (
+      {showHistory ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Saved versions</p>
           {historyLoading ? (
@@ -169,7 +223,7 @@ export function ScriptEditorPanel({
                       {new Date(v.createdAt).toLocaleString()}
                     </p>
                   </div>
-                  {!readOnly && (
+                  {!readOnly ? (
                     <Button
                       type="button"
                       size="sm"
@@ -179,56 +233,91 @@ export function ScriptEditorPanel({
                     >
                       {restoring === v.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Restore"}
                     </Button>
-                  )}
+                  ) : null}
                 </li>
               ))}
             </ul>
           )}
         </div>
-      )}
+      ) : null}
 
-      {editing ? (
-        <div className="space-y-3">
-          <Input
-            label="Title"
-            value={draft.title}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-          />
-          <Textarea
-            label="Logline"
-            value={draft.logline}
-            onChange={(e) => setDraft({ ...draft, logline: e.target.value })}
-            rows={2}
-          />
-          <Textarea
-            label="Look & feel"
-            value={draft.lookAndFeel ?? ""}
-            onChange={(e) => setDraft({ ...draft, lookAndFeel: e.target.value })}
-            rows={2}
-          />
-          <Textarea
-            label="Screenplay (Fountain)"
-            value={draft.fountain}
-            onChange={(e) => setDraft({ ...draft, fountain: e.target.value })}
-            rows={16}
-            className="font-mono text-xs"
+      <div className="flex flex-col gap-4">
+        <div className="min-w-0 space-y-4">
+          <div>
+            <h3 className="font-serif text-lg font-bold text-slate-900">{activeScript.title}</h3>
+            <p className="mt-1 break-words text-sm text-slate-600">{activeScript.logline}</p>
+          </div>
+
+          {editing ? (
+            <div className="space-y-3">
+              <Input
+                label="Title"
+                value={draft.title}
+                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+              />
+              <Input
+                label="Author"
+                value={draft.author ?? ""}
+                onChange={(e) => setDraft({ ...draft, author: e.target.value })}
+              />
+              <Input
+                label="Draft label"
+                value={draft.draftLabel ?? ""}
+                onChange={(e) => setDraft({ ...draft, draftLabel: e.target.value })}
+              />
+              <Textarea
+                label="Logline"
+                value={draft.logline}
+                onChange={(e) => setDraft({ ...draft, logline: e.target.value })}
+                rows={2}
+              />
+              <Textarea
+                label="Look & feel"
+                value={draft.lookAndFeel ?? ""}
+                onChange={(e) => setDraft({ ...draft, lookAndFeel: e.target.value })}
+                rows={2}
+              />
+            </div>
+          ) : null}
+
+          <ScriptProductionPackView script={activeScript} />
+          <ScreenplayExportMenu
+            script={activeScript}
+            showNotes={previewState.showNotes}
+            showPageOneNumber={previewState.showPageOneNumber}
           />
         </div>
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <h3 className="font-serif text-lg font-bold text-slate-900">{script.title}</h3>
-            <p className="mt-1 text-sm text-slate-600">{script.logline}</p>
-          </div>
-          <ScriptProductionPackView script={script} />
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Screenplay</h4>
-            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-800">
-              {script.fountain}
-            </pre>
-          </div>
+
+        <div className="min-w-0 space-y-3">
+          <ScreenplayPreviewControls
+            zoom={previewState.zoom}
+            onZoomChange={previewState.setZoom}
+            showNotes={previewState.showNotes}
+            onShowNotesChange={previewState.setShowNotes}
+            showPageOneNumber={previewState.showPageOneNumber}
+            onShowPageOneNumberChange={previewState.setShowPageOneNumber}
+          />
+
+          {viewMode === "edit" && editing ? (
+            <ScreenplayEditor
+              elements={elements}
+              onChange={(nextElements) => {
+                setDraft(applyElementsToScript(draft, nextElements));
+              }}
+            />
+          ) : (
+            <ScreenplayPreview
+              script={{
+                ...activeScript,
+                showPageOneNumber: previewState.showPageOneNumber,
+              }}
+              showNotes={previewState.showNotes}
+              showPageOneNumber={previewState.showPageOneNumber}
+              zoom={previewState.zoom}
+            />
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -10,6 +10,8 @@ import { getScriptSessionForRequest } from "@/lib/projectAccess/requestAccess";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
 import { archiveScriptVersion } from "@/lib/scriptWriter/scriptVersions";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
+import { normalizeScriptDocument } from "@/lib/screenplay/normalize";
+import { prepareScriptDocumentForFirestore } from "@/lib/screenplay/serialize";
 
 export const runtime = "nodejs";
 
@@ -40,18 +42,26 @@ export async function PATCH(
     const current = session.script as ScriptDocument;
     await archiveScriptVersion(db, id, current, "manual", "Before manual edit");
 
-    const nextScript: ScriptDocument = {
+    const nextScript = prepareScriptDocumentForFirestore(
+      normalizeScriptDocument({
       ...current,
       ...body.script,
       title: body.script.title?.trim() || current.title,
       logline: body.script.logline ?? current.logline,
+      author: body.script.author ?? current.author,
+      draftLabel: body.script.draftLabel ?? current.draftLabel,
       fountain: body.script.fountain ?? current.fountain,
+      elements: body.script.elements ?? current.elements,
       lookAndFeel: body.script.lookAndFeel ?? current.lookAndFeel,
       references: body.script.references ?? current.references,
       idealRuntime: body.script.idealRuntime ?? current.idealRuntime,
       genre: body.script.genre ?? current.genre,
+      scenes: body.script.scenes ?? current.scenes,
+      characters: body.script.characters ?? current.characters,
+      showPageOneNumber: body.script.showPageOneNumber ?? current.showPageOneNumber,
       productionPack: body.script.productionPack ?? current.productionPack,
-    };
+      })
+    );
 
     await db.collection(SCRIPT_WRITER_SESSIONS_COLLECTION).doc(id).update(
       stripUndefined({
