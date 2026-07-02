@@ -30,6 +30,7 @@ import {
   APP_SHORT_TAGLINE,
 } from "@/lib/brand";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import {
   canCreateQuotes,
   canManageClients,
@@ -259,6 +260,11 @@ export function Sidebar() {
               </p>
             </div>
           )}
+          <div className="mb-3 px-2">
+            <LegalFooterLinks
+              linkClassName="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            />
+          </div>
           <button
             onClick={() => signOut()}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"

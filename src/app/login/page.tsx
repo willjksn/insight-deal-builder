@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Card, CardBody } from "@/components/ui/Card";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { LegalAcceptanceNotice, LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 
 type Mode = "signIn" | "signUp" | "resetPassword";
 
@@ -125,6 +126,14 @@ export default function LoginPage() {
               {error && <p className="text-sm text-red-600">{error}</p>}
               {message && <p className="text-sm text-emerald-700">{message}</p>}
 
+              {mode !== "resetPassword" ? (
+                <LegalAcceptanceNotice
+                  action={mode === "signUp" ? "signUp" : "signIn"}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left"
+                  linkClassName="text-sky-700 hover:text-sky-800"
+                />
+              ) : null}
+
               <Button
                 type="submit"
                 size="touch"
@@ -181,6 +190,13 @@ export default function LoginPage() {
             </div>
           </CardBody>
         </Card>
+
+        <p className="mt-6 text-center text-xs text-slate-500">
+          <LegalFooterLinks
+            variant="full"
+            linkClassName="text-slate-400 hover:text-slate-200 transition-colors underline underline-offset-2"
+          />
+        </p>
       </div>
     </div>
   );
