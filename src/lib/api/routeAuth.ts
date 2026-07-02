@@ -61,6 +61,13 @@ export function assertCanUseScriptWriter(appUser: AppUser): void {
   assertCanUseShotScout(appUser);
 }
 
+export function assertCanManageProjects(appUser: AppUser): void {
+  if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
+  if (!hasPermission(appUser, "manageProjects") && !hasPermission(appUser, "manageUsers")) {
+    throw new Error("Not authorized to manage projects");
+  }
+}
+
 export function assertApprovedUser(appUser: AppUser): void {
   if (!isUserApproved(appUser)) {
     throw new Error("Not authorized");

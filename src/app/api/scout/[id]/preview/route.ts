@@ -30,6 +30,8 @@ export async function POST(
   try {
     const { id } = await params;
     const { project } = await requireScoutProjectAccess(request, id);
+    const body = (await request.json().catch(() => ({}))) as { generateImages?: boolean };
+    const generateImages = body.generateImages === true;
 
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
@@ -46,7 +48,8 @@ export async function POST(
       images,
       project.latestShotList,
       gearProfile,
-      gearList
+      gearList,
+      { generateImages }
     );
 
     const saved = [];
@@ -75,15 +78,16 @@ export async function POST(
       saved.push(stripUndefined({ ...clean, id: docRef.id, createdAt: new Date().toISOString() }));
     }
 
+    const hasImages = saved.some((p) => p.imageUrl);
     await ref.update(
       stripUndefined({
-        status: "previs_ready",
+        status: generateImages && hasImages ? "previs_ready" : "planned",
         latestPreviews: saved,
         updatedAt: FieldValue.serverTimestamp(),
       })
     );
 
-    return NextResponse.json({ ok: true, previews: saved, warnings });
+    return NextResponse.json({ ok: true, previews: saved, warnings, promptsOnly: !generateImages });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Preview failed";
     return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });

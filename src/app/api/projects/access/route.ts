@@ -14,12 +14,22 @@ export async function GET(request: NextRequest) {
     if (!db) throw new Error("Firebase Admin is not configured");
 
     if (hasGlobalProjectAdmin(appUser)) {
-      const snap = await db.collection("projects").orderBy("updatedAt", "desc").limit(100).get();
+      let snap;
+      try {
+        snap = await db.collection("projects").orderBy("updatedAt", "desc").limit(100).get();
+      } catch {
+        snap = await db.collection("projects").limit(100).get();
+      }
       const projects = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Project);
       return NextResponse.json({ projects });
     }
 
-    const projectIds = await getProjectIdsForMember(db, uid);
+    const projectIds = new Set(await getProjectIdsForMember(db, uid));
+    const ownedSnap = await db.collection("projects").where("ownerUserId", "==", uid).get();
+    for (const doc of ownedSnap.docs) {
+      projectIds.add(doc.id);
+    }
+
     const projects: Project[] = [];
     for (const projectId of projectIds) {
       const snap = await db.collection("projects").doc(projectId).get();

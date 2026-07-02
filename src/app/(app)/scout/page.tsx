@@ -15,7 +15,12 @@ import { duplicateScoutProject } from "@/lib/firebase/scoutFirestore";
 import { scoutDeleteSession } from "@/lib/scout/apiClient";
 import { canLinkScoutToProject, canUseShotScout } from "@/lib/utils/permissions";
 import { MOOD_LABEL, SCENE_TYPE_LABEL, SCOUT_STATUS_LABEL } from "@/lib/scout/constants";
-import { formatProjectLinkLabel, projectsForScoutLinkDisplay } from "@/lib/utils/scoutProjectLink";
+import {
+  formatProjectLinkLabel,
+  projectsForScoutLinkDisplay,
+  scoutHrefForProject,
+  scoutNewHrefForProject,
+} from "@/lib/utils/scoutProjectLink";
 import { Project } from "@/lib/types";
 
 export default function ScoutDashboardPage() {
@@ -140,7 +145,7 @@ export default function ScoutDashboardPage() {
             {linkableProjects.slice(0, 12).map((p) => (
               <Link
                 key={p.id}
-                href={`/scout/new?projectId=${p.id}`}
+                href={scoutHrefForProject(p.id, data, { projectName: p.projectName })}
                 className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900"
               >
                 <FolderKanban className="h-4 w-4 shrink-0 text-slate-400" />

@@ -13,21 +13,18 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getScoutProject, updateScoutProject } from "@/lib/firebase/scoutFirestore";
 import {
   SCOUT_ASPECT_RATIOS,
+  SCOUT_CAMERA_MOVEMENTS,
   SCOUT_MOODS,
   SCOUT_PLATFORMS,
 } from "@/lib/scout/constants";
+import {
+  readCameraMovementsFromBrief,
+  toggleCameraMovement,
+  withCameraMovements,
+} from "@/lib/scout/cameraMovementBrief";
 import { ScoutCreativeBrief, ScoutMood, ScoutPlatform, ScoutAspectRatio } from "@/lib/scout/types";
 import { canUseShotScout } from "@/lib/utils/permissions";
-
-const CAMERA_MOVEMENTS = [
-  { value: "locked_tripod", label: "Locked tripod" },
-  { value: "handheld", label: "Handheld" },
-  { value: "gimbal_push", label: "Gimbal push-in" },
-  { value: "slider", label: "Slider" },
-  { value: "orbit", label: "Orbit" },
-  { value: "slow_reveal", label: "Slow reveal" },
-  { value: "walk_and_talk", label: "Walk-and-talk" },
-];
+import { cn } from "@/lib/utils/cn";
 
 const SUBJECT_POSES = [
   { value: "sitting", label: "Sitting" },
@@ -53,7 +50,14 @@ export default function ScoutQuestionsPage() {
   useEffect(() => {
     getScoutProject(id)
       .then((p) => {
-        if (p?.creativeBrief) setBrief(p.creativeBrief);
+        if (p?.creativeBrief) {
+          setBrief(
+            withCameraMovements(
+              p.creativeBrief,
+              readCameraMovementsFromBrief(p.creativeBrief)
+            )
+          );
+        }
         if (p?.mood) setMood(p.mood);
         if (p?.platform) setPlatform(p.platform);
         if (p?.aspectRatio) setAspectRatio(p.aspectRatio);
@@ -69,7 +73,10 @@ export default function ScoutQuestionsPage() {
     setSaving(true);
     try {
       await updateScoutProject(id, {
-        creativeBrief: { ...brief, completedAt: new Date().toISOString() },
+        creativeBrief: withCameraMovements(
+          { ...brief, completedAt: new Date().toISOString() },
+          readCameraMovementsFromBrief(brief)
+        ),
         mood,
         platform,
         aspectRatio,
@@ -132,12 +139,38 @@ export default function ScoutQuestionsPage() {
               onChange={(e) => setAspectRatio(e.target.value as ScoutAspectRatio)}
               options={SCOUT_ASPECT_RATIOS}
             />
-            <Select
-              label="Camera movement"
-              value={brief.cameraMovement ?? ""}
-              onChange={(e) => setBrief({ ...brief, cameraMovement: e.target.value })}
-              options={[{ value: "", label: "Select…" }, ...CAMERA_MOVEMENTS]}
-            />
+            <div className="w-full">
+              <p className="mb-1.5 block text-sm font-medium text-slate-700">Camera movement</p>
+              <p className="mb-2 text-xs text-slate-500">Select all that apply.</p>
+              <div className="flex flex-wrap gap-2">
+                {SCOUT_CAMERA_MOVEMENTS.map(({ value, label }) => {
+                  const selected = readCameraMovementsFromBrief(brief).includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() =>
+                        setBrief((prev) =>
+                          withCameraMovements(
+                            prev,
+                            toggleCameraMovement(readCameraMovementsFromBrief(prev), value)
+                          )
+                        )
+                      }
+                      className={cn(
+                        "rounded-full border px-3 py-2 text-sm font-medium transition-colors",
+                        selected
+                          ? "border-sky-500 bg-sky-50 text-sky-900 ring-1 ring-sky-200"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"

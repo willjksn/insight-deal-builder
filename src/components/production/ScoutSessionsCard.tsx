@@ -14,6 +14,7 @@ import {
   trackLinkedScoutIds,
 } from "@/lib/production/scoutBoardImport";
 import { shotsFromScoutList } from "@/lib/production/scoutImport";
+import { scoutHrefForProject } from "@/lib/utils/scoutProjectLink";
 
 interface ScoutSessionsCardProps {
   scoutSessions: ScoutProject[];
@@ -33,7 +34,7 @@ export function ScoutSessionsCard({ scoutSessions, board, onPatch }: ScoutSessio
       >
         <p className="text-sm text-slate-600">
           No scout sessions linked yet. Open a scout and link it to this project, or{" "}
-          <Link href={`/scout/new?projectId=${board.projectId}`} className="font-medium text-sky-700 hover:underline">
+          <Link href={scoutHrefForProject(board.projectId, scoutSessions)} className="font-medium text-sky-700 hover:underline">
             start a new scout
           </Link>
           .

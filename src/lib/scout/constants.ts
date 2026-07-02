@@ -76,6 +76,18 @@ export const SCOUT_PREFERRED_LOOKS: { value: ScoutPreferredLook; label: string }
   { value: "high_contrast", label: "High contrast" },
 ];
 
+export const SCOUT_CAMERA_MOVEMENTS: { value: string; label: string }[] = [
+  { value: "locked_tripod", label: "Locked tripod" },
+  { value: "handheld", label: "Handheld" },
+  { value: "gimbal_push", label: "Gimbal push-in" },
+  { value: "dolly_push_in", label: "Dolly push-in" },
+  { value: "dolly_pull_out", label: "Dolly pull-out" },
+  { value: "slider", label: "Slider" },
+  { value: "orbit", label: "Orbit" },
+  { value: "slow_reveal", label: "Slow reveal" },
+  { value: "walk_and_talk", label: "Walk-and-talk" },
+];
+
 export const SCOUT_IMAGE_LABELS: { value: ScoutImageLabel; label: string }[] = [
   { value: "doorway", label: "Doorway" },
   { value: "left_corner", label: "Left corner" },

@@ -5,6 +5,10 @@ import {
   GEAR_CONSTRAINT_INSTRUCTIONS,
 } from "@/lib/scout/gearContext";
 import {
+  readCameraMovementsFromBrief,
+  formatCameraMovementLabels,
+} from "@/lib/scout/cameraMovementBrief";
+import {
   CINESCOUT_ON_SET_WORKFLOW,
   CINESCOUT_SCORING_CRITERIA,
   CINESCOUT_SYSTEM_PROMPT,
@@ -48,7 +52,12 @@ export function buildSceneContext(
     if (brief.subjectAction) lines.push(`Subject action: ${brief.subjectAction}`);
     if (brief.peopleCount != null) lines.push(`People count: ${brief.peopleCount}`);
     if (brief.subjectPose) lines.push(`Subject pose: ${brief.subjectPose}`);
-    if (brief.cameraMovement) lines.push(`Camera movement intent: ${brief.cameraMovement}`);
+    const movements = readCameraMovementsFromBrief(brief);
+    if (movements.length) {
+      lines.push(`Camera movement intent: ${formatCameraMovementLabels(movements)}`);
+    } else if (brief.cameraMovement) {
+      lines.push(`Camera movement intent: ${brief.cameraMovement}`);
+    }
     if (brief.avoidHeavyGrading) lines.push("Avoid heavy grading: yes");
   }
   if (project.sceneLightNotes?.trim()) {

@@ -191,6 +191,28 @@ export async function scriptWriterApplyToProject(
   }>(res);
 }
 
+export async function scriptWriterCreateAndApplyProject(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  body: {
+    projectName: string;
+    createScout?: boolean;
+    updateExistingScout?: boolean;
+  }
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/create-and-apply`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    ok: true;
+    projectId: string;
+    scoutProjectId?: string;
+    productionBoardId?: string;
+  }>(res);
+}
+
 export async function scriptWriterSaveScript(
   getToken: () => Promise<string | null>,
   sessionId: string,

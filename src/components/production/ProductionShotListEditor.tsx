@@ -3,6 +3,7 @@
 import { GripVertical, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { ProductionDayShot } from "@/lib/production/types";
 import {
   formatProductionShotLabel,
@@ -97,7 +98,7 @@ export function ProductionShotListEditor({
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[880px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
                 {!readOnly && <th className="w-8 py-2" />}
@@ -106,7 +107,7 @@ export function ProductionShotListEditor({
                 <th className="w-16 py-2 pr-2">Scene</th>
                 <th className="w-36 py-2 pr-2">Type</th>
                 <th className="py-2 pr-2">Shot</th>
-                <th className="w-28 py-2 pr-2">Movement</th>
+                <th className="min-w-[11rem] py-2 pr-2">Movement</th>
                 {canMove && <th className="w-28 py-2 pr-2">Move</th>}
                 {!readOnly && <th className="w-10 py-2" />}
               </tr>
@@ -201,14 +202,20 @@ export function ProductionShotListEditor({
                       {shot.notes && <p className="text-xs text-slate-400">{shot.notes}</p>}
                     </div>
                   </td>
-                  <td className="py-2 pr-2">
-                    <Input
-                      value={shot.cameraMovement ?? ""}
-                      disabled={readOnly}
-                      onChange={(e) => update(shot.id, { cameraMovement: e.target.value })}
-                      placeholder="Static"
-                      className="text-xs"
-                    />
+                  <td className="min-w-[11rem] py-2 pr-2">
+                    {readOnly ? (
+                      <span className="block whitespace-pre-wrap text-xs text-slate-700">
+                        {shot.cameraMovement?.trim() || "—"}
+                      </span>
+                    ) : (
+                      <Textarea
+                        value={shot.cameraMovement ?? ""}
+                        onChange={(e) => update(shot.id, { cameraMovement: e.target.value })}
+                        placeholder="Static"
+                        rows={2}
+                        className="min-h-[2.75rem] resize-y py-1.5 text-xs leading-snug"
+                      />
+                    )}
                   </td>
                   {canMove && (
                     <td className="py-2 pr-2">

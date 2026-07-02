@@ -2,48 +2,45 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useConditionalCollection } from "@/hooks/useConditionalCollection";
 import { Project } from "@/lib/types";
-import { canManageProjects } from "@/lib/utils/permissions";
 
-/** Projects the user can open — all org projects for admins, or shared memberships for collaborators. */
+/** Projects the user can open — org-wide for admins, memberships + owned for collaborators. */
 export function useAccessibleProjects() {
-  const { user, appUser } = useAuth();
-  const isAdmin = canManageProjects(appUser);
-  const orgProjects = useConditionalCollection<Project>("projects", isAdmin);
-  const [shared, setShared] = useState<Project[]>([]);
-  const [loadingShared, setLoadingShared] = useState(!isAdmin);
+  const { user } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const refreshShared = useCallback(async () => {
-    if (!user || isAdmin) return;
-    setLoadingShared(true);
+  const refresh = useCallback(async () => {
+    if (!user) {
+      setProjects([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
     try {
       const token = await user.getIdToken();
       const res = await fetch("/api/projects/access", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (res.ok) setShared(data.projects as Project[]);
+      const data = (await res.json()) as { projects?: Project[]; error?: string };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to load projects");
+      }
+      setProjects(data.projects ?? []);
+    } catch (err) {
+      setProjects([]);
+      setError(err instanceof Error ? err.message : "Failed to load projects");
     } finally {
-      setLoadingShared(false);
+      setLoading(false);
     }
-  }, [user, isAdmin]);
+  }, [user]);
 
   useEffect(() => {
-    void refreshShared();
-  }, [refreshShared]);
+    void refresh();
+  }, [refresh]);
 
-  if (isAdmin) {
-    return {
-      projects: orgProjects.data,
-      loading: orgProjects.loading,
-      refresh: orgProjects.refresh,
-    };
-  }
-
-  return {
-    projects: shared,
-    loading: loadingShared,
-    refresh: refreshShared,
-  };
+  return { projects, loading, error, refresh };
 }

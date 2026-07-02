@@ -532,8 +532,10 @@ export async function cineScoutGeneratePreviews(
   images: ScoutProjectImage[] = [],
   shotList?: ScoutShotList,
   gearProfile?: ScoutGearProfile | null,
-  gearList?: ScoutGearList | null
+  gearList?: ScoutGearList | null,
+  options?: { generateImages?: boolean }
 ): Promise<ScoutPreviewDraft[]> {
+  const generateImages = options?.generateImages === true;
   if (scoutAiUsesMock()) {
     return mockPreviews(project, dpPlan);
   }
@@ -551,7 +553,9 @@ export async function cineScoutGeneratePreviews(
 
   // 1) Top-down lighting diagram (schematic)
   const diagramPrompt = await buildLightingDiagramPrompt(project, dpPlan, referenceImage, gearProfile, gearList);
-  const diagramResult = await generateDiagramImage(diagramPrompt, project.aspectRatio);
+  const diagramResult = generateImages
+    ? await generateDiagramImage(diagramPrompt, project.aspectRatio)
+    : {};
   previews.push({
     id: `preview-${project.id}-diagram`,
     prompt: diagramPrompt,
@@ -577,11 +581,9 @@ export async function cineScoutGeneratePreviews(
         gearProfile,
         gearList
       );
-      const cinematicResult = await generateCinematicImage(
-        cinematicPrompt,
-        referenceImage,
-        project.aspectRatio
-      );
+      const cinematicResult = generateImages
+        ? await generateCinematicImage(cinematicPrompt, referenceImage, project.aspectRatio)
+        : {};
       previews.push({
         id: `preview-${project.id}-${target.suffix}`,
         prompt: cinematicPrompt,

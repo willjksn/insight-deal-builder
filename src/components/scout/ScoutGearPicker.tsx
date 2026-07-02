@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Dispatch, SetStateAction } from "react";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/Input";
@@ -24,7 +24,7 @@ import { ScoutGearProfile } from "@/lib/scout/types";
 
 type Props = {
   form: ScoutSessionFormValues;
-  onChange: (next: ScoutSessionFormValues) => void;
+  onChange: Dispatch<SetStateAction<ScoutSessionFormValues>>;
   gearProfiles: ScoutGearProfile[];
 };
 
@@ -62,18 +62,18 @@ export function ScoutGearPicker({ form, onChange, gearProfiles }: Props) {
   );
 
   const set = <K extends keyof ScoutSessionFormValues>(key: K, value: ScoutSessionFormValues[K]) => {
-    onChange({ ...form, [key]: value });
+    onChange((prev) => ({ ...prev, [key]: value }));
   };
 
   const onKitChange = (value: string) => {
     if (value.startsWith("__")) return;
     if (value === "__custom__" || value === "") {
-      onChange({ ...form, selectedGearProfileId: "" });
+      onChange((prev) => ({ ...prev, selectedGearProfileId: "" }));
       return;
     }
     const profile = gearProfiles.find((p) => p.id === value);
     if (!profile) return;
-    onChange({ ...form, ...formValuesFromGearProfile(profile) });
+    onChange((prev) => ({ ...prev, ...formValuesFromGearProfile(profile) }));
   };
 
   const cameraOptions = selectedProfile
@@ -130,14 +130,14 @@ export function ScoutGearPicker({ form, onChange, gearProfiles }: Props) {
         audioGear: form.audioGear,
         stabilizationGear: form.stabilizationGear,
       });
-      onChange({
-        ...form,
+      onChange((prev) => ({
+        ...prev,
         cameraBody: suggestion.cameraBody,
         lensOptions: suggestion.lensOptions,
         lightingGear: suggestion.lightingGear,
         audioGear: suggestion.audioGear,
         stabilizationGear: suggestion.stabilizationGear,
-      });
+      }));
       setSuggestRationale(suggestion.rationale);
     } catch (err) {
       setSuggestError(err instanceof Error ? err.message : "Could not suggest gear");
@@ -194,11 +194,11 @@ export function ScoutGearPicker({ form, onChange, gearProfiles }: Props) {
           const v = e.target.value;
           if (v.startsWith("__hdr_")) return;
           if (v === "") {
-            onChange({ ...form, selectedGearProfileId: "" });
+            onChange((prev) => ({ ...prev, selectedGearProfileId: "" }));
             return;
           }
           if (v === "__custom__") {
-            onChange({ ...form, selectedGearProfileId: "" });
+            onChange((prev) => ({ ...prev, selectedGearProfileId: "" }));
             return;
           }
           onKitChange(v);

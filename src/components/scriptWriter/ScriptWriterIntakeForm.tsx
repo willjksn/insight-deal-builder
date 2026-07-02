@@ -221,8 +221,7 @@ export function ScriptWriterIntakeForm({
             <span className="text-sm text-slate-700">
               <span className="font-medium text-slate-900">Research current trends</span>
               <span className="mt-0.5 block text-xs text-slate-500">
-                Uses the weekly trend cache when fresh (under 7 days), or Tavily live on refresh.
-                Requires <code className="text-[10px]">TAVILY_API_KEY</code> on the server.
+                Uses the weekly trend cache when fresh (under 7 days), or live research on refresh.
               </span>
             </span>
           </label>

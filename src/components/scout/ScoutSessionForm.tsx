@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Dispatch, SetStateAction } from "react";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
@@ -34,13 +35,14 @@ import { projectLocationHint, projectsForScoutLinkDisplay } from "@/lib/utils/sc
 
 type Props = {
   form: ScoutSessionFormValues;
-  onChange: (next: ScoutSessionFormValues) => void;
+  onChange: Dispatch<SetStateAction<ScoutSessionFormValues>>;
   linkedProjectId: string;
   onLinkedProjectChange: (projectId: string) => void;
   projects: Project[];
   canLinkProjects: boolean;
   gearProfiles: ScoutGearProfile[];
   linkedProject?: Project;
+  fieldErrors?: Partial<Record<"projectName" | "sceneIdea", string>>;
 };
 
 export function ScoutSessionForm({
@@ -52,9 +54,10 @@ export function ScoutSessionForm({
   canLinkProjects,
   gearProfiles,
   linkedProject,
+  fieldErrors,
 }: Props) {
   const set = <K extends keyof ScoutSessionFormValues>(key: K, value: ScoutSessionFormValues[K]) => {
-    onChange({ ...form, [key]: value });
+    onChange((prev) => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -81,8 +84,10 @@ export function ScoutSessionForm({
       <ScoutCard className="space-y-4">
         <Input
           label="Session name"
+          name="projectName"
           value={form.projectName}
           onChange={(e) => set("projectName", e.target.value)}
+          error={fieldErrors?.projectName}
           touch
         />
         <Select
@@ -94,6 +99,7 @@ export function ScoutSessionForm({
         />
         <Textarea
           label="Scene idea"
+          name="sceneIdea"
           value={form.sceneIdea}
           onChange={(e) => set("sceneIdea", e.target.value)}
           placeholder={
@@ -102,6 +108,7 @@ export function ScoutSessionForm({
                 "What happens in this scene? Who is on camera?"
               : "What happens in this scene? Who is on camera?"
           }
+          error={fieldErrors?.sceneIdea}
           className="min-h-[88px]"
           touch
         />

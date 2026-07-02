@@ -78,10 +78,14 @@ export async function scoutGenerateShotList(scoutProjectId: string) {
   return body;
 }
 
-export async function scoutGeneratePreview(scoutProjectId: string) {
+export async function scoutGeneratePreview(
+  scoutProjectId: string,
+  options?: { generateImages?: boolean }
+) {
   const res = await fetch(`/api/scout/${scoutProjectId}/preview`, {
     method: "POST",
     headers: await authHeaders(),
+    body: JSON.stringify({ generateImages: options?.generateImages === true }),
   });
   const body = await res.json();
   if (!res.ok) throw new Error(body.error ?? "Preview failed");

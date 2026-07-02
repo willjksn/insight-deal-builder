@@ -17,9 +17,15 @@ import { Project } from "@/lib/types";
 import { ScoutProject } from "@/lib/scout/types";
 import { ProductionBoard } from "@/lib/production/types";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
-import { getScoutProjectsForLinkedProject } from "@/lib/firebase/scoutFirestore";
 import { getProductionBoardByProject } from "@/lib/firebase/productionFirestore";
+import { getScoutProjectsByIds } from "@/lib/firebase/scoutFirestore";
 import { scriptWriterListSessions } from "@/lib/scriptWriter/apiClient";
+import { useScoutProjects } from "@/hooks/useScoutProjects";
+import {
+  pickScoutSessionsForProject,
+  scoutHrefForProject,
+  scoutNewHrefForProject,
+} from "@/lib/utils/scoutProjectLink";
 import { ProjectSpine } from "@/components/projects/ProjectSpine";
 import { ProjectShotProgressCard } from "@/components/projects/ProjectShotProgressCard";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
@@ -53,7 +59,7 @@ export default function ProjectDetailPage() {
   const { user, appUser } = useAuth();
   const { data: project, loading } = useDocument<Project>("projects", id);
   const { data: agreements } = useAgreements();
-  const [scoutSessions, setScoutSessions] = useState<ScoutProject[]>([]);
+  const [boardOnlyScouts, setBoardOnlyScouts] = useState<ScoutProject[]>([]);
   const [board, setBoard] = useState<ProductionBoard | null>(null);
   const [scriptSessions, setScriptSessions] = useState<ScriptWriterSession[]>([]);
   const [spineLoading, setSpineLoading] = useState(false);
@@ -68,6 +74,7 @@ export default function ProjectDetailPage() {
   const projectAccess = useProjectAccess(id, project?.ownerUserId);
   const showScout =
     canUseShotScout(appUser) || projectAccess.canAccessScout;
+  const { data: allScoutSessions } = useScoutProjects(user?.uid, showScout);
   const showProduction =
     canManageProjects(appUser) ||
     canUseShotScout(appUser) ||
@@ -88,15 +95,47 @@ export default function ProjectDetailPage() {
     [scriptSessions, id]
   );
 
-  useEffect(() => {
-    if (!showScout || !id) return;
-    getScoutProjectsForLinkedProject(id).then(setScoutSessions).catch(() => setScoutSessions([]));
-  }, [id, showScout]);
+  const scriptScoutIds = useMemo(
+    () =>
+      [primaryScript?.linkedScoutProjectId, primaryScript?.appliedScoutProjectId].filter(
+        (value): value is string => Boolean(value?.trim())
+      ),
+    [primaryScript?.linkedScoutProjectId, primaryScript?.appliedScoutProjectId]
+  );
+
+  const scoutSessions = useMemo(
+    () =>
+      pickScoutSessionsForProject([...allScoutSessions, ...boardOnlyScouts], id, {
+        boardLinkedScoutIds: board?.linkedScoutProjectIds,
+        scriptScoutIds,
+        projectName: project?.projectName,
+      }),
+    [
+      allScoutSessions,
+      boardOnlyScouts,
+      id,
+      board?.linkedScoutProjectIds,
+      scriptScoutIds,
+      project?.projectName,
+    ]
+  );
 
   useEffect(() => {
-    if (!showProduction || !id) return;
+    const boardIds = board?.linkedScoutProjectIds ?? [];
+    const missing = boardIds.filter((scoutId) => !allScoutSessions.some((s) => s.id === scoutId));
+    if (!missing.length) {
+      setBoardOnlyScouts([]);
+      return;
+    }
+    getScoutProjectsByIds(missing)
+      .then(setBoardOnlyScouts)
+      .catch(() => setBoardOnlyScouts([]));
+  }, [board?.linkedScoutProjectIds, allScoutSessions]);
+
+  useEffect(() => {
+    if (!showScout || !id) return;
     getProductionBoardByProject(id).then(setBoard).catch(() => setBoard(null));
-  }, [id, showProduction]);
+  }, [id, showScout]);
 
   useEffect(() => {
     if (!user || (!showScout && !projectAccess.canAccessScripts)) return;
@@ -159,10 +198,10 @@ export default function ProjectDetailPage() {
               </Link>
             )}
             {showScout && (
-              <Link href={`/scout/new?projectId=${project.id}`}>
+              <Link href={scoutHrefForProject(project.id, scoutSessions)}>
                 <Button size="touch" variant="outline">
                   <Clapperboard className="mr-2 h-5 w-5" />
-                  Scout scene
+                  {scoutSessions.length ? "Open scout" : "Scout scene"}
                 </Button>
               </Link>
             )}
@@ -331,9 +370,9 @@ export default function ProjectDetailPage() {
                   <Clapperboard className="h-5 w-5 text-sky-600" />
                   Shot Scout sessions
                 </h2>
-                <Link href={`/scout/new?projectId=${project.id}`}>
+                <Link href={scoutNewHrefForProject(project.id, scoutSessions.length > 0)}>
                   <Button size="sm" variant="outline">
-                    Add scout session
+                    {scoutSessions.length ? "Add another scout" : "Add scout session"}
                   </Button>
                 </Link>
               </div>

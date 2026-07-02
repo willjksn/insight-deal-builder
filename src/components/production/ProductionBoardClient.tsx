@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Banknote,
@@ -54,7 +54,9 @@ import {
   saveProductionBoard,
   subscribeProductionBoardByProject,
 } from "@/lib/firebase/productionFirestore";
-import { getGearList, getScoutProjectsForLinkedProject } from "@/lib/firebase/scoutFirestore";
+import { getGearList, getScoutProjectsByIds } from "@/lib/firebase/scoutFirestore";
+import { useScoutProjects } from "@/hooks/useScoutProjects";
+import { pickScoutSessionsForProject } from "@/lib/utils/scoutProjectLink";
 import { createEmptyProductionDay } from "@/lib/production/defaults";
 import {
   budgetLinesFromAgreement,
@@ -76,11 +78,12 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
   const { user } = useAuth();
   const { data: agreements } = useAgreements();
   const { data: crewCatalog } = useCollection<CrewMember>("crewMembers");
+  const { data: allScoutSessions } = useScoutProjects(user?.uid);
+  const [boardOnlyScouts, setBoardOnlyScouts] = useState<ScoutProject[]>([]);
   const [board, setBoard] = useState<ProductionBoard | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [scoutSessions, setScoutSessions] = useState<ScoutProject[]>([]);
   const [shootDateDismissed, setShootDateDismissed] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localEditRef = useRef(false);
@@ -104,11 +107,29 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load board"))
       .finally(() => setLoading(false));
-    getScoutProjectsForLinkedProject(project.id)
-      .then(setScoutSessions)
-      .catch(() => setScoutSessions([]));
     return () => unsub?.();
   }, [project, user?.uid]);
+
+  useEffect(() => {
+    const boardIds = board?.linkedScoutProjectIds ?? [];
+    const missing = boardIds.filter((scoutId) => !allScoutSessions.some((s) => s.id === scoutId));
+    if (!missing.length) {
+      setBoardOnlyScouts([]);
+      return;
+    }
+    getScoutProjectsByIds(missing)
+      .then(setBoardOnlyScouts)
+      .catch(() => setBoardOnlyScouts([]));
+  }, [board?.linkedScoutProjectIds, allScoutSessions]);
+
+  const scoutSessions = useMemo(
+    () =>
+      pickScoutSessionsForProject([...allScoutSessions, ...boardOnlyScouts], project.id, {
+        boardLinkedScoutIds: board?.linkedScoutProjectIds,
+        projectName: project.projectName,
+      }),
+    [allScoutSessions, boardOnlyScouts, project.id, project.projectName, board?.linkedScoutProjectIds]
+  );
 
   const persist = useCallback(
     (next: ProductionBoard, immediate = false) => {

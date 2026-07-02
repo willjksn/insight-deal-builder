@@ -16,6 +16,8 @@ import { Agreement } from "@/lib/types";
 import { ScoutProject } from "@/lib/scout/types";
 import { ProductionBoard } from "@/lib/production/types";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
+import { scoutSpineStatus, scoutSpineSummary } from "@/lib/scout/scoutWorkflow";
+import { scoutHrefForProject } from "@/lib/utils/scoutProjectLink";
 
 type SpineStep = {
   key: string;
@@ -72,19 +74,6 @@ function boardSummary(board: ProductionBoard | null | undefined): string {
   if (booked) parts.push(`${booked} location${booked === 1 ? "" : "s"} booked`);
   if (board.scriptSessionId) parts.push("Script on board");
   return parts.length ? parts.join(" · ") : "Board created — add your team and schedule";
-}
-
-function scoutStatus(sessions: ScoutProject[]): SpineStep["status"] {
-  if (!sessions.length) return "empty";
-  if (sessions.some((s) => s.latestDpPlan || s.latestShotList)) return "ready";
-  return "progress";
-}
-
-function scoutSummary(sessions: ScoutProject[]): string {
-  if (!sessions.length) return "No scout sessions linked";
-  const withPlan = sessions.filter((s) => s.latestDpPlan).length;
-  if (withPlan) return `${sessions.length} session${sessions.length === 1 ? "" : "s"} · ${withPlan} with DP plan`;
-  return `${sessions.length} session${sessions.length === 1 ? "" : "s"} in progress`;
 }
 
 function agreementStatus(agreements: Agreement[]): SpineStep["status"] {
@@ -203,14 +192,13 @@ export function ProjectSpine({
   }
 
   if (showScout) {
-    const latestScout = scoutSessions[0];
     steps.push({
       key: "scout",
       label: "Shot Scout",
       icon: Clapperboard,
-      href: latestScout ? `/scout/${latestScout.id}` : `/scout/new?projectId=${projectId}`,
-      status: scoutStatus(scoutSessions),
-      summary: scoutSummary(scoutSessions),
+      href: scoutHrefForProject(projectId, scoutSessions),
+      status: scoutSpineStatus(scoutSessions),
+      summary: scoutSpineSummary(scoutSessions),
       detail: scoutSessions.length > 1 ? `${scoutSessions.length} sessions linked` : undefined,
     });
   }

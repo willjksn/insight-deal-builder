@@ -47,8 +47,8 @@ function item(
     phase,
     sortOrder,
     done: false,
-    hint: options?.hint,
-    clientOnly: options?.clientOnly,
+    ...(options?.hint ? { hint: options.hint } : {}),
+    ...(options?.clientOnly ? { clientOnly: true } : {}),
   };
 }
 
@@ -151,7 +151,7 @@ export function buildChecklistForMode(
       ...template,
       id: template.stepKey,
       done: saved?.done ?? false,
-      notes: saved?.notes,
+      ...(saved?.notes !== undefined ? { notes: saved.notes } : {}),
     };
   });
 }

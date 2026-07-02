@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ReferenceGuideView } from "@/components/reference/ReferenceGuideView";
@@ -43,6 +45,13 @@ export default function ReferenceGuidePage() {
 
   return (
     <div className="pb-24">
+      <Link
+        href="/dashboard"
+        className="mb-4 inline-flex items-center text-sm font-medium text-sky-600 hover:text-sky-800"
+      >
+        <ArrowLeft className="mr-1 h-4 w-4" />
+        Back to command center
+      </Link>
       <PageHeader
         title="Reference guide"
         subtitle="Lighting, cameras, lenses, scripts & writing, and on-set workflow — iPad-friendly reference for ShootSpine crews."

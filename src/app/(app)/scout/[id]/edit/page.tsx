@@ -22,6 +22,10 @@ import {
   scoutGenerateShotList,
 } from "@/lib/scout/apiClient";
 import {
+  readSessionFormFromSubmit,
+  validateScoutSessionForm,
+} from "@/lib/scout/readSessionFormFromSubmit";
+import {
   DEFAULT_SCOUT_SESSION_FORM,
   formValuesToScoutProjectFields,
   scoutProjectToFormValues,
@@ -52,6 +56,9 @@ export default function ScoutEditPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<"projectName" | "sceneIdea", string>>
+  >({});
 
   useEffect(() => {
     getScoutProject(id)
@@ -94,12 +101,19 @@ export default function ScoutEditPage() {
     await scoutGeneratePreview(id);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user?.uid || !project) return;
     setError(null);
-    if (!form.projectName.trim() || !form.sceneIdea.trim()) {
-      setError("Session name and scene idea are required.");
+    setFieldErrors({});
+
+    const submission = readSessionFormFromSubmit(e.currentTarget, form);
+    setForm(submission);
+
+    const validation = validateScoutSessionForm(submission);
+    if (!validation.ok) {
+      setFieldErrors(validation.fieldErrors);
+      setError(validation.message);
       return;
     }
 
@@ -107,7 +121,7 @@ export default function ScoutEditPage() {
     try {
       await updateScoutProject(
         id,
-        formValuesToScoutProjectFields(form, linkedProjectId, linkedProject?.projectName)
+        formValuesToScoutProjectFields(submission, linkedProjectId, linkedProject?.projectName)
       );
 
       if (regenerateAfterSave && scoutSessionHasDownstreamArtifacts(project)) {
@@ -168,6 +182,7 @@ export default function ScoutEditPage() {
             canLinkProjects={canLinkProjects}
             gearProfiles={gearProfiles}
             linkedProject={linkedProject}
+            fieldErrors={fieldErrors}
           />
 
           {hasArtifacts && (

@@ -33,24 +33,77 @@ function ensureDb() {
 
 export const SCOUT_PROJECTS_COLLECTION = "shotScoutProjects";
 
-export async function getScoutProjectsForUser(userId: string): Promise<ScoutProject[]> {
-  const database = ensureDb();
-  const q = query(
-    collection(database, SCOUT_PROJECTS_COLLECTION),
-    where("userId", "==", userId),
-    orderBy("createdAt", "desc")
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as ScoutProject);
+function scoutCreatedAtMs(project: ScoutProject): number {
+  const raw = project.createdAt as { toMillis?: () => number } | string | undefined;
+  if (raw && typeof raw === "object" && typeof raw.toMillis === "function") {
+    return raw.toMillis();
+  }
+  if (typeof raw === "string") {
+    const ms = Date.parse(raw);
+    return Number.isNaN(ms) ? 0 : ms;
+  }
+  return 0;
+}
+
+function sortScoutProjectsNewestFirst(projects: ScoutProject[]): ScoutProject[] {
+  return [...projects].sort((a, b) => scoutCreatedAtMs(b) - scoutCreatedAtMs(a));
 }
 
 export async function getScoutProjectsForLinkedProject(
   linkedProjectId: string
 ): Promise<ScoutProject[]> {
   const database = ensureDb();
+  try {
+    const q = query(
+      collection(database, SCOUT_PROJECTS_COLLECTION),
+      where("linkedProjectId", "==", linkedProjectId),
+      orderBy("createdAt", "desc")
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as ScoutProject);
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : "";
+    if (code !== "failed-precondition") throw err;
+    const q = query(
+      collection(database, SCOUT_PROJECTS_COLLECTION),
+      where("linkedProjectId", "==", linkedProjectId)
+    );
+    const snapshot = await getDocs(q);
+    return sortScoutProjectsNewestFirst(
+      snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as ScoutProject)
+    );
+  }
+}
+
+export async function getScoutProjectsByIds(ids: string[]): Promise<ScoutProject[]> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return [];
+  const projects = await Promise.all(unique.map((id) => getScoutProject(id)));
+  return sortScoutProjectsNewestFirst(projects.filter((p): p is ScoutProject => Boolean(p)));
+}
+
+/** Linked scouts by project id and/or production board scout ids (deduped). */
+export async function resolveScoutSessionsForProject(
+  projectId: string,
+  boardLinkedScoutIds: string[] = []
+): Promise<ScoutProject[]> {
+  const [byLink, byBoardIds] = await Promise.all([
+    getScoutProjectsForLinkedProject(projectId).catch(() => [] as ScoutProject[]),
+    getScoutProjectsByIds(boardLinkedScoutIds).catch(() => [] as ScoutProject[]),
+  ]);
+  const map = new Map<string, ScoutProject>();
+  for (const session of [...byLink, ...byBoardIds]) {
+    map.set(session.id, session);
+  }
+  return sortScoutProjectsNewestFirst([...map.values()]);
+}
+
+export async function getScoutProjectsForUser(userId: string): Promise<ScoutProject[]> {
+  const database = ensureDb();
   const q = query(
     collection(database, SCOUT_PROJECTS_COLLECTION),
-    where("linkedProjectId", "==", linkedProjectId),
+    where("userId", "==", userId),
     orderBy("createdAt", "desc")
   );
   const snapshot = await getDocs(q);

@@ -201,6 +201,9 @@ export interface ScoutCreativeBrief {
   subjectAction?: string;
   peopleCount?: number;
   subjectPose?: string;
+  /** Selected movement keys — use readCameraMovementsFromBrief() when loading. */
+  cameraMovements?: string[];
+  /** Human-readable summary for prompts / legacy single-select saves. */
   cameraMovement?: string;
   avoidHeavyGrading?: boolean;
   completedAt?: string;

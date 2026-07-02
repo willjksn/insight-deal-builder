@@ -19,6 +19,12 @@ import {
   ScriptSuggestedShot,
 } from "@/lib/scriptWriter/types";
 
+/** AI / legacy sessions may store scene numbers as numbers — normalize for string ops. */
+export function normalizeSceneRef(value: string | number | undefined | null): string {
+  if (value == null) return "";
+  return String(value).trim();
+}
+
 const SHOT_TYPES = new Set<string>([
   "master_wide",
   "medium_shot",
@@ -52,10 +58,11 @@ export function scoutShotsFromScript(script: ScriptDocument): ScoutShotListItem[
 }
 
 function scriptShotToScout(shot: ScriptSuggestedShot): ScoutShotListItem {
+  const shotName = shot.shotName?.trim();
   return {
     shotNumber: shot.shotNumber,
-    shotName: shot.shotName?.trim(),
-    scene: shot.sceneNumber,
+    ...(shotName ? { shotName } : {}),
+    scene: normalizeSceneRef(shot.sceneNumber) || "1",
     shotType: normalizeShotType(shot.shotType),
     camera: "TBD",
     lens: "TBD",
@@ -86,11 +93,13 @@ export function productionShotsFromScript(script: ScriptDocument): ProductionDay
       scoutShotNumber: shot.shotNumber,
       sortOrder: index,
       shotType,
-      shotName: name,
-      subjectAction: subject,
-      cameraMovement: shot.cameraMovement?.trim(),
+      ...(name ? { shotName: name } : {}),
+      ...(subject ? { subjectAction: subject } : {}),
+      ...(shot.cameraMovement?.trim() ? { cameraMovement: shot.cameraMovement.trim() } : {}),
+      ...(normalizeSceneRef(shot.sceneNumber)
+        ? { sceneRef: normalizeSceneRef(shot.sceneNumber) }
+        : {}),
     };
-    if (shot.sceneNumber?.trim()) entry.sceneRef = shot.sceneNumber.trim();
     const notes = [shot.description, shot.lens, shot.lighting, shot.purpose]
       .filter(Boolean)
       .join(" · ");
@@ -119,7 +128,7 @@ export function mergeProductionShotsFromScript(
 }
 
 export function sceneNumbersFromScript(script: ScriptDocument): string[] {
-  return script.scenes.map((s) => s.sceneNumber).filter(Boolean);
+  return script.scenes.map((s) => normalizeSceneRef(s.sceneNumber)).filter(Boolean);
 }
 
 export function locationsFromScript(script: ScriptDocument): ProductionLocationEntry[] {
@@ -150,7 +159,7 @@ export function castFromScript(script: ScriptDocument): ProductionPerson[] {
     group: "cast" as const,
     name: character.name.trim(),
     role: character.role.trim() || "Cast",
-    notes: character.description?.trim(),
+    ...(character.description?.trim() ? { notes: character.description.trim() } : {}),
     sortOrder: index,
   }));
 }
@@ -175,16 +184,21 @@ export function locationsFromInspirationImages(
       id: crypto.randomUUID(),
       name: img.label?.trim() || `Location ${index + 1}`,
       status: "needed" as const,
-      notes: img.storageUrl ? "Reference photo from script writer" : undefined,
-      photoUrl: img.storageUrl,
+      ...(img.storageUrl
+        ? {
+            notes: "Reference photo from script writer",
+            photoUrl: img.storageUrl,
+          }
+        : {}),
     }));
 }
 
 function heroShotForScene(
-  sceneNumber: string,
+  sceneNumber: string | number,
   shots: ScriptSuggestedShot[]
 ): ScriptSuggestedShot | undefined {
-  const sceneShots = shots.filter((s) => s.sceneNumber === sceneNumber);
+  const ref = normalizeSceneRef(sceneNumber);
+  const sceneShots = shots.filter((s) => normalizeSceneRef(s.sceneNumber) === ref);
   return (
     sceneShots.find((s) => normalizeShotType(s.shotType) === "master_wide") ?? sceneShots[0]
   );
@@ -204,12 +218,12 @@ export function deriveStoryboardFramesFromScript(script: ScriptDocument): Script
     const shotType = hero ? normalizeShotType(hero.shotType) : "master_wide";
     const typeLabel = formatShotTypeLabel(shotType);
     return {
-      sceneNumber: scene.sceneNumber,
+      sceneNumber: normalizeSceneRef(scene.sceneNumber),
       sceneHeading: scene.heading,
       shotType,
-      shotName: hero?.shotName ?? `${typeLabel} — Scene ${scene.sceneNumber}`,
-      caption: hero?.description?.trim() || scene.action.trim() || scene.heading,
-      audioCue: audioFromScene(script, scene.sceneNumber),
+      shotName: hero?.shotName ?? `${typeLabel} — Scene ${normalizeSceneRef(scene.sceneNumber)}`,
+      caption: hero?.description?.trim() || scene.action?.trim() || scene.heading,
+      audioCue: audioFromScene(script, normalizeSceneRef(scene.sceneNumber)),
     };
   });
 }
@@ -222,19 +236,22 @@ function scriptFrameToProduction(
 ): ProductionSceneFrame {
   const img = pickInspirationForFrame(frame, pool, usedIds);
   if (img) usedIds.add(img.id);
+  const shotName = frame.shotName?.trim();
+  const sceneHeading = frame.sceneHeading?.trim();
+  const audioCue = frame.audioCue?.trim();
   return {
     id: crypto.randomUUID(),
-    sceneRef: frame.sceneNumber.trim(),
-    sceneHeading: frame.sceneHeading?.trim(),
+    sceneRef: normalizeSceneRef(frame.sceneNumber),
     shotType: normalizeShotType(frame.shotType),
-    shotName: frame.shotName?.trim(),
-    caption: frame.caption.trim(),
-    audioCue: frame.audioCue?.trim(),
-    referenceImageUrl: img?.imageUrl,
-    referenceImageStoragePath: img?.storagePath,
-    referenceImageSource: img ? "script_match" : undefined,
-    inspirationImageId: img?.id,
+    caption: (frame.caption ?? "").trim(),
     sortOrder: index,
+    ...(sceneHeading ? { sceneHeading } : {}),
+    ...(shotName ? { shotName } : {}),
+    ...(audioCue ? { audioCue } : {}),
+    ...(img?.imageUrl ? { referenceImageUrl: img.imageUrl } : {}),
+    ...(img?.storagePath ? { referenceImageStoragePath: img.storagePath } : {}),
+    ...(img ? { referenceImageSource: "script_match" as const } : {}),
+    ...(img?.id ? { inspirationImageId: img.id } : {}),
   };
 }
 
@@ -291,8 +308,8 @@ export function inspirationImagesFromSession(
       id: img.id,
       imageUrl: img.storageUrl,
       storagePath: img.storagePath,
-      caption: img.label,
       sortOrder: merged.length,
+      ...(img.label?.trim() ? { caption: img.label.trim() } : {}),
     });
   }
   return merged;

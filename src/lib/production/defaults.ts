@@ -22,6 +22,7 @@ export function createProductionBoardFromProject(
   project: Project,
   userId: string
 ): Omit<ProductionBoard, "id" | "createdAt" | "updatedAt"> {
+  const checklist = defaultChecklistForProject(project);
   return {
     projectId: project.id,
     userId,
@@ -54,6 +55,7 @@ export function createProductionBoardFromProject(
     budgetLink: "",
     productionDays: [createEmptyProductionDay(1)],
     linkedScoutProjectIds: [],
-    ...defaultChecklistForProject(project),
+    checklistMode: checklist.mode,
+    checklistItems: checklist.items,
   };
 }

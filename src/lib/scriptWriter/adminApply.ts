@@ -1,10 +1,9 @@
 import { FieldValue, Firestore } from "firebase-admin/firestore";
 import { Project } from "@/lib/types";
 import { ProductionBoard } from "@/lib/production/types";
-import { createProductionBoardFromProject } from "@/lib/production/defaults";
+import { createProductionBoardFromProject, createEmptyProductionDay } from "@/lib/production/defaults";
 import { PRODUCTION_BOARDS_COLLECTION } from "@/lib/firebase/productionFirestore";
 import { stripUndefined } from "@/lib/firebase/firestore";
-import { ScoutShotList } from "@/lib/scout/types";
 import {
   castFromScript,
   filmingNotesFromScript,
@@ -68,22 +67,37 @@ export async function applyScriptToProject(params: {
       updatedAt: FieldValue.serverTimestamp(),
     });
     const ref = await db.collection(PRODUCTION_BOARDS_COLLECTION).add(payload);
-    board = { ...(payload as unknown as ProductionBoard), id: ref.id };
+    board = {
+      ...(payload as unknown as ProductionBoard),
+      id: ref.id,
+      people: [],
+      locations: [],
+      productionDays: [createEmptyProductionDay(1)],
+      inspirationImages: [],
+      linkedScoutProjectIds: [],
+    };
   }
+
+  const boardPeople = board.people ?? [];
+  const boardLocations = board.locations ?? [];
+  const boardDays = board.productionDays?.length
+    ? board.productionDays
+    : [createEmptyProductionDay(1)];
+  const boardInspiration = board.inspirationImages ?? [];
 
   const newCast = castFromScript(script);
   const existingCastIds = new Set(
-    board.people.filter((p) => p.group === "cast").map((p) => p.name.toLowerCase())
+    boardPeople.filter((p) => p.group === "cast").map((p) => p.name.toLowerCase())
   );
   const mergedPeople = [
-    ...board.people,
+    ...boardPeople,
     ...newCast.filter((p) => !existingCastIds.has(p.name.toLowerCase())),
   ];
 
   const newLocations = locationsFromScript(script);
   const inspirationLocations = locationsFromInspirationImages(session.inspirationImages ?? []);
-  const locSet = new Set(board.locations.map((l) => l.name.toLowerCase()));
-  const mergedLocations = [...board.locations];
+  const locSet = new Set(boardLocations.map((l) => l.name.toLowerCase()));
+  const mergedLocations = [...boardLocations];
   for (const loc of [...newLocations, ...inspirationLocations]) {
     const key = loc.name.toLowerCase();
     if (locSet.has(key)) continue;
@@ -91,27 +105,27 @@ export async function applyScriptToProject(params: {
     mergedLocations.push(loc);
   }
 
-  const dayOne = board.productionDays[0];
+  const dayOne = boardDays[0];
   const sessionImages = session.inspirationImages ?? [];
-  const mergedInspiration = inspirationImagesFromSession(sessionImages, board.inspirationImages);
+  const mergedInspiration = inspirationImagesFromSession(sessionImages, boardInspiration);
   const sceneFrames =
     session.storyboardMode || script.storyboardFrames?.length
       ? productionSceneFramesFromScript(script, sessionImages, mergedInspiration)
       : dayOne?.sceneFrames ?? [];
 
-  const updatedDays = board.productionDays.length
-    ? board.productionDays.map((day, index) =>
+  const updatedDays = boardDays.length
+    ? boardDays.map((day, index) =>
         index === 0
-          ? {
+          ? stripUndefined({
               ...day,
               title: script.title || day.title,
               scenes: sceneNumbersFromScript(script),
               shots: productionShotsFromScript(script),
               sceneFrames,
-            }
+            })
           : day
       )
-    : board.productionDays;
+    : boardDays;
 
   const notesPrefix = filmingNotesFromScript(script);
   const filmingNotes = board.filmingNotes?.trim()
@@ -119,15 +133,12 @@ export async function applyScriptToProject(params: {
     : notesPrefix;
 
   const scoutShots = scoutShotsFromScript(script);
-  const latestShotList: Omit<ScoutShotList, "createdAt" | "updatedAt"> & {
-    createdAt: string;
-    updatedAt: string;
-  } = {
+  const latestShotList = stripUndefined({
     id: crypto.randomUUID(),
     shots: scoutShots,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  };
+  });
 
   let scoutProjectId = session.linkedScoutProjectId ?? session.appliedScoutProjectId;
 
@@ -137,7 +148,7 @@ export async function applyScriptToProject(params: {
     if (scoutSnap.exists && scoutSnap.data()?.userId === uid) {
       await scoutRef.update(
         stripUndefined({
-          sceneIdea: script.logline || script.fountain.slice(0, 500),
+          sceneIdea: script.logline || (script.fountain ?? "").slice(0, 500),
           projectName: script.title,
           theme: script.lookAndFeel ?? scoutSnap.data()?.theme,
           latestShotList,
@@ -152,7 +163,7 @@ export async function applyScriptToProject(params: {
       stripUndefined({
         userId: uid,
         projectName: script.title,
-        sceneIdea: script.logline || script.fountain.slice(0, 800),
+        sceneIdea: script.logline || (script.fountain ?? "").slice(0, 800),
         sceneType: "short_film",
         mood: "cinematic",
         theme: script.lookAndFeel ?? "",
@@ -190,7 +201,7 @@ export async function applyScriptToProject(params: {
       inspirationImages: mergedInspiration,
       productionDays: updatedDays,
       scriptSessionId: session.id,
-      scriptFountain: script.fountain,
+      scriptFountain: script.fountain ?? "",
       linkedScoutProjectIds: linkedScoutIds,
       updatedAt: FieldValue.serverTimestamp(),
     })

@@ -39,6 +39,7 @@ import { ScoutLinkToProjectCard } from "@/components/scout/ScoutLinkToProjectCar
 import { useConditionalCollection } from "@/hooks/useConditionalCollection";
 import { Project } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
+import { scoutWorkflowSteps } from "@/lib/scout/scoutWorkflow";
 import { SharedNotesPanel } from "@/components/sharedNotes/SharedNotesPanel";
 
 function formatPlanValue(v: string | string[] | undefined): string {
@@ -179,17 +180,17 @@ export default function ScoutProjectPage() {
     }
   };
 
-  const runPreview = async () => {
-    setBusy("preview");
+  const runPreview = async (generateImages = false) => {
+    setBusy(generateImages ? "preview-images" : "preview");
     setError(null);
     try {
-      const result = await scoutGeneratePreview(id);
+      const result = await scoutGeneratePreview(id, { generateImages });
       await refresh();
       setTab("preview");
       const warnings = Array.isArray(result.warnings) ? (result.warnings as string[]) : [];
       if (warnings.length) {
         setError(
-          `Previs prompts saved, but some images failed: ${warnings.slice(0, 2).join(" · ")}${
+          `${generateImages ? "Some images failed" : "Previs saved with warnings"}: ${warnings.slice(0, 2).join(" · ")}${
             warnings.length > 2 ? ` (+${warnings.length - 2} more)` : ""
           }`
         );
@@ -207,7 +208,7 @@ export default function ScoutProjectPage() {
   const runRegenerateAll = async () => {
     if (
       !confirm(
-        "Regenerate everything from your current photos and settings?\n\nThis re-runs analysis (if needed), DP plan, shot list, and previs."
+        "Regenerate analysis (if needed), DP plan, and shot list from your current photos and settings?\n\nPrevis images are not included — use Previs tab if you want prompts or images."
       )
     ) {
       return;
@@ -218,17 +219,8 @@ export default function ScoutProjectPage() {
       if (!analysis) await scoutAnalyze(id);
       await scoutGenerateDpPlan(id);
       await scoutGenerateShotList(id);
-      const result = await scoutGeneratePreview(id);
       await refresh();
-      setTab("preview");
-      const warnings = Array.isArray(result.warnings) ? (result.warnings as string[]) : [];
-      if (warnings.length) {
-        setError(
-          `Regenerated, but some previs images failed: ${warnings.slice(0, 2).join(" · ")}${
-            warnings.length > 2 ? ` (+${warnings.length - 2} more)` : ""
-          }`
-        );
-      }
+      setTab("shots");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Regeneration failed");
     } finally {
@@ -270,6 +262,7 @@ export default function ScoutProjectPage() {
   const dp = project.latestDpPlan;
   const shots = project.latestShotList;
   const previews = project.latestPreviews ?? [];
+  const workflowSteps = scoutWorkflowSteps(id, project, images.length);
   const isBeginner = project.skillLevel === "beginner";
   const adminReadOnly = adminOpen && !!user && project.userId !== user.uid;
 
@@ -359,11 +352,47 @@ export default function ScoutProjectPage() {
                 onClick={() => void runRegenerateAll()}
               >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                {busy === "all" ? "Regenerating…" : "Regenerate all"}
+                {busy === "all" ? "Regenerating…" : "Regenerate plan & shots"}
               </Button>
             )}
           </div>
         </div>
+
+        <ScoutCard className="mb-6">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Session progress</p>
+          <div className="flex flex-wrap gap-2">
+            {workflowSteps.map((step) =>
+              step.href ? (
+                <Link
+                  key={step.id}
+                  href={step.href}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition-colors",
+                    step.done
+                      ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
+                      : "bg-white text-slate-600 ring-slate-200 hover:ring-sky-300"
+                  )}
+                >
+                  {step.done ? "✓ " : ""}
+                  {step.label}
+                </Link>
+              ) : (
+                <span
+                  key={step.id}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-xs font-medium ring-1",
+                    step.done
+                      ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
+                      : "bg-slate-50 text-slate-500 ring-slate-200"
+                  )}
+                >
+                  {step.done ? "✓ " : ""}
+                  {step.label}
+                </span>
+              )
+            )}
+          </div>
+        </ScoutCard>
 
         <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-slate-200/80 bg-white/90 p-1 shadow-sm">
           {tabs.map((t) => {
@@ -697,13 +726,13 @@ export default function ScoutProjectPage() {
             </div>
             <ScoutVersionHistory scoutId={id} kind="shotLists" onRestored={() => void refresh()} />
             {!previews.length && (
-              <div className="p-4 border-t border-slate-100">
-                <p className="mb-3 text-xs text-slate-500">
-                  Lighting diagram plus 3 overall scene views (wide, medium, mood) — not one image per
-                  shot.
+              <div className="p-4 border-t border-slate-100 space-y-3">
+                <p className="text-xs text-slate-500">
+                  Save lighting-diagram and scene-view prompts for the crew (no image generation cost).
+                  AI images are optional below.
                 </p>
-                <Button onClick={() => void runPreview()} disabled={!!busy}>
-                  Generate diagram &amp; scene views →
+                <Button onClick={() => void runPreview(false)} disabled={!!busy}>
+                  {busy === "preview" ? "Saving prompts…" : "Save previs prompts →"}
                 </Button>
               </div>
             )}
@@ -725,14 +754,38 @@ export default function ScoutProjectPage() {
         {tab === "preview" && (
           <div className="space-y-6">
             {previews.length === 0 ? (
-              <ScoutCard>
+              <ScoutCard className="space-y-4">
                 <p className="text-sm text-slate-600">
-                  Top-down lighting diagram plus 3 overall scene views of your location (not one image
-                  per shot in the list).
+                  Save written previs prompts for the lighting diagram and overall scene views — useful
+                  for the crew without generating AI images.
                 </p>
-                <Button onClick={() => void runPreview()} disabled={!!busy || !dp} className="mt-4">
-                  Generate diagram &amp; scene views
+                <Button onClick={() => void runPreview(false)} disabled={!!busy || !dp}>
+                  {busy === "preview" ? "Saving prompts…" : "Save previs prompts"}
                 </Button>
+                <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 px-4 py-3">
+                  <p className="text-sm font-medium text-amber-950">Optional: AI images</p>
+                  <p className="mt-1 text-xs text-amber-900">
+                    Generates diagram and scene images via OpenAI — uses API credits. Skip this if cost
+                    is a concern; prompts above are enough for most shoots.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-3"
+                    disabled={!!busy || !dp || images.length === 0}
+                    onClick={() => {
+                      if (
+                        !confirm(
+                          "Generate AI previs images? This uses OpenAI image credits and can add cost."
+                        )
+                      ) {
+                        return;
+                      }
+                      void runPreview(true);
+                    }}
+                  >
+                    {busy === "preview-images" ? "Generating images…" : "Generate AI images (optional)"}
+                  </Button>
+                </div>
               </ScoutCard>
             ) : (
               <>
@@ -809,16 +862,32 @@ export default function ScoutProjectPage() {
                     </div>
                   </div>
                 )}
-                <div className="pt-2">
+                <div className="pt-2 flex flex-wrap gap-2">
                   <Button
                     variant="outline"
                     disabled={!!busy || !dp}
                     onClick={() => {
-                      if (!confirmRegenerate("lighting diagram")) return;
-                      void runPreview();
+                      if (!confirmRegenerate("previs prompts")) return;
+                      void runPreview(false);
                     }}
                   >
-                    {busy === "preview" ? "Regenerating…" : "Regenerate diagram"}
+                    {busy === "preview" ? "Saving…" : "Regenerate prompts"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={!!busy || !dp || images.length === 0}
+                    onClick={() => {
+                      if (
+                        !confirm(
+                          "Regenerate AI previs images? This uses OpenAI image credits and can add cost."
+                        )
+                      ) {
+                        return;
+                      }
+                      void runPreview(true);
+                    }}
+                  >
+                    {busy === "preview-images" ? "Generating…" : "Regenerate AI images (optional)"}
                   </Button>
                 </div>
               </>
@@ -837,7 +906,13 @@ export default function ScoutProjectPage() {
               <li>{dp ? "✓ DP plan + camera settings" : "○ DP plan"}</li>
               <li>{dp?.fixtureAwareLighting ? "✓ Fixture assignment table" : "○ Fixture lighting"}</li>
               <li>{shots ? "✓ Shot list" : "○ Shot list"}</li>
-              <li>{previews.length ? "✓ Scene previs + lighting diagram" : "○ Scene previs"}</li>
+              <li>
+                {previews.some((p) => p.imageUrl)
+                  ? "✓ Scene previs images"
+                  : previews.length
+                    ? "✓ Previs prompts (no images)"
+                    : "○ Previs prompts (optional)"}
+              </li>
             </ul>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button
