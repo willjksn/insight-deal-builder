@@ -39,6 +39,7 @@ import { ScoutLinkToProjectCard } from "@/components/scout/ScoutLinkToProjectCar
 import { useConditionalCollection } from "@/hooks/useConditionalCollection";
 import { Project } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
+import { SharedNotesPanel } from "@/components/sharedNotes/SharedNotesPanel";
 
 function formatPlanValue(v: string | string[] | undefined): string {
   if (v == null) return "—";
@@ -855,6 +856,13 @@ export default function ScoutProjectPage() {
           </ScoutCard>
         )}
       </div>
+
+      <SharedNotesPanel
+        resourceType="scout"
+        resourceId={id}
+        adminOpen={adminOpen}
+        className="mt-8"
+      />
     </ScoutShell>
   );
 }

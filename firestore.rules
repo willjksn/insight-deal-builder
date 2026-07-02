@@ -299,6 +299,10 @@ service cloud.firestore {
         allow read: if canWriteScout(scoutId) || request.auth.uid == memberId;
         allow write: if false;
       }
+
+      match /notes/{noteId} {
+        allow read, write: if false;
+      }
     }
 
     match /users/{userId}/gearProfiles/{gearId} {
@@ -408,6 +412,10 @@ service cloud.firestore {
       match /members/{memberId} {
         allow read: if request.auth.uid == memberId;
         allow write: if false;
+      }
+
+      match /notes/{noteId} {
+        allow read, write: if false;
       }
     }
 

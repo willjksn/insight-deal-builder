@@ -7,6 +7,11 @@ import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { formatDate } from "@/lib/utils/format";
+import {
+  notificationBody,
+  notificationHref,
+  notificationTitle,
+} from "@/lib/notifications/display";
 
 export function NotificationBell() {
   const { appUser } = useAuth();
@@ -64,7 +69,7 @@ export function NotificationBell() {
               notifications.map((n) => (
                 <li key={n.id}>
                   <Link
-                    href={n.type === "user_signup_pending" ? "/admin" : `/agreements/${n.agreementId}`}
+                    href={notificationHref(n)}
                     onClick={() => {
                       if (!n.read) markRead(n.id);
                       setOpen(false);
@@ -74,16 +79,8 @@ export function NotificationBell() {
                       !n.read && "bg-sky-50/60"
                     )}
                   >
-                    <p className="text-sm font-medium text-slate-900">
-                      {n.type === "user_signup_pending"
-                        ? "New signup pending approval"
-                        : "Client signed agreement"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-600 line-clamp-2">
-                      {n.type === "user_signup_pending"
-                        ? `${n.pendingUserName || n.pendingUserEmail || "Someone"} is waiting for access`
-                        : `${n.signerName} signed${n.projectName ? ` — ${n.projectName}` : ""}`}
-                    </p>
+                    <p className="text-sm font-medium text-slate-900">{notificationTitle(n)}</p>
+                    <p className="mt-0.5 text-xs text-slate-600 line-clamp-2">{notificationBody(n)}</p>
                     <p className="mt-1 text-[10px] text-slate-400">
                       {n.createdAt?.toDate ? formatDate(n.createdAt.toDate().toISOString()) : ""}
                     </p>

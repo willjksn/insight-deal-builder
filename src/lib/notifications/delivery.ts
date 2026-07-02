@@ -219,3 +219,76 @@ export async function sendSignupPendingPush(
     failed: response.failureCount,
   };
 }
+
+export function buildSharedResourceNoteEmail(params: {
+  resourceType: "script" | "scout";
+  resourceTitle: string;
+  authorName: string;
+  notePreview: string;
+  resourceUrl: string;
+}): { subject: string; html: string; text: string } {
+  const kind = params.resourceType === "script" ? "script" : "scout session";
+  const subject = `New note on ${params.resourceTitle}`;
+  const text = `${params.authorName} left a note on your ${kind} "${params.resourceTitle}":
+
+"${params.notePreview}"
+
+Open: ${params.resourceUrl}
+
+— ${INSIGHT_MEDIA_GROUP_LLC}`;
+
+  const html = `
+    <p><strong>${params.authorName}</strong> left a note on your ${kind} <strong>${params.resourceTitle}</strong>:</p>
+    <p style="margin:12px 0;padding:12px;background:#f8fafc;border-radius:8px;color:#334155;">${params.notePreview}</p>
+    <p><a href="${params.resourceUrl}">View ${kind}</a></p>
+    <p style="color:#64748b;font-size:12px;">${INSIGHT_MEDIA_GROUP_LLC}</p>
+  `;
+
+  return { subject, html, text };
+}
+
+export async function sendSharedResourceNoteEmails(
+  recipients: NotificationRecipient[],
+  emailContent: { subject: string; html: string; text: string }
+): Promise<EmailDeliveryResult> {
+  return sendAgreementSignedEmails(recipients, emailContent);
+}
+
+export async function sendSharedResourceNotePush(
+  messaging: import("firebase-admin/messaging").Messaging,
+  recipients: NotificationRecipient[],
+  payload: { title: string; body: string; resourcePath: string; appUrl: string }
+): Promise<{ sent: number; failed: number }> {
+  const tokens = [
+    ...new Set(
+      recipients
+        .filter((r) => r.notifyPush)
+        .flatMap((r) => r.fcmTokens ?? [])
+        .filter(Boolean)
+    ),
+  ];
+
+  if (!tokens.length) return { sent: 0, failed: 0 };
+
+  const response = await messaging.sendEachForMulticast({
+    tokens,
+    notification: {
+      title: payload.title,
+      body: payload.body,
+    },
+    data: {
+      type: "shared_resource_note",
+      url: payload.resourcePath,
+    },
+    webpush: {
+      fcmOptions: {
+        link: `${payload.appUrl.replace(/\/$/, "")}${payload.resourcePath}`,
+      },
+    },
+  });
+
+  return {
+    sent: response.successCount,
+    failed: response.failureCount,
+  };
+}

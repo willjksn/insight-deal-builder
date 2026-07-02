@@ -40,6 +40,7 @@ import { ScriptSuggestedShotsPanel } from "@/components/scriptWriter/ScriptSugge
 import { ShotListOptions } from "@/components/scriptWriter/StoryboardModeToggle";
 import { canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPanel";
+import { SharedNotesPanel } from "@/components/sharedNotes/SharedNotesPanel";
 
 interface ScriptWriterClientProps {
   sessionId: string;
@@ -570,6 +571,13 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           )}
         </section>
       </div>
+
+      <SharedNotesPanel
+        resourceType="script"
+        resourceId={sessionId}
+        adminOpen={adminOpen}
+        className="mt-6"
+      />
     </div>
   );
 }

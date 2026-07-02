@@ -647,7 +647,10 @@ export interface Agreement {
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
-export type NotificationType = "agreement_signed" | "user_signup_pending";
+export type NotificationType =
+  | "agreement_signed"
+  | "user_signup_pending"
+  | "shared_resource_note";
 
 export interface AppNotification {
   id: string;
@@ -659,6 +662,13 @@ export interface AppNotification {
   pendingUserId?: string;
   pendingUserEmail?: string;
   pendingUserName?: string;
+  resourceType?: "script" | "scout";
+  resourceId?: string;
+  resourceTitle?: string;
+  noteAuthorUserId?: string;
+  noteAuthorInitials?: string;
+  noteAuthorName?: string;
+  notePreview?: string;
   /** Specific user to notify (e.g. agreement creator) */
   userId?: string;
   /** All users in this company see the notification (e.g. Insight Media Group LLC) */
