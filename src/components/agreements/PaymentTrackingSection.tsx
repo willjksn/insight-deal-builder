@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Agreement } from "@/lib/types";
 import { useMutations } from "@/hooks/useMutations";
 import { useAuth } from "@/contexts/AuthContext";
-import { canRecordPayments } from "@/lib/utils/permissions";
+import { canRecordPayments, canEmailQuotes } from "@/lib/utils/permissions";
 import {
   agreementOutstanding,
   agreementTotalPaid,
@@ -21,11 +21,14 @@ import {
   resolvePaymentInstallments,
 } from "@/lib/analytics/paymentTracking";
 import { formatDate } from "@/lib/utils/format";
-import { ArrowDownLeft, ArrowUpRight, Banknote, Check, CreditCard, Loader2, RotateCcw } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, Check, CreditCard, Download, FileText, Loader2, Mail, RotateCcw } from "lucide-react";
 import { agreementAcceptsStripePayments } from "@/lib/stripe/eligibility";
 import { formatPromotionSummary, hasPaymentPromotion } from "@/lib/agreement/paymentDiscount";
 import { agreementTotalDue } from "@/lib/analytics/paymentTracking";
 import { createAgreementCheckout, fetchStripeConfig } from "@/lib/stripe/apiClient";
+import { createPaymentInvoice, getPaymentInvoiceDownloadUrl } from "@/lib/invoices/apiClient";
+import { markPaymentInvoicesPaid } from "@/lib/invoices/paymentInvoice";
+import { PaymentInvoiceRecord } from "@/lib/types";
 
 const TRACKABLE_STATUSES = new Set(["signed", "completed", "partially_signed"]);
 
@@ -72,6 +75,7 @@ export function PaymentTrackingSection({
   const [localError, setLocalError] = useState<string | null>(null);
   const [stripeEnabled, setStripeEnabled] = useState(false);
   const [checkoutBusyId, setCheckoutBusyId] = useState<string | null>(null);
+  const [invoiceBusyId, setInvoiceBusyId] = useState<string | null>(null);
   const [copiedPayLink, setCopiedPayLink] = useState(false);
 
   useEffect(() => {
@@ -88,6 +92,9 @@ export function PaymentTrackingSection({
     () => resolvePaymentInstallments(agreement),
     [agreement.paymentTerms, agreement.paymentTracking]
   );
+
+  const paymentInvoices = agreement.paymentTracking?.paymentInvoices ?? [];
+  const canEmail = canEmailQuotes(appUser);
 
   if (!showSection) return null;
 
@@ -127,6 +134,41 @@ export function PaymentTrackingSection({
     window.setTimeout(() => setCopiedPayLink(false), 2000);
   };
 
+  const issueInvoice = async (installmentId: string) => {
+    if (!user) return;
+    setInvoiceBusyId(installmentId);
+    setLocalError(null);
+    try {
+      await createPaymentInvoice(() => user.getIdToken(), agreementId, {
+        installmentId,
+        sendEmail: canEmail,
+      });
+      onUpdated?.();
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "Failed to issue invoice");
+    } finally {
+      setInvoiceBusyId(null);
+    }
+  };
+
+  const downloadInvoice = async (invoice: PaymentInvoiceRecord) => {
+    if (!user) return;
+    setInvoiceBusyId(invoice.id);
+    setLocalError(null);
+    try {
+      const { downloadUrl } = await getPaymentInvoiceDownloadUrl(
+        () => user.getIdToken(),
+        agreementId,
+        invoice.id
+      );
+      window.open(downloadUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "Failed to download invoice");
+    } finally {
+      setInvoiceBusyId(null);
+    }
+  };
+
   const openEditor = (id: string, defaultAmount: number, mode: InstallmentPaymentMode) => {
     setEditingId(id);
     setEditorMode(mode);
@@ -154,7 +196,9 @@ export function PaymentTrackingSection({
         notes,
         editorMode
       );
-      await update(agreementId, { paymentTracking: next });
+      const withInvoices =
+        markPaymentInvoicesPaid(next, installmentId, new Date(paidAt).toISOString()) ?? next;
+      await update(agreementId, { paymentTracking: withInvoices });
       setEditingId(null);
       onUpdated?.();
     } catch (err) {
@@ -197,6 +241,9 @@ export function PaymentTrackingSection({
                   : "to the payee"}{" "}
               against this agreement&apos;s payment schedule.
               {stripeEligible ? " Card payments are also available via Stripe." : ""}
+              {receivable && canRecord
+                ? " Issue a payment invoice when you are ready to collect — a PDF copy stays on this agreement."
+                : ""}
             </p>
             {hasPaymentPromotion(agreement.paymentTerms) && promotionSummary ? (
               <p className="mt-2 text-xs font-medium text-violet-700">{promotionSummary}</p>
@@ -305,6 +352,23 @@ export function PaymentTrackingSection({
                             )}
                             {canRecord && (
                               <>
+                            {receivable && remaining > 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={saving || invoiceBusyId != null}
+                                onClick={() => void issueInvoice(row.id)}
+                              >
+                                {invoiceBusyId === row.id ? (
+                                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                                ) : canEmail ? (
+                                  <Mail className="mr-1 h-4 w-4" />
+                                ) : (
+                                  <FileText className="mr-1 h-4 w-4" />
+                                )}
+                                {canEmail ? "Issue & email invoice" : "Create invoice"}
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="outline"
@@ -386,6 +450,71 @@ export function PaymentTrackingSection({
             </tbody>
           </table>
         </div>
+
+        {receivable && paymentInvoices.length > 0 ? (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900">Payment invoices</h3>
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Invoice</th>
+                    <th className="px-4 py-3">Installment</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Issued</th>
+                    <th className="px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...paymentInvoices]
+                    .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))
+                    .map((inv) => {
+                      const installmentLabel =
+                        installments.find((r) => r.id === inv.installmentId)?.label ?? inv.installmentId;
+                      return (
+                        <tr key={inv.id} className="border-t border-slate-100">
+                          <td className="px-4 py-3 font-medium text-slate-900">{inv.invoiceNumber}</td>
+                          <td className="px-4 py-3">{installmentLabel}</td>
+                          <td className="px-4 py-3 tabular-nums">{formatMoney(inv.amountDue)}</td>
+                          <td className="px-4 py-3 capitalize">
+                            {inv.status === "paid" ? (
+                              <span className="text-emerald-700">
+                                Paid {inv.paidAt ? formatDate(inv.paidAt) : ""}
+                              </span>
+                            ) : inv.status === "void" ? (
+                              <span className="text-slate-400">Void</span>
+                            ) : (
+                              <span className="text-amber-700">Sent</span>
+                            )}
+                            {inv.sentTo ? (
+                              <p className="mt-1 text-xs text-slate-500">Emailed to {inv.sentTo}</p>
+                            ) : null}
+                          </td>
+                          <td className="px-4 py-3">{formatDate(inv.issuedAt)}</td>
+                          <td className="px-4 py-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={invoiceBusyId === inv.id}
+                              onClick={() => void downloadInvoice(inv)}
+                            >
+                              {invoiceBusyId === inv.id ? (
+                                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Download className="mr-1 h-4 w-4" />
+                              )}
+                              Download
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
       </CardBody>
     </Card>
   );

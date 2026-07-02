@@ -63,8 +63,8 @@ export function MobileNav() {
       ? [
           { href: "/script-writer", label: "Script", icon: ScrollText },
           { href: "/scout", label: "Scout", icon: Clapperboard },
-          { href: "/reference", label: "Guide", icon: BookOpen },
           { href: "/stage", label: "Stage", icon: LayoutGrid },
+          { href: "/reference", label: "Guide", icon: BookOpen },
         ]
       : []),
     { href: "/agreements", label: "Deals", icon: FileText },

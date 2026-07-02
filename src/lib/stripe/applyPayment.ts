@@ -3,6 +3,7 @@ import { Agreement } from "@/lib/types";
 import { recordInstallmentPayment } from "@/lib/analytics/paymentTracking";
 import { recordPartnerReceivablePayment } from "@/lib/analytics/partnerReceivableTracking";
 import { centsToDollars, isPartnerReimburseInstallment } from "@/lib/stripe/eligibility";
+import { applyPaidInvoicesToTracking } from "@/lib/invoices/createPaymentInvoice";
 
 export function applyStripePaymentToAgreement(params: {
   agreement: Agreement;
@@ -63,7 +64,15 @@ export function applyStripePaymentToAgreement(params: {
     };
   });
 
-  return { ...base, installments };
+  return applyPaidInvoicesToTracking(
+    { ...base, installments },
+    params.installmentId,
+    params.paidAt,
+    {
+      stripeCheckoutSessionId: params.stripeCheckoutSessionId,
+      stripePaymentIntentId: params.stripePaymentIntentId,
+    }
+  );
 }
 
 export async function persistStripePayment(

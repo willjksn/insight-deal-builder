@@ -21,7 +21,9 @@ import {
 } from "@/lib/utils/permissions";
 import { canOpenInWizard } from "@/lib/agreement/lifecycle";
 import { downloadAgreementPdf } from "@/lib/pdf/generateAgreementPdf";
+import { Agreement } from "@/lib/types";
 import { Trash2, Download, PenLine, Pencil } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 function AgreementsContent() {
   const router = useRouter();
@@ -31,6 +33,8 @@ function AgreementsContent() {
   const { appUser } = useAuth();
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Agreement | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setStatusFilter(searchParams.get("status") || "");
@@ -57,6 +61,18 @@ function AgreementsContent() {
       case "partially_signed": case "ready_for_signature": return "warning" as const;
       case "void": return "danger" as const;
       default: return "default" as const;
+    }
+  };
+
+  const confirmDeleteAgreement = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await remove(deleteTarget.id);
+      setDeleteTarget(null);
+      refresh();
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -147,13 +163,11 @@ function AgreementsContent() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    aria-label="Delete"
-                    title="Delete"
-                    onClick={async () => {
-                      if (confirm("Delete?")) {
-                        await remove(a.id);
-                        refresh();
-                      }
+                    aria-label="Delete agreement"
+                    title="Delete agreement"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget(a);
                     }}
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
@@ -164,6 +178,23 @@ function AgreementsContent() {
           ))}
         </DataTable>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete this agreement?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.title}" will be permanently removed. Signed PDFs and payment records stored elsewhere will not be affected, but this agreement record cannot be recovered.`
+            : ""
+        }
+        confirmLabel="Delete agreement"
+        cancelLabel="Keep agreement"
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+        onConfirm={() => void confirmDeleteAgreement()}
+      />
     </div>
   );
 }

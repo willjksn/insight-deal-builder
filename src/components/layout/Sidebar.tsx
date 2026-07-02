@@ -88,15 +88,15 @@ const navGroups: NavGroup[] = [
         canAccess: canUseShotScout,
       },
       {
-        href: "/reference",
-        label: "Reference guide",
-        icon: BookOpen,
-        canAccess: canUseShotScout,
-      },
-      {
         href: "/stage",
         label: "Stage planner",
         icon: LayoutGrid,
+        canAccess: canUseShotScout,
+      },
+      {
+        href: "/reference",
+        label: "Reference guide",
+        icon: BookOpen,
         canAccess: canUseShotScout,
       },
     ],

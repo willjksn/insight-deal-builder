@@ -57,6 +57,9 @@ export function mergePaymentInstallments(
       paidAt: saved.paidAt,
       recordedBy: saved.recordedBy,
       notes: saved.notes,
+      paymentSource: saved.paymentSource,
+      stripeCheckoutSessionId: saved.stripeCheckoutSessionId,
+      stripePaymentIntentId: saved.stripePaymentIntentId,
     };
   });
 }
@@ -140,7 +143,12 @@ export function recordInstallmentPayment(
       notes: notes?.trim() || row.notes,
     };
   });
-  return { installments: next, partnerInstallments: tracking?.partnerInstallments };
+  return {
+    installments: next,
+    partnerInstallments: tracking?.partnerInstallments,
+    partnerReceivableInstallments: tracking?.partnerReceivableInstallments,
+    paymentInvoices: tracking?.paymentInvoices,
+  };
 }
 
 export function clearInstallmentPayment(
@@ -161,5 +169,10 @@ export function clearInstallmentPayment(
       notes: undefined,
     };
   });
-  return { installments, partnerInstallments: tracking?.partnerInstallments };
+  return {
+    installments,
+    partnerInstallments: tracking?.partnerInstallments,
+    partnerReceivableInstallments: tracking?.partnerReceivableInstallments,
+    paymentInvoices: tracking?.paymentInvoices,
+  };
 }

@@ -525,6 +525,27 @@ export interface AgreementPaymentTracking {
   partnerInstallments?: PaymentInstallmentRecord[];
   /** Collaborator remittances received by Insight Media Group on internal deals */
   partnerReceivableInstallments?: PaymentInstallmentRecord[];
+  /** Lightweight payment invoices (PDF stored in Firebase) */
+  paymentInvoices?: PaymentInvoiceRecord[];
+}
+
+export type PaymentInvoiceStatus = "sent" | "paid" | "void";
+
+export interface PaymentInvoiceRecord {
+  id: string;
+  installmentId: string;
+  invoiceNumber: string;
+  amountDue: number;
+  status: PaymentInvoiceStatus;
+  issuedAt: string;
+  dueDate?: string;
+  paidAt?: string;
+  storagePath: string;
+  sentTo?: string;
+  sentAt?: string;
+  resendEmailId?: string;
+  stripeCheckoutSessionId?: string;
+  stripePaymentIntentId?: string;
 }
 
 export interface RevisionPolicy {
