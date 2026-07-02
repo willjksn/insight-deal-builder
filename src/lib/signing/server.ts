@@ -22,6 +22,7 @@ import {
   redactAgreementPayeeTaxFields,
 } from "@/lib/w9/payeeTax";
 import { Agreement, AgreementParty, AgreementStatus, PartyIdentityVerification, PayeeTaxInfo, SignatureRecord } from "@/lib/types";
+import { isInsightMediaGroupParty } from "@/lib/analytics/partnerReceivableTracking";
 
 const LINK_TTL_DAYS = 30;
 
@@ -83,8 +84,18 @@ export async function createSigningLink(params: {
       agreement.agreementType === "contractor_agreement" && party.roleInAgreement === "Contractor";
     const allowedPropertyOwner =
       agreement.agreementType === "location_agreement" && party.roleInAgreement === "Property Owner";
-    if (!allowedRenter && !allowedTalent && !allowedContractor && !allowedPropertyOwner) {
-      throw new Error("Signing links are only available for client, renter, talent, contractor, or property owner parties");
+    const allowedCollaborator =
+      agreement.agreementType === "internal_collaboration" &&
+      !isInsightMediaGroupParty(party) &&
+      party.signatureRequired;
+    if (
+      !allowedRenter &&
+      !allowedTalent &&
+      !allowedContractor &&
+      !allowedPropertyOwner &&
+      !allowedCollaborator
+    ) {
+      throw new Error("Signing links are only available for client, renter, talent, contractor, property owner, or collaborator parties");
     }
   }
 

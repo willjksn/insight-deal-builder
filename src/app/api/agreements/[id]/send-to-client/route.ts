@@ -11,6 +11,7 @@ import { createSigningLink, getClientPaymentUrl, getSigningLinkUrl, serializeAgr
 import { getExternalSigningParty } from "@/lib/agreement/payeeParties";
 import { hasPermission } from "@/lib/utils/permissions";
 import { isStripeConfigured } from "@/lib/stripe/config";
+import { getStripePaymentKind } from "@/lib/stripe/eligibility";
 import { AppUser } from "@/lib/types";
 import { formatDate } from "@/lib/utils/format";
 
@@ -63,9 +64,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const signingUrl = getSigningLinkUrl(token, appUrl);
     const expiresLabel = formatDate(expiresAt.toISOString());
     const paymentUrl =
-      isStripeConfigured() &&
-      agreement.agreementType === "client_project" &&
-      agreement.paymentTerms.totalFee > 0
+      isStripeConfigured() && getStripePaymentKind(agreement) === "client_payment"
         ? getClientPaymentUrl(token, appUrl)
         : null;
 

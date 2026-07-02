@@ -499,6 +499,9 @@ export interface PaymentTerms {
   balanceAmount?: number;
   dueDates?: string[];
   paymentNotes?: string;
+  /** Optional promotion — list price stays in totalFee/deposit/balance; card pay uses discounted amounts */
+  discountPercent?: number;
+  discountLabel?: string;
 }
 
 export type PaymentInstallmentId = "deposit" | "balance" | "full";
@@ -520,6 +523,8 @@ export interface PaymentInstallmentRecord {
 export interface AgreementPaymentTracking {
   installments: PaymentInstallmentRecord[];
   partnerInstallments?: PaymentInstallmentRecord[];
+  /** Collaborator remittances received by Insight Media Group on internal deals */
+  partnerReceivableInstallments?: PaymentInstallmentRecord[];
 }
 
 export interface RevisionPolicy {

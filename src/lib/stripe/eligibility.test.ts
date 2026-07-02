@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { Agreement, PaymentTerms } from "@/lib/types";
+import { Agreement, PaymentTerms, PayoutDetails } from "@/lib/types";
 import {
   agreementAcceptsStripePayments,
   dollarsToCents,
+  getStripePaymentKind,
   installmentPayableAmount,
+  partyCanPayViaStripe,
 } from "@/lib/stripe/eligibility";
 
 function clientAgreement(overrides: Partial<Agreement> = {}): Agreement {
   const paymentTerms: PaymentTerms = {
     totalFee: 5000,
-    paymentStructure: "50% deposit / 50% before delivery",
+    paymentStructure: "50% deposit / 50% before final delivery",
     depositAmount: 2500,
     balanceAmount: 2500,
   };
@@ -20,7 +22,16 @@ function clientAgreement(overrides: Partial<Agreement> = {}): Agreement {
     status: "signed",
     paymentTerms,
     projectDetails: { projectName: "Demo" } as Agreement["projectDetails"],
-    parties: [],
+    parties: [
+      {
+        id: "p1",
+        type: "client",
+        name: "Acme",
+        signerName: "Jane",
+        roleInAgreement: "Client",
+        signatureRequired: true,
+      },
+    ],
     signatures: [],
     clauses: [],
     version: 1,
@@ -30,23 +41,127 @@ function clientAgreement(overrides: Partial<Agreement> = {}): Agreement {
   } as Agreement;
 }
 
+function rentalAgreement(overrides: Partial<Agreement> = {}): Agreement {
+  return clientAgreement({
+    agreementType: "equipment_rental",
+    title: "Gear rental",
+    parties: [
+      {
+        id: "owner",
+        type: "company",
+        name: "Insight Media Group LLC",
+        signerName: "Will",
+        roleInAgreement: "Owner",
+        signatureRequired: true,
+      },
+      {
+        id: "renter",
+        type: "company",
+        name: "Renter Co",
+        signerName: "Alex",
+        roleInAgreement: "Renter",
+        signatureRequired: true,
+      },
+    ],
+    ...overrides,
+  });
+}
+
+function internalAgreement(overrides: Partial<Agreement> = {}): Agreement {
+  const payoutDetails: PayoutDetails = {
+    totalProjectFee: 10000,
+    insightFeeAmount: 4000,
+    insightFeePercentage: 40,
+    aveFeeAmount: 6000,
+  };
+  return clientAgreement({
+    agreementType: "internal_collaboration",
+    paymentTerms: { totalFee: 0, paymentStructure: "Custom" },
+    payoutDetails,
+    parties: [
+      {
+        id: "img",
+        type: "company",
+        name: "Insight Media Group LLC",
+        signerName: "Will",
+        roleInAgreement: "Production Company",
+        signatureRequired: true,
+      },
+      {
+        id: "partner",
+        type: "company",
+        name: "Partner LLC",
+        signerName: "Pat",
+        roleInAgreement: "Collaborator",
+        signatureRequired: true,
+      },
+    ],
+    ...overrides,
+  });
+}
+
+describe("getStripePaymentKind", () => {
+  it("allows signed client projects with a fee", () => {
+    expect(getStripePaymentKind(clientAgreement())).toBe("client_payment");
+  });
+
+  it("allows signed equipment rentals with a fee", () => {
+    expect(getStripePaymentKind(rentalAgreement())).toBe("client_payment");
+  });
+
+  it("allows signed internal deals with producer fee remittance", () => {
+    expect(getStripePaymentKind(internalAgreement())).toBe("partner_reimburse");
+  });
+
+  it("blocks internal collaboration without payout", () => {
+    expect(
+      getStripePaymentKind(internalAgreement({ payoutDetails: undefined }))
+    ).toBeNull();
+  });
+});
+
 describe("agreementAcceptsStripePayments", () => {
   it("allows signed client projects with a fee", () => {
     expect(agreementAcceptsStripePayments(clientAgreement())).toBe(true);
   });
 
-  it("blocks internal collaboration", () => {
+  it("blocks internal collaboration without receivable", () => {
     expect(
       agreementAcceptsStripePayments(
-        clientAgreement({ agreementType: "internal_collaboration" })
+        internalAgreement({
+          payoutDetails: { totalProjectFee: 10000, insightFeeAmount: 0 },
+        })
       )
     ).toBe(false);
   });
 });
 
+describe("partyCanPayViaStripe", () => {
+  it("allows client on client project", () => {
+    const agreement = clientAgreement();
+    expect(partyCanPayViaStripe(agreement, agreement.parties[0])).toBe(true);
+  });
+
+  it("allows renter on equipment rental", () => {
+    const agreement = rentalAgreement();
+    const renter = agreement.parties.find((p) => p.roleInAgreement === "Renter")!;
+    expect(partyCanPayViaStripe(agreement, renter)).toBe(true);
+  });
+
+  it("allows collaborator on internal deal", () => {
+    const agreement = internalAgreement();
+    const partner = agreement.parties.find((p) => p.roleInAgreement === "Collaborator")!;
+    expect(partyCanPayViaStripe(agreement, partner)).toBe(true);
+  });
+});
+
 describe("installmentPayableAmount", () => {
-  it("returns outstanding deposit", () => {
+  it("returns outstanding deposit on client project", () => {
     expect(installmentPayableAmount(clientAgreement(), "deposit")).toBe(2500);
+  });
+
+  it("returns producer fee remittance on internal deal", () => {
+    expect(installmentPayableAmount(internalAgreement(), "reimburse:insight")).toBe(4000);
   });
 
   it("returns null when installment is paid", () => {

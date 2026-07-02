@@ -46,7 +46,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (publicPath && !user) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-10 md:py-14">
+      <div className="safe-area-pt min-h-screen bg-slate-50 px-4 py-10 pb-[calc(2.5rem+env(safe-area-inset-bottom,0))] md:py-14">
         <div className="mx-auto max-w-3xl">{children}</div>
       </div>
     );
@@ -71,7 +71,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     <div className="app-canvas">
       <Sidebar />
       <MobileNav />
-      <main className="lg:pl-64 pb-20 lg:pb-0">
+      <main className="safe-area-main-pb lg:pl-64 lg:pb-0">
         {!publicPath ? (
           <div className="sticky top-0 z-30 flex justify-end border-b border-slate-200/80 bg-white/90 px-4 py-2 backdrop-blur-sm md:px-6">
             <NotificationBell />

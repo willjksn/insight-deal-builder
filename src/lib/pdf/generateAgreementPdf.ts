@@ -12,6 +12,7 @@ import {
 } from "@/lib/agreement/payeeAgreementPreview";
 import { appendLocationAgreementPdf } from "@/lib/agreement/locationAgreementPreview";
 import { prepareAgreementMarksClient } from "@/lib/signatures/darkenMarkImage";
+import { paymentTermsDocumentLines } from "@/lib/agreement/paymentDiscount";
 
 function formatCurrency(amount?: number) {
   if (amount === undefined) return "—";
@@ -104,13 +105,8 @@ export function generateAgreementPdf(agreement: Agreement): jsPDF {
   }
 
   addText("COMMERCIAL TERMS", 11, true);
-  addText(`Payment structure: ${agreement.paymentTerms.paymentStructure}`, 10);
-  addText(`Total fee: ${formatCurrency(agreement.paymentTerms.totalFee)}`, 10);
-  if (agreement.paymentTerms.depositAmount) {
-    addText(`Deposit: ${formatCurrency(agreement.paymentTerms.depositAmount)}`, 10);
-  }
-  if (agreement.paymentTerms.balanceAmount) {
-    addText(`Balance: ${formatCurrency(agreement.paymentTerms.balanceAmount)}`, 10);
+  for (const line of paymentTermsDocumentLines(agreement.paymentTerms, formatCurrency)) {
+    addText(line, 10);
   }
   if (!isRental && !isPayee) {
     addText(

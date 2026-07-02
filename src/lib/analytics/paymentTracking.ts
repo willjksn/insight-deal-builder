@@ -4,9 +4,10 @@ import {
   PaymentInstallmentRecord,
   PaymentTerms,
 } from "@/lib/types";
+import { effectivePaymentTerms } from "@/lib/agreement/paymentDiscount";
 
 export function buildExpectedInstallments(terms: PaymentTerms): PaymentInstallmentRecord[] {
-  const { totalFee, depositAmount, balanceAmount } = terms;
+  const { totalFee, depositAmount, balanceAmount } = effectivePaymentTerms(terms);
   const rows: PaymentInstallmentRecord[] = [];
 
   if (depositAmount != null && depositAmount > 0) {

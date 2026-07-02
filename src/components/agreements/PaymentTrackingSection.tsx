@@ -23,6 +23,8 @@ import {
 import { formatDate } from "@/lib/utils/format";
 import { ArrowDownLeft, ArrowUpRight, Banknote, Check, CreditCard, Loader2, RotateCcw } from "lucide-react";
 import { agreementAcceptsStripePayments } from "@/lib/stripe/eligibility";
+import { formatPromotionSummary, hasPaymentPromotion } from "@/lib/agreement/paymentDiscount";
+import { agreementTotalDue } from "@/lib/analytics/paymentTracking";
 import { createAgreementCheckout, fetchStripeConfig } from "@/lib/stripe/apiClient";
 
 const TRACKABLE_STATUSES = new Set(["signed", "completed", "partially_signed"]);
@@ -44,7 +46,10 @@ interface PaymentTrackingSectionProps {
 }
 
 function isReceivable(agreement: Agreement): boolean {
-  return agreement.agreementType === "client_project";
+  return (
+    agreement.agreementType === "client_project" ||
+    agreement.agreementType === "equipment_rental"
+  );
 }
 
 function formatMoney(amount: number): string {
@@ -87,7 +92,9 @@ export function PaymentTrackingSection({
   if (!showSection) return null;
 
   const receivable = isReceivable(agreement);
-  const totalDue = agreement.paymentTerms.totalFee;
+  const totalDue = agreementTotalDue(agreement);
+  const listTotal = agreement.paymentTerms.totalFee;
+  const promotionSummary = formatPromotionSummary(agreement.paymentTerms);
   const totalPaid = agreementTotalPaid(agreement);
   const outstanding = agreementOutstanding(agreement);
   const stripeEligible = stripeEnabled && receivable && agreementAcceptsStripePayments(agreement);
@@ -182,15 +189,28 @@ export function PaymentTrackingSection({
               </h2>
             </div>
             <p className="mt-1 text-sm text-slate-500">
-              Record cash {receivable ? "received from the client" : "paid to the payee"} against this
-              agreement&apos;s payment schedule.
-              {stripeEligible ? " Clients can also pay by card via Stripe." : ""}
+              Record cash {receivable ? "received" : "paid"}{" "}
+              {agreement.agreementType === "equipment_rental"
+                ? "from the renter"
+                : receivable
+                  ? "from the client"
+                  : "to the payee"}{" "}
+              against this agreement&apos;s payment schedule.
+              {stripeEligible ? " Card payments are also available via Stripe." : ""}
             </p>
+            {hasPaymentPromotion(agreement.paymentTerms) && promotionSummary ? (
+              <p className="mt-2 text-xs font-medium text-violet-700">{promotionSummary}</p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2 text-sm">
             <Badge variant="default">
               <Banknote className="mr-1 inline h-3 w-3" />
               Paid {formatMoney(totalPaid)} / {formatMoney(totalDue)}
+              {hasPaymentPromotion(agreement.paymentTerms) ? (
+                <span className="ml-1 font-normal text-slate-500">
+                  (list {formatMoney(listTotal)})
+                </span>
+              ) : null}
             </Badge>
             {outstanding > 0 ? (
               <Badge variant="warning">Outstanding {formatMoney(outstanding)}</Badge>

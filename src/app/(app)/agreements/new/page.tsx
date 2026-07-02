@@ -74,6 +74,7 @@ import {
 import { generateAgreementPreview } from "@/lib/agreement/preview";
 import { advanceWizardStep, getWizardStepLabel, isWizardStepSkipped, WIZARD_STEP_DEFS } from "@/lib/agreement/wizardSteps";
 import { EquipmentRentalStep } from "@/components/agreements/EquipmentRentalStep";
+import { PaymentPromotionFields } from "@/components/agreements/PaymentPromotionFields";
 import { PayeeEngagementStep } from "@/components/agreements/PayeeEngagementStep";
 import { LocationAgreementStep } from "@/components/agreements/LocationAgreementStep";
 import {
@@ -961,8 +962,16 @@ function WizardContent() {
               />
             </div>
             <p className="text-xs text-slate-500">
-              Deposit and balance stay in sync — they always add up to the total fee.
+              Deposit and balance stay in sync — they always add up to the list price before any
+              promotion discount.
             </p>
+            {(agreement.agreementType === "client_project" ||
+              agreement.agreementType === "equipment_rental") && (
+              <PaymentPromotionFields
+                paymentTerms={agreement.paymentTerms}
+                onChange={(paymentTerms) => updateAgreement({ paymentTerms })}
+              />
+            )}
             <Textarea label="Payment Notes" value={agreement.paymentTerms.paymentNotes || ""} onChange={(e) => updateAgreement({ paymentTerms: { ...agreement.paymentTerms, paymentNotes: e.target.value } })} touch />
           </div>
         );

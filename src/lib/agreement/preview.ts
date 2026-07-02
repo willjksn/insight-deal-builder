@@ -10,6 +10,7 @@ import {
 } from "@/lib/agreement/payeeAgreementPreview";
 import { appendLocationAgreementPreview } from "@/lib/agreement/locationAgreementPreview";
 import { getAgreementTypeLabel } from "@/lib/agreement/wizardSteps";
+import { paymentTermsDocumentLines } from "@/lib/agreement/paymentDiscount";
 
 export type AgreementPreviewData = Omit<Agreement, "id" | "createdAt" | "updatedAt">;
 
@@ -109,14 +110,7 @@ export function generateAgreementPreview(agreement: AgreementPreviewData, mode: 
   }
 
   lines.push("COMMERCIAL TERMS");
-  lines.push(`Payment structure: ${agreement.paymentTerms.paymentStructure}`);
-  lines.push(`Total fee: ${formatCurrency(agreement.paymentTerms.totalFee)}`);
-  if (agreement.paymentTerms.depositAmount) {
-    lines.push(`Deposit: ${formatCurrency(agreement.paymentTerms.depositAmount)}`);
-  }
-  if (agreement.paymentTerms.balanceAmount) {
-    lines.push(`Balance: ${formatCurrency(agreement.paymentTerms.balanceAmount)}`);
-  }
+  lines.push(...paymentTermsDocumentLines(agreement.paymentTerms, (amount) => formatCurrency(amount)));
   if (!isRental && !isPayee) {
     lines.push(
       `Revisions: ${agreement.revisionPolicy.includedRevisionRounds} round(s) within ${agreement.revisionPolicy.revisionRequestWindowDays} days of delivery`

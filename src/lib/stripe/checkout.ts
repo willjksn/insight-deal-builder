@@ -4,9 +4,12 @@ import { getStripe } from "@/lib/stripe/server";
 import {
   agreementAcceptsStripePayments,
   dollarsToCents,
+  getStripePaymentKind,
   installmentPayableAmount,
+  isPartnerReimburseInstallment,
 } from "@/lib/stripe/eligibility";
 import { resolvePaymentInstallments } from "@/lib/analytics/paymentTracking";
+import { resolvePartnerReceivableInstallments } from "@/lib/analytics/partnerReceivableTracking";
 
 export type CreateAgreementCheckoutParams = {
   agreement: Agreement;
@@ -33,8 +36,19 @@ export function validateCheckoutRequest(params: CreateAgreementCheckoutParams): 
     throw new Error("That installment is already paid or not found.");
   }
 
-  const row = resolvePaymentInstallments(agreement).find((r) => r.id === installmentId);
+  const row = isPartnerReimburseInstallment(installmentId)
+    ? resolvePartnerReceivableInstallments(agreement).find((r) => r.id === installmentId)
+    : resolvePaymentInstallments(agreement).find((r) => r.id === installmentId);
   if (!row) throw new Error("Installment not found.");
+
+  const paymentKind = getStripePaymentKind(agreement);
+  if (!paymentKind) throw new Error("This agreement is not eligible for card payments.");
+  if (paymentKind === "partner_reimburse" && !isPartnerReimburseInstallment(installmentId)) {
+    throw new Error("That installment is not eligible for card payment.");
+  }
+  if (paymentKind === "client_payment" && isPartnerReimburseInstallment(installmentId)) {
+    throw new Error("That installment is not eligible for card payment.");
+  }
 
   return {
     amountDue,
@@ -58,6 +72,9 @@ export async function createAgreementCheckoutSession(
 
   const projectName = agreement.projectDetails.projectName || agreement.title;
   const stripe = getStripe();
+  const paymentKind = isPartnerReimburseInstallment(installmentId)
+    ? "partner_reimburse"
+    : "client_payment";
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -79,6 +96,7 @@ export async function createAgreementCheckoutSession(
     metadata: {
       agreementId: agreement.id,
       installmentId,
+      paymentKind,
       amountCents: String(amountCents),
       amountDue: String(amountDue),
     },
@@ -86,6 +104,7 @@ export async function createAgreementCheckoutSession(
       metadata: {
         agreementId: agreement.id,
         installmentId,
+        paymentKind,
         amountCents: String(amountCents),
       },
     },

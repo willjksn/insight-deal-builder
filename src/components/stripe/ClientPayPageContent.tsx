@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { createClientCheckout } from "@/lib/stripe/apiClient";
 import { PRODUCER_LEGAL_NAME } from "@/lib/constants/legalTerms";
+import { formatPromotionSummary } from "@/lib/agreement/paymentDiscount";
 
 type PayInstallment = {
   id: string;
@@ -19,10 +20,12 @@ type PayInstallment = {
 
 type PaySession = {
   stripeEnabled: boolean;
+  paymentKind?: "client_payment" | "partner_reimburse";
   agreementTitle: string;
   projectName?: string;
   partyName?: string;
   eligible: boolean;
+  promotionSummary?: string | null;
   installments: PayInstallment[];
 };
 
@@ -87,11 +90,24 @@ export function ClientPayPageContent() {
         <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
           {PRODUCER_LEGAL_NAME}
         </p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900">Pay agreement</h1>
+        <h1 className="mt-2 text-2xl font-bold text-slate-900">
+          {session.paymentKind === "partner_reimburse" ? "Remit split payment" : "Pay agreement"}
+        </h1>
         <p className="mt-1 text-sm text-slate-600">
           {session.projectName || session.agreementTitle}
           {session.partyName ? ` · ${session.partyName}` : ""}
         </p>
+        {session.paymentKind === "partner_reimburse" ? (
+          <p className="mt-2 text-sm text-slate-500">
+            Send your producer-fee remittance to {PRODUCER_LEGAL_NAME} by card below.
+          </p>
+        ) : null}
+
+        {session.promotionSummary ? (
+          <p className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">
+            {session.promotionSummary}
+          </p>
+        ) : null}
 
         {cancelled && (
           <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

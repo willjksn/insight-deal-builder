@@ -110,15 +110,21 @@ export function buildClientAgreementSendEmail(params: {
 
   const showPaymentLink =
     Boolean(paymentUrl) &&
-    agreement.agreementType === "client_project" &&
+    (agreement.agreementType === "client_project" ||
+      agreement.agreementType === "equipment_rental") &&
     agreement.paymentTerms.totalFee > 0;
 
+  const paymentLabel =
+    agreement.agreementType === "equipment_rental"
+      ? "pay your rental deposit or balance by card"
+      : "pay your deposit or balance by card";
+
   const paymentText = showPaymentLink
-    ? `\n\nAfter you sign, pay your deposit or balance by card here:\n${paymentUrl}`
+    ? `\n\nAfter you sign, ${paymentLabel} here:\n${paymentUrl}`
     : "";
 
   const paymentHtml = showPaymentLink
-    ? `<p>After you sign, <strong><a href="${paymentUrl}">pay your deposit or balance by card</a></strong> (secure Stripe checkout).</p>`
+    ? `<p>After you sign, <strong><a href="${paymentUrl}">${paymentLabel}</a></strong> (secure Stripe checkout).</p>`
     : "";
 
   const text = `${intro}

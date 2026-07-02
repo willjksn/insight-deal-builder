@@ -23,6 +23,7 @@ import {
   BookOpen,
   LayoutGrid,
   CircleHelp,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -60,7 +61,10 @@ type NavGroup = {
 const navGroups: NavGroup[] = [
   {
     label: "Overview",
-    items: [{ href: "/dashboard", label: "Command center", icon: LayoutDashboard }],
+    items: [
+      { href: "/dashboard", label: "Command center", icon: LayoutDashboard },
+      { href: "/calendar", label: "Calendar", icon: CalendarDays },
+    ],
   },
   {
     label: "Production",

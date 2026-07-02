@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorStatus, requireApprovedAuthUser } from "@/lib/api/routeAuth";
 import { loadAgreementForUser } from "@/lib/agreement/serverAccess";
-import { getExternalSigningParty } from "@/lib/agreement/payeeParties";
+import { getPaymentLinkParty } from "@/lib/agreement/payeeParties";
 import { createAgreementCheckoutSession } from "@/lib/stripe/checkout";
 import { assertStripeConfigured } from "@/lib/stripe/config";
 
@@ -23,14 +23,14 @@ export async function POST(
     }
 
     const agreement = await loadAgreementForUser(agreementId, appUser);
-    const clientParty = getExternalSigningParty(agreement);
+    const payParty = getPaymentLinkParty(agreement);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
 
     const { sessionId, url } = await createAgreementCheckoutSession({
       agreement,
       installmentId,
       appUrl,
-      customerEmail: clientParty?.email,
+      customerEmail: payParty?.email,
     });
 
     return NextResponse.json({ sessionId, url });

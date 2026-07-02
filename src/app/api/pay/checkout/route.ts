@@ -4,6 +4,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { getSigningSession } from "@/lib/signing/server";
 import { createAgreementCheckoutSession } from "@/lib/stripe/checkout";
 import { assertStripeConfigured } from "@/lib/stripe/config";
+import { partyCanPayViaStripe } from "@/lib/stripe/eligibility";
 import { Agreement } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -35,16 +36,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired payment link" }, { status: 404 });
     }
 
-    if (session.party.type !== "client") {
-      return NextResponse.json(
-        { error: "Card payments are only available on client project agreements" },
-        { status: 400 }
-      );
-    }
-
     const agreement = await loadFullAgreement(session.agreement.id);
     if (!agreement) {
       return NextResponse.json({ error: "Agreement not found" }, { status: 404 });
+    }
+
+    if (!partyCanPayViaStripe(agreement, session.party)) {
+      return NextResponse.json(
+        { error: "Card payments are not available for this party on this agreement" },
+        { status: 400 }
+      );
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;

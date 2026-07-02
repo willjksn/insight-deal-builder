@@ -10,6 +10,8 @@ import { buildClientAgreementSendEmail, copyToClipboard, getMailtoLink } from "@
 import { sendAgreementToClient, SendToClientResult } from "@/lib/email/sendClient";
 import { formatDate } from "@/lib/utils/format";
 import { createClientSigningLink } from "@/lib/signing/client";
+import { getExternalSigningParty } from "@/lib/agreement/payeeParties";
+import { getStripePaymentKind } from "@/lib/stripe/eligibility";
 import { Copy, Download, Mail, Send, X } from "lucide-react";
 
 interface SendToClientPanelProps {
@@ -52,16 +54,14 @@ export function SendToClientPanel({
 
   const handleCopyFallback = async () => {
     try {
-      const signingParty =
-        agreement.parties.find((p) => p.type === "client") ||
-        agreement.parties.find((p) => p.roleInAgreement === "Renter");
+      const signingParty = getExternalSigningParty(agreement);
       if (!signingParty) throw new Error("No signing party found");
       const { url, expiresAt } = await createClientSigningLink(
         agreementId,
         signingParty.id
       );
       const paymentUrl =
-        agreement.agreementType === "client_project" && agreement.paymentTerms.totalFee > 0
+        getStripePaymentKind(agreement) === "client_payment"
           ? url.replace("/sign/", "/pay/")
           : null;
       const content = buildClientAgreementSendEmail({

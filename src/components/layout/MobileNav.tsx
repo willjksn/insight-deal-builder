@@ -22,6 +22,7 @@ import {
   Calculator,
   BarChart3,
   CircleHelp,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -54,6 +55,7 @@ export function MobileNav() {
 
   const navItems = [
     { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+    { href: "/calendar", label: "Calendar", icon: CalendarDays },
     ...(canManageProjects(appUser)
       ? [{ href: "/projects", label: "Projects", icon: FolderKanban }]
       : []),
@@ -89,7 +91,7 @@ export function MobileNav() {
 
   return (
     <>
-      <header className="lg:hidden sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md shadow-sm">
+      <header className="safe-area-pt lg:hidden sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md shadow-sm">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5">

@@ -10,6 +10,11 @@ import {
 } from "@/lib/agreement/locationAgreement";
 import { formatFeeLabel, formatPayeeTaxBlock } from "@/lib/agreement/payeeEngagement";
 import { AgreementDocumentMeta } from "@/lib/agreement/documentMeta";
+import {
+  effectivePaymentTerms,
+  formatPromotionLabel,
+  hasPaymentPromotion,
+} from "@/lib/agreement/paymentDiscount";
 
 function formatCurrency(amount?: number) {
   if (amount === undefined || amount === null) return "—";
@@ -322,13 +327,36 @@ export function AgreementSigningDocumentBody({
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-900">Commercial Terms</h2>
         <div className="space-y-1 text-sm text-slate-700">
           <p>Payment structure: {agreement.paymentTerms.paymentStructure}</p>
-          <p>Total fee: {formatCurrency(agreement.paymentTerms.totalFee)}</p>
-          {agreement.paymentTerms.depositAmount != null && (
-            <p>Deposit: {formatCurrency(agreement.paymentTerms.depositAmount)}</p>
-          )}
-          {agreement.paymentTerms.balanceAmount != null && (
-            <p>Balance: {formatCurrency(agreement.paymentTerms.balanceAmount)}</p>
-          )}
+          {(() => {
+            const promoted = hasPaymentPromotion(agreement.paymentTerms);
+            const dueTerms = effectivePaymentTerms(agreement.paymentTerms);
+            if (promoted) {
+              return (
+                <>
+                  <p>List price: {formatCurrency(agreement.paymentTerms.totalFee)}</p>
+                  <p>{formatPromotionLabel(agreement.paymentTerms)}</p>
+                  <p>Amount due: {formatCurrency(dueTerms.totalFee)}</p>
+                  {dueTerms.depositAmount != null && (
+                    <p>Deposit: {formatCurrency(dueTerms.depositAmount)}</p>
+                  )}
+                  {dueTerms.balanceAmount != null && (
+                    <p>Balance: {formatCurrency(dueTerms.balanceAmount)}</p>
+                  )}
+                </>
+              );
+            }
+            return (
+              <>
+                <p>Total fee: {formatCurrency(agreement.paymentTerms.totalFee)}</p>
+                {agreement.paymentTerms.depositAmount != null && (
+                  <p>Deposit: {formatCurrency(agreement.paymentTerms.depositAmount)}</p>
+                )}
+                {agreement.paymentTerms.balanceAmount != null && (
+                  <p>Balance: {formatCurrency(agreement.paymentTerms.balanceAmount)}</p>
+                )}
+              </>
+            );
+          })()}
           {!meta.isRental && !meta.isPayee && (
             <>
               <p>

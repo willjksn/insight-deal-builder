@@ -52,8 +52,16 @@ body {
   background-size: 24px 24px;
 }
 
+.safe-area-pt {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
 .safe-area-pb {
   padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.safe-area-main-pb {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0));
 }
 
 input,

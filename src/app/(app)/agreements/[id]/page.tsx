@@ -38,7 +38,9 @@ import { SendToClientPanel } from "@/components/agreements/SendToClientPanel";
 import { PartyIdentitySection } from "@/components/identity/PartyIdentitySection";
 import { PaymentTrackingSection } from "@/components/agreements/PaymentTrackingSection";
 import { PartnerPayoutTrackingSection } from "@/components/agreements/PartnerPayoutTrackingSection";
+import { PartnerReimbursementSection } from "@/components/agreements/PartnerReimbursementSection";
 import { InternalPayoutBreakdown } from "@/components/agreements/InternalPayoutBreakdown";
+import { agreementAcceptsStripePayments } from "@/lib/stripe/eligibility";
 
 export default function AgreementDetailPage() {
   const params = useParams();
@@ -50,10 +52,10 @@ export default function AgreementDetailPage() {
   const { create, update, saving } = useMutations("agreements");
   const [showSendPanel, setShowSendPanel] = useState(false);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
-  const [clientSigningToken, setClientSigningToken] = useState<string | null>(null);
+  const [paymentSigningToken, setPaymentSigningToken] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || agreement?.agreementType !== "client_project") return;
+    if (!user || !agreement || !agreementAcceptsStripePayments(agreement)) return;
     void (async () => {
       try {
         const token = await user.getIdToken();
@@ -62,12 +64,12 @@ export default function AgreementDetailPage() {
         });
         if (!res.ok) return;
         const data = (await res.json()) as { token?: string | null };
-        setClientSigningToken(data.token ?? null);
+        setPaymentSigningToken(data.token ?? null);
       } catch {
         /* optional */
       }
     })();
-  }, [id, user, agreement?.agreementType]);
+  }, [id, user, agreement]);
 
   if (loading) return <LoadingSpinner className="py-20" />;
   if (!agreement) {
@@ -229,7 +231,13 @@ export default function AgreementDetailPage() {
         agreement={agreement}
         agreementId={id}
         onUpdated={refresh}
-        clientSigningToken={clientSigningToken}
+        clientSigningToken={paymentSigningToken}
+      />
+      <PartnerReimbursementSection
+        agreement={agreement}
+        agreementId={id}
+        paymentSigningToken={paymentSigningToken}
+        onUpdated={refresh}
       />
       <PartnerPayoutTrackingSection agreement={agreement} agreementId={id} onUpdated={refresh} />
 

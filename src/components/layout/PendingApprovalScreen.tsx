@@ -33,7 +33,7 @@ export function PendingApprovalScreen() {
   const archived = isUserArchived(appUser);
 
   return (
-    <div className="login-canvas flex min-h-screen items-center justify-center px-4">
+    <div className="login-canvas safe-area-pt flex min-h-screen items-center justify-center px-4 pb-[env(safe-area-inset-bottom,0)]">
       <div className="w-full max-w-md">
         <Card className="border-slate-700/50 bg-white/95 shadow-2xl shadow-black/20">
           <CardBody className="p-8 text-center">
