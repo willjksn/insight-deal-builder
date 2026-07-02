@@ -4,6 +4,7 @@ import { useRef } from "react";
 import SignatureCanvas from "react-signature-canvas";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
+import { darkenCanvasInk } from "@/lib/signatures/darkenMarkImage";
 
 interface SignaturePadProps {
   label?: string;
@@ -28,9 +29,13 @@ export function SignaturePad({
   };
 
   const handleSave = () => {
-    if (sigRef.current?.isEmpty()) return;
-    const dataUrl = sigRef.current?.toDataURL("image/png") || "";
-    onSave(dataUrl);
+    const canvas = sigRef.current?.getCanvas();
+    if (!canvas || sigRef.current?.isEmpty()) return;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      darkenCanvasInk(ctx, canvas.width, canvas.height);
+    }
+    onSave(canvas.toDataURL("image/png"));
   };
 
   return (
@@ -50,7 +55,9 @@ export function SignaturePad({
             className: "w-full h-full",
             style: { width: "100%", height: "100%" },
           }}
-          penColor="#1e293b"
+          penColor="#000000"
+          minWidth={2}
+          maxWidth={2.75}
         />
       </div>
       <div className="mt-3 flex gap-3">

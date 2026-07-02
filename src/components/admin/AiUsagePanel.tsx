@@ -112,7 +112,7 @@ export function AiUsagePanel() {
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
       ) : summary ? (
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card className="border-violet-200/80 bg-gradient-to-br from-violet-50/80 to-white">
               <CardBody className="p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-violet-800/70">
@@ -122,17 +122,6 @@ export function AiUsagePanel() {
                   {formatUsd(summary.totalEstimatedUsd)}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">{summary.callCount} AI calls</p>
-              </CardBody>
-            </Card>
-            <Card>
-              <CardBody className="p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tokens (text)</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900">
-                  {(summary.inputTokens + summary.outputTokens).toLocaleString()}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {summary.inputTokens.toLocaleString()} in · {summary.outputTokens.toLocaleString()} out
-                </p>
               </CardBody>
             </Card>
             <Card>

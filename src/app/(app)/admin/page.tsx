@@ -21,8 +21,11 @@ import {
 } from "@/lib/utils/permissions";
 import { ProjectAccessHub } from "@/components/projectAccess/ProjectAccessHub";
 import { AiUsagePanel } from "@/components/admin/AiUsagePanel";
+import { AdminWorkspacePanel } from "@/components/admin/AdminWorkspacePanel";
 import { ReferenceGuideAdminPanel } from "@/components/admin/ReferenceGuideAdminPanel";
-import { isUserPendingApproval, shouldApproveOnAdminSave } from "@/lib/users/approval";
+import { isUserApproved, isUserArchived, isUserPendingApproval, shouldApproveOnAdminSave } from "@/lib/users/approval";
+import { canArchivePartnerUser, canRestorePartnerUser } from "@/lib/users/archivePartner";
+import { deleteField } from "firebase/firestore";
 import {
   EMPTY_PERMISSIONS,
   PERMISSION_DEFINITIONS,
@@ -31,7 +34,7 @@ import {
   sanitizePermissionsForCompany,
 } from "@/lib/constants/permissions";
 import { AppUser, UserPermissions, UserRole } from "@/lib/types";
-import { Check, Shield, Users, Building2, ChevronDown } from "lucide-react";
+import { Check, Shield, Users, Building2, ChevronDown, Archive, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 type UserEdits = Record<
@@ -45,6 +48,23 @@ type UserEdits = Record<
 
 function permissionsEqual(a: UserPermissions, b: UserPermissions): boolean {
   return PERMISSION_DEFINITIONS.every((d) => a[d.key] === b[d.key]);
+}
+
+function matchingPresetId(
+  permissions: UserPermissions,
+  company: string
+): string | null {
+  for (const preset of PERMISSION_PRESETS) {
+    const sanitized = sanitizePermissionsForCompany(
+      preset.permissions,
+      company,
+      INSIGHT_MEDIA_GROUP_LLC
+    );
+    if (permissionsEqual(permissions, sanitized)) {
+      return preset.id;
+    }
+  }
+  return null;
 }
 
 function userSummaryLabel(permissions: UserPermissions, company: string): string {
@@ -61,9 +81,12 @@ function userSummaryLabel(permissions: UserPermissions, company: string): string
   return "Limited access";
 }
 
-function badgeVariant(label: string): "success" | "warning" | "info" | "default" {
+type UserListFilter = "active" | "pending" | "archived";
+
+function badgeVariant(label: string): "success" | "warning" | "info" | "default" | "danger" {
   if (label === "Full admin") return "success";
   if (label === "Pending approval") return "warning";
+  if (label === "Archived") return "danger";
   if (label === "Partner") return "info";
   if (label === "Producer") return "warning";
   if (label === "Accounting") return "info";
@@ -85,7 +108,7 @@ export default function AdminPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialProjectId = searchParams.get("project") ?? "";
-  const { appUser, refreshProfile } = useAuth();
+  const { appUser, refreshProfile, user: firebaseUser } = useAuth();
   const { data: users, loading, refresh } = useCollection<AppUser>("users");
   const { data: companies } = useCollection<{ id: string; displayName: string }>("companies");
   const { update, saving } = useMutations("users");
@@ -93,6 +116,8 @@ export default function AdminPage() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [userListFilter, setUserListFilter] = useState<UserListFilter>("active");
+  const [archivingId, setArchivingId] = useState<string | null>(null);
 
   const isOrgAdmin = canManageUsers(appUser);
   const canManageProjectTeams = canManageProjects(appUser) || isOrgAdmin;
@@ -120,20 +145,29 @@ export default function AdminPage() {
   const stats = useMemo(() => {
     const img = users.filter((u) => u.company === INSIGHT_MEDIA_GROUP_LLC).length;
     const partners = users.filter(
-      (u) => u.company && u.company !== INSIGHT_MEDIA_GROUP_LLC
+      (u) => u.company && u.company !== INSIGHT_MEDIA_GROUP_LLC && !isUserArchived(u)
     ).length;
     const pending = users.filter((u) => isUserPendingApproval(u)).length;
-    return { total: users.length, img, partners, pending };
+    const archived = users.filter((u) => isUserArchived(u)).length;
+    return { total: users.length, img, partners, pending, archived };
   }, [users]);
 
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      if (userListFilter === "archived") return isUserArchived(u);
+      if (userListFilter === "pending") return isUserPendingApproval(u);
+      return isUserApproved(u);
+    });
+  }, [users, userListFilter]);
+
   const sortedUsers = useMemo(() => {
-    return [...users].sort((a, b) => {
+    return [...filteredUsers].sort((a, b) => {
       const aPending = isUserPendingApproval(a) ? 0 : 1;
       const bPending = isUserPendingApproval(b) ? 0 : 1;
       if (aPending !== bPending) return aPending - bPending;
       return (a.email || "").localeCompare(b.email || "");
     });
-  }, [users]);
+  }, [filteredUsers]);
 
   useEffect(() => {
     setExpandedIds((prev) => {
@@ -233,6 +267,9 @@ export default function AdminPage() {
         permissions,
         role,
         approved,
+        ...(approved
+          ? { archivedAt: deleteField(), archivedByUserId: deleteField() }
+          : {}),
       });
       setEdits((prev) => {
         const next = { ...prev };
@@ -247,6 +284,70 @@ export default function AdminPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save user");
+    }
+  };
+
+  const handleArchivePartner = async (user: AppUser) => {
+    if (!appUser || !firebaseUser) return;
+    const block = canArchivePartnerUser(user, appUser.id);
+    if (block) {
+      setError(block);
+      return;
+    }
+    const name = user.displayName || user.email;
+    if (
+      !confirm(
+        `Archive ${name}?\n\nThey will lose login access and be removed from all project teams and shared scripts/scouts. Signed agreements and their work files stay on record.`
+      )
+    ) {
+      return;
+    }
+    setArchivingId(user.id);
+    setError(null);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`/api/admin/users/${user.id}/archive`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Archive failed");
+      setEdits((prev) => {
+        const next = { ...prev };
+        delete next[user.id];
+        return next;
+      });
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Archive failed");
+    } finally {
+      setArchivingId(null);
+    }
+  };
+
+  const handleRestorePartner = async (user: AppUser) => {
+    if (!appUser || !firebaseUser) return;
+    const block = canRestorePartnerUser(user, appUser.id);
+    if (block) {
+      setError(block);
+      return;
+    }
+    setArchivingId(user.id);
+    setError(null);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`/api/admin/users/${user.id}/restore`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Restore failed");
+      setUserListFilter("pending");
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Restore failed");
+    } finally {
+      setArchivingId(null);
     }
   };
 
@@ -333,6 +434,8 @@ export default function AdminPage() {
         </div>
       )}
 
+      {canManageProjectTeams && <AdminWorkspacePanel users={users.filter((u) => !isUserArchived(u))} />}
+
       {isOrgAdmin && <AiUsagePanel />}
       {isOrgAdmin && <ReferenceGuideAdminPanel />}
 
@@ -364,14 +467,50 @@ export default function AdminPage() {
                   <p className="text-sm text-slate-500">No users found.</p>
                 </CardBody>
               </Card>
+            ) : filteredUsers.length === 0 ? (
+              <Card>
+                <CardBody>
+                  <p className="text-sm text-slate-500">
+                    No {userListFilter} users. Try another filter.
+                  </p>
+                </CardBody>
+              </Card>
             ) : (
               <div className="space-y-5">
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      { id: "active" as const, label: `Active (${users.filter((u) => isUserApproved(u)).length})` },
+                      { id: "pending" as const, label: `Pending (${stats.pending})` },
+                      { id: "archived" as const, label: `Archived (${stats.archived})` },
+                    ] as const
+                  ).map((tab) => (
+                    <Button
+                      key={tab.id}
+                      type="button"
+                      size="sm"
+                      variant={userListFilter === tab.id ? "primary" : "outline"}
+                      onClick={() => setUserListFilter(tab.id)}
+                    >
+                      {tab.label}
+                    </Button>
+                  ))}
+                </div>
                 {sortedUsers.map((user) => {
             const edit = getEdit(user);
             const dirty = isDirty(user);
             const isCurrentUser = user.id === appUser.id;
+            const archived = isUserArchived(user);
             const pending = isUserPendingApproval(user);
-            const summary = pending ? "Pending approval" : userSummaryLabel(edit.permissions, edit.company);
+            const summary = archived
+              ? "Archived"
+              : pending
+                ? "Pending approval"
+                : userSummaryLabel(edit.permissions, edit.company);
+            const activePresetId = matchingPresetId(edit.permissions, edit.company);
+            const showArchive =
+              isOrgAdmin && !archived && canArchivePartnerUser(user, appUser.id) === null;
+            const showRestore = isOrgAdmin && archived && canRestorePartnerUser(user, appUser.id) === null;
             const applicableDefs = PERMISSION_DEFINITIONS.filter(
               (d) => !d.insightOnly || edit.company === INSIGHT_MEDIA_GROUP_LLC
             );
@@ -423,6 +562,21 @@ export default function AdminPage() {
 
                 {expanded && (
                 <CardBody className="space-y-5">
+                  {archived && (
+                    <InfoCallout variant="blue">
+                      <strong>Archived partner.</strong> Login is disabled and project access was
+                      removed. Their agreements and files remain on record. Restore to re-onboard, then
+                      assign permissions and save.
+                      {user.archivedAt && (
+                        <span className="mt-1 block text-xs opacity-80">
+                          Archived {new Date(user.archivedAt).toLocaleString()}
+                        </span>
+                      )}
+                    </InfoCallout>
+                  )}
+
+                  {!archived && (
+                  <>
                   <div className="grid gap-4 md:grid-cols-2">
                     <Input
                       label="Display name"
@@ -444,17 +598,28 @@ export default function AdminPage() {
                       Quick presets
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {PERMISSION_PRESETS.map((preset) => (
-                        <Button
-                          key={preset.id}
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => applyPreset(user.id, preset.permissions)}
-                        >
-                          {preset.label}
-                        </Button>
-                      ))}
+                      {PERMISSION_PRESETS.map((preset) => {
+                        const isActive = activePresetId === preset.id;
+                        return (
+                          <Button
+                            key={preset.id}
+                            type="button"
+                            size="sm"
+                            variant={isActive ? "primary" : "outline"}
+                            aria-pressed={isActive}
+                            className={cn(
+                              isActive && "ring-2 ring-sky-300 ring-offset-1",
+                              preset.id === "none" &&
+                                isActive &&
+                                "from-slate-600 to-slate-700 shadow-slate-500/20 hover:from-slate-700 hover:to-slate-800"
+                            )}
+                            onClick={() => applyPreset(user.id, preset.permissions)}
+                          >
+                            {isActive ? <Check className="mr-1.5 h-3.5 w-3.5" /> : null}
+                            {preset.label}
+                          </Button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -510,6 +675,38 @@ export default function AdminPage() {
                       )}
                     </Button>
                   </div>
+                  </>
+                  )}
+
+                  {(showArchive || showRestore) && (
+                    <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+                      {showArchive && (
+                        <Button
+                          type="button"
+                          size="touch"
+                          variant="outline"
+                          className="border-red-200 text-red-800 hover:bg-red-50"
+                          disabled={archivingId === user.id || saving}
+                          onClick={() => void handleArchivePartner(user)}
+                        >
+                          <Archive className="mr-2 h-4 w-4" />
+                          {archivingId === user.id ? "Archiving…" : "Archive partner"}
+                        </Button>
+                      )}
+                      {showRestore && (
+                        <Button
+                          type="button"
+                          size="touch"
+                          variant="outline"
+                          disabled={archivingId === user.id}
+                          onClick={() => void handleRestorePartner(user)}
+                        >
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          {archivingId === user.id ? "Restoring…" : "Restore partner"}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </CardBody>
                 )}
               </Card>

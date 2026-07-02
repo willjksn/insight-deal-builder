@@ -11,6 +11,7 @@ import {
   appendTalentAgreementPdf,
 } from "@/lib/agreement/payeeAgreementPreview";
 import { appendLocationAgreementPdf } from "@/lib/agreement/locationAgreementPreview";
+import { prepareAgreementMarksClient } from "@/lib/signatures/darkenMarkImage";
 
 function formatCurrency(amount?: number) {
   if (amount === undefined) return "—";
@@ -201,9 +202,10 @@ export function generateAgreementPdf(agreement: Agreement): jsPDF {
   return doc;
 }
 
-export function downloadAgreementPdf(agreement: Agreement) {
-  const doc = generateAgreementPdf(agreement);
-  doc.save(getPdfFilename(agreement));
+export async function downloadAgreementPdf(agreement: Agreement) {
+  const prepared = await prepareAgreementMarksClient(agreement);
+  const doc = generateAgreementPdf(prepared);
+  doc.save(getPdfFilename(prepared));
 }
 
 export function getAgreementPdfBlob(agreement: Agreement): Blob {

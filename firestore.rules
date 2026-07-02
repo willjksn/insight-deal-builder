@@ -239,10 +239,18 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/shotScoutProjects/$(scoutId)/members/$(request.auth.uid));
     }
 
+    function isScoutAdminSupportReader(scoutData) {
+      return isInsightOrg()
+        && hasPerm('manageProjects')
+        && scoutData.adminSupportReaders != null
+        && request.auth.uid in scoutData.adminSupportReaders;
+    }
+
     function canAccessScout(scoutId) {
       let scout = get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data;
       return (isSignedIn() && scout.userId == request.auth.uid)
         || isScoutDirectMember(scoutId)
+        || isScoutAdminSupportReader(scout)
         || (
           scout.linkedProjectId != null
           && hasProjectArea(scout.linkedProjectId, 'scout')
@@ -250,7 +258,13 @@ service cloud.firestore {
     }
 
     function canWriteScout(scoutId) {
-      return canAccessScout(scoutId);
+      let scout = get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data;
+      return (isSignedIn() && scout.userId == request.auth.uid)
+        || isScoutDirectMember(scoutId)
+        || (
+          scout.linkedProjectId != null
+          && hasProjectArea(scout.linkedProjectId, 'scout')
+        );
     }
 
     match /shotScoutProjects/{scoutId} {
@@ -381,6 +395,11 @@ service cloud.firestore {
         );
       allow delete: if canUseProductionBoard()
         && (resource.data.userId == request.auth.uid || hasPerm('manageProjects'));
+    }
+
+    // Admin workspace access audit — server-only (Admin SDK)
+    match /adminAccessLogs/{logId} {
+      allow read, write: if false;
     }
 
     match /scriptWriterSessions/{sessionId} {

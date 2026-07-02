@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, Camera, Sparkles, Film, List, ImageIcon, FileDown, RefreshCw, ScrollText, Globe, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -50,6 +50,8 @@ type Tab = "upload" | "analysis" | "plan" | "shots" | "preview" | "export";
 
 export default function ScoutProjectPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const adminOpen = searchParams.get("adminOpen") === "1";
   const id = params.id as string;
   const { user, appUser } = useAuth();
   const canLinkProjects = canLinkScoutToProject(appUser);
@@ -80,8 +82,28 @@ export default function ScoutProjectPage() {
       .finally(() => setLoading(false));
   }, [refresh]);
 
+  useEffect(() => {
+    if (!adminOpen || !user) return;
+    void (async () => {
+      try {
+        const token = await user.getIdToken();
+        await fetch("/api/admin/workspace-open", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ resourceType: "scout", resourceId: id }),
+        });
+        await refresh();
+      } catch {
+        /* refresh will surface permission errors */
+      }
+    })();
+  }, [adminOpen, user, id, refresh]);
+
   const handleUpload = async (files: FileList | null) => {
-    if (!files?.length || !user?.uid || !project) return;
+    if (!files?.length || !user?.uid || !project || adminReadOnly) return;
     if (images.length >= SCOUT_MAX_UPLOADS) {
       setError(`Maximum ${SCOUT_MAX_UPLOADS} photos per session.`);
       return;
@@ -248,6 +270,7 @@ export default function ScoutProjectPage() {
   const shots = project.latestShotList;
   const previews = project.latestPreviews ?? [];
   const isBeginner = project.skillLevel === "beginner";
+  const adminReadOnly = adminOpen && !!user && project.userId !== user.uid;
 
   const tabs: { id: Tab; label: string; icon: typeof Camera }[] = [
     { id: "upload", label: "Photos", icon: Camera },
@@ -265,6 +288,13 @@ export default function ScoutProjectPage() {
           <ArrowLeft className="mr-1 h-4 w-4" />
           All sessions
         </Link>
+
+        {adminReadOnly && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            Viewing as admin (read-only). This access is logged. You cannot edit this private scout
+            session.
+          </div>
+        )}
 
         <div className="mb-4 flex flex-wrap gap-2 text-xs">
           <Link href={`/scout/${id}/edit`} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sky-700 hover:border-sky-300 hover:bg-sky-50">

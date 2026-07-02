@@ -39,6 +39,18 @@ describe("isUserPendingApproval", () => {
     expect(isUserPendingApproval(user({ approved: false }))).toBe(true);
     expect(isUserPendingApproval(user())).toBe(false);
   });
+
+  it("does not treat archived users as pending", () => {
+    expect(
+      isUserPendingApproval(user({ approved: false, archivedAt: "2026-01-01T00:00:00.000Z" }))
+    ).toBe(false);
+  });
+});
+
+describe("isUserApproved", () => {
+  it("blocks archived users even if legacy approved", () => {
+    expect(isUserApproved(user({ archivedAt: "2026-01-01T00:00:00.000Z" }))).toBe(false);
+  });
 });
 
 describe("shouldApproveOnAdminSave", () => {

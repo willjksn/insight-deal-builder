@@ -8,7 +8,7 @@ import {
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
-import { getScriptSessionForUser } from "@/lib/projectAccess/server";
+import { getScriptSessionForRequest } from "@/lib/projectAccess/requestAccess";
 import { inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
 import { resolveSessionBrief, scriptWriterGenerate } from "@/lib/scriptWriter/scriptWriterAi";
 import { archiveScriptVersion } from "@/lib/scriptWriter/scriptVersions";
@@ -34,7 +34,7 @@ export async function POST(
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
 
-    const session = await getScriptSessionForUser(db, id, uid, appUser);
+    const session = await getScriptSessionForRequest(request, id, uid, appUser);
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
@@ -84,7 +84,7 @@ export async function POST(
       })
     );
 
-    const updated = await getScriptSessionForUser(db, id, uid, appUser);
+    const updated = await getScriptSessionForRequest(request, id, uid, appUser);
     return NextResponse.json({ session: updated });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Script generation failed";

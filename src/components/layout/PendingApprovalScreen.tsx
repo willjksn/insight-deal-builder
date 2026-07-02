@@ -6,8 +6,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { db } from "@/lib/firebase/config";
-import { isUserApproved } from "@/lib/users/approval";
-import { Clock, LogOut, RefreshCw } from "lucide-react";
+import { isUserApproved, isUserArchived } from "@/lib/users/approval";
+import { Archive, Clock, LogOut, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 
 export function PendingApprovalScreen() {
   const { user, appUser, signOut, refreshProfile } = useAuth();
@@ -29,21 +30,36 @@ export function PendingApprovalScreen() {
   }, [user, refreshProfile]);
 
   const approved = isUserApproved(appUser);
+  const archived = isUserArchived(appUser);
 
   return (
     <div className="login-canvas flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md">
         <Card className="border-slate-700/50 bg-white/95 shadow-2xl shadow-black/20">
           <CardBody className="p-8 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
-              <Clock className="h-7 w-7" />
+            <div
+              className={cn(
+                "mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl",
+                archived ? "bg-slate-200 text-slate-700" : "bg-amber-100 text-amber-700"
+              )}
+            >
+              {archived ? <Archive className="h-7 w-7" /> : <Clock className="h-7 w-7" />}
             </div>
             <h1 className="text-xl font-bold text-slate-900">
-              {approved ? "Access granted" : "Account pending approval"}
+              {approved
+                ? "Access granted"
+                : archived
+                  ? "Account archived"
+                  : "Account pending approval"}
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
               {approved ? (
                 <>Your account is approved. Refreshing the app…</>
+              ) : archived ? (
+                <>
+                  Your ShootSpine access was archived when your project ended. Contact Insight Media
+                  Group if you need to be re-enabled.
+                </>
               ) : (
                 <>
                   Thanks for signing up{appUser?.displayName ? `, ${appUser.displayName}` : ""}. An
@@ -51,13 +67,13 @@ export function PendingApprovalScreen() {
                 </>
               )}
             </p>
-            {!approved && (
+            {!approved && !archived && (
               <p className="mt-2 text-xs text-slate-500">
                 Signed in as {appUser?.email}. This page updates automatically when you are approved.
               </p>
             )}
             <div className="mt-6 flex flex-col gap-2">
-              {!approved && (
+              {!approved && !archived && (
                 <Button
                   variant="outline"
                   size="touch"

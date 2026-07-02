@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -47,6 +47,8 @@ interface ScriptWriterClientProps {
 
 export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const adminOpen = searchParams.get("adminOpen") === "1";
   const { user, appUser } = useAuth();
   const { data: projects } = useCollection<Project>("projects");
   const [session, setSession] = useState<ScriptWriterSession | null>(null);
@@ -72,7 +74,11 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
     setLoading(true);
     setError(null);
     try {
-      const { session: loaded } = await scriptWriterGetSession(() => user.getIdToken(), sessionId);
+      const { session: loaded } = await scriptWriterGetSession(
+        () => user.getIdToken(),
+        sessionId,
+        { adminOpen }
+      );
       const s = loaded as ScriptWriterSession;
       setSession(s);
       setProjectId(s.linkedProjectId ?? s.appliedProjectId ?? "");
@@ -83,7 +89,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
     } finally {
       setLoading(false);
     }
-  }, [sessionId, user]);
+  }, [sessionId, user, adminOpen]);
 
   useEffect(() => {
     void load();
@@ -94,7 +100,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   }, [session?.messages.length]);
 
   const send = async () => {
-    if (!user || !input.trim() || sending) return;
+    if (!user || !input.trim() || sending || adminReadOnly) return;
     setSending(true);
     setError(null);
     try {
@@ -114,7 +120,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   };
 
   const generate = async () => {
-    if (!user || generating) return;
+    if (!user || generating || adminReadOnly) return;
     setGenerating(true);
     setError(null);
     try {
@@ -224,9 +230,15 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const isInspiration = session.workflowMode === "inspiration";
   const awaitingAnalysisConfirm = session.status === "analysis_ready";
   const canRefine = Boolean(script && session.status === "script_ready" && !session.refineUsed);
+  const adminReadOnly = adminOpen && !!user && session.userId !== user.uid;
 
   return (
     <div className="pb-24">
+      {adminReadOnly && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          Viewing as admin (read-only). This access is logged. You cannot edit this private script.
+        </div>
+      )}
       <PageHeader
         title={session.title || "Script writer"}
         subtitle={

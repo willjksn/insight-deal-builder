@@ -47,6 +47,9 @@ export interface UserProfile {
   notifyPush?: boolean;
   /** False until an admin assigns company and permissions */
   approved?: boolean;
+  /** Set when a partner is offboarded — login blocked until restored and re-approved */
+  archivedAt?: string;
+  archivedByUserId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

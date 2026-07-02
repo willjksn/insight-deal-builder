@@ -38,6 +38,7 @@ export default function SignAgreementPage() {
 
   const [partyId, setPartyId] = useState("");
   const [showSendPanel, setShowSendPanel] = useState(false);
+  const [sendNotice, setSendNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setPartyId("");
@@ -136,6 +137,12 @@ export default function SignAgreementPage() {
 
       <PageHeader title="Sign Agreement" subtitle={agreement.title} />
 
+      {sendNotice && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {sendNotice}
+        </div>
+      )}
+
       {isLocked && (
         <div className="mb-4 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 p-3 text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
           <CheckCircle className="h-5 w-5" /> Agreement fully signed and locked.
@@ -193,7 +200,10 @@ export default function SignAgreementPage() {
           agreementId={id}
           defaultEmail={clientEmail || ""}
           onClose={() => setShowSendPanel(false)}
-          onSent={() => refresh()}
+          onSent={(result) => {
+            refresh();
+            setSendNotice(`Agreement sent to ${result.to}. The client can sign from the email link.`);
+          }}
         />
       )}
     </div>

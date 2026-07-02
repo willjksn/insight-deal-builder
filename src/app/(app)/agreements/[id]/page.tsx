@@ -49,6 +49,7 @@ export default function AgreementDetailPage() {
   const { data: servicePackages } = useServicePackages();
   const { create, update, saving } = useMutations("agreements");
   const [showSendPanel, setShowSendPanel] = useState(false);
+  const [sendNotice, setSendNotice] = useState<string | null>(null);
 
   if (loading) return <LoadingSpinner className="py-20" />;
   if (!agreement) {
@@ -107,6 +108,12 @@ export default function AgreementDetailPage() {
         subtitle={`${getAgreementTypeLabel(agreement.agreementType)} · v${agreement.version}${linkedPackage ? ` · ${linkedPackage.name}` : ""}`}
         action={<Badge variant={statusVariant(agreement.status)}>{agreement.status.replace(/_/g, " ")}</Badge>}
       />
+
+      {sendNotice && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {sendNotice}
+        </div>
+      )}
 
       {isLocked && (
         <div className="mb-4 rounded-lg bg-sky-50 border border-sky-200 p-3 text-sm text-sky-900">
@@ -260,7 +267,10 @@ export default function AgreementDetailPage() {
           agreementId={id}
           defaultEmail={clientEmail || ""}
           onClose={() => setShowSendPanel(false)}
-          onSent={() => refresh()}
+          onSent={(result) => {
+            refresh();
+            setSendNotice(`Agreement sent to ${result.to}. The client can sign from the email link.`);
+          }}
         />
       )}
     </div>

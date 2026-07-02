@@ -6,7 +6,6 @@ import {
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import {
-  hasGlobalProjectAdmin,
   listResourceMembers,
   listTeamUserCandidates,
   loadScriptSession,
@@ -29,8 +28,8 @@ async function assertCanManageScriptShares(
   if (!db) throw new Error("Firebase Admin is not configured");
   const session = await loadScriptSession(db, sessionId);
   if (!session) throw new Error("Session not found");
-  if (hasGlobalProjectAdmin(appUser) || session.userId === uid) return session;
-  throw new Error("Not authorized to manage script sharing");
+  if (session.userId !== uid) throw new Error("Not authorized to manage script sharing");
+  return session;
 }
 
 export async function GET(
@@ -54,8 +53,7 @@ export async function GET(
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
 
-    const canManage =
-      hasGlobalProjectAdmin(appUser) || session.userId === uid;
+    const canManage = session.userId === uid;
     const members = canManage
       ? await listResourceMembers(db, SCRIPT_WRITER_SESSIONS_COLLECTION, sessionId)
       : [];

@@ -69,7 +69,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
 
     const pdfFilename = getPdfFilename(agreement);
-    const pdfBase64 = getAgreementPdfBase64(agreement);
+    const pdfBase64 = await getAgreementPdfBase64(agreement);
 
     const emailResult = await sendClientAgreementEmail({
       to,

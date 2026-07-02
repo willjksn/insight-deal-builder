@@ -13,6 +13,8 @@ import {
   ProjectMember,
   ResourceMember,
 } from "@/lib/projectAccess/types";
+import { WorkspaceAccessOptions } from "@/lib/projectAccess/workspaceAccess";
+import { tryAdminWorkspaceReadAccess } from "@/lib/projectAccess/workspaceAccess.server";
 
 export const PROJECT_MEMBERS_SUBCOLLECTION = "members";
 export const RESOURCE_MEMBERS_SUBCOLLECTION = "members";
@@ -290,11 +292,10 @@ export async function resolveScriptSessionAccess(
   session: ScriptWriterSession,
   uid: string,
   appUser: AppUser,
-  requireWrite = false
+  requireWrite = false,
+  options?: WorkspaceAccessOptions,
+  adminEmail = ""
 ): Promise<{ allowed: boolean; via: "owner" | "project" | "direct" | "admin" | null }> {
-  if (hasGlobalProjectAdmin(appUser)) {
-    return { allowed: true, via: "admin" };
-  }
   if (session.userId === uid) {
     return { allowed: true, via: "owner" };
   }
@@ -310,7 +311,18 @@ export async function resolveScriptSessionAccess(
     if (has) return { allowed: true, via: "project" };
   }
 
-  if (requireWrite) return { allowed: false, via: null };
+  if (
+    !requireWrite &&
+    (await tryAdminWorkspaceReadAccess(db, appUser, session.userId, options, {
+      resourceType: "script",
+      resourceId: session.id,
+      adminUserId: uid,
+      adminEmail,
+    }))
+  ) {
+    return { allowed: true, via: "admin" };
+  }
+
   return { allowed: false, via: null };
 }
 
@@ -319,9 +331,19 @@ export async function assertScriptSessionAccess(
   session: ScriptWriterSession,
   uid: string,
   appUser: AppUser,
-  requireWrite = true
+  requireWrite = true,
+  options?: WorkspaceAccessOptions,
+  adminEmail = ""
 ): Promise<void> {
-  const { allowed } = await resolveScriptSessionAccess(db, session, uid, appUser, requireWrite);
+  const { allowed } = await resolveScriptSessionAccess(
+    db,
+    session,
+    uid,
+    appUser,
+    requireWrite,
+    options,
+    adminEmail
+  );
   if (!allowed) throw new Error("Not authorized");
 }
 
@@ -329,11 +351,10 @@ export async function resolveScoutAccess(
   db: Firestore,
   project: ScoutProject,
   uid: string,
-  appUser: AppUser
+  appUser: AppUser,
+  options?: WorkspaceAccessOptions,
+  adminEmail = ""
 ): Promise<{ allowed: boolean; via: "owner" | "project" | "direct" | "admin" | null }> {
-  if (hasGlobalProjectAdmin(appUser)) {
-    return { allowed: true, via: "admin" };
-  }
   if (project.userId === uid) {
     return { allowed: true, via: "owner" };
   }
@@ -349,6 +370,17 @@ export async function resolveScoutAccess(
     if (has) return { allowed: true, via: "project" };
   }
 
+  if (
+    await tryAdminWorkspaceReadAccess(db, appUser, project.userId, options, {
+      resourceType: "scout",
+      resourceId: project.id,
+      adminUserId: uid,
+      adminEmail,
+    })
+  ) {
+    return { allowed: true, via: "admin" };
+  }
+
   return { allowed: false, via: null };
 }
 
@@ -356,9 +388,11 @@ export async function assertScoutAccess(
   db: Firestore,
   project: ScoutProject,
   uid: string,
-  appUser: AppUser
+  appUser: AppUser,
+  options?: WorkspaceAccessOptions,
+  adminEmail = ""
 ): Promise<void> {
-  const { allowed } = await resolveScoutAccess(db, project, uid, appUser);
+  const { allowed } = await resolveScoutAccess(db, project, uid, appUser, options, adminEmail);
   if (!allowed) throw new Error("Not authorized");
 }
 
@@ -375,11 +409,21 @@ export async function getScriptSessionForUser(
   db: Firestore,
   sessionId: string,
   uid: string,
-  appUser: AppUser
+  appUser: AppUser,
+  options?: WorkspaceAccessOptions,
+  adminEmail = ""
 ): Promise<ScriptWriterSession | null> {
   const session = await loadScriptSession(db, sessionId);
   if (!session) return null;
-  const { allowed } = await resolveScriptSessionAccess(db, session, uid, appUser);
+  const { allowed } = await resolveScriptSessionAccess(
+    db,
+    session,
+    uid,
+    appUser,
+    false,
+    options,
+    adminEmail
+  );
   return allowed ? session : null;
 }
 
@@ -554,11 +598,13 @@ export async function getScoutProjectForUser(
   db: Firestore,
   scoutId: string,
   uid: string,
-  appUser: AppUser
+  appUser: AppUser,
+  options?: WorkspaceAccessOptions,
+  adminEmail = ""
 ): Promise<ScoutProject | null> {
   const project = await loadScoutProject(db, scoutId);
   if (!project) return null;
-  const { allowed } = await resolveScoutAccess(db, project, uid, appUser);
+  const { allowed } = await resolveScoutAccess(db, project, uid, appUser, options, adminEmail);
   return allowed ? project : null;
 }
 

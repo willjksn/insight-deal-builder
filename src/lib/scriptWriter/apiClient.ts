@@ -99,9 +99,11 @@ export async function scriptWriterRefineScript(
 
 export async function scriptWriterGetSession(
   getToken: () => Promise<string | null>,
-  sessionId: string
+  sessionId: string,
+  options?: { adminOpen?: boolean }
 ) {
-  const res = await fetch(`/api/script-writer/sessions/${sessionId}`, {
+  const qs = options?.adminOpen ? "?adminOpen=1" : "";
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}${qs}`, {
     headers: await authHeaders(getToken),
   });
   return parseJson<{ session: unknown }>(res);

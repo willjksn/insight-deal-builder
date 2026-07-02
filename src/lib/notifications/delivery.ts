@@ -107,7 +107,7 @@ export async function sendClientAgreementEmail(params: {
   text: string;
   pdfFilename: string;
   pdfBase64: string;
-}): Promise<void> {
+}): Promise<{ id?: string }> {
   const resend = getResendClient();
   if (!resend) {
     throw new Error("RESEND_API_KEY is not configured — add it to .env.local to send emails");

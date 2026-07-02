@@ -1,9 +1,15 @@
 import { AppUser, UserPermissions } from "@/lib/types";
 import { canManageUsers, isLegacyInsightAdmin } from "@/lib/utils/permissions";
 
+export function isUserArchived(user: AppUser | null | undefined): boolean {
+  if (!user?.archivedAt) return false;
+  return true;
+}
+
 /** Legacy profiles without `approved` are treated as already approved. */
 export function isUserApproved(user: AppUser | null | undefined): boolean {
   if (!user) return false;
+  if (isUserArchived(user)) return false;
   if (canManageUsers(user) || isLegacyInsightAdmin(user)) return true;
   if (user.approved === false) return false;
   return true;
@@ -11,6 +17,7 @@ export function isUserApproved(user: AppUser | null | undefined): boolean {
 
 export function isUserPendingApproval(user: AppUser | null | undefined): boolean {
   if (!user) return false;
+  if (isUserArchived(user)) return false;
   return !isUserApproved(user);
 }
 

@@ -14,7 +14,16 @@ export async function requireScoutProjectAccess(
   const db = getAdminDb();
   if (!db) throw new Error("Firebase Admin is not configured");
 
-  const project = await getScoutProjectForUser(db, scoutId, uid, appUser);
+  const { workspaceAccessOptionsFromRequest } = await import("@/lib/projectAccess/workspaceAccess.server");
+  const options = workspaceAccessOptionsFromRequest(request);
+  const project = await getScoutProjectForUser(
+    db,
+    scoutId,
+    uid,
+    appUser,
+    options,
+    appUser.email ?? ""
+  );
   if (!project) throw new Error("Not authorized");
 
   return { uid, appUser, project };
@@ -26,12 +35,7 @@ export async function requireScoutOwner(
 ): Promise<{ uid: string; appUser: Awaited<ReturnType<typeof requireAuthUser>>["appUser"]; project: ScoutProject }> {
   const { uid, appUser, project } = await requireScoutProjectAccess(request, scoutId);
   if (project.userId !== uid) {
-    const db = getAdminDb();
-    if (!db) throw new Error("Firebase Admin is not configured");
-    const { hasGlobalProjectAdmin } = await import("@/lib/projectAccess/server");
-    if (!hasGlobalProjectAdmin(appUser)) {
-      throw new Error("Not authorized");
-    }
+    throw new Error("Not authorized");
   }
   return { uid, appUser, project };
 }
