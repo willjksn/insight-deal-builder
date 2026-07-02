@@ -88,8 +88,10 @@ export default function PublicSignPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white px-4 py-4 md:px-8">
-        <p className="text-sm font-semibold text-slate-600">{PRODUCER_LEGAL_NAME}</p>
-        <p className="text-xs text-slate-400">Secure agreement signing · Link expires {formatDate(session.expiresAt)}</p>
+        <p className="text-sm font-semibold text-slate-900">{PRODUCER_LEGAL_NAME}</p>
+        <p className="mt-1 text-xs text-slate-400">
+          Secure agreement signing · Link expires {formatDate(session.expiresAt)}
+        </p>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 md:px-8">

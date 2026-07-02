@@ -24,7 +24,7 @@ export function usePushNotifications() {
     let unsubscribe = () => {};
     subscribeForegroundPush((title, body, url) => {
       if (Notification.permission === "granted") {
-        const n = new Notification(title, { body, icon: "/favicon.ico" });
+        const n = new Notification(title, { body, icon: "/brand/shootspine-icon-32.png" });
         n.onclick = () => {
           window.focus();
           if (url) window.location.href = url;

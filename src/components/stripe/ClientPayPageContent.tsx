@@ -84,7 +84,9 @@ export function ClientPayPageContent() {
   return (
     <div className="mx-auto min-h-screen max-w-lg bg-slate-50 px-4 py-10">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">{PRODUCER_LEGAL_NAME}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+          {PRODUCER_LEGAL_NAME}
+        </p>
         <h1 className="mt-2 text-2xl font-bold text-slate-900">Pay agreement</h1>
         <p className="mt-1 text-sm text-slate-600">
           {session.projectName || session.agreementTitle}

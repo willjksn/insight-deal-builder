@@ -27,9 +27,9 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  APP_NAME,
   APP_SHORT_TAGLINE,
 } from "@/lib/brand";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import {
   canCreateQuotes,
   canManageClients,
@@ -202,9 +202,10 @@ export function Sidebar() {
     <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-slate-900 text-white shadow-xl shadow-slate-900/20">
       <div className="flex flex-col flex-1 min-h-0">
         <div className="px-6 py-6 border-b border-slate-700/80">
-          <div className="mb-3 h-1 w-8 rounded-full bg-gradient-to-r from-sky-400 to-violet-500" />
-          <h1 className="text-lg font-bold tracking-tight leading-tight">{APP_NAME}</h1>
-          <p className="mt-1.5 text-[11px] text-slate-400 leading-snug">{APP_SHORT_TAGLINE}</p>
+          <div className="mb-3 inline-flex rounded-lg border border-slate-600/60 bg-slate-200/90 px-3 py-2 shadow-sm">
+            <BrandLogo variant="full" className="h-8 w-auto max-w-[180px]" priority />
+          </div>
+          <p className="text-[11px] text-slate-400 leading-snug">{APP_SHORT_TAGLINE}</p>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">

@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "process-brand-logos": "node scripts/process-brand-logos.mjs",
     "create-admin-user": "node scripts/create-admin-user.mjs"
   },
   "dependencies": {

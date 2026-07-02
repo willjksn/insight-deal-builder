@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
 import { APP_NAME, APP_SHORT_TAGLINE } from "@/lib/brand";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import {
   canCreateQuotes,
   canManageClients,
@@ -91,9 +92,12 @@ export function MobileNav() {
       <header className="lg:hidden sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md shadow-sm">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <BrandLogo variant="icon" className="h-9 w-9 shrink-0" />
+              <div className="min-w-0">
               <h1 className="truncate text-base font-bold text-slate-900">{APP_NAME}</h1>
               <p className="truncate text-[10px] font-medium text-sky-700/90">{APP_SHORT_TAGLINE}</p>
+              </div>
             </div>
           </div>
           {visibleMoreItems.length > 0 ? (

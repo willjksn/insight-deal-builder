@@ -6,8 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardBody } from "@/components/ui/Card";
-import { Clapperboard } from "lucide-react";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 
 type Mode = "signIn" | "signUp" | "resetPassword";
 
@@ -63,8 +63,8 @@ export default function LoginPage() {
     <div className="login-canvas flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-violet-500 shadow-lg shadow-sky-500/30 ring-4 ring-sky-400/20">
-            <Clapperboard className="h-8 w-8 text-white" />
+          <div className="mx-auto mb-4 flex justify-center">
+            <BrandLogo variant="icon" className="h-16 w-16 drop-shadow-lg" priority />
           </div>
           <h1 className="text-2xl font-bold text-white">{APP_NAME}</h1>
           <p className="mt-2 text-sm text-slate-400 leading-relaxed max-w-sm mx-auto">

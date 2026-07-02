@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { APP_NAME } from "@/lib/brand";
+import { APP_NAME, BRAND_ICON_32_PATH } from "@/lib/brand";
 
 export async function GET() {
   const config = {
@@ -20,7 +20,7 @@ messaging.onBackgroundMessage(function(payload) {
   const title = payload.notification?.title || ${JSON.stringify(APP_NAME)};
   const options = {
     body: payload.notification?.body || "",
-    icon: "/favicon.ico",
+    icon: ${JSON.stringify(BRAND_ICON_32_PATH)},
     data: payload.data || {},
   };
   self.registration.showNotification(title, options);
