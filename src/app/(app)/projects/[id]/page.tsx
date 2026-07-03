@@ -36,14 +36,15 @@ function pickProjectScriptSession(
   projectId: string,
   board: ProductionBoard | null
 ): ScriptWriterSession | undefined {
+  if (board?.scriptSessionId) {
+    const fromBoard = sessions.find((s) => s.id === board.scriptSessionId);
+    if (fromBoard) return fromBoard;
+  }
+
   const linked = sessions.filter(
     (s) => s.linkedProjectId === projectId || s.appliedProjectId === projectId
   );
   if (!linked.length) return undefined;
-  if (board?.scriptSessionId) {
-    const fromBoard = linked.find((s) => s.id === board.scriptSessionId);
-    if (fromBoard) return fromBoard;
-  }
   const rank = (s: ScriptWriterSession) => {
     if (s.status === "applied") return 0;
     if (s.status === "script_ready") return 1;
@@ -74,6 +75,8 @@ export default function ProjectDetailPage() {
   const projectAccess = useProjectAccess(id, project?.ownerUserId);
   const showScout =
     canUseShotScout(appUser) || projectAccess.canAccessScout;
+  const showScripts =
+    canUseShotScout(appUser) || projectAccess.canAccessScripts;
   const { data: allScoutSessions } = useScoutProjects(user?.uid, showScout);
   const showProduction =
     canManageProjects(appUser) ||
@@ -138,13 +141,13 @@ export default function ProjectDetailPage() {
   }, [id, showScout]);
 
   useEffect(() => {
-    if (!user || (!showScout && !projectAccess.canAccessScripts)) return;
+    if (!user || (!showScout && !showScripts)) return;
     setSpineLoading(true);
     scriptWriterListSessions(() => user.getIdToken())
       .then((res) => setScriptSessions(res.sessions as ScriptWriterSession[]))
       .catch(() => setScriptSessions([]))
       .finally(() => setSpineLoading(false));
-  }, [user, showScout, projectAccess.canAccessScripts]);
+  }, [user, showScout, showScripts]);
 
   if (loading) return <LoadingSpinner className="py-20" />;
   if (!project) {
@@ -179,7 +182,7 @@ export default function ProjectDetailPage() {
                 </Button>
               </Link>
             )}
-            {showScout && (
+            {showScripts && (
               <Link
                 href={
                   primaryScript
@@ -193,7 +196,7 @@ export default function ProjectDetailPage() {
               >
                 <Button size="touch" variant="outline">
                   <ScrollText className="mr-2 h-5 w-5" />
-                  Script writer
+                  {primaryScript ? "Open script" : "Script writer"}
                 </Button>
               </Link>
             )}
@@ -230,7 +233,7 @@ export default function ProjectDetailPage() {
         </p>
       )}
 
-      {spineLoading && showScout ? (
+      {spineLoading && (showScout || showScripts) ? (
         <LoadingSpinner className="py-8 mb-8" />
       ) : (
         <ProjectSpine
@@ -243,6 +246,7 @@ export default function ProjectDetailPage() {
           agreements={projectAgreements}
           showProduction={showProduction}
           showScout={showScout}
+          showScripts={showScripts}
           canCreateDeal={canCreateDeal}
         />
       )}
@@ -314,7 +318,7 @@ export default function ProjectDetailPage() {
           </CardBody>
         </Card>
 
-        {showScout && (
+        {showScripts && (
           <Card>
             <CardBody>
               <div className="mb-4 flex items-center justify-between">

@@ -122,6 +122,7 @@ interface ProjectSpineProps {
   agreements: Agreement[];
   showProduction: boolean;
   showScout: boolean;
+  showScripts: boolean;
   canCreateDeal: boolean;
 }
 
@@ -135,6 +136,7 @@ export function ProjectSpine({
   agreements,
   showProduction,
   showScout,
+  showScripts,
   canCreateDeal,
 }: ProjectSpineProps) {
   const idea = `A project for ${clientName || "client"}: ${projectName}`;
@@ -142,7 +144,7 @@ export function ProjectSpine({
 
   const steps: SpineStep[] = [];
 
-  if (showScout) {
+  if (showScripts) {
     steps.push({
       key: "script",
       label: "Script",

@@ -499,27 +499,9 @@ export async function listAccessibleScriptSessions(
     if (session) byId.set(sessionId, session);
   }
 
-  if (!hasGlobalProjectAdmin(appUser)) {
-    const projectIds = await getProjectIdsForMember(db, uid);
-    for (const projectId of projectIds) {
-      const perms = await resolveProjectPermissions(db, projectId, uid, appUser);
-      if (!perms.scripts) continue;
-
-      const [linkedSnap, appliedSnap] = await Promise.all([
-        db
-          .collection(SCRIPT_WRITER_SESSIONS_COLLECTION)
-          .where("linkedProjectId", "==", projectId)
-          .limit(25)
-          .get(),
-        db
-          .collection(SCRIPT_WRITER_SESSIONS_COLLECTION)
-          .where("appliedProjectId", "==", projectId)
-          .limit(25)
-          .get(),
-      ]);
-      linkedSnap.docs.forEach((d) => addDoc(d.id, d.data()));
-      appliedSnap.docs.forEach((d) => addDoc(d.id, d.data()));
-    }
+  const projectIds = await collectAccessibleProjectIds(db, uid, appUser);
+  for (const projectId of projectIds) {
+    await addProjectScriptSessions(db, uid, appUser, projectId, byId);
   }
 
   return [...byId.values()].sort((a, b) => {
@@ -529,6 +511,89 @@ export async function listAccessibleScriptSessions(
         : 0;
     return toMs(b.updatedAt) - toMs(a.updatedAt);
   });
+}
+
+async function collectAccessibleProjectIds(
+  db: Firestore,
+  uid: string,
+  appUser: AppUser
+): Promise<string[]> {
+  const ids = new Set<string>();
+
+  if (hasGlobalProjectAdmin(appUser)) {
+    let snap;
+    try {
+      snap = await db.collection("projects").orderBy("updatedAt", "desc").limit(100).get();
+    } catch {
+      snap = await db.collection("projects").limit(100).get();
+    }
+    snap.docs.forEach((d) => ids.add(d.id));
+    return [...ids];
+  }
+
+  for (const projectId of await getProjectIdsForMember(db, uid)) {
+    ids.add(projectId);
+  }
+
+  const ownedSnap = await db.collection("projects").where("ownerUserId", "==", uid).get();
+  ownedSnap.docs.forEach((d) => ids.add(d.id));
+
+  return [...ids];
+}
+
+async function addProjectScriptSessions(
+  db: Firestore,
+  uid: string,
+  appUser: AppUser,
+  projectId: string,
+  byId: Map<string, ScriptWriterSession>
+): Promise<void> {
+  const perms = await resolveProjectPermissions(db, projectId, uid, appUser);
+  const projectSnap = await db.collection("projects").doc(projectId).get();
+  const isOwner =
+    projectSnap.exists && (projectSnap.data() as Project).ownerUserId === uid;
+  const hasScripts = hasGlobalProjectAdmin(appUser) || isOwner || perms.scripts;
+  const hasBoard =
+    hasGlobalProjectAdmin(appUser) ||
+    isOwner ||
+    perms.production ||
+    perms.shots ||
+    perms.scripts;
+
+  if (hasScripts) {
+    const [linkedSnap, appliedSnap] = await Promise.all([
+      db
+        .collection(SCRIPT_WRITER_SESSIONS_COLLECTION)
+        .where("linkedProjectId", "==", projectId)
+        .limit(25)
+        .get(),
+      db
+        .collection(SCRIPT_WRITER_SESSIONS_COLLECTION)
+        .where("appliedProjectId", "==", projectId)
+        .limit(25)
+        .get(),
+    ]);
+    linkedSnap.docs.forEach((d) => byId.set(d.id, { id: d.id, ...(d.data() as Omit<ScriptWriterSession, "id">) }));
+    appliedSnap.docs.forEach((d) => byId.set(d.id, { id: d.id, ...(d.data() as Omit<ScriptWriterSession, "id">) }));
+  }
+
+  if (!hasBoard) return;
+
+  const boardSnap = await db
+    .collection("productionBoards")
+    .where("projectId", "==", projectId)
+    .limit(1)
+    .get();
+  if (boardSnap.empty) return;
+
+  const scriptSessionId = boardSnap.docs[0].data().scriptSessionId as string | undefined;
+  if (!scriptSessionId?.trim() || byId.has(scriptSessionId)) return;
+
+  const session = await loadScriptSession(db, scriptSessionId);
+  if (!session) return;
+
+  const { allowed } = await resolveScriptSessionAccess(db, session, uid, appUser, false);
+  if (allowed) byId.set(scriptSessionId, session);
 }
 
 export async function listAccessibleScoutProjects(

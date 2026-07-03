@@ -1,19 +1,35 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ScriptWriterClient } from "@/components/scriptWriter/ScriptWriterClient";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
+import { scriptWriterGetSession } from "@/lib/scriptWriter/apiClient";
 import { canUseShotScout } from "@/lib/utils/permissions";
 
 export default function ScriptWriterSessionPage() {
   const params = useParams();
   const sessionId = params.id as string;
-  const { appUser } = useAuth();
+  const { user, appUser } = useAuth();
+  const [allowed, setAllowed] = useState<boolean | null>(null);
 
-  if (!canUseShotScout(appUser)) {
+  useEffect(() => {
+    if (!user) return;
+    if (canUseShotScout(appUser)) {
+      setAllowed(true);
+      return;
+    }
+    scriptWriterGetSession(() => user.getIdToken(), sessionId)
+      .then(() => setAllowed(true))
+      .catch(() => setAllowed(false));
+  }, [user, appUser, sessionId]);
+
+  if (allowed === null) return <LoadingSpinner className="py-20" />;
+  if (!allowed) {
     return (
       <div className="py-20 text-center text-slate-500">
-        <p>Access denied.</p>
+        <p>You don&apos;t have access to this script.</p>
       </div>
     );
   }

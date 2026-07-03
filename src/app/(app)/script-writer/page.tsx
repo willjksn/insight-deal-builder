@@ -32,8 +32,8 @@ import {
 } from "@/lib/scriptWriter/brief";
 import { uploadScriptWriterFile } from "@/lib/scriptWriter/storage";
 import { ScriptInspirationImage, ScriptInspirationVideo, ScriptWriterSession } from "@/lib/scriptWriter/types";
-import { canUseShotScout, canManageProjects } from "@/lib/utils/permissions";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { scriptSessionStatusLabel, sessionsForProject } from "@/lib/scriptWriter/projectScripts";
+import { canUseShotScout } from "@/lib/utils/permissions";
 
 function ScriptWriterPageContent() {
   const router = useRouter();
@@ -196,6 +196,45 @@ function ScriptWriterPageContent() {
     );
   }
 
+  const projectSessions = linkedProjectId ? sessionsForProject(sessions, linkedProjectId) : [];
+  const otherSessions = linkedProjectId
+    ? sessions.filter((s) => !projectSessions.some((p) => p.id === s.id))
+    : sessions;
+
+  const renderSessionRow = (s: ScriptWriterSession) => {
+    const isOwner = user?.uid === s.userId;
+    return (
+      <li key={s.id} className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50">
+        <Link href={`/script-writer/${s.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+            <ScrollText className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium text-slate-900">{s.title}</p>
+            <p className="truncate text-xs text-slate-500">{scriptSessionStatusLabel(s)}</p>
+          </div>
+        </Link>
+        {isOwner ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-label="Delete script"
+            title="Delete script"
+            disabled={deleting && deleteTarget?.id === s.id}
+            onClick={() => setDeleteTarget(s)}
+          >
+            {deleting && deleteTarget?.id === s.id ? (
+              <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+            ) : (
+              <Trash2 className="h-4 w-4 text-red-500" />
+            )}
+          </Button>
+        ) : null}
+      </li>
+    );
+  };
+
   return (
     <div className="pb-24">
       <PageHeader
@@ -254,57 +293,30 @@ function ScriptWriterPageContent() {
         </CardBody>
       </Card>
 
+      {linkedProjectId && projectSessions.length > 0 ? (
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Scripts for this project
+          </h2>
+          <ul className="divide-y divide-slate-100 rounded-2xl border border-violet-200 bg-violet-50/40">
+            {projectSessions.map(renderSessionRow)}
+          </ul>
+        </section>
+      ) : null}
+
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Recent scripts
+          {linkedProjectId ? "All recent scripts" : "Recent scripts"}
         </h2>
         {loading ? (
           <LoadingSpinner className="py-8" />
-        ) : sessions.length === 0 ? (
+        ) : otherSessions.length === 0 && projectSessions.length === 0 ? (
           <p className="text-sm text-slate-500">No scripts yet.</p>
+        ) : otherSessions.length === 0 ? (
+          <p className="text-sm text-slate-500">No other scripts yet.</p>
         ) : (
           <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
-            {sessions.map((s) => {
-              const isOwner = user?.uid === s.userId;
-              return (
-                <li key={s.id} className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50">
-                  <Link href={`/script-writer/${s.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
-                      <ScrollText className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-slate-900">{s.title}</p>
-                      <p className="truncate text-xs text-slate-500">
-                        {s.status === "applied"
-                          ? "Applied to project"
-                          : s.status === "script_ready"
-                            ? "Script ready"
-                            : s.status === "analysis_ready"
-                              ? "Review analysis"
-                              : "In progress"}
-                      </p>
-                    </div>
-                  </Link>
-                  {isOwner ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      aria-label="Delete script"
-                      title="Delete script"
-                      disabled={deleting && deleteTarget?.id === s.id}
-                      onClick={() => setDeleteTarget(s)}
-                    >
-                      {deleting && deleteTarget?.id === s.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-red-500" />
-                      ) : (
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      )}
-                    </Button>
-                  ) : null}
-                </li>
-              );
-            })}
+            {otherSessions.map(renderSessionRow)}
           </ul>
         )}
       </section>
