@@ -114,6 +114,21 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   }, [load]);
 
   useEffect(() => {
+    try {
+      const key = `scriptWriterTrendWarning:${sessionId}`;
+      const warning = sessionStorage.getItem(key);
+      if (warning) {
+        sessionStorage.removeItem(key);
+        setError(
+          `Trend research could not run: ${warning}. You can retry below, or continue without trends.`
+        );
+      }
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [session?.messages.length]);
 

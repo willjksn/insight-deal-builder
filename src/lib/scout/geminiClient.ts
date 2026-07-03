@@ -39,9 +39,18 @@ function toGeminiApiParts(parts: GeminiPart[]): Record<string, unknown>[] {
   });
 }
 
-function isGeminiBlockedError(err: unknown): boolean {
+function shouldRetryWithVertexGemini(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return msg.includes("403") || msg.toLowerCase().includes("blocked") || msg.includes("PERMISSION_DENIED");
+  const lower = msg.toLowerCase();
+  return (
+    msg.includes("403") ||
+    lower.includes("blocked") ||
+    msg.includes("PERMISSION_DENIED") ||
+    lower.includes("invalid gemini api key") ||
+    lower.includes("missing or invalid api key") ||
+    lower.includes("api key not valid") ||
+    (lower.includes("api key") && (lower.includes("invalid") || lower.includes("missing")))
+  );
 }
 
 async function callGeminiApiKeyGenerate(params: {
@@ -157,8 +166,8 @@ export async function callGeminiGenerate(params: {
   try {
     return await callGeminiApiKeyGenerate(params);
   } catch (err) {
-    if (canFallbackToVertexGemini() && isGeminiBlockedError(err)) {
-      console.warn("[Scout] Gemini API key blocked — using Vertex AI fallback");
+    if (canFallbackToVertexGemini() && shouldRetryWithVertexGemini(err)) {
+      console.warn("[Scout] Gemini API key unavailable — using Vertex AI fallback");
       return vertexGeminiGenerate({ ...params, model });
     }
     throw err;
@@ -186,7 +195,7 @@ export async function probeGeminiConnection(): Promise<{
     const reply = await callGeminiApiKeyGenerate(ping);
     return { ok: true, provider: "api_key", reply };
   } catch (err) {
-    if (canFallbackToVertexGemini() && isGeminiBlockedError(err)) {
+    if (canFallbackToVertexGemini() && shouldRetryWithVertexGemini(err)) {
       const reply = await vertexGeminiGenerate(ping);
       return { ok: true, provider: "vertex", reply };
     }
@@ -300,8 +309,8 @@ export async function callGeminiGenerateImage(params: {
   try {
     return await callGeminiApiKeyGenerateImage(params);
   } catch (err) {
-    if (canFallbackToVertexGemini() && isGeminiBlockedError(err)) {
-      console.warn("[Scout] Gemini image API key blocked — using Vertex AI fallback");
+    if (canFallbackToVertexGemini() && shouldRetryWithVertexGemini(err)) {
+      console.warn("[Scout] Gemini image API key unavailable — using Vertex AI fallback");
       return vertexGeminiGenerateImage(params);
     }
     throw err;

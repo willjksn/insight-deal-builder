@@ -175,7 +175,17 @@ function ScriptWriterPageContent() {
 
       if (researchTrends) {
         setUploadProgress("Researching current trends…");
-        await scriptWriterResearchTrends(() => user.getIdToken(), id);
+        try {
+          await scriptWriterResearchTrends(() => user.getIdToken(), id);
+        } catch (trendErr) {
+          const trendMessage =
+            trendErr instanceof Error ? trendErr.message : "Trend research failed";
+          try {
+            sessionStorage.setItem(`scriptWriterTrendWarning:${id}`, trendMessage);
+          } catch {
+            /* ignore storage errors */
+          }
+        }
       }
 
       router.push(`/script-writer/${id}`);
