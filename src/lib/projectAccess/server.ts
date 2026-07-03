@@ -1,5 +1,6 @@
 import { Firestore } from "firebase-admin/firestore";
 import { AppUser, Project } from "@/lib/types";
+import { isUserApproved, isUserPendingApproval } from "@/lib/users/approval";
 import { canManageProjects, canManageUsers, canUseShotScout } from "@/lib/utils/permissions";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { ScoutProject } from "@/lib/scout/types";
@@ -52,24 +53,30 @@ export interface TeamUserCandidate {
 export async function lookupUserById(
   db: Firestore,
   userId: string
-): Promise<{ id: string; email: string; displayName?: string; approved?: boolean } | null> {
+): Promise<{
+  id: string;
+  email: string;
+  displayName?: string;
+  approved?: boolean;
+  accountApproved: boolean;
+  pendingApproval: boolean;
+} | null> {
   const snap = await db.collection("users").doc(userId).get();
   if (!snap.exists) return null;
   const data = snap.data()!;
+  const appUser = { id: snap.id, ...data } as AppUser;
   return {
     id: snap.id,
     email: data.email as string,
     displayName: data.displayName as string | undefined,
     approved: data.approved as boolean | undefined,
+    accountApproved: isUserApproved(appUser),
+    pendingApproval: isUserPendingApproval(appUser),
   };
 }
 
-export function isAccountApprovedForListing(approved?: boolean): boolean {
-  return approved !== false;
-}
-
-export function isExplicitlyPendingApproval(approved?: boolean): boolean {
-  return approved === false;
+function appUserFromDoc(id: string, data: FirebaseFirestore.DocumentData): AppUser {
+  return { id, ...data } as AppUser;
 }
 
 export async function listTeamUserCandidates(
@@ -85,7 +92,7 @@ export async function listTeamUserCandidates(
         userId: doc.id,
         email: (data.email as string) ?? "",
         displayName: data.displayName as string | undefined,
-        approved: isAccountApprovedForListing(data.approved as boolean | undefined),
+        approved: isUserApproved(appUserFromDoc(doc.id, data)),
       };
     })
     .filter((u) => u.email && !exclude.has(u.userId))
@@ -106,7 +113,14 @@ export function teamUserLabel(candidate: TeamUserCandidate): string {
 export async function lookupUserByEmail(
   db: Firestore,
   email: string
-): Promise<{ id: string; email: string; displayName?: string; approved?: boolean } | null> {
+): Promise<{
+  id: string;
+  email: string;
+  displayName?: string;
+  approved?: boolean;
+  accountApproved: boolean;
+  pendingApproval: boolean;
+} | null> {
   const normalized = normalizeEmail(email);
   const snap = await db.collection("users").where("email", "==", normalized).limit(1).get();
   if (snap.empty) {
@@ -114,20 +128,26 @@ export async function lookupUserByEmail(
     if (snapOriginal.empty) return null;
     const doc = snapOriginal.docs[0];
     const data = doc.data();
+    const appUser = { id: doc.id, ...data } as AppUser;
     return {
       id: doc.id,
       email: data.email as string,
       displayName: data.displayName as string | undefined,
       approved: data.approved as boolean | undefined,
+      accountApproved: isUserApproved(appUser),
+      pendingApproval: isUserPendingApproval(appUser),
     };
   }
   const doc = snap.docs[0];
   const data = doc.data();
+  const appUser = { id: doc.id, ...data } as AppUser;
   return {
     id: doc.id,
     email: data.email as string,
     displayName: data.displayName as string | undefined,
     approved: data.approved as boolean | undefined,
+    accountApproved: isUserApproved(appUser),
+    pendingApproval: isUserPendingApproval(appUser),
   };
 }
 
@@ -161,7 +181,7 @@ export async function listProjectMembers(
       const user = await lookupUserById(db, member.userId);
       return {
         ...member,
-        accountApproved: isAccountApprovedForListing(user?.approved),
+        accountApproved: user?.accountApproved ?? false,
       };
     })
   );

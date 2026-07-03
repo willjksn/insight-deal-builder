@@ -6,8 +6,6 @@ import {
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import {
-  isAccountApprovedForListing,
-  isExplicitlyPendingApproval,
   listResourceMembers,
   listTeamUserCandidates,
   loadScriptSession,
@@ -125,9 +123,9 @@ export async function POST(
       ok: true,
       member: {
         ...member,
-        accountApproved: isAccountApprovedForListing(user.approved),
+        accountApproved: user.accountApproved,
       },
-      pendingApproval: isExplicitlyPendingApproval(user.approved),
+      pendingApproval: user.pendingApproval,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to share script";

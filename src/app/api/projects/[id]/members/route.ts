@@ -18,8 +18,6 @@ import {
   PROJECT_MEMBERS_SUBCOLLECTION,
   resolveProjectPermissions,
   sanitizeProjectPermissions,
-  isAccountApprovedForListing,
-  isExplicitlyPendingApproval,
 } from "@/lib/projectAccess/server";
 import { ProjectAccessPermissions } from "@/lib/projectAccess/types";
 import { Project } from "@/lib/types";
@@ -136,9 +134,9 @@ export async function POST(
       ok: true,
       member: {
         ...member,
-        accountApproved: isAccountApprovedForListing(user.approved),
+        accountApproved: user.accountApproved,
       },
-      pendingApproval: isExplicitlyPendingApproval(user.approved),
+      pendingApproval: user.pendingApproval,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to add member";
