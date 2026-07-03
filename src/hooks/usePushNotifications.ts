@@ -3,10 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { arrayUnion, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
-import { registerPushToken, PushRegistrationError, subscribeForegroundPush } from "@/lib/firebase/messaging";
 import {
+  registerPushTokenAfterPermission,
+  PushRegistrationError,
+  subscribeForegroundPush,
+} from "@/lib/firebase/messaging";
+import { collectPushDiagnostics, type PushDiagnostics } from "@/lib/firebase/pushDiagnostics";
+import {
+  isIosDevice,
   isStandalonePwa,
+  permissionBlockedMessage,
   pushSupportMessage,
+  quickPushPrecheck,
   resolvePushSupportStatus,
   type PushSupportStatus,
 } from "@/lib/firebase/pushSupport";
@@ -18,6 +26,7 @@ export function usePushNotifications() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<PushDiagnostics | null>(null);
 
   useEffect(() => {
     setPushEnabled((appUser?.fcmTokens?.length ?? 0) > 0);
@@ -25,11 +34,26 @@ export function usePushNotifications() {
 
   useEffect(() => {
     let cancelled = false;
-    resolvePushSupportStatus().then((status) => {
-      if (!cancelled) setPushStatus(status);
-    });
+
+    const refresh = () => {
+      resolvePushSupportStatus().then((status) => {
+        if (!cancelled) setPushStatus(status);
+      });
+      collectPushDiagnostics().then((d) => {
+        if (!cancelled) setDiagnostics(d);
+      });
+    };
+
+    refresh();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 
@@ -56,21 +80,37 @@ export function usePushNotifications() {
     if (!user || !db) return false;
     setRegistering(true);
     setError(null);
-    try {
-      const status = await resolvePushSupportStatus();
-      setPushStatus(status);
-      if (status !== "ready") {
-        setError(pushSupportMessage(status));
-        return false;
-      }
 
-      const token = await registerPushToken();
+    const precheck = quickPushPrecheck();
+    setPushStatus(precheck);
+    if (precheck !== "ready") {
+      setError(pushSupportMessage(precheck));
+      setRegistering(false);
+      return false;
+    }
+
+    let permission = Notification.permission;
+    if (permission === "default") {
+      permission = await Notification.requestPermission();
+    }
+
+    if (permission !== "granted") {
+      setError(permission === "denied" ? permissionBlockedMessage() : "Notification permission was not granted.");
+      setRegistering(false);
+      void collectPushDiagnostics().then(setDiagnostics);
+      return false;
+    }
+
+    try {
+      const token = await registerPushTokenAfterPermission();
       await updateDoc(doc(db, "users", user.uid), {
         fcmTokens: arrayUnion(token),
         notifyPush: true,
       });
       await refreshProfile();
       setPushEnabled(true);
+      setError(null);
+      void collectPushDiagnostics().then(setDiagnostics);
       return true;
     } catch (err) {
       const message =
@@ -80,6 +120,7 @@ export function usePushNotifications() {
             ? err.message
             : "Failed to enable push notifications";
       setError(message);
+      void collectPushDiagnostics().then(setDiagnostics);
       return false;
     } finally {
       setRegistering(false);
@@ -100,11 +141,8 @@ export function usePushNotifications() {
       if (!user || !db) return;
       await updateDoc(doc(db, "users", user.uid), { notifyPush: enabled });
       await refreshProfile();
-      if (enabled && !pushEnabled) {
-        await enablePush();
-      }
     },
-    [user, refreshProfile, pushEnabled, enablePush]
+    [user, refreshProfile]
   );
 
   return {
@@ -114,9 +152,11 @@ export function usePushNotifications() {
     pushEnabled,
     registering,
     error,
+    diagnostics,
     notifyEmail: appUser?.notifyEmail !== false,
     notifyPush: appUser?.notifyPush !== false,
     isStandalonePwa: isStandalonePwa(),
+    isIosDevice: isIosDevice(),
     enablePush,
     setNotifyEmail,
     setNotifyPushPref,

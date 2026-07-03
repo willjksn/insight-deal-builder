@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
       adminConfigured: Boolean(
         process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_ADMIN_PROJECT_ID
       ),
+      pushVapidConfigured: Boolean(process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY?.trim()),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Firebase Admin failed to load";

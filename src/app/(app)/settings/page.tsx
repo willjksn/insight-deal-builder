@@ -50,9 +50,11 @@ export default function SettingsPage() {
     pushEnabled,
     registering,
     error: pushError,
+    diagnostics,
     notifyEmail,
     notifyPush,
     isStandalonePwa,
+    isIosDevice,
     enablePush,
     setNotifyEmail,
     setNotifyPushPref,
@@ -162,37 +164,97 @@ export default function SettingsPage() {
                 onChange={(e) => setNotifyPushPref(e.target.checked)}
                 className="h-5 w-5 rounded"
               />
-              Send push notifications to this device
+              Send push notifications to this device (preference)
             </label>
+            {isIosDevice && !isStandalonePwa ? (
+              <InfoCallout variant="sky">
+                <strong>iPhone / iPad:</strong> Open ShootSpine in Safari → <strong>Share</strong> →{" "}
+                <strong>Add to Home Screen</strong>. Open the app from your home screen icon (not Safari), then
+                enable push below.
+              </InfoCallout>
+            ) : null}
             {pushStatus === "loading" ? (
               <p className="text-sm text-slate-500">Checking push support…</p>
+            ) : pushStatus === "missing_vapid" ? (
+              <InfoCallout variant="sky">
+                <strong>Push is not configured yet.</strong> Add{" "}
+                <code className="text-xs">NEXT_PUBLIC_FIREBASE_VAPID_KEY</code> in Vercel (and{" "}
+                <code className="text-xs">.env.local</code> for local dev). In Firebase Console → Project Settings →
+                Cloud Messaging → Web Push certificates, copy the key pair value, redeploy, then try again.
+              </InfoCallout>
             ) : pushStatus === "ios_install_required" ? (
               <InfoCallout variant="sky">
-                <strong>iPhone / iPad:</strong> Open ShootSpine in Safari, tap <strong>Share</strong>, then{" "}
-                <strong>Add to Home Screen</strong>. Launch the app from your home screen icon, then return here
-                and tap <strong>Enable push on this device</strong>. iOS only shows push alerts for installed apps,
-                not regular Safari tabs.
+                Add ShootSpine to your Home Screen first, then open it from the icon — iOS will not offer push from
+                a Safari tab.
               </InfoCallout>
-            ) : pushStatus === "ready" ? (
+            ) : pushStatus === "ready" || isStandalonePwa ? (
               <div className="space-y-2">
                 <Button
+                  type="button"
                   size="touch"
                   variant={pushEnabled ? "outline" : "primary"}
-                  disabled={registering || pushEnabled}
-                  onClick={() => enablePush()}
+                  disabled={registering || pushEnabled || pushStatus !== "ready"}
+                  onClick={() => void enablePush()}
                 >
-                  {pushEnabled ? "Push enabled on this device" : "Enable push on this device"}
+                  {registering
+                    ? "Enabling…"
+                    : pushEnabled
+                      ? "Push enabled on this device"
+                      : "Enable push on this device"}
                 </Button>
-                {isStandalonePwa ? (
-                  <p className="text-xs text-emerald-700">Running as an installed app — push can appear under your home screen icon.</p>
+                {isIosDevice ? (
+                  <p className="text-xs text-slate-600">
+                    Tap the button above — iOS will ask to allow notifications. You must tap <strong>Allow</strong>{" "}
+                    when prompted.
+                  </p>
                 ) : null}
-                {pushError && <p className="text-sm text-red-600">{pushError}</p>}
+                {isStandalonePwa ? (
+                  <p className="text-xs text-emerald-700">
+                    Installed app detected — alerts can show under your home screen icon.
+                  </p>
+                ) : null}
+                {pushError ? <p className="text-sm text-red-600">{pushError}</p> : null}
+                {diagnostics ? (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                    <p className="font-medium text-slate-700">Device check</p>
+                    <ul className="mt-1 space-y-0.5">
+                      <li>Home screen app: {diagnostics.standalone ? "Yes" : "No"}</li>
+                      <li>Notification permission: {diagnostics.notificationPermission}</li>
+                      <li>Push API: {diagnostics.pushManager ? "Yes" : "No"}</li>
+                      <li>Service worker: {diagnostics.serviceWorkerState}</li>
+                      <li>VAPID configured: {diagnostics.vapidConfigured ? "Yes" : "No"}</li>
+                    </ul>
+                    {!diagnostics.vapidConfigured ? (
+                      <p className="mt-2 text-amber-800">
+                        Server is missing the VAPID key — push cannot work on any device until it is added in Vercel
+                        and the app is redeployed.
+                      </p>
+                    ) : null}
+                    {diagnostics.notificationPermission === "denied" ? (
+                      <p className="mt-2 text-amber-800">
+                        {isIosDevice
+                          ? "Permission was denied. Go to Settings → Notifications → ShootSpine → Allow Notifications, then tap Enable push again."
+                          : "Permission was denied. Allow notifications in your browser site settings (lock icon in the address bar), then try again."}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : (
               <InfoCallout variant="sky">{pushSupportMessage}</InfoCallout>
             )}
-            {pushStatus === "ready" && !pushEnabled && pushError ? null : pushStatus !== "ready" && pushError ? (
+            {pushStatus !== "ready" && !isStandalonePwa && pushError ? (
               <p className="text-sm text-red-600">{pushError}</p>
+            ) : null}
+            {diagnostics && pushStatus !== "ready" && pushStatus !== "loading" && !isStandalonePwa ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                <p className="font-medium text-slate-700">Device check</p>
+                <ul className="mt-1 space-y-0.5">
+                  <li>VAPID configured: {diagnostics.vapidConfigured ? "Yes" : "No"}</li>
+                  <li>Notification permission: {diagnostics.notificationPermission}</li>
+                  <li>Push API: {diagnostics.pushManager ? "Yes" : "No"}</li>
+                </ul>
+              </div>
             ) : null}
             <InfoCallout variant="emerald">
               Push alerts cover client signatures, new signup approvals (admins), and shared resource notes. You need

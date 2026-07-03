@@ -44,8 +44,9 @@ self.addEventListener("notificationclick", function(event) {
 
   return new Response(body, {
     headers: {
-      "Content-Type": "application/javascript",
+      "Content-Type": "application/javascript; charset=utf-8",
       "Service-Worker-Allowed": "/",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
     },
   });
 }
