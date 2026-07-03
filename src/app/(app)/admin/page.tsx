@@ -260,6 +260,7 @@ export default function AdminPage() {
         : "member";
 
     try {
+      const wasPending = isUserPendingApproval(user);
       const approved = shouldApproveOnAdminSave(edit.company, permissions);
       await update(user.id, {
         displayName: edit.displayName.trim() || user.email,
@@ -271,6 +272,21 @@ export default function AdminPage() {
           ? { archivedAt: deleteField(), archivedByUserId: deleteField() }
           : {}),
       });
+      if (wasPending && approved && firebaseUser) {
+        try {
+          const token = await firebaseUser.getIdToken();
+          await fetch("/api/users/approval-notify", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ userId: user.id }),
+          });
+        } catch (notifyErr) {
+          console.error("Failed to send approval email:", notifyErr);
+        }
+      }
       setEdits((prev) => {
         const next = { ...prev };
         delete next[user.id];

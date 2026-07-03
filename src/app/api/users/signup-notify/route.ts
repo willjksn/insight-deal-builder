@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { verifyAuthToken } from "@/lib/notifications/server";
 import { notifyAdminsOfSignup } from "@/lib/notifications/signupNotify";
+import { sendSignupWelcomeEmail } from "@/lib/email/userLifecycleEmail";
 import { AppUser } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -31,7 +32,17 @@ export async function POST(request: NextRequest) {
       appUrl,
     });
 
-    return NextResponse.json({ ok: true, notified: result.notified });
+    let welcomeEmailSent = false;
+    if (user.email) {
+      const welcome = await sendSignupWelcomeEmail({
+        to: user.email,
+        displayName: user.displayName ?? user.email,
+        appUrl,
+      });
+      welcomeEmailSent = welcome.sent;
+    }
+
+    return NextResponse.json({ ok: true, notified: result.notified, welcomeEmailSent });
   } catch (err) {
     console.error("signup-notify error:", err);
     const message = err instanceof Error ? err.message : "Failed to notify admins";

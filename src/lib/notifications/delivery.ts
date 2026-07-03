@@ -100,6 +100,34 @@ export async function sendAgreementSignedEmails(
   return { sent, failed, skipped, resendConfigured: true };
 }
 
+export async function sendTransactionalEmail(params: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}): Promise<{ sent: boolean; resendConfigured: boolean; error?: string }> {
+  const resend = getResendClient();
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping transactional email to", params.to);
+    return { sent: false, resendConfigured: false };
+  }
+
+  const { error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: params.to.trim(),
+    subject: params.subject,
+    html: params.html,
+    text: params.text,
+  });
+
+  if (error) {
+    console.error("Resend error for", params.to, error);
+    return { sent: false, resendConfigured: true, error: error.message };
+  }
+
+  return { sent: true, resendConfigured: true };
+}
+
 export async function sendClientAgreementEmail(params: {
   to: string;
   subject: string;

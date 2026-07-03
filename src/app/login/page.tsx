@@ -39,7 +39,7 @@ export default function LoginPage() {
         await signUp(email, password, displayName);
         await signOut();
         setMessage(
-          "Account created. An admin will approve your access — sign in once you are approved."
+          "Account created. Check your email — we'll notify you when an admin approves your access."
         );
         setMode("signIn");
         setPassword("");

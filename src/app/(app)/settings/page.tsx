@@ -45,12 +45,14 @@ export default function SettingsPage() {
   const [repairing, setRepairing] = useState(false);
   const [repairMessage, setRepairMessage] = useState("");
   const {
-    pushSupported,
+    pushStatus,
+    pushSupportMessage,
     pushEnabled,
     registering,
     error: pushError,
     notifyEmail,
     notifyPush,
+    isStandalonePwa,
     enablePush,
     setNotifyEmail,
     setNotifyPushPref,
@@ -141,7 +143,7 @@ export default function SettingsPage() {
           icon={Bell}
           accent="emerald"
           title="Notifications"
-          description="Email and browser alerts when clients sign agreements"
+          description="Email and push alerts for agreements, signups, and shared notes"
         >
           <div className="space-y-4">
             <label className="flex items-center gap-3 text-sm font-medium">
@@ -160,9 +162,18 @@ export default function SettingsPage() {
                 onChange={(e) => setNotifyPushPref(e.target.checked)}
                 className="h-5 w-5 rounded"
               />
-              Send browser push notifications
+              Send push notifications to this device
             </label>
-            {pushSupported ? (
+            {pushStatus === "loading" ? (
+              <p className="text-sm text-slate-500">Checking push support…</p>
+            ) : pushStatus === "ios_install_required" ? (
+              <InfoCallout variant="sky">
+                <strong>iPhone / iPad:</strong> Open ShootSpine in Safari, tap <strong>Share</strong>, then{" "}
+                <strong>Add to Home Screen</strong>. Launch the app from your home screen icon, then return here
+                and tap <strong>Enable push on this device</strong>. iOS only shows push alerts for installed apps,
+                not regular Safari tabs.
+              </InfoCallout>
+            ) : pushStatus === "ready" ? (
               <div className="space-y-2">
                 <Button
                   size="touch"
@@ -172,15 +183,20 @@ export default function SettingsPage() {
                 >
                   {pushEnabled ? "Push enabled on this device" : "Enable push on this device"}
                 </Button>
+                {isStandalonePwa ? (
+                  <p className="text-xs text-emerald-700">Running as an installed app — push can appear under your home screen icon.</p>
+                ) : null}
                 {pushError && <p className="text-sm text-red-600">{pushError}</p>}
               </div>
             ) : (
-              <InfoCallout variant="sky">
-                Push notifications require a supported browser (Chrome, Edge, Firefox).
-              </InfoCallout>
+              <InfoCallout variant="sky">{pushSupportMessage}</InfoCallout>
             )}
+            {pushStatus === "ready" && !pushEnabled && pushError ? null : pushStatus !== "ready" && pushError ? (
+              <p className="text-sm text-red-600">{pushError}</p>
+            ) : null}
             <InfoCallout variant="emerald">
-              When a client signs, Insight Media Group and the agreement creator receive an in-app alert, email (via Resend), and push if enabled.
+              Push alerts cover client signatures, new signup approvals (admins), and shared resource notes. You need
+              to enable push on each phone, tablet, or computer you use.
             </InfoCallout>
           </div>
         </PageSection>

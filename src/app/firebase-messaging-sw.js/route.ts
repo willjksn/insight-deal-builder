@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { APP_NAME, BRAND_ICON_32_PATH } from "@/lib/brand";
+import { APP_NAME, BRAND_ICON_192_PATH } from "@/lib/brand";
 
 export async function GET() {
   const config = {
@@ -20,15 +20,25 @@ messaging.onBackgroundMessage(function(payload) {
   const title = payload.notification?.title || ${JSON.stringify(APP_NAME)};
   const options = {
     body: payload.notification?.body || "",
-    icon: ${JSON.stringify(BRAND_ICON_32_PATH)},
+    icon: ${JSON.stringify(BRAND_ICON_192_PATH)},
     data: payload.data || {},
   };
   self.registration.showNotification(title, options);
 });
 self.addEventListener("notificationclick", function(event) {
   event.notification.close();
-  const url = event.notification.data?.url || "/agreements";
-  event.waitUntil(clients.openWindow(url));
+  const rawUrl = event.notification.data?.url || "/dashboard";
+  const target = rawUrl.startsWith("http") ? rawUrl : new URL(rawUrl, self.location.origin).href;
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(function(clientList) {
+      for (const client of clientList) {
+        if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(target);
+    })
+  );
 });
 `.trim();
 

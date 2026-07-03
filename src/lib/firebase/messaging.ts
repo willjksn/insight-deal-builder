@@ -1,40 +1,60 @@
 "use client";
 
-import { getApps, initializeApp } from "firebase/app";
-import { getMessaging, getToken, isSupported, onMessage, Messaging } from "firebase/messaging";
+import { getToken, isSupported, onMessage, Messaging } from "firebase/messaging";
 import { APP_NAME } from "@/lib/brand";
-
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
+import { app, isFirebaseConfigured } from "@/lib/firebase/config";
+import { hasVapidKey } from "@/lib/firebase/pushSupport";
 
 let messagingInstance: Messaging | null = null;
+let messagingInit: Promise<Messaging | null> | null = null;
 
-export async function getFirebaseMessaging(): Promise<Messaging | null> {
-  if (typeof window === "undefined") return null;
+async function loadMessaging(appInstance: NonNullable<typeof app>): Promise<Messaging | null> {
   if (!(await isSupported())) return null;
-
-  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-  if (!messagingInstance) {
-    messagingInstance = getMessaging(app);
-  }
-  return messagingInstance;
+  const { getMessaging } = await import("firebase/messaging");
+  return getMessaging(appInstance);
 }
 
-export async function registerPushToken(): Promise<string | null> {
-  const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-  if (!vapidKey) {
-    console.warn("NEXT_PUBLIC_FIREBASE_VAPID_KEY is not set");
-    return null;
+export async function getFirebaseMessaging(): Promise<Messaging | null> {
+  if (typeof window === "undefined" || !isFirebaseConfigured || !app) return null;
+
+  if (messagingInstance) return messagingInstance;
+  if (!messagingInit) {
+    messagingInit = loadMessaging(app).then((instance) => {
+      messagingInstance = instance;
+      return instance;
+    });
+  }
+  return messagingInit;
+}
+
+export class PushRegistrationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PushRegistrationError";
+  }
+}
+
+export async function registerPushToken(): Promise<string> {
+  if (!hasVapidKey()) {
+    throw new PushRegistrationError(
+      "Push notifications are not configured (missing VAPID key on the server)."
+    );
+  }
+
+  if (!(await isSupported())) {
+    throw new PushRegistrationError(
+      "Push notifications are not supported in this browser. On iPhone/iPad, add ShootSpine to your Home Screen first."
+    );
   }
 
   const permission = await Notification.requestPermission();
-  if (permission !== "granted") return null;
+  if (permission !== "granted") {
+    throw new PushRegistrationError(
+      permission === "denied"
+        ? "Notification permission was blocked. Allow notifications in your browser or device settings."
+        : "Notification permission was not granted."
+    );
+  }
 
   const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
     scope: "/",
@@ -42,9 +62,20 @@ export async function registerPushToken(): Promise<string | null> {
   await navigator.serviceWorker.ready;
 
   const messaging = await getFirebaseMessaging();
-  if (!messaging) return null;
+  if (!messaging) {
+    throw new PushRegistrationError("Could not initialize push messaging.");
+  }
 
-  return getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
+  const token = await getToken(messaging, {
+    vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY!,
+    serviceWorkerRegistration: registration,
+  });
+
+  if (!token) {
+    throw new PushRegistrationError("Could not register this device for push notifications.");
+  }
+
+  return token;
 }
 
 export async function subscribeForegroundPush(
