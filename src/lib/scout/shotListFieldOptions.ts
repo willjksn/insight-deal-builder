@@ -15,7 +15,7 @@ export function buildLensSelectOptions(
   lenses: string[],
   existingValues: string[] = []
 ): ShotListSelectOption[] {
-  const options = uniqueStrings([...lenses, ...existingValues]).map((value) => ({
+  const options: ShotListSelectOption[] = uniqueStrings([...lenses, ...existingValues]).map((value) => ({
     value,
     label: value,
   }));
@@ -41,7 +41,7 @@ export function buildMovementSelectOptions(
     fromBrief.push(legacyText);
   }
 
-  const options = uniqueStrings([...fromBrief, ...existingValues]).map((value) => ({
+  const options: ShotListSelectOption[] = uniqueStrings([...fromBrief, ...existingValues]).map((value) => ({
     value,
     label: value,
   }));
