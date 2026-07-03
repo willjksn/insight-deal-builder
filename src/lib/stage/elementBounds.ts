@@ -21,7 +21,7 @@ export type ElementBounds = {
 };
 
 export function getElementBounds(el: StageElement): ElementBounds | null {
-  if (el.kind === "note" || el.kind === "room" || el.kind === "doorway") {
+  if (el.kind === "note" || el.kind === "room" || el.kind === "doorway" || el.kind === "window") {
     return { x: el.x, y: el.y, width: el.width, height: el.height };
   }
 
@@ -104,4 +104,66 @@ export function rotateDelta(dx: number, dy: number, degrees: number): { dx: numb
     dx: dx * cos + dy * sin,
     dy: -dx * sin + dy * cos,
   };
+}
+
+/** Lower renders behind; higher renders on top for hit-testing. */
+export function elementRenderRank(el: StageElement): number {
+  if (el.kind === "room") return 0;
+  if (el.kind === "prop" && findStageProp(el.propId)?.shape === "light-cone") return 1;
+  if (el.kind === "wall") return 2;
+  if (el.kind === "window" || el.kind === "doorway") return 3;
+  if (el.kind === "arrow") return 4;
+  return 5;
+}
+
+function pointInBounds(x: number, y: number, bounds: ElementBounds, pad = 0): boolean {
+  return (
+    x >= bounds.x - pad &&
+    x <= bounds.x + bounds.width + pad &&
+    y >= bounds.y - pad &&
+    y <= bounds.y + bounds.height + pad
+  );
+}
+
+function pointNearSegment(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  threshold: number
+): boolean {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - x1, py - y1) <= threshold;
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+  const projX = x1 + t * dx;
+  const projY = y1 + t * dy;
+  return Math.hypot(px - projX, py - projY) <= threshold;
+}
+
+/** Topmost element at canvas coordinates (for select tool). */
+export function hitTestAtPoint(
+  x: number,
+  y: number,
+  elements: StageElement[]
+): StageElement | null {
+  const sorted = [...elements].sort((a, b) => elementRenderRank(b) - elementRenderRank(a));
+  for (const el of sorted) {
+    if (el.kind === "wall") {
+      if (pointNearSegment(x, y, el.x, el.y, el.x2, el.y2, Math.max(el.thickness / 2 + 8, 12))) {
+        return el;
+      }
+      continue;
+    }
+    if (el.kind === "arrow") {
+      if (pointNearSegment(x, y, el.x, el.y, el.x2, el.y2, 10)) return el;
+      continue;
+    }
+    const bounds = getElementBounds(el);
+    if (bounds && pointInBounds(x, y, bounds, el.kind === "prop" ? 4 : 0)) return el;
+  }
+  return null;
 }

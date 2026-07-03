@@ -8,14 +8,16 @@ export function StagePropIcon({
   width: widthOverride,
   height: heightOverride,
   scale = 1,
+  color,
 }: {
   prop: StagePropDefinition;
   width?: number;
   height?: number;
   scale?: number;
+  color?: string;
 }) {
   const w = widthOverride ?? prop.width * scale;
   const h = heightOverride ?? prop.height * scale;
 
-  return renderStagePropShape(prop, w, h);
+  return renderStagePropShape(prop, w, h, color);
 }

@@ -136,15 +136,14 @@ export default function ShotListDayPage() {
       const sessionImages = session.inspirationImages ?? [];
       patchDay({
         shots: mergeProductionShotsFromScript(day.shots, script),
-        sceneFrames:
-          session.storyboardMode || script.storyboardFrames?.length
-            ? mergeProductionSceneFramesFromScript(
-                sceneFrames,
-                script,
-                sessionImages,
-                board.inspirationImages
-              )
-            : sceneFrames,
+        sceneFrames: script.scenes?.length
+          ? mergeProductionSceneFramesFromScript(
+              sceneFrames,
+              script,
+              sessionImages,
+              board.inspirationImages
+            )
+          : sceneFrames,
       });
     } catch (e) {
       setRefreshError(e instanceof Error ? e.message : "Could not refresh from script");

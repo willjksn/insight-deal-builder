@@ -4,12 +4,19 @@ import { useCallback, useRef, useState } from "react";
 import { StagePropIcon } from "@/components/stage/StagePropIcon";
 import {
   applyCornerResize,
+  elementRenderRank,
   getElementBounds,
   getPropDisplaySize,
+  hitTestAtPoint,
   ResizeHandle,
   rotateDelta,
 } from "@/lib/stage/elementBounds";
 import { findStageProp } from "@/lib/stage/propCatalog";
+import {
+  labelBadgeColor,
+  resolvePropColor,
+  STAGE_DEFAULT_COLORS,
+} from "@/lib/stage/elementColor";
 import { StageElement, StageTool } from "@/lib/stage/types";
 import { cn } from "@/lib/utils/cn";
 
@@ -67,7 +74,7 @@ type ResizeState = {
 };
 
 type DrawState = {
-  tool: "wall" | "room" | "doorway";
+  tool: "wall" | "room" | "doorway" | "window";
   startX: number;
   startY: number;
   currentX: number;
@@ -106,6 +113,23 @@ export function StageCanvas({
     return { x: clientX - rect.left, y: clientY - rect.top };
   }, []);
 
+  const captureOnCanvas = (e: React.PointerEvent) => {
+    canvasRef.current?.setPointerCapture(e.pointerId);
+  };
+
+  const beginDrag = (el: StageElement, clientX: number, clientY: number) => {
+    onSelect(el.id);
+    const { x, y } = clientToCanvas(clientX, clientY);
+    setDrag({
+      id: el.id,
+      startX: x,
+      startY: y,
+      origX: el.x,
+      origY: el.y,
+      ...(el.kind === "wall" ? { origX2: el.x2, origY2: el.y2 } : {}),
+    });
+  };
+
   const patchElement = (id: string, patch: Partial<StageElement>) => {
     onChange(
       elements.map((el) => (el.id === id ? ({ ...el, ...patch } as StageElement) : el))
@@ -113,7 +137,7 @@ export function StageCanvas({
   };
 
   const applyBoundsToElement = (el: StageElement, bounds: { x: number; y: number; width: number; height: number }) => {
-    if (el.kind === "note" || el.kind === "room" || el.kind === "doorway") {
+    if (el.kind === "note" || el.kind === "room" || el.kind === "doorway" || el.kind === "window") {
       return { ...el, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
     }
     if (el.kind === "prop") {
@@ -140,36 +164,34 @@ export function StageCanvas({
       orig: bounds,
       rotation: el.kind === "prop" ? el.rotation : 0,
     });
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    captureOnCanvas(e);
   };
 
   const onPointerDownElement = (e: React.PointerEvent, el: StageElement) => {
     if (readOnly || activeTool !== "select") return;
     e.stopPropagation();
-    onSelect(el.id);
-    const { x, y } = clientToCanvas(e.clientX, e.clientY);
-    setDrag({
-      id: el.id,
-      startX: x,
-      startY: y,
-      origX: el.x,
-      origY: el.y,
-      ...(el.kind === "wall" ? { origX2: el.x2, origY2: el.y2 } : {}),
-    });
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    beginDrag(el, e.clientX, e.clientY);
+    captureOnCanvas(e);
   };
 
   const onPointerDownCanvas = (e: React.PointerEvent) => {
     if (readOnly) return;
     const { x, y } = clientToCanvas(e.clientX, e.clientY);
 
-    if (activeTool === "wall" || activeTool === "room" || activeTool === "doorway") {
+    if (activeTool === "wall" || activeTool === "room" || activeTool === "doorway" || activeTool === "window") {
       setDraw({ tool: activeTool, startX: x, startY: y, currentX: x, currentY: y });
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      captureOnCanvas(e);
       return;
     }
 
     if (activeTool === "select") {
+      const hit = hitTestAtPoint(x, y, elements);
+      if (hit) {
+        e.stopPropagation();
+        beginDrag(hit, e.clientX, e.clientY);
+        captureOnCanvas(e);
+        return;
+      }
       onSelect(null);
     }
   };
@@ -236,19 +258,40 @@ export function StageCanvas({
     const y = Math.min(startY, currentY);
     const width = Math.abs(currentX - startX);
     const height = Math.abs(currentY - startY);
-    if (width < 16 || height < 16) return;
 
     if (tool === "room") {
+      if (width < 16 || height < 16) return;
       onChange([
         ...elements,
         { id, kind: "room", x, y, width, height, label: "Room" },
       ]);
-    } else {
+      onSelect(id);
+      return;
+    }
+
+    if (tool === "window") {
+      if (width < 6 && height < 6) return;
       onChange([
         ...elements,
-        { id, kind: "doorway", x, y, width: Math.max(width, 32), height: Math.max(height, 12), swing: "right" },
+        {
+          id,
+          kind: "window",
+          x,
+          y,
+          width: Math.max(width, 32),
+          height: Math.max(height, 10),
+          color: STAGE_DEFAULT_COLORS.window,
+        },
       ]);
+      onSelect(id);
+      return;
     }
+
+    if (width < 16 || height < 16) return;
+    onChange([
+      ...elements,
+      { id, kind: "doorway", x, y, width: Math.max(width, 32), height: Math.max(height, 12), swing: "right" },
+    ]);
     onSelect(id);
   };
 
@@ -330,6 +373,8 @@ export function StageCanvas({
         scale: 1,
         width: w,
         height: h,
+        color: prop?.color,
+        label: prop?.name,
       },
     ]);
     setDropPreview(null);
@@ -338,7 +383,7 @@ export function StageCanvas({
 
   const showResizeHandles = (el: StageElement) =>
     !readOnly && activeTool === "select" && el.id === selectedId &&
-    (el.kind === "prop" || el.kind === "note" || el.kind === "room" || el.kind === "doorway");
+    (el.kind === "prop" || el.kind === "note" || el.kind === "room" || el.kind === "doorway" || el.kind === "window");
 
   const renderDrawPreview = () => {
     if (!draw) return null;
@@ -375,6 +420,20 @@ export function StageCanvas({
       );
     }
 
+    if (tool === "window") {
+      return (
+        <div
+          className="pointer-events-none absolute border-2 border-dashed border-sky-500 bg-sky-200/50"
+          style={{
+            left: x,
+            top: y,
+            width: Math.max(width, 32),
+            height: Math.max(height, 10),
+          }}
+        />
+      );
+    }
+
     return (
       <div
         className="pointer-events-none absolute border-2 border-dashed border-amber-600 bg-amber-100/40"
@@ -383,13 +442,24 @@ export function StageCanvas({
     );
   };
 
+  const sortedElements = [...elements].sort((a, b) => {
+    if (a.id === selectedId) return 1;
+    if (b.id === selectedId) return -1;
+    return elementRenderRank(a) - elementRenderRank(b);
+  });
+
+  const elementZIndex = (el: StageElement, selected: boolean) => {
+    if (selected) return 40;
+    return 10 + elementRenderRank(el);
+  };
+
   return (
     <div
       ref={canvasRef}
       className={cn(
-        "relative min-h-[520px] flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 touch-none",
+        "relative min-h-[520px] flex-1 overflow-hidden rounded-xl border border-slate-300 bg-white touch-none",
         showGrid && "stage-grid-bg",
-        activeTool === "wall" || activeTool === "room" || activeTool === "doorway"
+        activeTool === "wall" || activeTool === "room" || activeTool === "doorway" || activeTool === "window"
           ? "cursor-crosshair"
           : undefined
       )}
@@ -402,13 +472,15 @@ export function StageCanvas({
       onDrop={onDrop}
       onDragLeave={() => setDropPreview(null)}
     >
-      {elements.map((el) => {
+      {sortedElements.map((el) => {
         if (el.kind === "wall") {
           const selected = el.id === selectedId;
+          const wallColor = el.color ?? STAGE_DEFAULT_COLORS.wall;
           return (
             <svg
               key={el.id}
-              className={cn("absolute inset-0 h-full w-full", selected ? "z-[1]" : undefined)}
+              className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+              style={{ zIndex: elementZIndex(el, selected) }}
               aria-hidden={false}
             >
               <line
@@ -419,7 +491,7 @@ export function StageCanvas({
                 stroke="transparent"
                 strokeWidth={Math.max(el.thickness + 12, 20)}
                 strokeLinecap="square"
-                className={readOnly || activeTool !== "select" ? undefined : "cursor-move"}
+                className={readOnly || activeTool !== "select" ? undefined : "pointer-events-auto cursor-move"}
                 onPointerDown={(e) => onPointerDownElement(e, el)}
               />
               <line
@@ -427,7 +499,7 @@ export function StageCanvas({
                 y1={el.y}
                 x2={el.x2}
                 y2={el.y2}
-                stroke={selected ? "#0ea5e9" : "#475569"}
+                stroke={selected ? "#0ea5e9" : wallColor}
                 strokeWidth={el.thickness}
                 strokeLinecap="square"
                 pointerEvents="none"
@@ -438,14 +510,22 @@ export function StageCanvas({
 
         if (el.kind === "room") {
           const selected = el.id === selectedId;
+          const fill = el.color ?? STAGE_DEFAULT_COLORS.room;
           return (
             <div
               key={el.id}
               className={cn(
-                "absolute cursor-move select-none border-2 bg-slate-100/20",
-                selected ? "border-sky-500 ring-2 ring-sky-500/30" : "border-slate-500"
+                "absolute cursor-move select-none border-2",
+                selected ? "border-sky-500 ring-2 ring-sky-500/30" : "border-slate-600"
               )}
-              style={{ left: el.x, top: el.y, width: el.width, height: el.height }}
+              style={{
+                left: el.x,
+                top: el.y,
+                width: el.width,
+                height: el.height,
+                backgroundColor: fill,
+                zIndex: elementZIndex(el, selected),
+              }}
               onPointerDown={(e) => onPointerDownElement(e, el)}
             >
               {el.label && (
@@ -458,6 +538,7 @@ export function StageCanvas({
                       value={el.label}
                       onChange={(ev) => patchElement(el.id, { label: ev.target.value })}
                       onClick={(ev) => ev.stopPropagation()}
+                      onPointerDown={(ev) => ev.stopPropagation()}
                     />
                   )}
                 </span>
@@ -469,9 +550,89 @@ export function StageCanvas({
           );
         }
 
+        if (el.kind === "window") {
+          const selected = el.id === selectedId;
+          const fill = el.color ?? STAGE_DEFAULT_COLORS.window;
+          const stroke = selected ? "#0ea5e9" : STAGE_DEFAULT_COLORS.windowStroke;
+          const spillH = Math.min(72, Math.max(24, el.width * 0.6));
+          return (
+            <div
+              key={el.id}
+              className={cn(
+                "absolute cursor-move select-none overflow-visible",
+                selected && "ring-2 ring-sky-500 ring-offset-1"
+              )}
+              style={{
+                left: el.x,
+                top: el.y,
+                width: el.width,
+                height: el.height,
+                zIndex: elementZIndex(el, selected),
+              }}
+              onPointerDown={(e) => onPointerDownElement(e, el)}
+            >
+              <svg
+                width={el.width}
+                height={el.height + spillH}
+                viewBox={`0 0 ${el.width} ${el.height + spillH}`}
+                className="pointer-events-none overflow-visible"
+                aria-hidden
+              >
+                <defs>
+                  <linearGradient id={`window-spill-${el.id}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={fill} stopOpacity="0.45" />
+                    <stop offset="100%" stopColor={fill} stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <polygon
+                  points={`2,${el.height} ${el.width - 2},${el.height} ${el.width * 0.78},${el.height + spillH} ${el.width * 0.22},${el.height + spillH}`}
+                  fill={`url(#window-spill-${el.id})`}
+                />
+                <rect
+                  x={1}
+                  y={1}
+                  width={el.width - 2}
+                  height={el.height - 2}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={2}
+                />
+                <line
+                  x1={el.width / 2}
+                  y1={2}
+                  x2={el.width / 2}
+                  y2={el.height - 2}
+                  stroke={stroke}
+                  strokeWidth={1}
+                  opacity={0.65}
+                />
+                <line
+                  x1={2}
+                  y1={el.height / 2}
+                  x2={el.width - 2}
+                  y2={el.height / 2}
+                  stroke={stroke}
+                  strokeWidth={1}
+                  opacity={0.65}
+                />
+              </svg>
+              {el.label ? (
+                <span className="absolute -top-4 left-0 text-[9px] font-medium text-sky-800">
+                  {el.label}
+                </span>
+              ) : null}
+              {showResizeHandles(el) && (
+                <ResizeHandles onPointerDown={(e, handle) => onPointerDownResize(e, el, handle)} />
+              )}
+            </div>
+          );
+        }
+
         if (el.kind === "doorway") {
           const selected = el.id === selectedId;
           const swing = el.swing ?? "right";
+          const fill = el.color ?? STAGE_DEFAULT_COLORS.doorway;
+          const stroke = selected ? "#0ea5e9" : STAGE_DEFAULT_COLORS.doorwayStroke;
           return (
             <div
               key={el.id}
@@ -479,17 +640,23 @@ export function StageCanvas({
                 "absolute cursor-move select-none",
                 selected && "ring-2 ring-sky-500 ring-offset-1"
               )}
-              style={{ left: el.x, top: el.y, width: el.width, height: el.height }}
+              style={{
+                left: el.x,
+                top: el.y,
+                width: el.width,
+                height: el.height,
+                zIndex: elementZIndex(el, selected),
+              }}
               onPointerDown={(e) => onPointerDownElement(e, el)}
             >
-              <svg width="100%" height="100%" viewBox={`0 0 ${el.width} ${el.height}`} aria-hidden>
+              <svg width="100%" height="100%" viewBox={`0 0 ${el.width} ${el.height}`} className="pointer-events-none" aria-hidden>
                 <rect
                   x={1}
                   y={1}
                   width={el.width - 2}
                   height={el.height - 2}
-                  fill="#fef3c7"
-                  stroke={selected ? "#0ea5e9" : "#b45309"}
+                  fill={fill}
+                  stroke={stroke}
                   strokeWidth={2}
                   strokeDasharray="6 3"
                 />
@@ -500,7 +667,7 @@ export function StageCanvas({
                       : `M ${el.width - 2} ${el.height - 2} L ${el.width - 2} 2 A ${el.width - 4} ${el.height - 4} 0 0 0 2 ${el.height - 2}`
                   }
                   fill="none"
-                  stroke={selected ? "#0ea5e9" : "#92400e"}
+                  stroke={stroke}
                   strokeWidth={1.5}
                 />
               </svg>
@@ -513,15 +680,17 @@ export function StageCanvas({
 
         if (el.kind === "arrow") {
           const selected = el.id === selectedId;
+          const arrowColor = el.color ?? STAGE_DEFAULT_COLORS.arrow;
           return (
             <svg
               key={el.id}
-              className="pointer-events-none absolute inset-0 h-full w-full"
-              aria-hidden
+              className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+              style={{ zIndex: elementZIndex(el, selected) }}
+              aria-hidden={false}
             >
               <defs>
                 <marker id={`arrowhead-${el.id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-                  <polygon points="0 0, 8 3, 0 6" fill={selected ? "#0ea5e9" : "#64748b"} />
+                  <polygon points="0 0, 8 3, 0 6" fill={selected ? "#0ea5e9" : arrowColor} />
                 </marker>
               </defs>
               <line
@@ -529,10 +698,23 @@ export function StageCanvas({
                 y1={el.y}
                 x2={el.x2}
                 y2={el.y2}
-                stroke={selected ? "#0ea5e9" : "#64748b"}
-                strokeWidth={selected ? 2.5 : 2}
+                stroke="transparent"
+                strokeWidth={14}
+                strokeLinecap="round"
+                className={readOnly || activeTool !== "select" ? undefined : "pointer-events-auto cursor-move"}
+                onPointerDown={(e) => onPointerDownElement(e, el)}
+              />
+              <line
+                x1={el.x}
+                y1={el.y}
+                x2={el.x2}
+                y2={el.y2}
+                stroke={selected ? "#0ea5e9" : arrowColor}
+                strokeWidth={selected ? 3 : 2.5}
+                strokeOpacity={0.85}
                 strokeDasharray="6 4"
                 markerEnd={`url(#arrowhead-${el.id})`}
+                pointerEvents="none"
               />
             </svg>
           );
@@ -540,6 +722,7 @@ export function StageCanvas({
 
         if (el.kind === "note") {
           const selected = el.id === selectedId;
+          const headerColor = el.color ?? STAGE_DEFAULT_COLORS.noteHeader;
           return (
             <div
               key={el.id}
@@ -547,11 +730,20 @@ export function StageCanvas({
                 "absolute cursor-move select-none overflow-visible rounded-md border shadow-sm",
                 selected ? "ring-2 ring-sky-500" : "border-slate-300"
               )}
-              style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height }}
+              style={{
+                left: el.x,
+                top: el.y,
+                width: el.width,
+                minHeight: el.height,
+                zIndex: elementZIndex(el, selected),
+              }}
               onPointerDown={(e) => onPointerDownElement(e, el)}
             >
               <div className="overflow-hidden rounded-md">
-                <div className="bg-slate-700 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                <div
+                  className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white"
+                  style={{ backgroundColor: headerColor }}
+                >
                   {readOnly ? (
                     el.title
                   ) : (
@@ -560,6 +752,7 @@ export function StageCanvas({
                       value={el.title}
                       onChange={(ev) => patchElement(el.id, { title: ev.target.value })}
                       onClick={(ev) => ev.stopPropagation()}
+                      onPointerDown={(ev) => ev.stopPropagation()}
                     />
                   )}
                 </div>
@@ -574,6 +767,7 @@ export function StageCanvas({
                     value={el.body}
                     onChange={(ev) => patchElement(el.id, { body: ev.target.value })}
                     onClick={(ev) => ev.stopPropagation()}
+                    onPointerDown={(ev) => ev.stopPropagation()}
                   />
                 )}
               </div>
@@ -588,6 +782,9 @@ export function StageCanvas({
         if (!prop) return null;
         const selected = el.id === selectedId;
         const { width, height } = getPropDisplaySize(el, prop.width, prop.height);
+        const fillColor = resolvePropColor(el);
+        const badgeBg = labelBadgeColor(prop.category, fillColor);
+        const displayLabel = el.label?.trim() || prop.name;
         return (
           <div
             key={el.id}
@@ -603,15 +800,27 @@ export function StageCanvas({
               height,
               transform: `rotate(${el.rotation}deg)`,
               transformOrigin: `${width / 2}px ${height / 2}px`,
+              zIndex: elementZIndex(el, selected),
             }}
             onPointerDown={(e) => onPointerDownElement(e, el)}
           >
-            <StagePropIcon prop={prop} width={width} height={height} />
-            {el.label && (
-              <p className="mt-0.5 max-w-[120px] text-center text-[9px] leading-tight text-slate-600">
-                {el.label}
-              </p>
+            {displayLabel && (
+              <div
+                className="pointer-events-none absolute left-1/2 top-0 z-20 max-w-[160px] pb-0.5 text-center"
+                style={{
+                  transform: `translate(-50%, -100%) rotate(${-el.rotation}deg)`,
+                  transformOrigin: "center bottom",
+                }}
+              >
+                <span
+                  className="inline-block rounded-md px-1.5 py-0.5 text-[9px] font-semibold leading-tight text-white shadow-sm"
+                  style={{ backgroundColor: badgeBg }}
+                >
+                  {displayLabel}
+                </span>
+              </div>
             )}
+            <StagePropIcon prop={prop} width={width} height={height} color={fillColor} />
             {showResizeHandles(el) && (
               <ResizeHandles onPointerDown={(e, handle) => onPointerDownResize(e, el, handle)} />
             )}

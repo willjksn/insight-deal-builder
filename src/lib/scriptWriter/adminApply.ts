@@ -10,6 +10,7 @@ import {
   inspirationImagesFromSession,
   locationsFromInspirationImages,
   locationsFromScript,
+  mergeProductionSceneFramesFromScript,
   productionSceneFramesFromScript,
   productionShotsFromScript,
   sceneNumbersFromScript,
@@ -108,10 +109,17 @@ export async function applyScriptToProject(params: {
   const dayOne = boardDays[0];
   const sessionImages = session.inspirationImages ?? [];
   const mergedInspiration = inspirationImagesFromSession(sessionImages, boardInspiration);
-  const sceneFrames =
-    session.storyboardMode || script.storyboardFrames?.length
-      ? productionSceneFramesFromScript(script, sessionImages, mergedInspiration)
-      : dayOne?.sceneFrames ?? [];
+  const existingSceneFrames = dayOne?.sceneFrames ?? [];
+  const sceneFrames = script.scenes?.length
+    ? existingSceneFrames.length
+      ? mergeProductionSceneFramesFromScript(
+          existingSceneFrames,
+          script,
+          sessionImages,
+          mergedInspiration
+        )
+      : productionSceneFramesFromScript(script, sessionImages, mergedInspiration)
+    : existingSceneFrames;
 
   const updatedDays = boardDays.length
     ? boardDays.map((day, index) =>

@@ -75,6 +75,9 @@ export const STAGE_PROP_CATALOG: StagePropDefinition[] = [
   // Audio
   p({ id: "boom-mic", name: "Boom mic", category: "audio", tags: ["boom", "mic", "audio"], shape: "boom-mic", color: "#374151", width: 48, height: 48 }),
   p({ id: "lav", name: "Lav pack", category: "audio", tags: ["lav", "wireless"], shape: "lav", color: "#4b5563", width: 16, height: 16 }),
+
+  // Diagram
+  p({ id: "light-beam", name: "Light beam", category: "diagram", tags: ["beam", "cone", "light", "spill"], shape: "light-cone", color: "#fde68a", width: 80, height: 120 }),
 ];
 
 export function findStageProp(id: string): StagePropDefinition | undefined {

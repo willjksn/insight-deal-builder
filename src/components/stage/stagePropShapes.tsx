@@ -9,8 +9,13 @@ function Svg({ w, h, viewBox, children }: { w: number; h: number; viewBox: strin
   );
 }
 
-export function renderStagePropShape(prop: StagePropDefinition, w: number, h: number) {
-  const fill = prop.color;
+export function renderStagePropShape(
+  prop: StagePropDefinition,
+  w: number,
+  h: number,
+  colorOverride?: string
+) {
+  const fill = colorOverride ?? prop.color;
   const stroke = "#334155";
   const s = prop.shape;
 
@@ -403,6 +408,20 @@ export function renderStagePropShape(prop: StagePropDefinition, w: number, h: nu
           <line x1="8" y1="5" x2="8" y2="2" stroke={stroke} strokeWidth="1" />
           <circle cx="8" cy="2" r="1" fill={stroke} />
           <circle cx="6" cy="9" r="1" fill="#94a3b8" />
+        </Svg>
+      );
+    case "light-cone":
+      return (
+        <Svg w={w} h={h} viewBox="0 0 80 120">
+          <polygon
+            points="40,4 6,116 74,116"
+            fill={fill}
+            fillOpacity="0.45"
+            stroke={stroke}
+            strokeWidth="1"
+            strokeOpacity="0.35"
+          />
+          <line x1="40" y1="4" x2="40" y2="116" stroke={fill} strokeWidth="0.75" strokeOpacity="0.25" />
         </Svg>
       );
     case "circle":

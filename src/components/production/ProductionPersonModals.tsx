@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Search, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -19,8 +20,24 @@ function ModalShell({
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center">
       <button
         type="button"
         className="absolute inset-0 bg-slate-900/45 backdrop-blur-[1px]"
@@ -47,7 +64,8 @@ function ModalShell({
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

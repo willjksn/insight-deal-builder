@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, Camera, Sparkles, Film, List, ImageIcon, FileDown, RefreshCw, ScrollText, Globe, Loader2 } from "lucide-react";
@@ -13,6 +13,13 @@ import {
   getScoutProject,
   getScoutProjectImages,
 } from "@/lib/firebase/scoutFirestore";
+import {
+  getProductionBoardByProject,
+  saveProductionBoard,
+} from "@/lib/firebase/productionFirestore";
+import { ProductionShotListEditor } from "@/components/production/ProductionShotListEditor";
+import { shotsFromScoutList } from "@/lib/production/scoutImport";
+import { ProductionBoard, ProductionDayShot } from "@/lib/production/types";
 import { uploadScoutImage } from "@/lib/scout/storage";
 import {
   scoutAnalyze,
@@ -20,6 +27,7 @@ import {
   scoutGeneratePreview,
   scoutGenerateShotList,
   scoutRegisterImage,
+  scoutSaveShotList,
   scoutTechniqueLookup,
 } from "@/lib/scout/apiClient";
 import {
@@ -69,6 +77,9 @@ export default function ScoutProjectPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadLabel, setUploadLabel] = useState<ScoutImageLabel>("unlabeled");
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [productionBoard, setProductionBoard] = useState<ProductionBoard | null>(null);
+  const [shotListSaving, setShotListSaving] = useState(false);
+  const shotListSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = useCallback(async () => {
     const p = await getScoutProject(id);
@@ -82,6 +93,55 @@ export default function ScoutProjectPage() {
     refresh()
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
+  }, [refresh]);
+
+  useEffect(() => {
+    const projectId = project?.linkedProjectId?.trim();
+    if (!projectId) {
+      setProductionBoard(null);
+      return;
+    }
+    getProductionBoardByProject(projectId)
+      .then(setProductionBoard)
+      .catch(() => setProductionBoard(null));
+  }, [project?.linkedProjectId]);
+
+  const productionDayShots = useMemo(
+    () => productionBoard?.productionDays[0]?.shots ?? [],
+    [productionBoard]
+  );
+
+  const isLinkedToProject = Boolean(project?.linkedProjectId?.trim());
+
+  const persistLinkedProductionShots = useCallback(
+    (nextShots: ProductionDayShot[]) => {
+      if (!productionBoard) return;
+      const dayIndex = 0;
+      const nextDays = productionBoard.productionDays.map((d, index) =>
+        index === dayIndex ? { ...d, shots: nextShots } : d
+      );
+      const nextBoard = { ...productionBoard, productionDays: nextDays };
+      setProductionBoard(nextBoard);
+      if (shotListSaveTimer.current) clearTimeout(shotListSaveTimer.current);
+      shotListSaveTimer.current = setTimeout(() => {
+        void (async () => {
+          setShotListSaving(true);
+          try {
+            const { id: boardId, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } =
+              nextBoard;
+            await saveProductionBoard(boardId, rest);
+            await scoutSaveShotList(id, shotsFromScoutList(nextShots));
+          } finally {
+            setShotListSaving(false);
+          }
+        })();
+      }, 600);
+    },
+    [productionBoard, id]
+  );
+
+  const handleScoutShotListSaved = useCallback(async () => {
+    await refresh();
   }, [refresh]);
 
   useEffect(() => {
@@ -208,7 +268,9 @@ export default function ScoutProjectPage() {
   const runRegenerateAll = async () => {
     if (
       !confirm(
-        "Regenerate analysis (if needed), DP plan, and shot list from your current photos and settings?\n\nPrevis images are not included — use Previs tab if you want prompts or images."
+        isLinkedToProject
+          ? "Regenerate analysis (if needed) and DP plan from your current photos and settings?\n\nYour project shot list is unchanged — edit it on the project board or Scout shot list tab."
+          : "Regenerate analysis (if needed), DP plan, and shot list from your current photos and settings?\n\nPrevis images are not included — use Previs tab if you want prompts or images."
       )
     ) {
       return;
@@ -218,9 +280,11 @@ export default function ScoutProjectPage() {
     try {
       if (!analysis) await scoutAnalyze(id);
       await scoutGenerateDpPlan(id);
-      await scoutGenerateShotList(id);
+      if (!isLinkedToProject) {
+        await scoutGenerateShotList(id);
+      }
       await refresh();
-      setTab("shots");
+      setTab(isLinkedToProject ? "plan" : "shots");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Regeneration failed");
     } finally {
@@ -260,8 +324,11 @@ export default function ScoutProjectPage() {
 
   const analysis = project.latestAnalysis;
   const dp = project.latestDpPlan;
-  const shots = project.latestShotList;
   const previews = project.latestPreviews ?? [];
+  const hasShotList = isLinkedToProject
+    ? productionDayShots.length > 0
+    : (project?.latestShotList?.shots?.length ?? 0) > 0;
+  const standaloneScoutShots = project?.latestShotList?.shots ?? [];
   const workflowSteps = scoutWorkflowSteps(id, project, images.length);
   const isBeginner = project.skillLevel === "beginner";
   const adminReadOnly = adminOpen && !!user && project.userId !== user.uid;
@@ -694,7 +761,7 @@ export default function ScoutProjectPage() {
               </dl>
             </ScoutCard>
 
-            {!shots && (
+            {!hasShotList && (
               <Button onClick={() => void runShotList()} disabled={!!busy}>
                 Generate shot list →
               </Button>
@@ -715,16 +782,32 @@ export default function ScoutProjectPage() {
           </div>
         )}
 
-        {tab === "shots" && shots && (
+        {tab === "shots" && hasShotList && (
           <ScoutCard className="overflow-x-auto p-0">
-            <div className="p-4">
-              <ScoutShotListEditor
-                scoutId={id}
-                shots={shots.shots}
-                onSaved={() => void refresh()}
-              />
-            </div>
-            <ScoutVersionHistory scoutId={id} kind="shotLists" onRestored={() => void refresh()} />
+            {isLinkedToProject && productionBoard ? (
+              <div className="p-4">
+                {shotListSaving ? (
+                  <p className="mb-3 text-xs text-slate-500">Saving shot list…</p>
+                ) : null}
+                <ProductionShotListEditor
+                  className="border-0 bg-transparent p-0 shadow-none scroll-mt-0"
+                  shots={productionDayShots}
+                  onChange={persistLinkedProductionShots}
+                />
+              </div>
+            ) : (
+              <div className="p-4">
+                <ScoutShotListEditor
+                  scoutId={id}
+                  scoutProject={project}
+                  shots={standaloneScoutShots}
+                  onSaved={handleScoutShotListSaved}
+                />
+              </div>
+            )}
+            {!isLinkedToProject ? (
+              <ScoutVersionHistory scoutId={id} kind="shotLists" onRestored={() => void refresh()} />
+            ) : null}
             {!previews.length && (
               <div className="p-4 border-t border-slate-100 space-y-3">
                 <p className="text-xs text-slate-500">
@@ -736,18 +819,20 @@ export default function ScoutProjectPage() {
                 </Button>
               </div>
             )}
-            <div className="border-t border-slate-100 p-4">
-              <Button
-                variant="outline"
-                disabled={!!busy}
-                onClick={() => {
-                  if (!confirmRegenerate("shot list")) return;
-                  void runShotList();
-                }}
-              >
-                {busy === "shots" ? "Regenerating…" : "Regenerate shot list"}
-              </Button>
-            </div>
+            {!isLinkedToProject ? (
+              <div className="border-t border-slate-100 p-4">
+                <Button
+                  variant="outline"
+                  disabled={!!busy}
+                  onClick={() => {
+                    if (!confirmRegenerate("shot list")) return;
+                    void runShotList();
+                  }}
+                >
+                  {busy === "shots" ? "Regenerating…" : "Regenerate shot list"}
+                </Button>
+              </div>
+            ) : null}
           </ScoutCard>
         )}
 
@@ -905,7 +990,7 @@ export default function ScoutProjectPage() {
               <li>{analysis ? "✓ Location analysis" : "○ Location analysis"}</li>
               <li>{dp ? "✓ DP plan + camera settings" : "○ DP plan"}</li>
               <li>{dp?.fixtureAwareLighting ? "✓ Fixture assignment table" : "○ Fixture lighting"}</li>
-              <li>{shots ? "✓ Shot list" : "○ Shot list"}</li>
+              <li>{hasShotList ? "✓ Shot list" : "○ Shot list"}</li>
               <li>
                 {previews.some((p) => p.imageUrl)
                   ? "✓ Scene previs images"

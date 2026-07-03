@@ -605,9 +605,8 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                 {script.suggestedShots.length === 1 ? "" : "s"}
                 {storyboardMode
                   ? ` · ${script.storyboardFrames?.length ?? script.scenes.length} storyboard frame${(script.storyboardFrames?.length ?? script.scenes.length) === 1 ? "" : "s"}`
-                  : detailedShotList
-                    ? " (detailed coverage)"
-                    : ""}{" "}
+                  : ""}
+                {detailedShotList ? " · detailed coverage" : ""}{" "}
                 · {script.characters.length} characters
               </p>
             ) : (

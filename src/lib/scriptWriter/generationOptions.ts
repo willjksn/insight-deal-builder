@@ -4,8 +4,6 @@ export function resolveScriptGenerationOptions(
   session?: { detailedShotList?: boolean; storyboardMode?: boolean }
 ): { detailedShotList: boolean; storyboardMode: boolean } {
   const storyboardMode = body.storyboardMode ?? session?.storyboardMode ?? false;
-  const detailedShotList = storyboardMode
-    ? true
-    : body.detailedShotList ?? session?.detailedShotList !== false;
+  const detailedShotList = body.detailedShotList ?? session?.detailedShotList !== false;
   return { detailedShotList, storyboardMode };
 }

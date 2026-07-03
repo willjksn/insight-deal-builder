@@ -63,7 +63,8 @@ export type StagePropDefinition = {
     | "window"
     | "door"
     | "boom-mic"
-    | "lav";
+    | "lav"
+    | "light-cone";
 };
 
 export type StagePropElement = {
@@ -80,6 +81,8 @@ export type StagePropElement = {
   /** Display height in canvas px */
   height?: number;
   label?: string;
+  /** Override catalog fill color */
+  color?: string;
 };
 
 export type StageNoteElement = {
@@ -92,6 +95,7 @@ export type StageNoteElement = {
   title: string;
   body: string;
   template?: "camera" | "light" | "general";
+  color?: string;
 };
 
 export type StageArrowElement = {
@@ -101,6 +105,7 @@ export type StageArrowElement = {
   y: number;
   x2: number;
   y2: number;
+  color?: string;
 };
 
 export type StageWallElement = {
@@ -111,6 +116,7 @@ export type StageWallElement = {
   x2: number;
   y2: number;
   thickness: number;
+  color?: string;
 };
 
 export type StageRoomElement = {
@@ -121,6 +127,7 @@ export type StageRoomElement = {
   width: number;
   height: number;
   label?: string;
+  color?: string;
 };
 
 export type StageDoorwayElement = {
@@ -131,6 +138,18 @@ export type StageDoorwayElement = {
   width: number;
   height: number;
   swing?: "left" | "right";
+  color?: string;
+};
+
+export type StageWindowElement = {
+  id: string;
+  kind: "window";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label?: string;
+  color?: string;
 };
 
 export type StageElement =
@@ -139,7 +158,8 @@ export type StageElement =
   | StageArrowElement
   | StageWallElement
   | StageRoomElement
-  | StageDoorwayElement;
+  | StageDoorwayElement
+  | StageWindowElement;
 
 export type StageTool =
   | "select"
@@ -147,7 +167,8 @@ export type StageTool =
   | "note"
   | "wall"
   | "room"
-  | "doorway";
+  | "doorway"
+  | "window";
 
 export type StageBoard = {
   id: string;

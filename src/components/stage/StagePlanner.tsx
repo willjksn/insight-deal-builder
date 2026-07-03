@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   DoorOpen,
+  LayoutPanelTop,
   MousePointer2,
   RotateCw,
   RotateCcw,
@@ -12,9 +13,11 @@ import {
   Trash2,
   Grid3X3,
   Minus,
+  Eraser,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { StageCanvas } from "@/components/stage/StageCanvas";
+import { StageElementInspector } from "@/components/stage/StageElementInspector";
 import { StagePropSidebar } from "@/components/stage/StagePropSidebar";
 import { saveStageBoard } from "@/lib/stage/stageFirestore";
 import { NOTE_TEMPLATES, StageBoard, StageElement, StageTool } from "@/lib/stage/types";
@@ -108,6 +111,27 @@ export function StagePlanner({
     setActiveTool("select");
   };
 
+  const patchSelected = (patch: Partial<StageElement>) => {
+    if (!selectedId || readOnly) return;
+    updateElements(
+      elements.map((el) => (el.id === selectedId ? ({ ...el, ...patch } as StageElement) : el))
+    );
+  };
+
+  const resetBoard = () => {
+    if (elements.length === 0) return;
+    if (
+      !window.confirm(
+        "Clear the entire stage plan? All rooms, props, and lighting elements will be removed."
+      )
+    ) {
+      return;
+    }
+    updateElements([]);
+    setSelectedId(null);
+    setActiveTool("select");
+  };
+
   return (
     <div className="flex flex-col gap-3 lg:flex-row">
       {!readOnly && <StagePropSidebar className="max-h-[70vh] lg:max-h-[calc(100vh-12rem)]" />}
@@ -123,6 +147,7 @@ export function StagePlanner({
                 { id: "wall" as const, icon: Minus, label: "Wall" },
                 { id: "room" as const, icon: Square, label: "Room" },
                 { id: "doorway" as const, icon: DoorOpen, label: "Doorway" },
+                { id: "window" as const, icon: LayoutPanelTop, label: "Window" },
                 { id: "note" as const, icon: StickyNote, label: "Note" },
                 { id: "arrow" as const, icon: ArrowRight, label: "Light arrow" },
               ] as const
@@ -192,6 +217,16 @@ export function StagePlanner({
               <Button
                 type="button"
                 size="sm"
+                variant="outline"
+                disabled={elements.length === 0}
+                onClick={resetBoard}
+              >
+                <Eraser className="mr-1 h-3.5 w-3.5" />
+                Reset
+              </Button>
+              <Button
+                type="button"
+                size="sm"
                 variant="ghost"
                 disabled={!selectedId}
                 onClick={deleteSelected}
@@ -206,30 +241,38 @@ export function StagePlanner({
         {activeTool === "arrow" && !readOnly && (
           <p className="text-xs text-sky-700">Click start point, then end point for light direction arrow.</p>
         )}
-        {(activeTool === "wall" || activeTool === "room" || activeTool === "doorway") && !readOnly && (
+        {(activeTool === "wall" || activeTool === "room" || activeTool === "doorway" || activeTool === "window") && !readOnly && (
           <p className="text-xs text-sky-700">
             {activeTool === "wall"
               ? "Click and drag to draw a wall segment."
               : activeTool === "room"
                 ? "Click and drag to outline a room."
-                : "Click and drag to mark a doorway opening."}
+                : activeTool === "window"
+                  ? "Click and drag on a wall to place a window — daylight spill shows into the room."
+                  : "Click and drag to mark a doorway opening."}
           </p>
         )}
         {activeTool === "select" && selected && !readOnly && (
           <p className="text-xs text-slate-500">
-            Drag corner handles to resize. Hold and drag the element to move.
+            Drag to move · corner handles to resize · use the color picker in the panel to match your
+            diagram.
           </p>
         )}
 
-        <StageCanvas
-          elements={elements}
-          onChange={updateElements}
-          showGrid={showGrid}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          activeTool={activeTool}
-          readOnly={readOnly}
-        />
+        <div className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row">
+          <StageCanvas
+            elements={elements}
+            onChange={updateElements}
+            showGrid={showGrid}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            activeTool={activeTool}
+            readOnly={readOnly}
+          />
+          {activeTool === "select" && selected && !readOnly ? (
+            <StageElementInspector element={selected} onPatch={patchSelected} />
+          ) : null}
+        </div>
       </div>
     </div>
   );

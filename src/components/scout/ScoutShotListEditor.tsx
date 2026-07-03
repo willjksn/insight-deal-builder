@@ -1,12 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
+import { ScoutShotListFieldSelect } from "@/components/scout/ScoutShotListFieldSelect";
+import { useAuth } from "@/contexts/AuthContext";
+import { getGearList, getGearProfiles } from "@/lib/firebase/scoutFirestore";
 import { scoutSaveShotList } from "@/lib/scout/apiClient";
-import { ScoutShotListItem, ScoutShotType } from "@/lib/scout/types";
+import { buildGearInventory } from "@/lib/scout/gearContext";
+import {
+  buildLensSelectOptions,
+  buildMovementSelectOptions,
+  formatStoredMovement,
+  normalizeShotListRow,
+  shotListsEqual,
+} from "@/lib/scout/shotListFieldOptions";
+import { ScoutGearList, ScoutGearProfile, ScoutProject, ScoutShotListItem, ScoutShotType } from "@/lib/scout/types";
 
 const SHOT_TYPES: ScoutShotType[] = [
   "master_wide",
@@ -45,40 +57,90 @@ function emptyShot(sortOrder: number): ScoutShotListItem {
 
 interface ScoutShotListEditorProps {
   scoutId: string;
+  scoutProject: ScoutProject;
   shots: ScoutShotListItem[];
-  onSaved: (shots: ScoutShotListItem[]) => void;
+  onSaved: (shots: ScoutShotListItem[]) => void | Promise<void>;
   readOnly?: boolean;
 }
 
 export function ScoutShotListEditor({
   scoutId,
+  scoutProject,
   shots: initial,
   onSaved,
   readOnly,
 }: ScoutShotListEditorProps) {
+  const { user } = useAuth();
   const [rows, setRows] = useState(initial);
+  const [baseline, setBaseline] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
+  const [gearProfiles, setGearProfiles] = useState<ScoutGearProfile[]>([]);
+  const [gearList, setGearList] = useState<ScoutGearList | null>(null);
+
+  const initialSnapshot = useMemo(
+    () => JSON.stringify(initial.map(normalizeShotListRow)),
+    [initial]
+  );
 
   useEffect(() => {
     setRows(initial);
-    setDirty(false);
-  }, [initial]);
+    setBaseline(initial);
+  }, [initial, initialSnapshot]);
 
-  const patch = (index: number, patch: Partial< ScoutShotListItem>) => {
-    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
-    setDirty(true);
+  const dirty = useMemo(() => !shotListsEqual(rows, baseline), [rows, baseline]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    Promise.all([getGearProfiles(user.uid), getGearList(user.uid)])
+      .then(([profiles, list]) => {
+        setGearProfiles(profiles);
+        setGearList(list);
+      })
+      .catch(() => {
+        setGearProfiles([]);
+        setGearList(null);
+      });
+  }, [user?.uid]);
+
+  const gearProfile = useMemo(
+    () => gearProfiles.find((p) => p.id === scoutProject.selectedGearProfileId),
+    [gearProfiles, scoutProject.selectedGearProfileId]
+  );
+
+  const lensInventory = useMemo(
+    () => buildGearInventory(scoutProject, gearProfile, gearList).lenses,
+    [scoutProject, gearProfile, gearList]
+  );
+
+  const lensOptions = useMemo(() => buildLensSelectOptions(lensInventory), [lensInventory]);
+
+  const movementOptions = useMemo(
+    () => buildMovementSelectOptions(scoutProject.creativeBrief),
+    [scoutProject.creativeBrief]
+  );
+
+  const patch = (index: number, patch: Partial<ScoutShotListItem>) => {
+    setRows((prev) => {
+      const current = prev[index];
+      if (!current) return prev;
+      const updated = { ...current, ...patch };
+      if (
+        JSON.stringify(normalizeShotListRow(current)) ===
+        JSON.stringify(normalizeShotListRow(updated))
+      ) {
+        return prev;
+      }
+      return prev.map((r, i) => (i === index ? updated : r));
+    });
   };
 
   const remove = (index: number) => {
     setRows((prev) => prev.filter((_, i) => i !== index).map((r, i) => ({ ...r, shotNumber: i + 1 })));
-    setDirty(true);
   };
 
   const add = () => {
     setRows((prev) => [...prev, emptyShot(prev.length)]);
-    setDirty(true);
   };
 
   const save = async () => {
@@ -86,8 +148,10 @@ export function ScoutShotListEditor({
     setError(null);
     try {
       const { shotList } = await scoutSaveShotList(scoutId, rows);
-      onSaved(shotList.shots);
-      setDirty(false);
+      const saved = shotList.shots;
+      setRows(saved);
+      setBaseline(saved);
+      await onSaved(saved);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -113,8 +177,8 @@ export function ScoutShotListEditor({
             <tr key={s.shotNumber} className="border-t border-slate-100">
               <td className="px-4 py-3 tabular-nums">{s.shotNumber}</td>
               <td className="px-4 py-3">{s.shotType.replace(/_/g, " ")}</td>
-              <td className="px-4 py-3">{s.lens}</td>
-              <td className="px-4 py-3">{s.cameraMovement}</td>
+              <td className="px-4 py-3">{s.lens || "—"}</td>
+              <td className="px-4 py-3">{formatStoredMovement(s.cameraMovement)}</td>
               <td className="px-4 py-3 max-w-xs">{s.subjectAction}</td>
               <td className="px-4 py-3 capitalize">{s.priority.replace(/_/g, " ")}</td>
             </tr>
@@ -161,11 +225,19 @@ export function ScoutShotListEditor({
                 onChange={(e) => patch(index, { shotType: e.target.value as ScoutShotType })}
                 options={SHOT_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, " ") }))}
               />
-              <Input label="Lens" value={shot.lens} onChange={(e) => patch(index, { lens: e.target.value })} />
-              <Input
+              <ScoutShotListFieldSelect
+                label="Lens"
+                value={shot.lens}
+                options={lensOptions}
+                customPlaceholder="e.g. 35mm f/1.4"
+                onChange={(lens) => patch(index, { lens })}
+              />
+              <ScoutShotListFieldSelect
                 label="Movement"
                 value={shot.cameraMovement}
-                onChange={(e) => patch(index, { cameraMovement: e.target.value })}
+                options={movementOptions}
+                customPlaceholder="Describe camera movement"
+                onChange={(cameraMovement) => patch(index, { cameraMovement })}
               />
               <Input
                 label="Scene"
@@ -181,15 +253,19 @@ export function ScoutShotListEditor({
                 options={PRIORITIES.map((p) => ({ value: p, label: p.replace(/_/g, " ") }))}
               />
             </div>
-            <Input
+            <Textarea
               label="Subject / action"
               value={shot.subjectAction}
               onChange={(e) => patch(index, { subjectAction: e.target.value })}
+              rows={2}
+              className="min-h-[3.5rem] resize-y leading-snug"
             />
-            <Input
+            <Textarea
               label="Notes"
               value={shot.notes}
               onChange={(e) => patch(index, { notes: e.target.value })}
+              rows={3}
+              className="min-h-[4.5rem] resize-y leading-snug"
             />
           </div>
         ))}
