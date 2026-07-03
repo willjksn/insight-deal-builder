@@ -5,6 +5,7 @@ import { Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { InfoCallout } from "@/components/ui/PageSection";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   addProjectMember,
@@ -29,6 +30,8 @@ function candidateLabel(candidate: TeamUserCandidate): string {
   return candidate.email;
 }
 
+type ProjectMemberRow = ProjectMember & { accountApproved?: boolean };
+
 interface ProjectAccessEditorProps {
   projectId: string;
   /** Pre-loaded from hub — avoids a second candidates fetch when provided. */
@@ -37,7 +40,7 @@ interface ProjectAccessEditorProps {
 
 export function ProjectAccessEditor({ projectId, hubCandidates }: ProjectAccessEditorProps) {
   const { user } = useAuth();
-  const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [members, setMembers] = useState<ProjectMemberRow[]>([]);
   const [candidates, setCandidates] = useState<TeamUserCandidate[]>(hubCandidates ?? []);
   const [canManageTeam, setCanManageTeam] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,6 +53,7 @@ export function ProjectAccessEditor({ projectId, hubCandidates }: ProjectAccessE
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingNotice, setPendingNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user || !projectId) return;
@@ -57,7 +61,7 @@ export function ProjectAccessEditor({ projectId, hubCandidates }: ProjectAccessE
     setError(null);
     try {
       const data = await fetchProjectTeam(() => user.getIdToken(), projectId);
-      setMembers(data.members);
+      setMembers(data.members as ProjectMemberRow[]);
       setCandidates(data.candidates ?? hubCandidates ?? []);
       setCanManageTeam(data.canManageTeam);
     } catch (e) {
@@ -71,38 +75,39 @@ export function ProjectAccessEditor({ projectId, hubCandidates }: ProjectAccessE
     void load();
   }, [load]);
 
-  const approvedCandidates = useMemo(
-    () => candidates.filter((c) => c.approved && !members.some((m) => m.userId === c.userId)),
+  const addableCandidates = useMemo(
+    () => candidates.filter((c) => !members.some((m) => m.userId === c.userId)),
     [candidates, members]
   );
-  const pendingCandidates = useMemo(
-    () => candidates.filter((c) => !c.approved),
-    [candidates]
+
+  const selectedCandidate = useMemo(
+    () => addableCandidates.find((c) => c.userId === selectedUserId),
+    [addableCandidates, selectedUserId]
   );
 
   const selectOptions = useMemo(() => {
-    const options: { value: string; label: string; disabled?: boolean }[] = [
-      { value: "", label: "Select a person…" },
-    ];
-    for (const c of approvedCandidates) {
-      options.push({ value: c.userId, label: candidateLabel(c) });
-    }
-    for (const c of pendingCandidates) {
+    const options: { value: string; label: string }[] = [{ value: "", label: "Select a person…" }];
+    for (const c of addableCandidates) {
       options.push({
         value: c.userId,
-        label: `${candidateLabel(c)} — pending approval`,
-        disabled: true,
+        label: c.approved ? candidateLabel(c) : `${candidateLabel(c)} — pending approval`,
       });
     }
     return options;
-  }, [approvedCandidates, pendingCandidates]);
+  }, [addableCandidates]);
 
   const addMember = async () => {
     if (!user || !selectedUserId) return;
     setSaving(true);
     setError(null);
+    setPendingNotice(null);
     try {
       await addProjectMember(() => user.getIdToken(), projectId, selectedUserId, newPerms);
+      if (selectedCandidate && !selectedCandidate.approved) {
+        setPendingNotice(
+          `${candidateLabel(selectedCandidate)} was added to this project. They cannot sign in until an admin approves their account.`
+        );
+      }
       setSelectedUserId("");
       await load();
     } catch (e) {
@@ -112,7 +117,7 @@ export function ProjectAccessEditor({ projectId, hubCandidates }: ProjectAccessE
     }
   };
 
-  const togglePerm = async (member: ProjectMember, area: ProjectAccessArea) => {
+  const togglePerm = async (member: ProjectMemberRow, area: ProjectAccessArea) => {
     if (!user) return;
     const next = { ...member.permissions, [area]: !member.permissions[area] };
     setSaving(true);
@@ -127,7 +132,7 @@ export function ProjectAccessEditor({ projectId, hubCandidates }: ProjectAccessE
     }
   };
 
-  const remove = async (member: ProjectMember) => {
+  const remove = async (member: ProjectMemberRow) => {
     if (!user) return;
     if (!window.confirm(`Remove ${member.displayName || member.email} from this project?`)) return;
     setSaving(true);
@@ -161,21 +166,38 @@ export function ProjectAccessEditor({ projectId, hubCandidates }: ProjectAccessE
           {error}
         </p>
       )}
+      {pendingNotice ? (
+        <InfoCallout variant="sky">{pendingNotice}</InfoCallout>
+      ) : null}
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
         <p className="text-sm font-medium text-slate-800">Add someone</p>
-        <Select
-          label="Person"
-          value={selectedUserId}
-          onChange={(e) => setSelectedUserId(e.target.value)}
-          options={selectOptions}
-          disabled={saving || approvedCandidates.length === 0}
-        />
-        <PermissionCheckboxes permissions={newPerms} onChange={setNewPerms} disabled={saving} />
-        <Button type="button" disabled={saving || !selectedUserId} onClick={() => void addMember()}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Add to project
-        </Button>
+        {addableCandidates.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Everyone in the system is already on this project, or no other users have signed up yet.
+          </p>
+        ) : (
+          <>
+            <Select
+              label="Person"
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              options={selectOptions}
+              disabled={saving}
+            />
+            {selectedCandidate && !selectedCandidate.approved ? (
+              <p className="text-xs text-amber-800">
+                This person is waiting for admin approval. You can add them now — they will get project
+                access once their account is approved.
+              </p>
+            ) : null}
+            <PermissionCheckboxes permissions={newPerms} onChange={setNewPerms} disabled={saving} />
+            <Button type="button" disabled={saving || !selectedUserId} onClick={() => void addMember()}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add to project
+            </Button>
+          </>
+        )}
       </div>
 
       {members.length === 0 ? (
@@ -188,6 +210,9 @@ export function ProjectAccessEditor({ projectId, hubCandidates }: ProjectAccessE
                 <div>
                   <p className="font-medium text-slate-900">{member.displayName || member.email}</p>
                   {member.displayName && <p className="text-xs text-slate-500">{member.email}</p>}
+                  {member.accountApproved === false ? (
+                    <p className="mt-1 text-xs font-medium text-amber-700">Pending account approval</p>
+                  ) : null}
                 </div>
                 <button
                   type="button"

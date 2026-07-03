@@ -64,6 +64,14 @@ export async function lookupUserById(
   };
 }
 
+export function isAccountApprovedForListing(approved?: boolean): boolean {
+  return approved !== false;
+}
+
+export function isExplicitlyPendingApproval(approved?: boolean): boolean {
+  return approved === false;
+}
+
 export async function listTeamUserCandidates(
   db: Firestore,
   excludeUserIds: string[] = []
@@ -77,7 +85,7 @@ export async function listTeamUserCandidates(
         userId: doc.id,
         email: (data.email as string) ?? "",
         displayName: data.displayName as string | undefined,
-        approved: Boolean(data.approved),
+        approved: isAccountApprovedForListing(data.approved as boolean | undefined),
       };
     })
     .filter((u) => u.email && !exclude.has(u.userId))
@@ -141,13 +149,23 @@ export async function getProjectMember(
 export async function listProjectMembers(
   db: Firestore,
   projectId: string
-): Promise<ProjectMember[]> {
+): Promise<(ProjectMember & { accountApproved: boolean })[]> {
   const snap = await db
     .collection("projects")
     .doc(projectId)
     .collection(PROJECT_MEMBERS_SUBCOLLECTION)
     .get();
-  return snap.docs.map((d) => d.data() as ProjectMember);
+  const members = snap.docs.map((d) => d.data() as ProjectMember);
+  const enriched = await Promise.all(
+    members.map(async (member) => {
+      const user = await lookupUserById(db, member.userId);
+      return {
+        ...member,
+        accountApproved: isAccountApprovedForListing(user?.approved),
+      };
+    })
+  );
+  return enriched;
 }
 
 export async function getResourceMember(

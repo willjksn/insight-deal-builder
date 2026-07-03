@@ -116,16 +116,16 @@ export function ProjectAccessHub({ initialProjectId = "", onAdminPage = false }:
         </h3>
         <InfoCallout>
           {onAdminPage
-            ? "New users sign up first, then approve them in the organization list above, then add them to a project below."
-            : "New users sign up first, then an admin approves them, then add them to a project below."}
+            ? "New users sign up first. You can add them to a project while they are pending approval — they will get access once an admin approves their account in the list above."
+            : "New users sign up first. You can add them to a project while pending — an admin must approve their account before they can sign in."}
         </InfoCallout>
         <ContentPanel className="space-y-3">
           <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-600">
             <li>Send them the sign-up link for {APP_NAME}.</li>
             <li>
               {onAdminPage
-                ? "After they register, expand their row above, assign company and permissions, and save."
-                : "After they register, an admin approves their account."}
+                ? "After they register, expand their row above to approve them — or add them to a project now and they will get access once approved."
+                : "After they register, an admin approves their account (or add them to a project now — access starts when approved)."}
             </li>
             <li>Select a project below and add them with the access they need.</li>
           </ol>

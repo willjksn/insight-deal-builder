@@ -6,6 +6,8 @@ import {
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import {
+  isAccountApprovedForListing,
+  isExplicitlyPendingApproval,
   listResourceMembers,
   listTeamUserCandidates,
   loadScriptSession,
@@ -96,12 +98,9 @@ export async function POST(
     const user = userId
       ? await lookupUserById(db, userId)
       : await lookupUserByEmail(db, email!);
-    if (!user?.approved) {
+    if (!user) {
       return NextResponse.json(
-        {
-          error:
-            "That person is not approved yet. Have them sign up, then approve them in Admin.",
-        },
+        { error: "That person is not in the system yet. Have them sign up first." },
         { status: 404 }
       );
     }
@@ -122,7 +121,14 @@ export async function POST(
       .doc(user.id)
       .set(member, { merge: true });
 
-    return NextResponse.json({ ok: true, member });
+    return NextResponse.json({
+      ok: true,
+      member: {
+        ...member,
+        accountApproved: isAccountApprovedForListing(user.approved),
+      },
+      pendingApproval: isExplicitlyPendingApproval(user.approved),
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to share script";
     return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });

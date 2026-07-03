@@ -39,6 +39,8 @@ function toGeminiApiParts(parts: GeminiPart[]): Record<string, unknown>[] {
   });
 }
 
+let geminiApiKeyUsable: boolean | null = null;
+
 function shouldRetryWithVertexGemini(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   const lower = msg.toLowerCase();
@@ -156,6 +158,10 @@ export async function callGeminiGenerate(params: {
     return vertexGeminiGenerate({ ...params, model });
   }
 
+  if (geminiApiKeyUsable === false && canFallbackToVertexGemini()) {
+    return vertexGeminiGenerate({ ...params, model });
+  }
+
   if (!process.env.GEMINI_API_KEY?.trim()) {
     if (canFallbackToVertexGemini()) {
       return vertexGeminiGenerate({ ...params, model });
@@ -164,9 +170,12 @@ export async function callGeminiGenerate(params: {
   }
 
   try {
-    return await callGeminiApiKeyGenerate(params);
+    const text = await callGeminiApiKeyGenerate(params);
+    geminiApiKeyUsable = true;
+    return text;
   } catch (err) {
     if (canFallbackToVertexGemini() && shouldRetryWithVertexGemini(err)) {
+      geminiApiKeyUsable = false;
       console.warn("[Scout] Gemini API key unavailable — using Vertex AI fallback");
       return vertexGeminiGenerate({ ...params, model });
     }

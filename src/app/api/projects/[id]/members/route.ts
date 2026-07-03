@@ -18,6 +18,8 @@ import {
   PROJECT_MEMBERS_SUBCOLLECTION,
   resolveProjectPermissions,
   sanitizeProjectPermissions,
+  isAccountApprovedForListing,
+  isExplicitlyPendingApproval,
 } from "@/lib/projectAccess/server";
 import { ProjectAccessPermissions } from "@/lib/projectAccess/types";
 import { Project } from "@/lib/types";
@@ -100,15 +102,9 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "That person is not in the system yet. Have them sign up first, then approve them in Admin.",
+            "That person is not in the system yet. Have them sign up first, then add them here.",
         },
         { status: 404 }
-      );
-    }
-    if (!user.approved) {
-      return NextResponse.json(
-        { error: "That user is pending approval. Ask an admin to approve them first." },
-        { status: 400 }
       );
     }
     if (user.id === uid && !hasGlobalProjectAdmin(appUser)) {
@@ -136,7 +132,14 @@ export async function POST(
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    return NextResponse.json({ ok: true, member });
+    return NextResponse.json({
+      ok: true,
+      member: {
+        ...member,
+        accountApproved: isAccountApprovedForListing(user.approved),
+      },
+      pendingApproval: isExplicitlyPendingApproval(user.approved),
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to add member";
     return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });

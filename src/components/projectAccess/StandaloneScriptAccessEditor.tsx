@@ -59,27 +59,21 @@ export function StandaloneScriptAccessEditor({
     void load();
   }, [load]);
 
-  const approvedCandidates = useMemo(
-    () => candidates.filter((c) => c.approved && !members.some((m) => m.userId === c.userId)),
+  const addableCandidates = useMemo(
+    () => candidates.filter((c) => !members.some((m) => m.userId === c.userId)),
     [candidates, members]
   );
 
   const selectOptions = useMemo(() => {
-    const options: { value: string; label: string; disabled?: boolean }[] = [
-      { value: "", label: "Select a person…" },
-    ];
-    for (const c of approvedCandidates) {
-      options.push({ value: c.userId, label: candidateLabel(c) });
-    }
-    for (const c of candidates.filter((x) => !x.approved)) {
+    const options: { value: string; label: string }[] = [{ value: "", label: "Select a person…" }];
+    for (const c of addableCandidates) {
       options.push({
         value: c.userId,
-        label: `${candidateLabel(c)} — pending approval`,
-        disabled: true,
+        label: c.approved ? candidateLabel(c) : `${candidateLabel(c)} — pending approval`,
       });
     }
     return options;
-  }, [approvedCandidates, candidates]);
+  }, [addableCandidates]);
 
   const share = async () => {
     if (!user || !selectedUserId) return;
@@ -130,7 +124,7 @@ export function StandaloneScriptAccessEditor({
             value={selectedUserId}
             onChange={(e) => setSelectedUserId(e.target.value)}
             options={selectOptions}
-            disabled={saving || approvedCandidates.length === 0}
+            disabled={saving || addableCandidates.length === 0}
           />
         </div>
         <Button type="button" disabled={saving || !selectedUserId} onClick={() => void share()}>
