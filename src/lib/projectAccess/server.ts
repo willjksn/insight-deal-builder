@@ -1,11 +1,9 @@
 import { Firestore } from "firebase-admin/firestore";
 import { AppUser, Project } from "@/lib/types";
 import { isUserApproved, isUserPendingApproval } from "@/lib/users/approval";
-import { canManageProjects, canManageUsers, canUseShotScout } from "@/lib/utils/permissions";
+import { canManageProjects, canManageUsers, canUseProductionTools } from "@/lib/utils/permissions";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
-import { ScoutProject } from "@/lib/scout/types";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
-import { SCOUT_PROJECTS_COLLECTION } from "@/lib/firebase/scoutFirestore";
 import {
   EMPTY_PROJECT_ACCESS,
   FULL_PROJECT_ACCESS,
@@ -321,10 +319,6 @@ function projectIdFromSession(session: ScriptWriterSession): string | undefined 
   return session.linkedProjectId ?? session.appliedProjectId;
 }
 
-function projectIdFromScout(project: ScoutProject): string | undefined {
-  return project.linkedProjectId;
-}
-
 export async function resolveScriptSessionAccess(
   db: Firestore,
   session: ScriptWriterSession,
@@ -385,55 +379,6 @@ export async function assertScriptSessionAccess(
   if (!allowed) throw new Error("Not authorized");
 }
 
-export async function resolveScoutAccess(
-  db: Firestore,
-  project: ScoutProject,
-  uid: string,
-  appUser: AppUser,
-  options?: WorkspaceAccessOptions,
-  adminEmail = ""
-): Promise<{ allowed: boolean; via: "owner" | "project" | "direct" | "admin" | null }> {
-  if (project.userId === uid) {
-    return { allowed: true, via: "owner" };
-  }
-
-  const direct = await getResourceMember(db, SCOUT_PROJECTS_COLLECTION, project.id, uid);
-  if (direct?.permissions.scout) {
-    return { allowed: true, via: "direct" };
-  }
-
-  const projectId = projectIdFromScout(project);
-  if (projectId) {
-    const has = await hasProjectAreaAccess(db, projectId, uid, appUser, "scout");
-    if (has) return { allowed: true, via: "project" };
-  }
-
-  if (
-    await tryAdminWorkspaceReadAccess(db, appUser, project.userId, options, {
-      resourceType: "scout",
-      resourceId: project.id,
-      adminUserId: uid,
-      adminEmail,
-    })
-  ) {
-    return { allowed: true, via: "admin" };
-  }
-
-  return { allowed: false, via: null };
-}
-
-export async function assertScoutAccess(
-  db: Firestore,
-  project: ScoutProject,
-  uid: string,
-  appUser: AppUser,
-  options?: WorkspaceAccessOptions,
-  adminEmail = ""
-): Promise<void> {
-  const { allowed } = await resolveScoutAccess(db, project, uid, appUser, options, adminEmail);
-  if (!allowed) throw new Error("Not authorized");
-}
-
 export async function loadScriptSession(
   db: Firestore,
   sessionId: string
@@ -465,15 +410,6 @@ export async function getScriptSessionForUser(
   return allowed ? session : null;
 }
 
-export async function loadScoutProject(
-  db: Firestore,
-  scoutId: string
-): Promise<ScoutProject | null> {
-  const snap = await db.collection(SCOUT_PROJECTS_COLLECTION).doc(scoutId).get();
-  if (!snap.exists) return null;
-  return { id: snap.id, ...(snap.data() as Omit<ScoutProject, "id">) };
-}
-
 export async function assertScriptWriterAppAccess(
   db: Firestore,
   uid: string,
@@ -481,7 +417,7 @@ export async function assertScriptWriterAppAccess(
 ): Promise<void> {
   if (hasGlobalProjectAdmin(appUser)) return;
 
-  if (canUseShotScout(appUser)) return;
+  if (canUseProductionTools(appUser)) return;
 
   const projectIds = await getProjectIdsForMember(db, uid);
   for (const projectId of projectIds) {
@@ -632,104 +568,4 @@ async function addProjectScriptSessions(
 
   const { allowed } = await resolveScriptSessionAccess(db, session, uid, appUser, false);
   if (allowed) byId.set(scriptSessionId, session);
-}
-
-export async function listAccessibleScoutProjects(
-  db: Firestore,
-  uid: string,
-  appUser: AppUser
-): Promise<ScoutProject[]> {
-  const byId = new Map<string, ScoutProject>();
-
-  const addDoc = (id: string, data: FirebaseFirestore.DocumentData) => {
-    byId.set(id, { id, ...(data as Omit<ScoutProject, "id">) });
-  };
-
-  let ownedSnap;
-  try {
-    ownedSnap = await db
-      .collection(SCOUT_PROJECTS_COLLECTION)
-      .where("userId", "==", uid)
-      .orderBy("createdAt", "desc")
-      .limit(50)
-      .get();
-  } catch {
-    ownedSnap = await db
-      .collection(SCOUT_PROJECTS_COLLECTION)
-      .where("userId", "==", uid)
-      .limit(50)
-      .get();
-  }
-  ownedSnap.docs.forEach((d) => addDoc(d.id, d.data()));
-
-  const shareSnap = await db
-    .collectionGroup(RESOURCE_MEMBERS_SUBCOLLECTION)
-    .where("userId", "==", uid)
-    .get();
-  for (const doc of shareSnap.docs) {
-    if (doc.ref.parent.parent?.parent?.id !== SCOUT_PROJECTS_COLLECTION) continue;
-    const scoutId = doc.ref.parent.parent!.id;
-    if (byId.has(scoutId)) continue;
-    const project = await loadScoutProject(db, scoutId);
-    if (project) byId.set(scoutId, project);
-  }
-
-  const projectIds = hasGlobalProjectAdmin(appUser)
-    ? []
-    : await getProjectIdsForMember(db, uid);
-  for (const projectId of projectIds) {
-    const perms = await resolveProjectPermissions(db, projectId, uid, appUser);
-    if (!perms.scout) continue;
-    const linkedSnap = await db
-      .collection(SCOUT_PROJECTS_COLLECTION)
-      .where("linkedProjectId", "==", projectId)
-      .limit(25)
-      .get();
-    linkedSnap.docs.forEach((d) => addDoc(d.id, d.data()));
-  }
-
-  return [...byId.values()].sort((a, b) => {
-    const toMs = (ts: unknown) =>
-      typeof ts === "object" && ts && "seconds" in (ts as object)
-        ? (ts as { seconds: number }).seconds * 1000
-        : 0;
-    return toMs(b.createdAt) - toMs(a.createdAt);
-  });
-}
-
-export async function getScoutProjectForUser(
-  db: Firestore,
-  scoutId: string,
-  uid: string,
-  appUser: AppUser,
-  options?: WorkspaceAccessOptions,
-  adminEmail = ""
-): Promise<ScoutProject | null> {
-  const project = await loadScoutProject(db, scoutId);
-  if (!project) return null;
-  const { allowed } = await resolveScoutAccess(db, project, uid, appUser, options, adminEmail);
-  return allowed ? project : null;
-}
-
-export async function assertScoutAppAccess(
-  db: Firestore,
-  uid: string,
-  appUser: AppUser
-): Promise<void> {
-  if (hasGlobalProjectAdmin(appUser)) return;
-
-  if (canUseShotScout(appUser)) return;
-
-  const projectIds = await getProjectIdsForMember(db, uid);
-  for (const projectId of projectIds) {
-    const perms = await resolveProjectPermissions(db, projectId, uid, appUser);
-    if (perms.scout) return;
-  }
-
-  const shareSnap = await db.collectionGroup(RESOURCE_MEMBERS_SUBCOLLECTION).where("userId", "==", uid).get();
-  for (const doc of shareSnap.docs) {
-    if (doc.ref.parent.parent?.parent?.id === SCOUT_PROJECTS_COLLECTION) return;
-  }
-
-  throw new Error("Not authorized");
 }

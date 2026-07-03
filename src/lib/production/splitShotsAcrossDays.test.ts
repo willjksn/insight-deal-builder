@@ -43,6 +43,18 @@ describe("groupShotsByLocation", () => {
     expect(groups[0].shots).toHaveLength(2);
     expect(groups[1].location).toBe("KITCHEN");
   });
+
+  it("handles numeric scene numbers in script scenes", () => {
+    const numericScript = {
+      ...script,
+      scenes: script.scenes.map((s, i) => ({
+        ...s,
+        sceneNumber: (i + 1) as unknown as string,
+      })),
+    };
+    expect(() => sceneLocationMap(numericScript)).not.toThrow();
+    expect(sceneLocationMap(numericScript).get("1")).toBe("STREET");
+  });
 });
 
 describe("buildAutoSplitPlan", () => {

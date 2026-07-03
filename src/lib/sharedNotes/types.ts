@@ -1,4 +1,4 @@
-export type SharedResourceType = "script" | "scout";
+export type SharedResourceType = "script";
 
 export interface SharedResourceNote {
   id: string;

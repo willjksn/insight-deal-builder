@@ -1,5 +1,5 @@
-import { callGeminiJsonText } from "@/lib/scout/geminiClient";
-import { scoutAiUsesMock } from "@/lib/scout/cineScoutAi";
+import { callGeminiJsonText } from "@/lib/ai/geminiClient";
+import { aiUsesMock } from "@/lib/ai/mockAi";
 import {
   buildQuoteScopeUserPrompt,
   QUOTE_SCOPE_SYSTEM_PROMPT,
@@ -205,7 +205,7 @@ export async function suggestQuoteScope(
     throw new Error("Describe the job first");
   }
 
-  if (scoutAiUsesMock()) {
+  if (aiUsesMock()) {
     return mockQuoteScopeSuggest(
       jobDescription,
       packages,

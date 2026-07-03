@@ -37,7 +37,7 @@ import {
   canManageTemplates,
   canManageUsers,
   canAccessReports,
-  canUseShotScout,
+  canUseProductionTools,
 } from "@/lib/utils/permissions";
 import { canAccessHowToUseGuide } from "@/lib/guide/access";
 
@@ -51,7 +51,7 @@ type MoreNavItem = {
 export function MobileNav() {
   const pathname = usePathname();
   const { appUser } = useAuth();
-  const showProduction = canUseShotScout(appUser);
+  const showProduction = canUseProductionTools(appUser);
 
   const navItems = [
     { href: "/dashboard", label: "Home", icon: LayoutDashboard },
@@ -62,7 +62,6 @@ export function MobileNav() {
     ...(showProduction
       ? [
           { href: "/script-writer", label: "Script", icon: ScrollText },
-          { href: "/scout", label: "Scout", icon: Clapperboard },
           { href: "/stage", label: "Stage", icon: LayoutGrid },
           { href: "/reference", label: "Guide", icon: BookOpen },
         ]

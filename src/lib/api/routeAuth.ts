@@ -39,16 +39,19 @@ export function assertCanViewIdentity(appUser: AppUser): void {
   }
 }
 
-export function assertCanUseShotScout(appUser: AppUser): void {
+export function assertCanUseProductionTools(appUser: AppUser): void {
   if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
   if (
     !hasPermission(appUser, "useShotScout") &&
     !hasPermission(appUser, "manageUsers") &&
     !hasPermission(appUser, "manageProjects")
   ) {
-    throw new Error("Not authorized for Shot Scout");
+    throw new Error("Not authorized for production tools");
   }
 }
+
+/** @deprecated use assertCanUseProductionTools */
+export const assertCanUseShotScout = assertCanUseProductionTools;
 
 export function assertCanCreateQuotes(appUser: AppUser): void {
   if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
@@ -58,7 +61,7 @@ export function assertCanCreateQuotes(appUser: AppUser): void {
 }
 
 export function assertCanUseScriptWriter(appUser: AppUser): void {
-  assertCanUseShotScout(appUser);
+  assertCanUseProductionTools(appUser);
 }
 
 export function assertCanManageProjects(appUser: AppUser): void {

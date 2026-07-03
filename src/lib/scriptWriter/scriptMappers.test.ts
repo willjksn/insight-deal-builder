@@ -3,7 +3,6 @@ import {
   normalizeSceneRef,
   productionSceneFramesFromScript,
   productionShotsFromScript,
-  scoutShotsFromScript,
 } from "@/lib/scriptWriter/scriptMappers";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 
@@ -50,10 +49,8 @@ describe("scriptMappers scene numbers", () => {
     expect(frames[0].caption).toBe("Stormi watches TV");
   });
 
-  it("maps production and scout shots when sceneNumber is numeric", () => {
+  it("maps production shots when sceneNumber is numeric", () => {
     const shots = productionShotsFromScript(scriptWithNumericScenes);
     expect(shots[0].sceneRef).toBe("1");
-    const scout = scoutShotsFromScript(scriptWithNumericScenes);
-    expect(scout[0].scene).toBe("1");
   });
 });

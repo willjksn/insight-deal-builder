@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { ProductionBoardClient } from "@/components/production/ProductionBoardClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
-import { canManageProjects, canUseShotScout } from "@/lib/utils/permissions";
+import { canManageProjects, canUseProductionTools } from "@/lib/utils/permissions";
 
 export default function ProductionBoardPage() {
   const params = useParams();
@@ -19,7 +19,7 @@ export default function ProductionBoardPage() {
   const projectAccess = useProjectAccess(id, project?.ownerUserId);
 
   const allowed =
-    canUseShotScout(appUser) ||
+    canUseProductionTools(appUser) ||
     canManageProjects(appUser) ||
     projectAccess.canAccessProduction ||
     projectAccess.canAccessShots;

@@ -32,14 +32,12 @@ import {
   CrewPickerModal,
   PersonDetailModal,
 } from "@/components/production/ProductionPersonModals";
-import { ScoutSessionsCard } from "@/components/production/ScoutSessionsCard";
 import { ProductionBoardChecklistSection } from "@/components/production/ProductionBoardChecklistSection";
 import { PersonAvatar } from "@/components/production/PersonAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgreements } from "@/hooks/useAgreements";
 import { useCollection } from "@/hooks/useCollection";
 import { Project, CrewMember } from "@/lib/types";
-import { ScoutProject } from "@/lib/scout/types";
 import {
   ProductionBoard,
   ProductionDay,
@@ -54,17 +52,13 @@ import {
   saveProductionBoard,
   subscribeProductionBoardByProject,
 } from "@/lib/firebase/productionFirestore";
-import { getGearList, getScoutProjectsByIds } from "@/lib/firebase/scoutFirestore";
-import { useScoutProjects } from "@/hooks/useScoutProjects";
-import { pickScoutSessionsForProject } from "@/lib/utils/scoutProjectLink";
 import { createEmptyProductionDay } from "@/lib/production/defaults";
 import {
   budgetLinesFromAgreement,
   importGearFromAgreement,
   primaryAgreementForProject,
 } from "@/lib/production/agreementImport";
-import { gearItemsFromScoutList, mergeGearItems } from "@/lib/production/gearImport";
-import { musicEmbedUrl } from "@/lib/production/scoutBoardImport";
+import { musicEmbedUrl } from "@/lib/utils/musicEmbed";
 import { uploadProductionDocument, uploadProductionImage } from "@/lib/production/storage";
 import { isInspirationStoryLink } from "@/lib/production/storyLinks";
 import { imageFilesFromZip, isImageFile, isZipFile } from "@/lib/production/zipImages";
@@ -78,8 +72,6 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
   const { user } = useAuth();
   const { data: agreements } = useAgreements();
   const { data: crewCatalog } = useCollection<CrewMember>("crewMembers");
-  const { data: allScoutSessions } = useScoutProjects(user?.uid);
-  const [boardOnlyScouts, setBoardOnlyScouts] = useState<ScoutProject[]>([]);
   const [board, setBoard] = useState<ProductionBoard | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -109,27 +101,6 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
       .finally(() => setLoading(false));
     return () => unsub?.();
   }, [project, user?.uid]);
-
-  useEffect(() => {
-    const boardIds = board?.linkedScoutProjectIds ?? [];
-    const missing = boardIds.filter((scoutId) => !allScoutSessions.some((s) => s.id === scoutId));
-    if (!missing.length) {
-      setBoardOnlyScouts([]);
-      return;
-    }
-    getScoutProjectsByIds(missing)
-      .then(setBoardOnlyScouts)
-      .catch(() => setBoardOnlyScouts([]));
-  }, [board?.linkedScoutProjectIds, allScoutSessions]);
-
-  const scoutSessions = useMemo(
-    () =>
-      pickScoutSessionsForProject([...allScoutSessions, ...boardOnlyScouts], project.id, {
-        boardLinkedScoutIds: board?.linkedScoutProjectIds,
-        projectName: project.projectName,
-      }),
-    [allScoutSessions, boardOnlyScouts, project.id, project.projectName, board?.linkedScoutProjectIds]
-  );
 
   const persist = useCallback(
     (next: ProductionBoard, immediate = false) => {
@@ -253,7 +224,6 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
       <ProductionBoardChecklistSection
         project={project}
         board={board}
-        scoutSessions={scoutSessions}
         primaryAgreement={primaryAgreement ?? undefined}
         onPatch={(partial) => patch(partial)}
       />
@@ -344,9 +314,7 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
               onChangeMusicLink={(musicLink) => patch({ musicLink })}
               onChangeBudgetLink={(budgetLink) => patch({ budgetLink })}
             />
-            <ScoutSessionsCard scoutSessions={scoutSessions} board={board} onPatch={patch} />
             <GearCard
-              userId={user?.uid}
               items={board.gearItems}
               notes={board.gearNotes ?? ""}
               hasAgreement={Boolean(primaryAgreement)}
@@ -1267,14 +1235,12 @@ function InspirationEditor({
 }
 
 function GearCard({
-  userId,
   items,
   notes,
   onChange,
   hasAgreement,
   onImportFromAgreement,
 }: {
-  userId?: string;
   items: string[];
   notes: string;
   onChange: (items: string[], notes: string) => void;
@@ -1282,7 +1248,6 @@ function GearCard({
   onImportFromAgreement?: () => void;
 }) {
   const [draft, setDraft] = useState("");
-  const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
   const addItem = () => {
@@ -1290,29 +1255,6 @@ function GearCard({
     if (!next) return;
     onChange([...items, next], notes);
     setDraft("");
-  };
-
-  const importFromScout = async () => {
-    if (!userId) return;
-    setImportError(null);
-    setImporting(true);
-    try {
-      const list = await getGearList(userId);
-      if (!list) {
-        setImportError("No Scout gear list yet. Add gear in Settings → Scout gear.");
-        return;
-      }
-      const incoming = gearItemsFromScoutList(list);
-      if (!incoming.length) {
-        setImportError("Your Scout gear list is empty.");
-        return;
-      }
-      onChange(mergeGearItems(items, incoming), notes);
-    } catch (err) {
-      setImportError(err instanceof Error ? err.message : "Could not import gear");
-    } finally {
-      setImporting(false);
-    }
   };
 
   const summary = items.length
@@ -1325,15 +1267,6 @@ function GearCard({
       collapsible
       defaultOpen={false}
       summary={summary}
-      action={
-        <Link
-          href="/settings/scout-gear"
-          className="text-[11px] font-medium text-sky-700 hover:underline"
-          onClick={(e) => e.stopPropagation()}
-        >
-          Scout gear
-        </Link>
-      }
       bodyClassName="p-3"
     >
       <div className="space-y-3">
@@ -1357,7 +1290,7 @@ function GearCard({
             </ul>
           </BoardScrollArea>
         ) : (
-          <p className="text-sm text-slate-500">No gear listed yet. Add items below or import from Scout.</p>
+          <p className="text-sm text-slate-500">No gear listed yet. Add items below.</p>
         )}
 
         <div className="flex flex-col gap-2">
@@ -1388,16 +1321,6 @@ function GearCard({
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={importing || !userId}
-            onClick={() => void importFromScout()}
-            className="w-full text-xs"
-          >
-            {importing ? "Importing…" : "Import from Scout gear"}
-          </Button>
           {hasAgreement && onImportFromAgreement ? (
             <Button
               type="button"

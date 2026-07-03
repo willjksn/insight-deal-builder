@@ -1,7 +1,7 @@
 import { AgreementType, EquipmentCatalogItem, LocationCatalogItem, ServicePackage } from "@/lib/types";
 import { summarizeWebResearch } from "@/lib/search/researchSummarize";
 import { tavilySearch, tavilyAvailable } from "@/lib/search/tavilyClient";
-import { scoutAiUsesMock } from "@/lib/scout/cineScoutAi";
+import { aiUsesMock } from "@/lib/ai/mockAi";
 import { formatMarketArea } from "@/lib/agreement/marketArea";
 import {
   MarketPricingResearch,
@@ -207,8 +207,8 @@ export async function researchMarketPricing(input: {
     throw new Error("Enter a city or ZIP so we can research the right market.");
   }
 
-  if (scoutAiUsesMock() || !tavilyAvailable()) {
-    if (!tavilyAvailable() && !scoutAiUsesMock()) {
+  if (aiUsesMock() || !tavilyAvailable()) {
+    if (!tavilyAvailable() && !aiUsesMock()) {
       throw new Error("TAVILY_API_KEY is not configured on the server");
     }
     return mockPricingResearch(jobDescription, marketArea, input.yourQuotedFee);

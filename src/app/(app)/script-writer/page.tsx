@@ -33,7 +33,7 @@ import {
 import { uploadScriptWriterFile } from "@/lib/scriptWriter/storage";
 import { ScriptInspirationImage, ScriptInspirationVideo, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { scriptSessionStatusLabel, sessionsForProject } from "@/lib/scriptWriter/projectScripts";
-import { canUseShotScout } from "@/lib/utils/permissions";
+import { canUseProductionTools } from "@/lib/utils/permissions";
 
 function ScriptWriterPageContent() {
   const router = useRouter();
@@ -46,7 +46,6 @@ function ScriptWriterPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [linkedProjectId, setLinkedProjectId] = useState<string>();
-  const [linkedScoutProjectId, setLinkedScoutProjectId] = useState<string>();
   const [title, setTitle] = useState<string>();
   const [pendingImages, setPendingImages] = useState<PendingInspirationImage[]>([]);
   const [pendingVideo, setPendingVideo] = useState<PendingInspirationVideo | null>(null);
@@ -69,14 +68,12 @@ function ScriptWriterPageContent() {
     }
     if (t) setTitle(t);
     const projectId = searchParams.get("projectId") ?? undefined;
-    const scoutId = searchParams.get("scoutId") ?? undefined;
     if (projectId) setLinkedProjectId(projectId);
-    if (scoutId) setLinkedScoutProjectId(scoutId);
   }, [searchParams]);
 
   useEffect(() => {
     if (!user) return;
-    if (canUseShotScout(appUser)) {
+    if (canUseProductionTools(appUser)) {
       setAllowed(true);
       return;
     }
@@ -120,7 +117,6 @@ function ScriptWriterPageContent() {
         initialIdea: brief.concept.trim() || "Inspired script",
         title: title ?? (brief.concept.trim().slice(0, 60) || "Inspired script"),
         linkedProjectId,
-        linkedScoutProjectId,
         workflowMode: hasInspiration ? "inspiration" : "text",
         detailedShotList,
         storyboardMode,

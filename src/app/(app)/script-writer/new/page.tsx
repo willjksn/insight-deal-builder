@@ -10,7 +10,7 @@ function RedirectInner() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    for (const key of ["idea", "title", "projectId", "scoutId"]) {
+    for (const key of ["idea", "title", "projectId"]) {
       const value = searchParams.get(key);
       if (value) params.set(key, value);
     }

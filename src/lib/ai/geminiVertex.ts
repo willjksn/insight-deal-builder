@@ -1,7 +1,7 @@
 import { GoogleAuth } from "google-auth-library";
 import { getServiceAccountCredentials } from "@/lib/firebase/admin";
 import { logGeminiImageUsage, logGeminiTextUsage } from "@/lib/ai/usageLog";
-import type { GeminiChatTurn, GeminiPart } from "@/lib/scout/geminiClient";
+import type { GeminiChatTurn, GeminiPart } from "@/lib/ai/geminiClient";
 
 /** Default Vertex model (2.0 flash retired 2026-06-01). */
 const DEFAULT_VERTEX_MODEL = "gemini-2.5-flash";

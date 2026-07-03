@@ -55,14 +55,11 @@ export async function POST(
       session: { ...session, id: session.id ?? id },
       script: session.script as ScriptDocument,
       projectId,
-      createScout: body.createScout !== false,
-      updateExistingScout: body.updateExistingScout !== false,
     });
 
     return NextResponse.json({
       ok: true,
       projectId,
-      scoutProjectId: result.scoutProjectId,
       productionBoardId: result.productionBoardId,
     });
   } catch (err) {

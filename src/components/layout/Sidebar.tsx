@@ -41,7 +41,7 @@ import {
   canManageTemplates,
   canManageUsers,
   canAccessReports,
-  canUseShotScout,
+  canUseProductionTools,
 } from "@/lib/utils/permissions";
 import { canAccessHowToUseGuide } from "@/lib/guide/access";
 import { AppUser } from "@/lib/types";
@@ -79,25 +79,19 @@ const navGroups: NavGroup[] = [
         href: "/script-writer",
         label: "Script writer",
         icon: ScrollText,
-        canAccess: canUseShotScout,
-      },
-      {
-        href: "/scout",
-        label: "Shot Scout",
-        icon: Clapperboard,
-        canAccess: canUseShotScout,
+        canAccess: canUseProductionTools,
       },
       {
         href: "/stage",
         label: "Stage planner",
         icon: LayoutGrid,
-        canAccess: canUseShotScout,
+        canAccess: canUseProductionTools,
       },
       {
         href: "/reference",
         label: "Reference guide",
         icon: BookOpen,
-        canAccess: canUseShotScout,
+        canAccess: canUseProductionTools,
       },
     ],
   },

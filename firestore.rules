@@ -196,7 +196,8 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    function canUseShotScout() {
+    // Production tools permission (Firestore field: useShotScout — legacy name)
+    function canUseProductionTools() {
       return isInsightOrg() && (
         hasPerm('useShotScout')
         || canManageUsers()
@@ -234,96 +235,9 @@ service cloud.firestore {
         || isProjectOwner(projectId);
     }
 
-    function isScoutDirectMember(scoutId) {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/shotScoutProjects/$(scoutId)/members/$(request.auth.uid));
-    }
-
-    function isScoutAdminSupportReader(scoutData) {
-      return isInsightOrg()
-        && hasPerm('manageProjects')
-        && scoutData.adminSupportReaders != null
-        && request.auth.uid in scoutData.adminSupportReaders;
-    }
-
-    function canAccessScout(scoutId) {
-      let scout = get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data;
-      return (isSignedIn() && scout.userId == request.auth.uid)
-        || isScoutDirectMember(scoutId)
-        || isScoutAdminSupportReader(scout)
-        || (
-          scout.linkedProjectId != null
-          && hasProjectArea(scout.linkedProjectId, 'scout')
-        );
-    }
-
-    function canWriteScout(scoutId) {
-      let scout = get(/databases/$(database)/documents/shotScoutProjects/$(scoutId)).data;
-      return (isSignedIn() && scout.userId == request.auth.uid)
-        || isScoutDirectMember(scoutId)
-        || (
-          scout.linkedProjectId != null
-          && hasProjectArea(scout.linkedProjectId, 'scout')
-        );
-    }
-
-    match /shotScoutProjects/{scoutId} {
-      allow read: if canAccessScout(scoutId);
-      allow create: if canUseShotScout()
-        && request.resource.data.userId == request.auth.uid;
-      allow update: if canWriteScout(scoutId);
-      allow delete: if canUseShotScout()
-        && resource.data.userId == request.auth.uid;
-
-      match /images/{imageId} {
-        allow read, write: if canWriteScout(scoutId);
-      }
-
-      match /analysis/{docId} {
-        allow read, write: if canWriteScout(scoutId);
-      }
-
-      match /dpPlans/{docId} {
-        allow read, write: if canWriteScout(scoutId);
-      }
-
-      match /shotLists/{docId} {
-        allow read, write: if canWriteScout(scoutId);
-      }
-
-      match /previews/{docId} {
-        allow read, write: if canWriteScout(scoutId);
-      }
-
-      match /members/{memberId} {
-        allow read: if canWriteScout(scoutId) || request.auth.uid == memberId;
-        allow write: if false;
-      }
-
-      match /notes/{noteId} {
-        allow read, write: if false;
-      }
-    }
-
-    match /users/{userId}/gearProfiles/{gearId} {
-      allow read, write: if request.auth.uid == userId && canUseShotScout();
-    }
-
-    match /users/{userId}/gearList/{docId} {
-      allow read, write: if request.auth.uid == userId && canUseShotScout();
-    }
-
-    match /users/{userId}/lightFixtures/{fixtureId} {
-      allow read, write: if request.auth.uid == userId && canUseShotScout();
-    }
-
-    match /users/{userId}/lightingRecipes/{recipeId} {
-      allow read, write: if request.auth.uid == userId && canUseShotScout();
-    }
-
     function canUseProductionBoard() {
       return isInsightOrg()
-        && (canUseShotScout() || hasPerm('manageProjects'));
+        && (canUseProductionTools() || hasPerm('manageProjects'));
     }
 
     match /productionBoards/{boardId} {
@@ -352,7 +266,7 @@ service cloud.firestore {
     }
 
     match /referenceGuide/{docId} {
-      allow read: if canUseShotScout() || hasPerm('manageProjects');
+      allow read: if canUseProductionTools() || hasPerm('manageProjects');
       allow write: if false;
     }
 

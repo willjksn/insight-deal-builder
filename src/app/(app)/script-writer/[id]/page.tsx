@@ -6,7 +6,7 @@ import { ScriptWriterClient } from "@/components/scriptWriter/ScriptWriterClient
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { scriptWriterGetSession } from "@/lib/scriptWriter/apiClient";
-import { canUseShotScout } from "@/lib/utils/permissions";
+import { canUseProductionTools } from "@/lib/utils/permissions";
 
 export default function ScriptWriterSessionPage() {
   const params = useParams();
@@ -16,7 +16,7 @@ export default function ScriptWriterSessionPage() {
 
   useEffect(() => {
     if (!user) return;
-    if (canUseShotScout(appUser)) {
+    if (canUseProductionTools(appUser)) {
       setAllowed(true);
       return;
     }

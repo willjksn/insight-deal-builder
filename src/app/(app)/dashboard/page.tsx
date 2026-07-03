@@ -21,14 +21,13 @@ import { Button } from "@/components/ui/Button";
 import { useCollection } from "@/hooks/useCollection";
 import { useAgreements } from "@/hooks/useAgreements";
 import { useAuth } from "@/contexts/AuthContext";
-import { useScoutProjects } from "@/hooks/useScoutProjects";
 import { APP_TAGLINE } from "@/lib/brand";
 import { scriptWriterListSessions } from "@/lib/scriptWriter/apiClient";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
 import {
   canCreateQuotes,
   canManageProjects,
-  canUseShotScout,
+  canUseProductionTools,
 } from "@/lib/utils/permissions";
 import { Project } from "@/lib/types";
 
@@ -36,12 +35,11 @@ export default function DashboardPage() {
   const { user, appUser } = useAuth();
   const { data: agreements, loading: aLoading } = useAgreements();
   const { data: projects, loading: pLoading } = useCollection<Project>("projects");
-  const showProduction = canUseShotScout(appUser);
-  const { data: scoutSessions, loading: sLoading } = useScoutProjects(user?.uid, showProduction);
+  const showProduction = canUseProductionTools(appUser);
   const [scriptSessions, setScriptSessions] = useState<ScriptWriterSession[]>([]);
   const [scriptsLoading, setScriptsLoading] = useState(false);
 
-  const loading = aLoading || pLoading || (showProduction && sLoading);
+  const loading = aLoading || pLoading || (showProduction && scriptsLoading);
 
   useEffect(() => {
     if (!user || !showProduction) return;
@@ -97,20 +95,13 @@ export default function DashboardPage() {
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Production</h2>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <QuickAction
                   href="/script-writer"
                   icon={ScrollText}
                   label="Script writer"
                   description="Idea → full script"
                   accent="violet"
-                />
-                <QuickAction
-                  href="/scout"
-                  icon={Clapperboard}
-                  label="Shot Scout"
-                  description="Locations & shot list"
-                  accent="sky"
                 />
                 <QuickAction
                   href="/projects"
@@ -272,41 +263,6 @@ export default function DashboardPage() {
                                     : s.status === "analysis_ready"
                                       ? "Review analysis"
                                       : "In progress"}
-                              </p>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardBody>
-                </Card>
-
-                <Card>
-                  <CardBody>
-                    <SectionHeader title="Recent scout sessions" icon={Clapperboard} href="/scout" actionLabel="Shot Scout" />
-                    {scoutSessions.length === 0 ? (
-                      <EmptyPanel
-                        text="No scout sessions — add location photos to build a shot list."
-                        action={
-                          <Link href="/scout/new">
-                            <Button size="sm" variant="outline">
-                              <Clapperboard className="mr-1.5 h-4 w-4" />
-                              New scout session
-                            </Button>
-                          </Link>
-                        }
-                      />
-                    ) : (
-                      <ul className="divide-y divide-slate-100">
-                        {scoutSessions.slice(0, 5).map((s) => (
-                          <li key={s.id}>
-                            <Link
-                              href={`/scout/${s.id}`}
-                              className="block py-3 hover:bg-slate-50 -mx-2 px-2 rounded-xl transition-colors"
-                            >
-                              <p className="truncate font-medium text-slate-900">{s.projectName}</p>
-                              <p className="truncate text-xs text-slate-500">
-                                {s.linkedProjectName || "Unlinked session"}
                               </p>
                             </Link>
                           </li>

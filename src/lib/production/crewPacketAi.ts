@@ -1,5 +1,5 @@
-import { callGeminiJsonText } from "@/lib/scout/geminiClient";
-import { scoutAiUsesMock } from "@/lib/scout/cineScoutAi";
+import { callGeminiJsonText } from "@/lib/ai/geminiClient";
+import { aiUsesMock } from "@/lib/ai/mockAi";
 import { buildCrewPacketBase } from "@/lib/production/buildCrewPacketBase";
 import {
   buildFallbackLightingTargets,
@@ -140,7 +140,7 @@ export async function generateCrewPacket(params: {
     };
   }
 
-  if (scoutAiUsesMock()) {
+  if (aiUsesMock()) {
     return {
       ...base,
       lightingTargets: fallbackLighting,

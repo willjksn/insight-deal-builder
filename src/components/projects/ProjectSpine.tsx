@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  Clapperboard,
   FileText,
   LayoutGrid,
   ScrollText,
@@ -13,11 +12,8 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { Badge } from "@/components/ui/Badge";
 import { Agreement } from "@/lib/types";
-import { ScoutProject } from "@/lib/scout/types";
 import { ProductionBoard } from "@/lib/production/types";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
-import { scoutSpineStatus, scoutSpineSummary } from "@/lib/scout/scoutWorkflow";
-import { scoutHrefForProject } from "@/lib/utils/scoutProjectLink";
 
 type SpineStep = {
   key: string;
@@ -118,10 +114,8 @@ interface ProjectSpineProps {
   clientName?: string;
   scriptSession?: ScriptWriterSession;
   board?: ProductionBoard | null;
-  scoutSessions: ScoutProject[];
   agreements: Agreement[];
   showProduction: boolean;
-  showScout: boolean;
   showScripts: boolean;
   canCreateDeal: boolean;
 }
@@ -132,10 +126,8 @@ export function ProjectSpine({
   clientName,
   scriptSession,
   board,
-  scoutSessions,
   agreements,
   showProduction,
-  showScout,
   showScripts,
   canCreateDeal,
 }: ProjectSpineProps) {
@@ -190,18 +182,6 @@ export function ProjectSpine({
       href: "/reference",
       status: "ready",
       summary: "FX6, lenses, and on-set quick reference",
-    });
-  }
-
-  if (showScout) {
-    steps.push({
-      key: "scout",
-      label: "Shot Scout",
-      icon: Clapperboard,
-      href: scoutHrefForProject(projectId, scoutSessions),
-      status: scoutSpineStatus(scoutSessions),
-      summary: scoutSpineSummary(scoutSessions),
-      detail: scoutSessions.length > 1 ? `${scoutSessions.length} sessions linked` : undefined,
     });
   }
 

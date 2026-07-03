@@ -139,8 +139,8 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   },
   {
     key: "useShotScout",
-    label: "Shot Scout (AI DP assistant)",
-    description: "Scout locations, generate DP plans, shot lists, and previs",
+    label: "Production tools",
+    description: "Script writer, stage planner, reference guide, and pre-production boards",
     group: "imgData",
     insightOnly: true,
   },

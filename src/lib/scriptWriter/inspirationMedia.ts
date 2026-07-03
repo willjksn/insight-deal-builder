@@ -1,5 +1,5 @@
-import { fetchMediaInlineData } from "@/lib/scout/geminiClient";
-import type { GeminiMediaInput } from "@/lib/scout/geminiClient";
+import { fetchMediaInlineData } from "@/lib/ai/geminiClient";
+import type { GeminiMediaInput } from "@/lib/ai/geminiClient";
 import { SCRIPT_VIDEO_MODE_LABELS } from "@/lib/scriptWriter/constants";
 import { normalizeInspirationUrl } from "@/lib/scriptWriter/inspirationUrlUtils";
 import {

@@ -1,4 +1,3 @@
-import { ScoutShotListItem, ScoutShotType } from "@/lib/scout/types";
 import {
   ProductionDayShot,
   ProductionInspirationImage,
@@ -39,9 +38,9 @@ const SHOT_TYPES = new Set<string>([
   "wild_line",
 ]);
 
-function normalizeShotType(raw: string): ScoutShotType {
+function normalizeShotType(raw: string): string {
   const key = raw.trim().toLowerCase().replace(/\s+/g, "_");
-  if (SHOT_TYPES.has(key)) return key as ScoutShotType;
+  if (SHOT_TYPES.has(key)) return key;
   if (key.includes("close")) return "close_up";
   if (key.includes("wide") || key.includes("master")) return "master_wide";
   if (key.includes("insert")) return "insert_shot";
@@ -51,31 +50,6 @@ function normalizeShotType(raw: string): ScoutShotType {
   }
   if (key.includes("vertical") || key.includes("social")) return "vertical_social_shot";
   return "medium_shot";
-}
-
-export function scoutShotsFromScript(script: ScriptDocument): ScoutShotListItem[] {
-  return script.suggestedShots.map((shot) => scriptShotToScout(shot));
-}
-
-function scriptShotToScout(shot: ScriptSuggestedShot): ScoutShotListItem {
-  const shotName = shot.shotName?.trim();
-  return {
-    shotNumber: shot.shotNumber,
-    ...(shotName ? { shotName } : {}),
-    scene: normalizeSceneRef(shot.sceneNumber) || "1",
-    shotType: normalizeShotType(shot.shotType),
-    camera: "TBD",
-    lens: "TBD",
-    frameRate: "24fps",
-    cameraMovement: shot.cameraMovement?.trim() || "static",
-    subjectAction: shot.subjectAction?.trim() || shot.description.trim(),
-    blockingNotes: "",
-    lightingNotes: "",
-    audioDialogueNotes: "",
-    priority: "must_have",
-    status: "planned",
-    notes: shot.description.trim(),
-  };
 }
 
 export function productionShotsFromScript(script: ScriptDocument): ProductionDayShot[] {

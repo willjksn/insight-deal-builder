@@ -27,12 +27,6 @@ export async function runWithAiUsageContextAsync<T>(
 export function inferFeatureFromPath(pathname: string): string {
   const p = pathname.replace(/\/+$/, "");
   const rules: Array<[RegExp, string]> = [
-    [/\/api\/scout\/[^/]+\/analyze$/, "scout.analyze"],
-    [/\/api\/scout\/[^/]+\/dp-plan$/, "scout.dp_plan"],
-    [/\/api\/scout\/[^/]+\/shot-list$/, "scout.shot_list"],
-    [/\/api\/scout\/[^/]+\/preview$/, "scout.preview"],
-    [/\/api\/scout\/[^/]+\/technique-lookup$/, "scout.technique"],
-    [/\/api\/scout\/suggest-gear$/, "scout.gear"],
     [/\/api\/script-writer\/sessions\/[^/]+\/chat$/, "script_writer.chat"],
     [/\/api\/script-writer\/sessions\/[^/]+\/analyze$/, "script_writer.analyze"],
     [/\/api\/script-writer\/sessions\/[^/]+\/generate$/, "script_writer.generate"],
@@ -43,7 +37,6 @@ export function inferFeatureFromPath(pathname: string): string {
     [/\/api\/agreements\/suggest-scope$/, "agreements.scope"],
     [/\/api\/agreements\/pricing-research$/, "agreements.pricing"],
     [/\/api\/cron\/trend-snapshots$/, "cron.trends"],
-    [/\/api\/health\/scout-ai$/, "health.scout_ai"],
   ];
   for (const [re, feature] of rules) {
     if (re.test(p)) return feature;

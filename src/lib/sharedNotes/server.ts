@@ -1,14 +1,11 @@
 import { FieldValue, Firestore } from "firebase-admin/firestore";
 import { AppUser } from "@/lib/types";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
-import { ScoutProject } from "@/lib/scout/types";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
-import { SCOUT_PROJECTS_COLLECTION } from "@/lib/firebase/scoutFirestore";
 import {
   listProjectMembers,
   listResourceMembers,
   lookupUserById,
-  resolveScoutAccess,
   resolveScriptSessionAccess,
 } from "@/lib/projectAccess/server";
 import { WorkspaceAccessOptions } from "@/lib/projectAccess/workspaceAccess";
@@ -26,42 +23,24 @@ import {
 export const RESOURCE_NOTES_SUBCOLLECTION = "notes";
 
 function collectionForResourceType(resourceType: SharedResourceType): string {
-  return resourceType === "script" ? SCRIPT_WRITER_SESSIONS_COLLECTION : SCOUT_PROJECTS_COLLECTION;
+  if (resourceType !== "script") throw new Error("Resource not found");
+  return SCRIPT_WRITER_SESSIONS_COLLECTION;
 }
 
-function linkedProjectIdForResource(
-  resourceType: SharedResourceType,
-  resource: ScriptWriterSession | ScoutProject
-): string | undefined {
-  if (resourceType === "script") {
-    const session = resource as ScriptWriterSession;
-    return session.linkedProjectId ?? session.appliedProjectId;
-  }
-  return (resource as ScoutProject).linkedProjectId ?? undefined;
+function linkedProjectIdForResource(resource: ScriptWriterSession): string | undefined {
+  return resource.linkedProjectId ?? resource.appliedProjectId;
 }
 
-function ownerUserIdForResource(
-  resourceType: SharedResourceType,
-  resource: ScriptWriterSession | ScoutProject
-): string {
+function ownerUserIdForResource(resource: ScriptWriterSession): string {
   return resource.userId;
 }
 
-function titleForResource(
-  resourceType: SharedResourceType,
-  resource: ScriptWriterSession | ScoutProject
-): string {
-  if (resourceType === "script") {
-    return (resource as ScriptWriterSession).title?.trim() || "Untitled script";
-  }
-  return (resource as ScoutProject).projectName?.trim() || "Untitled scout";
+function titleForResource(resource: ScriptWriterSession): string {
+  return resource.title?.trim() || "Untitled script";
 }
 
-function memberHasAreaPermission(
-  resourceType: SharedResourceType,
-  member: { permissions: { scripts?: boolean; scout?: boolean } }
-): boolean {
-  return resourceType === "script" ? Boolean(member.permissions.scripts) : Boolean(member.permissions.scout);
+function memberHasAreaPermission(member: { permissions: { scripts?: boolean } }): boolean {
+  return Boolean(member.permissions.scripts);
 }
 
 export async function isResourceSharedWithOthers(
@@ -79,7 +58,7 @@ export async function isResourceSharedWithOthers(
     const projectMembers = await listProjectMembers(db, linkedProjectId);
     if (
       projectMembers.some(
-        (m) => m.userId !== ownerUserId && memberHasAreaPermission(resourceType, m)
+        (m) => m.userId !== ownerUserId && memberHasAreaPermission(m)
       )
     ) {
       return true;
@@ -92,31 +71,19 @@ export async function isResourceSharedWithOthers(
 async function assertResourceReadAccess(
   db: Firestore,
   resourceType: SharedResourceType,
-  resource: ScriptWriterSession | ScoutProject,
+  resource: ScriptWriterSession,
   uid: string,
   appUser: AppUser,
   options?: WorkspaceAccessOptions,
   adminEmail = ""
 ): Promise<{ via: "owner" | "project" | "direct" | "admin" | null }> {
-  if (resourceType === "script") {
-    const { allowed, via } = await resolveScriptSessionAccess(
-      db,
-      resource as ScriptWriterSession,
-      uid,
-      appUser,
-      false,
-      options,
-      adminEmail
-    );
-    if (!allowed) throw new Error("Not authorized");
-    return { via };
-  }
-
-  const { allowed, via } = await resolveScoutAccess(
+  if (resourceType !== "script") throw new Error("Resource not found");
+  const { allowed, via } = await resolveScriptSessionAccess(
     db,
-    resource as ScoutProject,
+    resource,
     uid,
     appUser,
+    false,
     options,
     adminEmail
   );
@@ -127,7 +94,7 @@ async function assertResourceReadAccess(
 export async function listSharedResourceNotes(params: {
   db: Firestore;
   resourceType: SharedResourceType;
-  resource: ScriptWriterSession | ScoutProject;
+  resource: ScriptWriterSession;
   uid: string;
   appUser: AppUser;
   options?: WorkspaceAccessOptions;
@@ -144,8 +111,8 @@ export async function listSharedResourceNotes(params: {
     adminEmail
   );
 
-  const ownerUserId = ownerUserIdForResource(resourceType, resource);
-  const linkedProjectId = linkedProjectIdForResource(resourceType, resource);
+  const ownerUserId = ownerUserIdForResource(resource);
+  const linkedProjectId = linkedProjectIdForResource(resource);
   const isShared = await isResourceSharedWithOthers(
     db,
     resourceType,
@@ -183,7 +150,7 @@ export async function listSharedResourceNotes(params: {
 export async function createSharedResourceNote(params: {
   db: Firestore;
   resourceType: SharedResourceType;
-  resource: ScriptWriterSession | ScoutProject;
+  resource: ScriptWriterSession;
   uid: string;
   appUser: AppUser;
   body: string;
@@ -237,14 +204,16 @@ export function resourceUrlForNotification(
   resourceType: SharedResourceType,
   resourceId: string
 ): string {
-  return resourceType === "script" ? `/script-writer/${resourceId}` : `/scout/${resourceId}`;
+  if (resourceType !== "script") return "/dashboard";
+  return `/script-writer/${resourceId}`;
 }
 
 export function resourceTitleForNotification(
   resourceType: SharedResourceType,
-  resource: ScriptWriterSession | ScoutProject
+  resource: ScriptWriterSession
 ): string {
-  return titleForResource(resourceType, resource);
+  if (resourceType !== "script") return "Resource";
+  return titleForResource(resource);
 }
 
 export async function touchResourceUpdatedAt(

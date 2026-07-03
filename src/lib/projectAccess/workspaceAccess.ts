@@ -1,7 +1,7 @@
 import { AppUser } from "@/lib/types";
 import { INSIGHT_MEDIA_GROUP_LLC, isPartnerOrgUser } from "@/lib/utils/permissions";
 
-export type WorkspaceResourceType = "script" | "scout";
+export type WorkspaceResourceType = "script";
 
 export interface WorkspaceAccessOptions {
   /** Deliberate admin open (Option A — IMG internal owners only). */

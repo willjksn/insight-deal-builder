@@ -48,10 +48,10 @@ export const STAGE_PROP_CATALOG: StagePropDefinition[] = [
   p({ id: "apple-box", name: "Apple box", category: "grip", tags: ["apple box", "grip"], shape: "apple-box", color: "#d6d3d1", width: 32, height: 24 }),
 
   // Camera
-  p({ id: "camera-body", name: "Camera", category: "camera", tags: ["camera", "fx6", "fx3", "body"], shape: "camera", color: "#1e293b", width: 40, height: 32 }),
-  p({ id: "tripod", name: "Tripod", category: "camera", tags: ["tripod", "sticks"], shape: "tripod", color: "#334155", width: 36, height: 36 }),
-  p({ id: "gimbal", name: "Gimbal", category: "camera", tags: ["gimbal", "stabilizer"], shape: "gimbal", color: "#475569", width: 32, height: 32 }),
-  p({ id: "slider", name: "Slider", category: "camera", tags: ["slider", "rail"], shape: "slider", color: "#64748b", width: 80, height: 16 }),
+  p({ id: "camera-body", name: "Camera", category: "camera", tags: ["camera", "fx6", "fx3", "body"], shape: "camera", color: "#1e293b", width: 40, height: 44 }),
+  p({ id: "tripod", name: "Tripod", category: "camera", tags: ["tripod", "sticks"], shape: "tripod", color: "#334155", width: 36, height: 40 }),
+  p({ id: "gimbal", name: "Gimbal", category: "camera", tags: ["gimbal", "stabilizer"], shape: "gimbal", color: "#475569", width: 36, height: 40 }),
+  p({ id: "slider", name: "Slider", category: "camera", tags: ["slider", "rail"], shape: "slider", color: "#64748b", width: 80, height: 20 }),
   p({ id: "monitor", name: "Monitor", category: "camera", tags: ["monitor", "director"], shape: "monitor", color: "#0f172a", width: 36, height: 24 }),
 
   // Subject

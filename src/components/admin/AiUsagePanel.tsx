@@ -130,7 +130,7 @@ export function AiUsagePanel() {
                 <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900">
                   {summary.imageCount.toLocaleString()}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">Scout previs & diagrams</p>
+                <p className="mt-1 text-xs text-slate-500">Storyboard frames & diagrams</p>
               </CardBody>
             </Card>
             <Card>

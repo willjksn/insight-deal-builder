@@ -134,8 +134,8 @@ export function canAccessReports(user: AppUser | null | undefined): boolean {
   return isInsightOrgUser(user) && hasPermission(user, "exportPayments");
 }
 
-/** Shot Scout — location analysis, DP plan, shot list, previs */
-export function canUseShotScout(user: AppUser | null | undefined): boolean {
+/** Script writer, stage planner, reference guide, production boards */
+export function canUseProductionTools(user: AppUser | null | undefined): boolean {
   return (
     isInsightOrgUser(user) &&
     (hasPermission(user, "useShotScout") ||
@@ -144,16 +144,8 @@ export function canUseShotScout(user: AppUser | null | undefined): boolean {
   );
 }
 
-/** Pick a production project when creating or linking a scout session */
-export function canLinkScoutToProject(user: AppUser | null | undefined): boolean {
-  if (!canUseShotScout(user)) return false;
-  return (
-    canManageProjects(user) ||
-    canCreateQuotes(user) ||
-    canEditQuotes(user) ||
-    canManageUsers(user)
-  );
-}
+/** @deprecated use canUseProductionTools */
+export const canUseShotScout = canUseProductionTools;
 
 /** Record cash received from clients or paid to payees on signed agreements */
 export function canRecordPayments(user: AppUser | null | undefined): boolean {

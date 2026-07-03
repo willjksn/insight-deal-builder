@@ -19,7 +19,7 @@ import {
 } from "@/lib/scriptWriter/scriptWriterAi";
 import { ScriptWriterMessage } from "@/lib/scriptWriter/types";
 import { serializeScriptSession } from "@/lib/scriptWriter/adminApply";
-import { canUseShotScout } from "@/lib/utils/permissions";
+import { canUseProductionTools } from "@/lib/utils/permissions";
 
 export const runtime = "nodejs";
 
@@ -58,7 +58,6 @@ export async function POST(request: NextRequest) {
       brief?: ScriptWriterBrief;
       title?: string;
       linkedProjectId?: string;
-      linkedScoutProjectId?: string;
       workflowMode?: "text" | "inspiration";
       detailedShotList?: boolean;
       storyboardMode?: boolean;
@@ -75,7 +74,7 @@ export async function POST(request: NextRequest) {
         appUser,
         "scripts"
       );
-      if (!canLink && !canUseShotScout(appUser)) {
+      if (!canLink && !canUseProductionTools(appUser)) {
         return NextResponse.json({ error: "Not authorized for this project" }, { status: 401 });
       }
     } else {
@@ -122,7 +121,6 @@ export async function POST(request: NextRequest) {
         inspirationAnalysis: null,
         refineUsed: false,
         linkedProjectId: body.linkedProjectId,
-        linkedScoutProjectId: body.linkedScoutProjectId,
         detailedShotList: body.detailedShotList !== false,
         storyboardMode: body.storyboardMode ?? false,
         createdAt: FieldValue.serverTimestamp(),

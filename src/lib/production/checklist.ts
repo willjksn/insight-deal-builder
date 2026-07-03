@@ -69,7 +69,7 @@ function coreChecklistItems(mode: ProductionChecklistMode): ProductionChecklistI
       hint: "One-line concept, beats or full script — Script writer or notes.",
     }),
     item("visual_plan", "Visual plan", "prepro_creative", 30, {
-      hint: "Shot Scout: location photos, shot list, DP plan, previs.",
+      hint: "Shot list, stage planner, and look references on the pre-production board.",
     }),
     item("schedule", "Schedule & logistics", "prepro_creative", 40, {
       hint: "Shoot day, shot order, locations, talent/crew if any.",
@@ -188,7 +188,6 @@ export type ChecklistAutoSignals = {
   hasAgreement?: boolean;
   hasSignedAgreement?: boolean;
   hasScript?: boolean;
-  hasScout?: boolean;
   hasSchedule?: boolean;
   hasGear?: boolean;
   hasShots?: boolean;
@@ -204,11 +203,9 @@ export function buildChecklistAutoSignals(opts: {
   board: {
     scriptSessionId?: string;
     scriptFountain?: string;
-    linkedScoutProjectIds?: string[];
     gearItems?: string[];
     productionDays?: { shootDate?: string; schedule?: unknown[]; shots?: { done: boolean }[] }[];
   };
-  hasScoutSessions: boolean;
   agreement?: { status: string } | null;
 }): ChecklistAutoSignals {
   const dayOne = opts.board.productionDays?.[0];
@@ -221,9 +218,6 @@ export function buildChecklistAutoSignals(opts: {
     hasAgreement: Boolean(opts.agreement),
     hasSignedAgreement: signed,
     hasScript: Boolean(opts.board.scriptSessionId || opts.board.scriptFountain?.trim()),
-    hasScout:
-      opts.hasScoutSessions ||
-      (opts.board.linkedScoutProjectIds?.length ?? 0) > 0,
     hasSchedule: Boolean(
       dayOne?.shootDate?.trim() || (dayOne?.schedule?.length ?? 0) > 0
     ),
@@ -239,7 +233,7 @@ const AUTO_CHECK_BY_STEP: Partial<Record<string, keyof ChecklistAutoSignals>> = 
   usage_revisions: "hasAgreement",
   scope: "hasAgreement",
   concept_script: "hasScript",
-  visual_plan: "hasScout",
+  visual_plan: "hasShots",
   schedule: "hasSchedule",
   gear: "hasGear",
   ready_to_shoot: "hasShots",

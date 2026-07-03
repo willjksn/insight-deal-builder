@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     const resourceType = body.resourceType;
     const resourceId = body.resourceId?.trim();
-    if ((resourceType !== "script" && resourceType !== "scout") || !resourceId) {
+    if (resourceType !== "script" || !resourceId) {
       return NextResponse.json({ error: "resourceType and resourceId are required" }, { status: 400 });
     }
 

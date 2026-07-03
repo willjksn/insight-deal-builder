@@ -1,12 +1,11 @@
-import { scoutImageProvider } from "@/lib/scout/imageConfig";
-import { throwGeminiApiError } from "@/lib/scout/geminiErrors";
+import { throwGeminiApiError } from "@/lib/ai/geminiErrors";
 import { logGeminiImageUsage, logGeminiTextUsage } from "@/lib/ai/usageLog";
 import {
   canFallbackToVertexGemini,
   shouldPreferVertexGemini,
   vertexGeminiGenerate,
   vertexGeminiGenerateImage,
-} from "@/lib/scout/geminiVertex";
+} from "@/lib/ai/geminiVertex";
 
 export type GeminiPart =
   | { text: string }
@@ -293,10 +292,13 @@ async function callGeminiApiKeyGenerateImage(params: {
   return buffer;
 }
 
-export function scoutGeminiImageGenEnabled(): boolean {
+export function geminiImageGenEnabled(): boolean {
   if (process.env.SCOUT_USE_MOCK_AI === "true") return false;
   return Boolean(process.env.GEMINI_API_KEY?.trim()) || canFallbackToVertexGemini();
 }
+
+/** @deprecated */
+export const scoutGeminiImageGenEnabled = geminiImageGenEnabled;
 
 /** Generate a cinematic image using the uploaded location photo as reference. */
 export async function callGeminiGenerateImage(params: {
@@ -304,7 +306,7 @@ export async function callGeminiGenerateImage(params: {
   referenceInline?: { mimeType: string; data: string };
   aspectRatio?: string;
 }): Promise<Buffer> {
-  if (scoutImageProvider() === "vertex" || shouldPreferVertexGemini()) {
+  if (shouldPreferVertexGemini()) {
     return vertexGeminiGenerateImage(params);
   }
 

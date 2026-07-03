@@ -8,7 +8,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ReferenceGuideView } from "@/components/reference/ReferenceGuideView";
 import { useAuth } from "@/contexts/AuthContext";
 import { ReferenceGuideDocument } from "@/lib/reference/types";
-import { canUseShotScout } from "@/lib/utils/permissions";
+import { canUseProductionTools } from "@/lib/utils/permissions";
 
 export default function ReferenceGuidePage() {
   const { user, appUser } = useAuth();
@@ -17,7 +17,7 @@ export default function ReferenceGuidePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || !canUseShotScout(appUser)) return;
+    if (!user || !canUseProductionTools(appUser)) return;
     setLoading(true);
     user
       .getIdToken()
@@ -35,7 +35,7 @@ export default function ReferenceGuidePage() {
       .finally(() => setLoading(false));
   }, [user, appUser]);
 
-  if (!canUseShotScout(appUser)) {
+  if (!canUseProductionTools(appUser)) {
     return (
       <div className="py-20 text-center text-slate-500">
         <p>You don&apos;t have access to the reference guide.</p>

@@ -1,5 +1,5 @@
 import { authHeaders } from "@/lib/scriptWriter/apiClient";
-import { SharedNotesResponse, SharedResourceNote } from "@/lib/sharedNotes/types";
+import { SharedNotesResponse, SharedResourceNote, SharedResourceType } from "@/lib/sharedNotes/types";
 
 async function parseJson<T>(res: Response): Promise<T> {
   const data = (await res.json()) as T & { error?: string };
@@ -7,37 +7,37 @@ async function parseJson<T>(res: Response): Promise<T> {
   return data;
 }
 
-function notesUrl(resourceType: "script" | "scout", resourceId: string): string {
-  return resourceType === "script"
-    ? `/api/script-writer/sessions/${resourceId}/notes`
-    : `/api/scout/${resourceId}/notes`;
+function notesUrl(resourceId: string): string {
+  return `/api/script-writer/sessions/${resourceId}/notes`;
 }
 
 export async function fetchSharedNotes(
   getToken: () => Promise<string | null>,
-  resourceType: "script" | "scout",
+  resourceType: SharedResourceType,
   resourceId: string,
   options?: { adminOpen?: boolean }
 ): Promise<SharedNotesResponse> {
+  if (resourceType !== "script") throw new Error("Resource not found");
   const params = new URLSearchParams();
   if (options?.adminOpen) params.set("adminOpen", "1");
   const qs = params.toString();
-  const url = `${notesUrl(resourceType, resourceId)}${qs ? `?${qs}` : ""}`;
+  const url = `${notesUrl(resourceId)}${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: await authHeaders(getToken) });
   return parseJson<SharedNotesResponse>(res);
 }
 
 export async function postSharedNote(
   getToken: () => Promise<string | null>,
-  resourceType: "script" | "scout",
+  resourceType: SharedResourceType,
   resourceId: string,
   body: string,
   options?: { adminOpen?: boolean }
 ): Promise<{ note: SharedResourceNote } & SharedNotesResponse> {
+  if (resourceType !== "script") throw new Error("Resource not found");
   const params = new URLSearchParams();
   if (options?.adminOpen) params.set("adminOpen", "1");
   const qs = params.toString();
-  const url = `${notesUrl(resourceType, resourceId)}${qs ? `?${qs}` : ""}`;
+  const url = `${notesUrl(resourceId)}${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, {
     method: "POST",
     headers: await authHeaders(getToken),

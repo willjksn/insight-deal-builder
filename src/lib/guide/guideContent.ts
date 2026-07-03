@@ -15,7 +15,7 @@ import {
   canManageUsers,
   canSignQuotes,
   canUploadW9Docs,
-  canUseShotScout,
+  canUseProductionTools,
   canViewIdentityDocs,
   canViewW9Docs,
   isInsightOrgUser,
@@ -26,7 +26,7 @@ import { AppUser } from "@/lib/types";
 import { GuideCategory } from "@/lib/guide/types";
 
 const approved = (user: AppUser | null) => isUserApproved(user);
-const production = (user: AppUser | null) => canUseShotScout(user);
+const production = (user: AppUser | null) => canUseProductionTools(user);
 const deals = (user: AppUser | null) =>
   canCreateQuotes(user) ||
   canEditQuotes(user) ||
@@ -48,7 +48,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
         blocks: [
           {
             paragraphs: [
-              "ShootSpine is built around projects — each production follows one spine. A project is a single client job, portfolio piece, or campaign; everything for that shoot lives together: script, board, shot list, scout sessions, and the commercial agreement.",
+              "ShootSpine is built around projects — each production follows one spine. A project is a single client job, portfolio piece, or campaign; everything for that shoot lives together: script, board, shot list, and the commercial agreement.",
               "Most IMG producers move through the same path. You do not have to use every tool on every job, but the order below is the intended workflow when you are planning a full shoot.",
             ],
           },
@@ -59,7 +59,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
               "Go to Script writer. Talk through the concept, turn on detailed shot list if you need full coverage, then generate the script and production pack.",
               "Open the project → Pre-production. Link the script session, then apply the script to the board so cast, locations, days, and shots populate.",
               "Open Shot list. Use Auto-split days if you have multiple shoot days, then generate a crew packet for each day you are printing for set.",
-              "Optional: run Shot Scout on locations, or use Stage planner for a lighting diagram.",
+              "Optional: use Stage planner for a lighting diagram.",
               "When the deal is ready, create an agreement from Quick quote or the full wizard, sign, and send to the client.",
             ],
             links: [{ label: "Command center", href: "/dashboard" }],
@@ -81,7 +81,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
         blocks: [
           {
             paragraphs: [
-              "When you sign up, an admin assigns your company and turns on permissions before you can use the app. Each permission is a checkbox on your profile — create quotes, use Shot Scout, manage projects, and so on.",
+              "When you sign up, an admin assigns your company and turns on permissions before you can use the app. Each permission is a checkbox on your profile — create quotes, use production tools, manage projects, and so on.",
               "The sidebar, project pages, and this guide all respect those same checkboxes. If you cannot see Script writer in the sidebar, you will not get script-writer instructions here either.",
             ],
           },
@@ -89,7 +89,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
             heading: "If something is missing",
             bullets: [
               "Ask an admin to enable the permission on your user profile in Admin.",
-              "For freelancers who only need a shot list on one job, use Settings → Project access to add them to that project with scripts, scout, production, or shots only — without giving them the full catalog.",
+              "For freelancers who only need a shot list on one job, use Settings → Project access to add them to that project with scripts, production, or shots only — without giving them the full catalog.",
               "Partners usually start with quote and agreement permissions only. IMG catalogs (clients, crew, packages) are separate and IMG-only unless explicitly granted.",
             ],
             links: [{ label: "Settings", href: "/settings" }],
@@ -169,12 +169,12 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       {
         id: "projects",
         title: "How to set up and use a project",
-        description: "The hub that ties script, board, scout, and agreements together.",
+        description: "The hub that ties script, board, and agreements together.",
         canAccess: (user) => canManageProjects(user) || production(user),
         blocks: [
           {
             paragraphs: [
-              "Create a project from Projects → New. The project page shows the spine — a row of cards for Script, Pre-production, Shot list, Stage planner, Reference guide, Shot Scout, and Agreement. Green or linked states mean that step is connected; open any card to work there.",
+              "Create a project from Projects → New. The project page shows the spine — a row of cards for Script, Pre-production, Shot list, Stage planner, Reference guide, and Agreement. Green or linked states mean that step is connected; open any card to work there.",
             ],
           },
           {
@@ -322,39 +322,6 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
               "Enter crew call, meal times, wrap, weather, and schedule blocks.",
               "Key contacts auto-fill from people you added on the board — add missing names on the board first if a field is empty.",
               "Use Print from the call sheet page for a paper copy on set.",
-            ],
-          },
-        ],
-      },
-      {
-        id: "shot-scout",
-        title: "How to use Shot Scout",
-        description: "Scout locations with AI analysis and a DP plan.",
-        canAccess: production,
-        blocks: [
-          {
-            paragraphs: [
-              "Shot Scout is for location scouting: upload photos, get AI analysis, generate a DP plan and shot list, and optionally link the session to a project.",
-            ],
-          },
-          {
-            heading: "Run a scout session",
-            bullets: [
-              "Open Shot Scout → New session (or open an existing one).",
-              "Upload location photos and run Analyze.",
-              "Generate the DP plan and shot list from the analysis results.",
-              "Link the session to a project from the session page if you want it on the project spine.",
-            ],
-          },
-          {
-            heading: "Gear profiles",
-            bullets: [
-              "Go to Settings → Scout gear and Settings → Lights to set what gear you own.",
-              "Scout uses these profiles when suggesting equipment in the DP plan.",
-            ],
-            links: [
-              { label: "Shot Scout", href: "/scout" },
-              { label: "Scout gear", href: "/settings/scout-gear" },
             ],
           },
         ],
@@ -681,12 +648,12 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       {
         id: "packages-equipment-locations",
         title: "How to use packages, equipment, and locations",
-        description: "Catalogs that feed quotes, scope, and scout.",
+        description: "Catalogs that feed quotes and scope.",
         canAccess: canManageProjects,
         blocks: [
           {
             paragraphs: [
-              "These catalogs keep fees, gear, and locations consistent across Quick quote, agreement scope, and Shot Scout.",
+              "These catalogs keep fees, gear, and locations consistent across Quick quote and agreement scope.",
             ],
           },
           {
@@ -699,8 +666,8 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
           {
             heading: "Equipment & locations",
             bullets: [
-              "Equipment — gear list for scope assistant and scout suggestions.",
-              "Locations — saved locations you can attach to projects or reference in scout.",
+              "Equipment — gear list for scope assistant suggestions.",
+              "Locations — saved locations you can attach to projects.",
             ],
             links: [
               { label: "Packages", href: "/packages" },
@@ -751,12 +718,12 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       {
         id: "settings",
         title: "How to use Settings and notifications",
-        description: "Profile, alerts, scout gear, and project access.",
+        description: "Profile, alerts, and project access.",
         canAccess: approved,
         blocks: [
           {
             paragraphs: [
-              "Settings holds account preferences, push notification setup, and links to scout configuration and project team management.",
+              "Settings holds account preferences, push notification setup, and project team management.",
             ],
           },
           {
@@ -767,15 +734,12 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
             ],
           },
           {
-            heading: "Password and scout config",
+            heading: "Password",
             bullets: [
               "Use Forgot password on the login page for a Firebase reset email.",
-              "Scout gear and Lights under Settings define what Shot Scout recommends.",
             ],
             links: [
               { label: "Settings", href: "/settings" },
-              { label: "Scout gear", href: "/settings/scout-gear" },
-              { label: "Lights", href: "/settings/lights" },
               { label: "Project access", href: "/settings/project-access" },
             ],
           },
@@ -789,7 +753,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
         blocks: [
           {
             paragraphs: [
-              "Project access lets you invite someone to one job without giving them the whole app. Permissions are per project: scripts, scout, production, or shots.",
+              "Project access lets you invite someone to one job without giving them the whole app. Permissions are per project: scripts, production, or shots.",
             ],
           },
           {

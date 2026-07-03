@@ -31,8 +31,8 @@ export function StoryboardModeToggle({
         <span className="font-medium text-slate-900">Storyboard mode</span>
         {!compact && (
           <span className="mt-0.5 block text-xs text-slate-500">
-            One reference frame per scene for grid view and client PDF — matched to your
-            inspiration images (ShotDeck, mood refs). Works alongside the detailed shot list.
+            One reference frame per scene — shown below your script after generation, and on the
+            project shot list grid after you apply. Works alongside the detailed shot list.
           </span>
         )}
         {compact && (

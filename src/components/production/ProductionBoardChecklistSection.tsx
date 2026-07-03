@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { ProductionChecklistCard } from "@/components/production/ProductionChecklistCard";
 import { Agreement, Project } from "@/lib/types";
-import { ScoutProject } from "@/lib/scout/types";
 import { ProductionBoard } from "@/lib/production/types";
 import {
   applyChecklistAutoChecks,
@@ -17,7 +16,6 @@ import {
 interface ProductionBoardChecklistSectionProps {
   project: Project;
   board: ProductionBoard;
-  scoutSessions: ScoutProject[];
   primaryAgreement: Agreement | undefined;
   onPatch: (partial: {
     checklistMode?: ProductionChecklistMode;
@@ -28,7 +26,6 @@ interface ProductionBoardChecklistSectionProps {
 export function ProductionBoardChecklistSection({
   project,
   board,
-  scoutSessions,
   primaryAgreement,
   onPatch,
 }: ProductionBoardChecklistSectionProps) {
@@ -44,13 +41,12 @@ export function ProductionBoardChecklistSection({
     const signals = buildChecklistAutoSignals({
       project,
       board,
-      hasScoutSessions: scoutSessions.length > 0,
       agreement: primaryAgreement ?? null,
     });
     onPatch({
       checklistItems: applyChecklistAutoChecks(checklistItems, signals),
     });
-  }, [board, project, scoutSessions.length, primaryAgreement, checklistItems, onPatch]);
+  }, [board, project, primaryAgreement, checklistItems, onPatch]);
 
   const autoChecklistRef = useRef(false);
   useEffect(() => {
@@ -59,7 +55,6 @@ export function ProductionBoardChecklistSection({
     const signals = buildChecklistAutoSignals({
       project,
       board,
-      hasScoutSessions: scoutSessions.length > 0,
       agreement: primaryAgreement ?? null,
     });
     const next = applyChecklistAutoChecks(checklistItems, signals);
@@ -67,7 +62,7 @@ export function ProductionBoardChecklistSection({
     if (changed) {
       onPatch({ checklistItems: next });
     }
-  }, [board, project, scoutSessions.length, primaryAgreement, checklistItems, onPatch]);
+  }, [board, project, primaryAgreement, checklistItems, onPatch]);
 
   return (
     <ProductionChecklistCard
@@ -75,7 +70,6 @@ export function ProductionBoardChecklistSection({
       mode={checklistMode}
       items={checklistItems}
       scriptSessionId={board.scriptSessionId}
-      hasScoutSessions={scoutSessions.length > 0}
       hasAgreement={Boolean(primaryAgreement)}
       hasSignedAgreement={signedAgreement}
       onSyncProgress={syncChecklistFromProject}

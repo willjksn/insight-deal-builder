@@ -30,7 +30,6 @@ export async function scriptWriterCreateSession(
     brief?: ScriptWriterBrief;
     title?: string;
     linkedProjectId?: string;
-    linkedScoutProjectId?: string;
     workflowMode?: "text" | "inspiration";
     detailedShotList?: boolean;
     storyboardMode?: boolean;
@@ -174,8 +173,6 @@ export async function scriptWriterApplyToProject(
   sessionId: string,
   body: {
     projectId: string;
-    createScout?: boolean;
-    updateExistingScout?: boolean;
   }
 ) {
   const res = await fetch(`/api/script-writer/sessions/${sessionId}/apply`, {
@@ -186,7 +183,6 @@ export async function scriptWriterApplyToProject(
   return parseJson<{
     ok: true;
     projectId: string;
-    scoutProjectId?: string;
     productionBoardId?: string;
   }>(res);
 }
@@ -196,8 +192,6 @@ export async function scriptWriterCreateAndApplyProject(
   sessionId: string,
   body: {
     projectName: string;
-    createScout?: boolean;
-    updateExistingScout?: boolean;
   }
 ) {
   const res = await fetch(`/api/script-writer/sessions/${sessionId}/create-and-apply`, {
@@ -208,7 +202,6 @@ export async function scriptWriterCreateAndApplyProject(
   return parseJson<{
     ok: true;
     projectId: string;
-    scoutProjectId?: string;
     productionBoardId?: string;
   }>(res);
 }

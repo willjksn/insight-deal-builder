@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, FolderSearch, ScrollText, Clapperboard } from "lucide-react";
+import { ExternalLink, FolderSearch, ScrollText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -20,7 +20,6 @@ type SearchResult = {
   ownerCompany?: string;
   partnerPrivateHidden: boolean;
   scripts: WorkspaceListItem[];
-  scouts: WorkspaceListItem[];
 };
 
 interface AdminWorkspacePanelProps {
@@ -111,9 +110,7 @@ export function AdminWorkspacePanel({ users }: AdminWorkspacePanelProps) {
     }
   };
 
-  const items = result
-    ? [...result.scripts, ...result.scouts].sort((a, b) => a.title.localeCompare(b.title))
-    : [];
+  const items = result ? [...result.scripts].sort((a, b) => a.title.localeCompare(b.title)) : [];
 
   return (
     <ContentPanel className="mb-8">
@@ -124,7 +121,7 @@ export function AdminWorkspacePanel({ users }: AdminWorkspacePanelProps) {
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Open workspace (admin)</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Search a team member&apos;s scripts and scouts. IMG internal private work opens read-only
+            Search a team member&apos;s scripts. IMG internal private work opens read-only
             with an audit log. Partner private work is never listed unless already shared or on a project.
           </p>
         </div>
@@ -156,7 +153,7 @@ export function AdminWorkspacePanel({ users }: AdminWorkspacePanelProps) {
       {isPartnerOwner && (
         <div className="mt-4">
           <InfoCallout variant="blue">
-            <strong>Partner workspace.</strong> Only scouts and scripts this partner has shared or linked
+            <strong>Partner workspace.</strong> Only scripts this partner has shared or linked
             to a project appear here. Private partner drafts are not accessible.
           </InfoCallout>
         </div>
@@ -171,7 +168,7 @@ export function AdminWorkspacePanel({ users }: AdminWorkspacePanelProps) {
       {loading && <LoadingSpinner className="py-8" />}
 
       {!loading && result && items.length === 0 && (
-        <p className="mt-4 text-sm text-slate-500">No matching scripts or scouts.</p>
+        <p className="mt-4 text-sm text-slate-500">No matching scripts.</p>
       )}
 
       {!loading && items.length > 0 && (
@@ -179,16 +176,12 @@ export function AdminWorkspacePanel({ users }: AdminWorkspacePanelProps) {
           {items.map((item) => (
             <li key={`${item.resourceType}-${item.id}`} className="flex items-center gap-3 px-4 py-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                {item.resourceType === "script" ? (
-                  <ScrollText className="h-4 w-4" />
-                ) : (
-                  <Clapperboard className="h-4 w-4" />
-                )}
+                <ScrollText className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-slate-900">{item.title}</p>
                 <p className="text-xs text-slate-500">
-                  {item.resourceType === "script" ? "Script" : "Shot Scout"}
+                  Script
                   {item.linkedProjectId ? " · linked to project" : " · private"}
                   {item.status ? ` · ${item.status.replace(/_/g, " ")}` : ""}
                 </p>

@@ -21,7 +21,7 @@ import {
   ProjectMember,
 } from "@/lib/projectAccess/types";
 
-const ACCESS_AREAS: ProjectAccessArea[] = ["scripts", "scout", "production", "shots"];
+const ACCESS_AREAS: ProjectAccessArea[] = ["scripts", "production", "shots"];
 
 function candidateLabel(candidate: TeamUserCandidate): string {
   if (candidate.displayName?.trim()) {

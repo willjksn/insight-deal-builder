@@ -99,7 +99,7 @@ export function SharedNotesPanel({
   const visible = meta.isShared || notes.length > 0;
   if (!visible) return null;
 
-  const resourceLabel = resourceType === "script" ? "script" : "scout session";
+  const resourceLabel = "script";
 
   return (
     <section

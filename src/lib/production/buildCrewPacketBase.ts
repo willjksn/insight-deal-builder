@@ -8,6 +8,7 @@ import {
 } from "@/lib/production/crewPacketTypes";
 import { ProductionBoard, ProductionDay } from "@/lib/production/types";
 import { ScriptDocument, ScriptScene, ScriptSuggestedShot } from "@/lib/scriptWriter/types";
+import { normalizeSceneRef } from "@/lib/scriptWriter/scriptMappers";
 
 export function locationFromSceneHeading(heading: string): string {
   const cleaned = heading.trim();
@@ -20,7 +21,7 @@ export function locationFromSceneHeading(heading: string): string {
 function sceneMap(script?: ScriptDocument | null): Map<string, ScriptScene> {
   const map = new Map<string, ScriptScene>();
   for (const scene of script?.scenes ?? []) {
-    map.set(scene.sceneNumber.trim(), scene);
+    map.set(normalizeSceneRef(scene.sceneNumber), scene);
   }
   return map;
 }
@@ -60,7 +61,7 @@ export function buildMasterShots(
         const num = shot.scoutShotNumber ?? index + 1;
         const suggestedShot = suggestedByNumber.get(num);
         const sceneRef = shot.sceneRef ?? suggestedShot?.sceneNumber;
-        const scene = sceneRef ? scenes.get(sceneRef.trim()) : undefined;
+        const scene = sceneRef ? scenes.get(normalizeSceneRef(sceneRef)) : undefined;
         const location = scene ? locationFromSceneHeading(scene.heading) : day.primaryLocation || "—";
         const action =
           shot.subjectAction?.trim() ||
@@ -86,7 +87,7 @@ export function buildMasterShots(
     .slice()
     .sort((a, b) => a.shotNumber - b.shotNumber)
     .map((shot) => {
-      const scene = scenes.get(shot.sceneNumber.trim());
+      const scene = scenes.get(normalizeSceneRef(shot.sceneNumber));
       return {
         shotNumber: shot.shotNumber,
         location: scene ? locationFromSceneHeading(scene.heading) : "—",

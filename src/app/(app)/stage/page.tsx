@@ -9,7 +9,7 @@ import { StagePlanner } from "@/components/stage/StagePlanner";
 import { useAuth } from "@/contexts/AuthContext";
 import { ensurePersonalStageBoard } from "@/lib/stage/stageFirestore";
 import { StageBoard } from "@/lib/stage/types";
-import { canUseShotScout } from "@/lib/utils/permissions";
+import { canUseProductionTools } from "@/lib/utils/permissions";
 
 export default function GlobalStagePlannerPage() {
   const { user, appUser } = useAuth();
@@ -18,14 +18,14 @@ export default function GlobalStagePlannerPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || !canUseShotScout(appUser)) return;
+    if (!user || !canUseProductionTools(appUser)) return;
     ensurePersonalStageBoard(user.uid)
       .then(setBoard)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   }, [user, appUser]);
 
-  if (!canUseShotScout(appUser)) {
+  if (!canUseProductionTools(appUser)) {
     return (
       <div className="py-20 text-center text-slate-500">
         <p>You don&apos;t have access to the stage planner.</p>

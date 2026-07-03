@@ -83,6 +83,15 @@ export type StagePropElement = {
   label?: string;
   /** Override catalog fill color */
   color?: string;
+  /** Light beam cone (lighting props) */
+  beamEnabled?: boolean;
+  beamColor?: string;
+  /** Beam half-angle spread in degrees */
+  beamSpread?: number;
+  /** Beam length in canvas px */
+  beamLength?: number;
+  /** Beam fill opacity 0–1 */
+  beamOpacity?: number;
 };
 
 export type StageNoteElement = {
@@ -139,6 +148,7 @@ export type StageDoorwayElement = {
   height: number;
   swing?: "left" | "right";
   color?: string;
+  rotation?: number;
 };
 
 export type StageWindowElement = {
@@ -150,6 +160,14 @@ export type StageWindowElement = {
   height: number;
   label?: string;
   color?: string;
+  rotation?: number;
+  /** Daylight spill cone */
+  beamEnabled?: boolean;
+  beamColor?: string;
+  /** Spill width as % of window width */
+  beamSpread?: number;
+  beamLength?: number;
+  beamOpacity?: number;
 };
 
 export type StageElement =

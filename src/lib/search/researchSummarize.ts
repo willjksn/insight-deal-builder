@@ -1,4 +1,4 @@
-import { callGeminiJsonText } from "@/lib/scout/geminiClient";
+import { callGeminiJsonText } from "@/lib/ai/geminiClient";
 import { formatTavilyResultsForPrompt, TavilySearchResponse } from "@/lib/search/tavilyClient";
 
 export async function summarizeWebResearch<T>(

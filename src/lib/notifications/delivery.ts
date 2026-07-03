@@ -249,13 +249,13 @@ export async function sendSignupPendingPush(
 }
 
 export function buildSharedResourceNoteEmail(params: {
-  resourceType: "script" | "scout";
+  resourceType: "script";
   resourceTitle: string;
   authorName: string;
   notePreview: string;
   resourceUrl: string;
 }): { subject: string; html: string; text: string } {
-  const kind = params.resourceType === "script" ? "script" : "scout session";
+  const kind = "script";
   const subject = `New note on ${params.resourceTitle}`;
   const text = `${params.authorName} left a note on your ${kind} "${params.resourceTitle}":
 

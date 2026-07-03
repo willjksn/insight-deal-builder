@@ -1,6 +1,7 @@
 import { locationFromSceneHeading } from "@/lib/production/buildCrewPacketBase";
 import { ProductionBoard, ProductionDay, ProductionDayShot } from "@/lib/production/types";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
+import { normalizeSceneRef } from "@/lib/scriptWriter/scriptMappers";
 
 export const DEFAULT_MAX_SHOTS_PER_DAY = 18;
 
@@ -12,7 +13,7 @@ export type ShotLocationGroup = {
 export function sceneLocationMap(script?: ScriptDocument | null): Map<string, string> {
   const map = new Map<string, string>();
   for (const scene of script?.scenes ?? []) {
-    map.set(scene.sceneNumber.trim(), locationFromSceneHeading(scene.heading));
+    map.set(normalizeSceneRef(scene.sceneNumber), locationFromSceneHeading(scene.heading));
   }
   return map;
 }
@@ -21,10 +22,11 @@ export function inferShotLocation(
   shot: ProductionDayShot,
   sceneLocations: Map<string, string>
 ): string {
-  if (shot.sceneRef?.trim()) {
-    const fromScene = sceneLocations.get(shot.sceneRef.trim());
+  const ref = normalizeSceneRef(shot.sceneRef);
+  if (ref) {
+    const fromScene = sceneLocations.get(ref);
     if (fromScene) return fromScene;
-    return `Scene ${shot.sceneRef.trim()}`;
+    return `Scene ${ref}`;
   }
   const text = `${shot.label} ${shot.shotName ?? ""} ${shot.notes ?? ""} ${shot.subjectAction ?? ""}`;
   const intExt = text.match(/(?:INT\.|EXT\.)\s+([^-–,]+)/i);

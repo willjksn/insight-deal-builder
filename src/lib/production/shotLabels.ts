@@ -1,7 +1,19 @@
-import { ScoutShotType } from "@/lib/scout/types";
 import { ProductionDayShot } from "@/lib/production/types";
 
-export const SHOT_TYPE_LABELS: Record<ScoutShotType, string> = {
+export type ProductionShotType =
+  | "master_wide"
+  | "medium_shot"
+  | "close_up"
+  | "insert_shot"
+  | "reaction_shot"
+  | "movement_shot"
+  | "vertical_social_shot"
+  | "thumbnail_shot"
+  | "bts_shot"
+  | "room_tone"
+  | "wild_line";
+
+export const SHOT_TYPE_LABELS: Record<ProductionShotType, string> = {
   master_wide: "Wide / Establishing",
   medium_shot: "Medium",
   close_up: "Close-up",
@@ -17,7 +29,7 @@ export const SHOT_TYPE_LABELS: Record<ScoutShotType, string> = {
 
 export function formatShotTypeLabel(shotType?: string): string {
   if (!shotType?.trim()) return "—";
-  const key = shotType.trim().toLowerCase().replace(/\s+/g, "_") as ScoutShotType;
+  const key = shotType.trim().toLowerCase().replace(/\s+/g, "_") as ProductionShotType;
   if (SHOT_TYPE_LABELS[key]) return SHOT_TYPE_LABELS[key];
   return shotType.replace(/_/g, " ");
 }

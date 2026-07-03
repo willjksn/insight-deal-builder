@@ -14,7 +14,7 @@ import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { ensureProjectStageBoard } from "@/lib/stage/stageFirestore";
 import { StageBoard } from "@/lib/stage/types";
 import { Project } from "@/lib/types";
-import { canManageProjects, canUseShotScout } from "@/lib/utils/permissions";
+import { canManageProjects, canUseProductionTools } from "@/lib/utils/permissions";
 
 export default function ProjectStagePlannerPage() {
   const params = useParams();
@@ -28,7 +28,7 @@ export default function ProjectStagePlannerPage() {
 
   const allowed =
     canManageProjects(appUser) ||
-    canUseShotScout(appUser) ||
+    canUseProductionTools(appUser) ||
     projectAccess.canAccessProduction ||
     projectAccess.canAccessShots;
 

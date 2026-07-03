@@ -58,12 +58,11 @@ export async function POST(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Trend research failed";
     const lower = message.toLowerCase();
-    const hint =
-      lower.includes("api key") || lower.includes("gemini")
+    const hint = lower.includes("tavily") || lower.includes("tavily_api_key")
+      ? " Add or update TAVILY_API_KEY on the server (tavily.com → API keys)."
+      : lower.includes("api key") || lower.includes("gemini")
         ? " Check GEMINI_API_KEY or FIREBASE_SERVICE_ACCOUNT_JSON (Vertex) on the server."
-        : lower.includes("tavily")
-          ? " Add TAVILY_API_KEY on the server for live trend search."
-          : "";
+        : "";
     return NextResponse.json({ error: `${message}${hint}` }, { status: apiErrorStatus(message) });
   }
 }

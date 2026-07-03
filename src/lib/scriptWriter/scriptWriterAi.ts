@@ -1,5 +1,5 @@
-import { callGeminiJsonWithHistory, callGeminiJsonWithMedia, GeminiMediaInput } from "@/lib/scout/geminiClient";
-import { scoutAiUsesMock } from "@/lib/scout/cineScoutAi";
+import { callGeminiJsonWithHistory, callGeminiJsonWithMedia, GeminiMediaInput } from "@/lib/ai/geminiClient";
+import { aiUsesMock } from "@/lib/ai/mockAi";
 import {
   formatBriefForPrompt,
   inferScriptDetailLevel,
@@ -304,7 +304,7 @@ export async function scriptWriterChat(
   brief: ScriptWriterBrief,
   messages: ScriptWriterMessage[]
 ): Promise<ScriptWriterChatResponse> {
-  if (scoutAiUsesMock()) {
+  if (aiUsesMock()) {
     return mockChatResponse(brief, messages);
   }
 
@@ -322,7 +322,7 @@ export async function scriptWriterAnalyzeInspiration(params: {
   urls?: ScriptInspirationUrl[];
 }): Promise<ScriptInspirationAnalysis> {
   const { brief, images, video, urls = [] } = params;
-  if (scoutAiUsesMock()) {
+  if (aiUsesMock()) {
     return mockAnalysis(images, video, urls);
   }
 
@@ -376,7 +376,7 @@ export async function scriptWriterGenerate(
   const detailedShotList = options?.detailedShotList !== false;
   const storyboardMode = options?.storyboardMode ?? false;
 
-  if (scoutAiUsesMock()) {
+  if (aiUsesMock()) {
     return mockScript(brief, detailedShotList, storyboardMode);
   }
 
@@ -457,7 +457,7 @@ export async function scriptWriterRefineScript(
   const detailedShotList = options?.detailedShotList !== false;
   const storyboardMode = options?.storyboardMode ?? false;
 
-  if (scoutAiUsesMock()) {
+  if (aiUsesMock()) {
     return { ...currentScript, title: currentScript.title };
   }
 

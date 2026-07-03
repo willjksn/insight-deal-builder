@@ -65,4 +65,14 @@ describe("buildMasterShots", () => {
     expect(rows[0].location).toBe("STREET");
     expect(rows[0].lightingNotes).toBe("Cool moonlight");
   });
+
+  it("handles numeric scene numbers from AI script JSON", () => {
+    const numericScript = {
+      ...script,
+      scenes: [{ ...script.scenes[0], sceneNumber: 1 as unknown as string }],
+      suggestedShots: [{ ...script.suggestedShots[0], sceneNumber: 1 as unknown as string }],
+    };
+    expect(() => buildMasterShots(day, numericScript)).not.toThrow();
+    expect(buildMasterShots(day, numericScript)[0].location).toBe("STREET");
+  });
 });

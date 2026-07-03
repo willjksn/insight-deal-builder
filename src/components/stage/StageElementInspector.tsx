@@ -7,6 +7,17 @@ import {
   STAGE_DEFAULT_COLORS,
 } from "@/lib/stage/elementColor";
 import { findStageProp } from "@/lib/stage/propCatalog";
+import {
+  beamValuesFromDefaults,
+  StageBeamInspectorControls,
+} from "@/components/stage/StageBeamInspectorControls";
+import {
+  defaultBeamForProp,
+  defaultBeamForWindow,
+  isBeamCapableProp,
+  resolveLightBeam,
+  resolveWindowSpill,
+} from "@/lib/stage/lightBeam";
 
 interface StageElementInspectorProps {
   element: StageElement;
@@ -51,6 +62,7 @@ function ColorField({
 export function StageElementInspector({ element, onPatch }: StageElementInspectorProps) {
   const typeLabel = elementTypeLabel(element);
   const color = resolveElementColor(element);
+  const beamCapable = element.kind === "prop" && isBeamCapableProp(element.propId);
 
   const setColor = (hex: string) => onPatch({ color: hex });
 
@@ -71,13 +83,35 @@ export function StageElementInspector({ element, onPatch }: StageElementInspecto
     onPatch({ color: defaults[element.kind] });
   };
 
+  const propBeam =
+    element.kind === "prop"
+      ? beamValuesFromDefaults(
+          element,
+          defaultBeamForProp(element.propId) ?? {},
+          resolveLightBeam(element)
+        )
+      : null;
+
+  const windowBeam =
+    element.kind === "window"
+      ? beamValuesFromDefaults(
+          element,
+          defaultBeamForWindow(element.width),
+          resolveWindowSpill(element)
+        )
+      : null;
+
   return (
     <aside className="w-full shrink-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:w-56">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected</p>
       <p className="mt-0.5 text-sm font-medium text-slate-900">{typeLabel}</p>
 
       <div className="mt-4 space-y-4">
-        <ColorField label="Color" value={color} onChange={setColor} />
+        <ColorField
+          label={element.kind === "window" ? "Glass tint" : "Color"}
+          value={color}
+          onChange={setColor}
+        />
 
         {element.kind === "prop" && (
           <div className="space-y-1.5">
@@ -96,6 +130,27 @@ export function StageElementInspector({ element, onPatch }: StageElementInspecto
               Shown on the diagram — e.g. &quot;Arri 650 PLUS · 3200K&quot;
             </p>
           </div>
+        )}
+
+        {beamCapable && element.kind === "prop" && propBeam && (
+          <StageBeamInspectorControls
+            enabled={propBeam.enabled}
+            onEnabledChange={(v) => onPatch({ beamEnabled: v })}
+            beamColor={propBeam.color}
+            onBeamColorChange={(hex) => onPatch({ beamColor: hex })}
+            spread={propBeam.spread}
+            onSpreadChange={(v) => onPatch({ beamSpread: v })}
+            length={propBeam.length}
+            onLengthChange={(v) => onPatch({ beamLength: v })}
+            opacity={propBeam.opacity}
+            onOpacityChange={(v) => onPatch({ beamOpacity: v })}
+            spreadLabel="Spread"
+            spreadMin={8}
+            spreadMax={120}
+            lengthMin={40}
+            lengthMax={420}
+            hint="Rotate the light with the toolbar arrows — the beam follows."
+          />
         )}
 
         {element.kind === "room" && (
@@ -138,7 +193,7 @@ export function StageElementInspector({ element, onPatch }: StageElementInspecto
           </p>
         )}
 
-        {element.kind === "window" && (
+        {element.kind === "window" && windowBeam && (
           <>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-slate-700" htmlFor="stage-window-label">
@@ -153,9 +208,24 @@ export function StageElementInspector({ element, onPatch }: StageElementInspecto
                 className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/20"
               />
             </div>
-            <p className="text-[10px] leading-snug text-slate-500">
-              Color tints the glass and daylight spill cone.
-            </p>
+            <StageBeamInspectorControls
+              enabled={windowBeam.enabled}
+              onEnabledChange={(v) => onPatch({ beamEnabled: v })}
+              beamColor={windowBeam.color}
+              onBeamColorChange={(hex) => onPatch({ beamColor: hex })}
+              spread={windowBeam.spread}
+              onSpreadChange={(v) => onPatch({ beamSpread: v })}
+              length={windowBeam.length}
+              onLengthChange={(v) => onPatch({ beamLength: v })}
+              opacity={windowBeam.opacity}
+              onOpacityChange={(v) => onPatch({ beamOpacity: v })}
+              spreadLabel="Spread width %"
+              spreadMin={20}
+              spreadMax={100}
+              lengthMin={24}
+              lengthMax={280}
+              hint="Daylight spill extends into the room from the bottom of the window. Match color to sun angle or gel."
+            />
           </>
         )}
       </div>

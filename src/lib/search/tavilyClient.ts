@@ -44,6 +44,12 @@ export async function tavilySearch(
 
   if (!res.ok) {
     const errText = await res.text();
+    if (res.status === 401) {
+      throw new Error(
+        "TAVILY_API_KEY is missing or invalid (Tavily returned 401 Unauthorized). " +
+          "Set a valid key from tavily.com in server env."
+      );
+    }
     throw new Error(`Tavily search failed (${res.status}): ${errText.slice(0, 200)}`);
   }
 

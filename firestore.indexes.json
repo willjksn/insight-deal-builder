@@ -33,22 +33,6 @@
       ]
     },
     {
-      "collectionGroup": "shotScoutProjects",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "shotScoutProjects",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "linkedProjectId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "scriptWriterSessions",
       "queryScope": "COLLECTION",
       "fields": [

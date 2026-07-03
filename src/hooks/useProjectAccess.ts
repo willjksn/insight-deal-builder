@@ -61,7 +61,6 @@ export function useProjectAccess(projectId: string | undefined, ownerUserId?: st
     loading,
     refresh,
     canAccessScripts: hasGlobal || isOwner || permissions.scripts,
-    canAccessScout: hasGlobal || isOwner || permissions.scout,
     canAccessProduction: hasGlobal || isOwner || permissions.production,
     canAccessShots: hasGlobal || isOwner || permissions.shots || permissions.production,
     canAccessAny:

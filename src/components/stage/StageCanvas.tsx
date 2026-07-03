@@ -2,16 +2,21 @@
 
 import { useCallback, useRef, useState } from "react";
 import { StagePropIcon } from "@/components/stage/StagePropIcon";
+import { StageLightBeam } from "@/components/stage/StageLightBeam";
+import { StageWindowDaylight } from "@/components/stage/StageWindowDaylight";
 import {
   applyCornerResize,
   elementRenderRank,
   getElementBounds,
   getPropDisplaySize,
   hitTestAtPoint,
+  labelAnchorAboveRotatedBox,
   ResizeHandle,
   rotateDelta,
+  stageElementRotation,
 } from "@/lib/stage/elementBounds";
 import { findStageProp } from "@/lib/stage/propCatalog";
+import { defaultBeamForProp, isBeamCapableProp, resolveLightBeam, resolveWindowSpill } from "@/lib/stage/lightBeam";
 import {
   labelBadgeColor,
   resolvePropColor,
@@ -162,7 +167,7 @@ export function StageCanvas({
       startX: x,
       startY: y,
       orig: bounds,
-      rotation: el.kind === "prop" ? el.rotation : 0,
+      rotation: stageElementRotation(el),
     });
     captureOnCanvas(e);
   };
@@ -271,6 +276,7 @@ export function StageCanvas({
 
     if (tool === "window") {
       if (width < 6 && height < 6) return;
+      const winWidth = Math.max(width, 32);
       onChange([
         ...elements,
         {
@@ -278,21 +284,37 @@ export function StageCanvas({
           kind: "window",
           x,
           y,
-          width: Math.max(width, 32),
+          width: winWidth,
           height: Math.max(height, 10),
           color: STAGE_DEFAULT_COLORS.window,
+          beamEnabled: true,
+          beamSpread: 56,
+          beamLength: Math.min(120, Math.max(40, winWidth * 0.75)),
+          beamOpacity: 0.45,
         },
       ]);
       onSelect(id);
       return;
     }
 
-    if (width < 16 || height < 16) return;
-    onChange([
-      ...elements,
-      { id, kind: "doorway", x, y, width: Math.max(width, 32), height: Math.max(height, 12), swing: "right" },
-    ]);
-    onSelect(id);
+    if (tool === "doorway") {
+      if (width < 6 && height < 6) return;
+      onChange([
+        ...elements,
+        {
+          id,
+          kind: "doorway",
+          x,
+          y,
+          width: Math.max(width, 32),
+          height: Math.max(height, 12),
+          swing: "right",
+          color: STAGE_DEFAULT_COLORS.doorway,
+        },
+      ]);
+      onSelect(id);
+      return;
+    }
   };
 
   const onPointerUpCanvas = () => {
@@ -361,6 +383,7 @@ export function StageCanvas({
     const id = crypto.randomUUID();
     const w = prop?.width ?? 48;
     const h = prop?.height ?? 48;
+    const beamDefaults = isBeamCapableProp(propId) ? defaultBeamForProp(propId) : {};
     onChange([
       ...elements,
       {
@@ -375,6 +398,15 @@ export function StageCanvas({
         height: h,
         color: prop?.color,
         label: prop?.name,
+        ...(isBeamCapableProp(propId)
+          ? {
+              beamEnabled: beamDefaults.enabled ?? true,
+              beamSpread: beamDefaults.spread,
+              beamLength: beamDefaults.length,
+              beamColor: beamDefaults.color,
+              beamOpacity: beamDefaults.opacity,
+            }
+          : {}),
       },
     ]);
     setDropPreview(null);
@@ -554,7 +586,11 @@ export function StageCanvas({
           const selected = el.id === selectedId;
           const fill = el.color ?? STAGE_DEFAULT_COLORS.window;
           const stroke = selected ? "#0ea5e9" : STAGE_DEFAULT_COLORS.windowStroke;
-          const spillH = Math.min(72, Math.max(24, el.width * 0.6));
+          const spill = resolveWindowSpill(el);
+          const rotation = el.rotation ?? 0;
+          const labelPos = el.label
+            ? labelAnchorAboveRotatedBox(el.width, el.height, rotation)
+            : null;
           return (
             <div
               key={el.id}
@@ -571,59 +607,37 @@ export function StageCanvas({
               }}
               onPointerDown={(e) => onPointerDownElement(e, el)}
             >
-              <svg
-                width={el.width}
-                height={el.height + spillH}
-                viewBox={`0 0 ${el.width} ${el.height + spillH}`}
-                className="pointer-events-none overflow-visible"
-                aria-hidden
-              >
-                <defs>
-                  <linearGradient id={`window-spill-${el.id}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={fill} stopOpacity="0.45" />
-                    <stop offset="100%" stopColor={fill} stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                <polygon
-                  points={`2,${el.height} ${el.width - 2},${el.height} ${el.width * 0.78},${el.height + spillH} ${el.width * 0.22},${el.height + spillH}`}
-                  fill={`url(#window-spill-${el.id})`}
-                />
-                <rect
-                  x={1}
-                  y={1}
-                  width={el.width - 2}
-                  height={el.height - 2}
-                  fill={fill}
-                  stroke={stroke}
-                  strokeWidth={2}
-                />
-                <line
-                  x1={el.width / 2}
-                  y1={2}
-                  x2={el.width / 2}
-                  y2={el.height - 2}
-                  stroke={stroke}
-                  strokeWidth={1}
-                  opacity={0.65}
-                />
-                <line
-                  x1={2}
-                  y1={el.height / 2}
-                  x2={el.width - 2}
-                  y2={el.height / 2}
-                  stroke={stroke}
-                  strokeWidth={1}
-                  opacity={0.65}
-                />
-              </svg>
-              {el.label ? (
-                <span className="absolute -top-4 left-0 text-[9px] font-medium text-sky-800">
+              {labelPos && (
+                <span
+                  className="pointer-events-none absolute z-30 text-[9px] font-medium text-sky-800"
+                  style={{
+                    left: labelPos.left,
+                    top: labelPos.top,
+                    transform: "translate(-50%, -100%)",
+                  }}
+                >
                   {el.label}
                 </span>
-              ) : null}
-              {showResizeHandles(el) && (
-                <ResizeHandles onPointerDown={(e, handle) => onPointerDownResize(e, el, handle)} />
               )}
+              <div
+                className="relative h-full w-full overflow-visible"
+                style={{
+                  transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                  transformOrigin: `${el.width / 2}px ${el.height / 2}px`,
+                }}
+              >
+                <StageWindowDaylight
+                  width={el.width}
+                  height={el.height}
+                  spill={spill}
+                  windowId={el.id}
+                  glassColor={fill}
+                  strokeColor={stroke}
+                />
+                {showResizeHandles(el) && (
+                  <ResizeHandles onPointerDown={(e, handle) => onPointerDownResize(e, el, handle)} />
+                )}
+              </div>
             </div>
           );
         }
@@ -633,11 +647,12 @@ export function StageCanvas({
           const swing = el.swing ?? "right";
           const fill = el.color ?? STAGE_DEFAULT_COLORS.doorway;
           const stroke = selected ? "#0ea5e9" : STAGE_DEFAULT_COLORS.doorwayStroke;
+          const rotation = el.rotation ?? 0;
           return (
             <div
               key={el.id}
               className={cn(
-                "absolute cursor-move select-none",
+                "absolute cursor-move select-none overflow-visible",
                 selected && "ring-2 ring-sky-500 ring-offset-1"
               )}
               style={{
@@ -649,31 +664,39 @@ export function StageCanvas({
               }}
               onPointerDown={(e) => onPointerDownElement(e, el)}
             >
-              <svg width="100%" height="100%" viewBox={`0 0 ${el.width} ${el.height}`} className="pointer-events-none" aria-hidden>
-                <rect
-                  x={1}
-                  y={1}
-                  width={el.width - 2}
-                  height={el.height - 2}
-                  fill={fill}
-                  stroke={stroke}
-                  strokeWidth={2}
-                  strokeDasharray="6 3"
-                />
-                <path
-                  d={
-                    swing === "right"
-                      ? `M 2 ${el.height - 2} L 2 2 A ${el.width - 4} ${el.height - 4} 0 0 1 ${el.width - 2} ${el.height - 2}`
-                      : `M ${el.width - 2} ${el.height - 2} L ${el.width - 2} 2 A ${el.width - 4} ${el.height - 4} 0 0 0 2 ${el.height - 2}`
-                  }
-                  fill="none"
-                  stroke={stroke}
-                  strokeWidth={1.5}
-                />
-              </svg>
-              {showResizeHandles(el) && (
-                <ResizeHandles onPointerDown={(e, handle) => onPointerDownResize(e, el, handle)} />
-              )}
+              <div
+                className="relative h-full w-full overflow-visible"
+                style={{
+                  transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                  transformOrigin: `${el.width / 2}px ${el.height / 2}px`,
+                }}
+              >
+                <svg width="100%" height="100%" viewBox={`0 0 ${el.width} ${el.height}`} className="pointer-events-none" aria-hidden>
+                  <rect
+                    x={1}
+                    y={1}
+                    width={el.width - 2}
+                    height={el.height - 2}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={2}
+                    strokeDasharray="6 3"
+                  />
+                  <path
+                    d={
+                      swing === "right"
+                        ? `M 2 ${el.height - 2} L 2 2 A ${el.width - 4} ${el.height - 4} 0 0 1 ${el.width - 2} ${el.height - 2}`
+                        : `M ${el.width - 2} ${el.height - 2} L ${el.width - 2} 2 A ${el.width - 4} ${el.height - 4} 0 0 0 2 ${el.height - 2}`
+                    }
+                    fill="none"
+                    stroke={stroke}
+                    strokeWidth={1.5}
+                  />
+                </svg>
+                {showResizeHandles(el) && (
+                  <ResizeHandles onPointerDown={(e, handle) => onPointerDownResize(e, el, handle)} />
+                )}
+              </div>
             </div>
           );
         }
@@ -785,11 +808,16 @@ export function StageCanvas({
         const fillColor = resolvePropColor(el);
         const badgeBg = labelBadgeColor(prop.category, fillColor);
         const displayLabel = el.label?.trim() || prop.name;
+        const beam = resolveLightBeam(el);
+        const beamOriginY = height * (prop.category === "lighting" ? 0.88 : 0.72);
+        const labelPos = displayLabel
+          ? labelAnchorAboveRotatedBox(width, height, el.rotation)
+          : null;
         return (
           <div
             key={el.id}
             className={cn(
-              "absolute select-none",
+              "absolute select-none overflow-visible",
               activeTool === "select" ? "cursor-move" : undefined,
               selected && "ring-2 ring-sky-500 ring-offset-2 rounded"
             )}
@@ -798,18 +826,17 @@ export function StageCanvas({
               top: el.y,
               width,
               height,
-              transform: `rotate(${el.rotation}deg)`,
-              transformOrigin: `${width / 2}px ${height / 2}px`,
               zIndex: elementZIndex(el, selected),
             }}
             onPointerDown={(e) => onPointerDownElement(e, el)}
           >
-            {displayLabel && (
+            {labelPos && (
               <div
-                className="pointer-events-none absolute left-1/2 top-0 z-20 max-w-[160px] pb-0.5 text-center"
+                className="pointer-events-none absolute z-30 max-w-[160px] text-center"
                 style={{
-                  transform: `translate(-50%, -100%) rotate(${-el.rotation}deg)`,
-                  transformOrigin: "center bottom",
+                  left: labelPos.left,
+                  top: labelPos.top,
+                  transform: "translate(-50%, -100%)",
                 }}
               >
                 <span
@@ -820,10 +847,32 @@ export function StageCanvas({
                 </span>
               </div>
             )}
-            <StagePropIcon prop={prop} width={width} height={height} color={fillColor} />
+            <div
+              className="relative h-full w-full overflow-visible"
+              style={{
+                transform: `rotate(${el.rotation}deg)`,
+                transformOrigin: `${width / 2}px ${height / 2}px`,
+              }}
+            >
+            {prop.shape === "light-cone" && beam ? (
+              <StageLightBeam width={width} beam={{ ...beam, length: height }} beamId={el.id} />
+            ) : (
+              <>
+                {beam && (
+                  <div
+                    className="pointer-events-none absolute left-0 overflow-visible"
+                    style={{ top: beamOriginY, width, zIndex: 0 }}
+                  >
+                    <StageLightBeam width={width} beam={beam} beamId={el.id} />
+                  </div>
+                )}
+                <StagePropIcon prop={prop} width={width} height={height} color={fillColor} />
+              </>
+            )}
             {showResizeHandles(el) && (
               <ResizeHandles onPointerDown={(e, handle) => onPointerDownResize(e, el, handle)} />
             )}
+            </div>
           </div>
         );
       })}

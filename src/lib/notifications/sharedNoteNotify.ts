@@ -1,7 +1,6 @@
 import { FieldValue, Firestore } from "firebase-admin/firestore";
 import { getAdminMessaging } from "@/lib/firebase/admin";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
-import { ScoutProject } from "@/lib/scout/types";
 import { recipientFromUser, NotificationRecipient } from "@/lib/notifications/recipients";
 import {
   buildSharedResourceNoteEmail,
@@ -19,7 +18,7 @@ import { SharedResourceNote, SharedResourceType } from "@/lib/sharedNotes/types"
 export async function notifyOwnerOfSharedResourceNote(params: {
   db: Firestore;
   resourceType: SharedResourceType;
-  resource: ScriptWriterSession | ScoutProject;
+  resource: ScriptWriterSession;
   note: SharedResourceNote;
   authorAppUser: AppUser;
   appUrl: string;
@@ -70,7 +69,7 @@ export async function notifyOwnerOfSharedResourceNote(params: {
 
   const messaging = getAdminMessaging();
   if (messaging) {
-    const label = resourceType === "script" ? "script" : "scout session";
+    const label = "script";
     await sendSharedResourceNotePush(messaging, [recipient], {
       title: `New note on your ${label}`,
       body: `${note.authorInitials}: ${notePreview}`,

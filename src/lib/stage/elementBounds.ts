@@ -106,6 +106,57 @@ export function rotateDelta(dx: number, dy: number, degrees: number): { dx: numb
   };
 }
 
+/** Place a label above the visual top of a rotated rectangle (canvas coordinates). */
+export function labelAnchorAboveRotatedBox(
+  width: number,
+  height: number,
+  rotationDeg: number,
+  padding = 8
+): { left: number; top: number } {
+  if (!rotationDeg) {
+    return { left: width / 2, top: -padding };
+  }
+
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const cx = width / 2;
+  const cy = height / 2;
+  const corners = [
+    [-width / 2, -height / 2],
+    [width / 2, -height / 2],
+    [width / 2, height / 2],
+    [-width / 2, height / 2],
+  ] as const;
+
+  let minY = Infinity;
+  const topXs: number[] = [];
+  for (const [dx, dy] of corners) {
+    const x = cx + dx * cos - dy * sin;
+    const y = cy + dx * sin + dy * cos;
+    if (y < minY - 0.001) {
+      minY = y;
+      topXs.length = 0;
+      topXs.push(x);
+    } else if (Math.abs(y - minY) < 0.5) {
+      topXs.push(x);
+    }
+  }
+
+  const left = topXs.reduce((sum, x) => sum + x, 0) / topXs.length;
+  return { left, top: minY - padding };
+}
+
+export function stageElementRotation(el: StageElement): number {
+  if (el.kind === "prop") return el.rotation;
+  if (el.kind === "window" || el.kind === "doorway") return el.rotation ?? 0;
+  return 0;
+}
+
+export function isStageRotatable(el: StageElement): boolean {
+  return el.kind === "prop" || el.kind === "window" || el.kind === "doorway";
+}
+
 /** Lower renders behind; higher renders on top for hit-testing. */
 export function elementRenderRank(el: StageElement): number {
   if (el.kind === "room") return 0;

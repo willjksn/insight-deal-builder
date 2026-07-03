@@ -20,6 +20,7 @@ import { StageCanvas } from "@/components/stage/StageCanvas";
 import { StageElementInspector } from "@/components/stage/StageElementInspector";
 import { StagePropSidebar } from "@/components/stage/StagePropSidebar";
 import { saveStageBoard } from "@/lib/stage/stageFirestore";
+import { isStageRotatable, stageElementRotation } from "@/lib/stage/elementBounds";
 import { NOTE_TEMPLATES, StageBoard, StageElement, StageTool } from "@/lib/stage/types";
 import { cn } from "@/lib/utils/cn";
 
@@ -72,14 +73,15 @@ export function StagePlanner({
   const selected = elements.find((e) => e.id === selectedId);
 
   const rotateSelected = (direction: "left" | "right") => {
-    if (!selected || selected.kind !== "prop" || readOnly) return;
+    if (!selected || !isStageRotatable(selected) || readOnly) return;
     const delta = direction === "right" ? 15 : -15;
     updateElements(
-      elements.map((el) =>
-        el.id === selected.id && el.kind === "prop"
-          ? { ...el, rotation: (((el.rotation + delta) % 360) + 360) % 360 }
-          : el
-      )
+      elements.map((el) => {
+        if (el.id !== selected.id || !isStageRotatable(el)) return el;
+        const current = stageElementRotation(el);
+        const rotation = (((current + delta) % 360) + 360) % 360;
+        return { ...el, rotation };
+      })
     );
   };
 
@@ -184,7 +186,7 @@ export function StagePlanner({
                 size="sm"
                 variant="outline"
                 onClick={() => rotateSelected("left")}
-                disabled={selected?.kind !== "prop"}
+                disabled={!selected || !isStageRotatable(selected)}
                 title="Rotate left 15°"
               >
                 <RotateCcw className="mr-1 h-3.5 w-3.5" />
@@ -195,8 +197,8 @@ export function StagePlanner({
                 size="sm"
                 variant="outline"
                 onClick={() => rotateSelected("right")}
-                disabled={selected?.kind !== "prop"}
-                title="Rotate right 15°"
+                disabled={!selected || !isStageRotatable(selected)}
+                title="Rotate right 15° — props face arrow; windows spill into room"
               >
                 <RotateCw className="mr-1 h-3.5 w-3.5" />
                 Right

@@ -313,7 +313,7 @@ export default function AdminPage() {
     const name = user.displayName || user.email;
     if (
       !confirm(
-        `Archive ${name}?\n\nThey will lose login access and be removed from all project teams and shared scripts/scouts. Signed agreements and their work files stay on record.`
+        `Archive ${name}?\n\nThey will lose login access and be removed from all project teams and shared scripts. Signed agreements and their work files stay on record.`
       )
     ) {
       return;
@@ -462,8 +462,8 @@ export default function AdminPage() {
         title="Team & access"
         description={
           isOrgAdmin
-            ? "Approve users and set org-wide permissions (quotes, clients, Scout). Then assign per-project access for scripts, Scout, pre-production, and call sheet shots."
-            : "Assign teammates and partners to projects — scripts, Scout, pre-production, and call sheet shots."
+            ? "Approve users and set org-wide permissions (quotes, clients, production tools). Then assign per-project access for scripts, pre-production, and call sheet shots."
+            : "Assign teammates and partners to projects — scripts, pre-production, and call sheet shots."
         }
       >
         {isOrgAdmin && (

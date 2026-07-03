@@ -20,7 +20,7 @@ import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useDocument } from "@/hooks/useDocument";
 import { Project } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
-import { canManageProjects, canUseShotScout } from "@/lib/utils/permissions";
+import { canManageProjects, canUseProductionTools } from "@/lib/utils/permissions";
 
 export function useProductionDayPage(projectId: string, dayId: string) {
   const router = useRouter();
@@ -36,17 +36,17 @@ export function useProductionDayPage(projectId: string, dayId: string) {
   const contactsSyncedRef = useRef(false);
 
   const allowed =
-    canUseShotScout(appUser) ||
+    canUseProductionTools(appUser) ||
     canManageProjects(appUser) ||
     projectAccess.canAccessProduction ||
     projectAccess.canAccessShots;
   const canEditShots =
-    canUseShotScout(appUser) ||
+    canUseProductionTools(appUser) ||
     canManageProjects(appUser) ||
     projectAccess.canAccessProduction ||
     projectAccess.canAccessShots;
   const canEditSchedule =
-    canUseShotScout(appUser) ||
+    canUseProductionTools(appUser) ||
     canManageProjects(appUser) ||
     projectAccess.canAccessProduction;
 

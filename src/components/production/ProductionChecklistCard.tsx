@@ -32,7 +32,6 @@ interface ProductionChecklistCardProps {
   mode: ProductionChecklistMode;
   items: ProductionChecklistItem[];
   scriptSessionId?: string;
-  hasScoutSessions: boolean;
   hasAgreement: boolean;
   hasSignedAgreement?: boolean;
   onSyncProgress?: () => void;
@@ -44,7 +43,6 @@ export function ProductionChecklistCard({
   mode,
   items,
   scriptSessionId,
-  hasScoutSessions,
   hasAgreement,
   hasSignedAgreement,
   onSyncProgress,
@@ -197,7 +195,6 @@ export function ProductionChecklistCard({
                   item={item}
                   projectId={project.id}
                   scriptSessionId={scriptSessionId}
-                  hasScoutSessions={hasScoutSessions}
                   hasAgreement={hasAgreement}
                   onToggle={() => toggleItem(item.stepKey)}
                   onNotesChange={(notes) => updateNotes(item.stepKey, notes)}
@@ -243,7 +240,6 @@ function ChecklistRow({
   item,
   projectId,
   scriptSessionId,
-  hasScoutSessions,
   hasAgreement,
   onToggle,
   onNotesChange,
@@ -251,7 +247,6 @@ function ChecklistRow({
   item: ProductionChecklistItem;
   projectId: string;
   scriptSessionId?: string;
-  hasScoutSessions: boolean;
   hasAgreement: boolean;
   onToggle: () => void;
   onNotesChange: (notes: string) => void;
@@ -261,7 +256,6 @@ function ChecklistRow({
   const quickLinks = getQuickLinks(item.stepKey, {
     projectId,
     scriptSessionId,
-    hasScoutSessions,
     hasAgreement,
   });
 
@@ -354,11 +348,10 @@ function getQuickLinks(
   ctx: {
     projectId: string;
     scriptSessionId?: string;
-    hasScoutSessions: boolean;
     hasAgreement: boolean;
   }
 ): { href: string; label: string; icon: typeof FileText }[] {
-  const { projectId, scriptSessionId, hasScoutSessions, hasAgreement } = ctx;
+  const { projectId, scriptSessionId, hasAgreement } = ctx;
   const links: { href: string; label: string; icon: typeof FileText }[] = [];
 
   if (stepKey === "fee_agreement" || stepKey === "scope") {
@@ -391,9 +384,10 @@ function getQuickLinks(
   }
 
   if (stepKey === "visual_plan") {
+    const dayPath = `/projects/${projectId}/production`;
     links.push({
-      href: hasScoutSessions ? `/scout` : `/scout/new?projectId=${projectId}`,
-      label: hasScoutSessions ? "Shot Scout" : "New scout",
+      href: dayPath,
+      label: "Shot list",
       icon: MapPin,
     });
   }

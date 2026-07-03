@@ -3,9 +3,7 @@ import { AppNotification } from "@/lib/types";
 export function notificationHref(notification: AppNotification): string {
   if (notification.type === "user_signup_pending") return "/admin";
   if (notification.type === "shared_resource_note" && notification.resourceId) {
-    return notification.resourceType === "scout"
-      ? `/scout/${notification.resourceId}`
-      : `/script-writer/${notification.resourceId}`;
+    return `/script-writer/${notification.resourceId}`;
   }
   if (notification.agreementId) return `/agreements/${notification.agreementId}`;
   return "/";
@@ -14,8 +12,7 @@ export function notificationHref(notification: AppNotification): string {
 export function notificationTitle(notification: AppNotification): string {
   if (notification.type === "user_signup_pending") return "New signup pending approval";
   if (notification.type === "shared_resource_note") {
-    const kind = notification.resourceType === "scout" ? "scout" : "script";
-    return `New note on your ${kind}`;
+    return "New note on your script";
   }
   return "Client signed agreement";
 }

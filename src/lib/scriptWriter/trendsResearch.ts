@@ -112,7 +112,17 @@ export async function researchScriptTrends(
     }
   }
 
-  return researchScriptTrendsLive(brief);
+  try {
+    return await researchScriptTrendsLive(brief);
+  } catch (liveErr) {
+    if (db) {
+      const stale = await getTrendSnapshot(db, brief.contentType);
+      if (stale) {
+        return snapshotToSessionResearch(stale, "cache");
+      }
+    }
+    throw liveErr;
+  }
 }
 
 export function formatTrendsForPrompt(trends: ScriptTrendsResearch): string {

@@ -14,7 +14,6 @@ import {
   productionSceneFramesFromScript,
   productionShotsFromScript,
   sceneNumbersFromScript,
-  scoutShotsFromScript,
 } from "@/lib/scriptWriter/scriptMappers";
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
@@ -51,10 +50,8 @@ export async function applyScriptToProject(params: {
   session: ScriptWriterSession & { id: string };
   script: ScriptDocument;
   projectId: string;
-  createScout: boolean;
-  updateExistingScout: boolean;
-}): Promise<{ productionBoardId: string; scoutProjectId?: string }> {
-  const { db, uid, session, script, projectId, createScout, updateExistingScout } = params;
+}): Promise<{ productionBoardId: string }> {
+  const { db, uid, session, script, projectId } = params;
 
   const projectSnap = await db.collection("projects").doc(projectId).get();
   if (!projectSnap.exists) throw new Error("Project not found");
@@ -75,7 +72,6 @@ export async function applyScriptToProject(params: {
       locations: [],
       productionDays: [createEmptyProductionDay(1)],
       inspirationImages: [],
-      linkedScoutProjectIds: [],
     };
   }
 
@@ -140,62 +136,6 @@ export async function applyScriptToProject(params: {
     ? `${board.filmingNotes.trim()}\n\n— From script writer\n${notesPrefix}`
     : notesPrefix;
 
-  const scoutShots = scoutShotsFromScript(script);
-  const latestShotList = stripUndefined({
-    id: crypto.randomUUID(),
-    shots: scoutShots,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
-
-  let scoutProjectId = session.linkedScoutProjectId ?? session.appliedScoutProjectId;
-
-  if (scoutProjectId && updateExistingScout) {
-    const scoutRef = db.collection("shotScoutProjects").doc(scoutProjectId);
-    const scoutSnap = await scoutRef.get();
-    if (scoutSnap.exists && scoutSnap.data()?.userId === uid) {
-      await scoutRef.update(
-        stripUndefined({
-          sceneIdea: script.logline || (script.fountain ?? "").slice(0, 500),
-          projectName: script.title,
-          theme: script.lookAndFeel ?? scoutSnap.data()?.theme,
-          latestShotList,
-          linkedProjectId: projectId,
-          linkedProjectName: project.projectName,
-          updatedAt: FieldValue.serverTimestamp(),
-        })
-      );
-    }
-  } else if (createScout) {
-    const scoutRef = await db.collection("shotScoutProjects").add(
-      stripUndefined({
-        userId: uid,
-        projectName: script.title,
-        sceneIdea: script.logline || (script.fountain ?? "").slice(0, 800),
-        sceneType: "short_film",
-        mood: "cinematic",
-        theme: script.lookAndFeel ?? "",
-        platform: "youtube",
-        aspectRatio: "16:9",
-        skillLevel: "intermediate",
-        preferredLook: "s_log3",
-        appMode: "pro",
-        status: "needs_images",
-        linkedProjectId: projectId,
-        linkedProjectName: project.projectName,
-        latestShotList,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      })
-    );
-    scoutProjectId = scoutRef.id;
-  }
-
-  const linkedScoutIds = [...(board.linkedScoutProjectIds ?? [])];
-  if (scoutProjectId && !linkedScoutIds.includes(scoutProjectId)) {
-    linkedScoutIds.push(scoutProjectId);
-  }
-
   await db.collection(PRODUCTION_BOARDS_COLLECTION).doc(board.id).update(
     stripUndefined({
       filmTitle: script.title,
@@ -210,7 +150,6 @@ export async function applyScriptToProject(params: {
       productionDays: updatedDays,
       scriptSessionId: session.id,
       scriptFountain: script.fountain ?? "",
-      linkedScoutProjectIds: linkedScoutIds,
       updatedAt: FieldValue.serverTimestamp(),
     })
   );
@@ -219,12 +158,10 @@ export async function applyScriptToProject(params: {
     stripUndefined({
       status: "applied",
       appliedProjectId: projectId,
-      appliedScoutProjectId: scoutProjectId,
       linkedProjectId: projectId,
-      linkedScoutProjectId: scoutProjectId ?? session.linkedScoutProjectId,
       updatedAt: FieldValue.serverTimestamp(),
     })
   );
 
-  return { productionBoardId: board.id, scoutProjectId };
+  return { productionBoardId: board.id };
 }

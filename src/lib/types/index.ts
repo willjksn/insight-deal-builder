@@ -27,7 +27,7 @@ export interface UserPermissions {
   viewW9Docs: boolean;
   /** Download payee payment CSV for accounting and 1099 prep */
   exportPayments: boolean;
-  /** AI location scout, DP plan, and shot previs */
+  /** Script writer, stage planner, reference guide, production boards */
   useShotScout: boolean;
 }
 

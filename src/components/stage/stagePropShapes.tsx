@@ -38,37 +38,52 @@ export function renderStagePropShape(
       );
     case "camera":
       return (
-        <Svg w={w} h={h} viewBox="0 0 40 32">
-          <rect x="4" y="8" width="32" height="20" rx="3" fill={fill} stroke={stroke} strokeWidth="1.5" />
-          <rect x="14" y="4" width="12" height="6" rx="1" fill={fill} stroke={stroke} strokeWidth="1" />
-          <circle cx="20" cy="18" r="6" fill="#0f172a" stroke="#64748b" strokeWidth="1.5" />
-          <circle cx="20" cy="18" r="3" fill="#1e293b" />
+        <Svg w={w} h={h} viewBox="0 0 40 44">
+          {/* Top-down plan view — lens / shoot direction is toward bottom (+Y) */}
+          <rect x="10" y="6" width="20" height="16" rx="3" fill={fill} stroke={stroke} strokeWidth="1.5" />
+          <rect x="16" y="2" width="8" height="4" rx="1" fill={fill} stroke={stroke} strokeWidth="1" opacity={0.85} />
+          <polygon
+            points="20,26 9,42 31,42"
+            fill={fill}
+            fillOpacity="0.2"
+            stroke={stroke}
+            strokeWidth="1"
+            strokeOpacity="0.35"
+          />
+          <circle cx="20" cy="26" r="5" fill="#0f172a" stroke="#64748b" strokeWidth="1.5" />
+          <circle cx="20" cy="26" r="2.5" fill="#334155" />
+          <line x1="20" y1="31" x2="20" y2="42" stroke="#64748b" strokeWidth="1" strokeDasharray="2 2" />
         </Svg>
       );
     case "tripod":
       return (
-        <Svg w={w} h={h} viewBox="0 0 36 36">
-          <circle cx="18" cy="18" r="4" fill={fill} stroke={stroke} strokeWidth="1.5" />
-          <line x1="18" y1="18" x2="6" y2="32" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" />
-          <line x1="18" y1="18" x2="30" y2="32" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" />
-          <line x1="18" y1="18" x2="18" y2="4" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" />
+        <Svg w={w} h={h} viewBox="0 0 36 40">
+          {/* Top-down — front leg points down (+Y) toward subject */}
+          <circle cx="18" cy="14" r="5" fill={fill} stroke={stroke} strokeWidth="1.5" />
+          <line x1="18" y1="14" x2="8" y2="36" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" />
+          <line x1="18" y1="14" x2="28" y2="36" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" />
+          <line x1="18" y1="14" x2="18" y2="38" stroke={stroke} strokeWidth="3" strokeLinecap="round" />
+          <circle cx="18" cy="38" r="2" fill={fill} stroke={stroke} strokeWidth="1" />
         </Svg>
       );
     case "gimbal":
       return (
-        <Svg w={w} h={h} viewBox="0 0 32 32">
-          <circle cx="16" cy="16" r="10" fill="none" stroke={stroke} strokeWidth="2" />
-          <circle cx="16" cy="16" r="4" fill={fill} stroke={stroke} strokeWidth="1.5" />
-          <rect x="14" y="2" width="4" height="8" rx="1" fill="#64748b" />
-          <rect x="22" y="14" width="8" height="4" rx="1" fill="#64748b" />
+        <Svg w={w} h={h} viewBox="0 0 36 40">
+          <circle cx="18" cy="14" r="9" fill="none" stroke={stroke} strokeWidth="2" />
+          <circle cx="18" cy="14" r="4" fill={fill} stroke={stroke} strokeWidth="1.5" />
+          <rect x="16" y="4" width="4" height="7" rx="1" fill="#64748b" />
+          <line x1="18" y1="23" x2="18" y2="38" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" />
+          <polygon points="18,38 14,32 22,32" fill={fill} stroke={stroke} strokeWidth="1" />
         </Svg>
       );
     case "slider":
       return (
-        <Svg w={w} h={h} viewBox="0 0 80 16">
-          <rect x="2" y="6" width="76" height="4" rx="2" fill="#475569" />
-          <rect x="30" y="3" width="20" height="10" rx="2" fill={fill} stroke={stroke} strokeWidth="1.5" />
-          <circle cx="40" cy="8" r="2" fill="#94a3b8" />
+        <Svg w={w} h={h} viewBox="0 0 80 20">
+          <rect x="2" y="8" width="76" height="4" rx="2" fill="#475569" />
+          <rect x="30" y="5" width="20" height="10" rx="2" fill={fill} stroke={stroke} strokeWidth="1.5" />
+          <circle cx="40" cy="10" r="2" fill="#94a3b8" />
+          {/* Camera / travel direction toward right (+X) */}
+          <polygon points="72,10 64,6 64,14" fill={fill} stroke={stroke} strokeWidth="1" />
         </Svg>
       );
     case "monitor":
@@ -81,11 +96,13 @@ export function renderStagePropShape(
       );
     case "softbox":
       return (
-        <Svg w={w} h={h} viewBox="0 0 56 40">
+        <Svg w={w} h={h} viewBox="0 0 56 44">
+          {/* Top-down — light emits toward bottom (+Y); stand at top (back) */}
           <rect x="8" y="4" width="40" height="28" rx="2" fill={fill} stroke={stroke} strokeWidth="1.5" />
           <rect x="14" y="10" width="28" height="16" rx="1" fill="#f8fafc" opacity="0.5" />
-          <line x1="28" y1="32" x2="28" y2="38" stroke="#78716c" strokeWidth="2" />
-          <line x1="24" y1="38" x2="32" y2="38" stroke="#78716c" strokeWidth="2" />
+          <line x1="28" y1="32" x2="28" y2="40" stroke="#78716c" strokeWidth="2" />
+          <line x1="24" y1="40" x2="32" y2="40" stroke="#78716c" strokeWidth="2" />
+          <polygon points="28,34 20,42 36,42" fill={fill} fillOpacity="0.25" stroke={stroke} strokeWidth="0.75" />
         </Svg>
       );
     case "strip-softbox":

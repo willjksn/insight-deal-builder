@@ -152,7 +152,7 @@ export function ProjectAccessHub({ initialProjectId = "", onAdminPage = false }:
         </h3>
         <p className="text-sm text-slate-600">
           Pick a project, then choose a person and what they can edit:{" "}
-          {Object.values(PROJECT_ACCESS_LABELS).join(", ")}. Linked scripts and scout sessions inherit
+          {Object.values(PROJECT_ACCESS_LABELS).filter((l) => l !== "Shot Scout").join(", ")}. Linked scripts inherit
           these permissions.
         </p>
         <ContentPanel className="space-y-4">

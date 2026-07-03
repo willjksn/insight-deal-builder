@@ -11,7 +11,7 @@ import {
   ServicePackage,
 } from "@/lib/types";
 import { tavilyAvailable } from "@/lib/search/tavilyClient";
-import { scoutAiUsesMock } from "@/lib/scout/cineScoutAi";
+import { aiUsesMock } from "@/lib/ai/mockAi";
 
 export const runtime = "nodejs";
 
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     const { appUser } = await requireApprovedAuthUser(request);
     assertCanCreateQuotes(appUser);
 
-    if (!tavilyAvailable() && !scoutAiUsesMock()) {
+    if (!tavilyAvailable() && !aiUsesMock()) {
       return NextResponse.json(
         { error: "TAVILY_API_KEY is not configured on the server" },
         { status: 503 }

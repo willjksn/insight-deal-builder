@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FileText, Plus, Clapperboard, LayoutGrid, ScrollText, ArrowRight } from "lucide-react";
+import { FileText, Plus, LayoutGrid, ScrollText, ArrowRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -14,22 +14,19 @@ import { useAgreements } from "@/hooks/useAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/lib/utils/format";
 import { Project } from "@/lib/types";
-import { ScoutProject } from "@/lib/scout/types";
 import { ProductionBoard } from "@/lib/production/types";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { getProductionBoardByProject } from "@/lib/firebase/productionFirestore";
-import { getScoutProjectsByIds } from "@/lib/firebase/scoutFirestore";
 import { scriptWriterListSessions } from "@/lib/scriptWriter/apiClient";
-import { useScoutProjects } from "@/hooks/useScoutProjects";
-import {
-  pickScoutSessionsForProject,
-  scoutHrefForProject,
-  scoutNewHrefForProject,
-} from "@/lib/utils/scoutProjectLink";
 import { ProjectSpine } from "@/components/projects/ProjectSpine";
 import { ProjectShotProgressCard } from "@/components/projects/ProjectShotProgressCard";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
-import { canCreateQuotes, canUseShotScout, canManageProjects, canManageUsers } from "@/lib/utils/permissions";
+import {
+  canCreateQuotes,
+  canUseProductionTools,
+  canManageProjects,
+  canManageUsers,
+} from "@/lib/utils/permissions";
 
 function pickProjectScriptSession(
   sessions: ScriptWriterSession[],
@@ -60,7 +57,6 @@ export default function ProjectDetailPage() {
   const { user, appUser } = useAuth();
   const { data: project, loading } = useDocument<Project>("projects", id);
   const { data: agreements } = useAgreements();
-  const [boardOnlyScouts, setBoardOnlyScouts] = useState<ScoutProject[]>([]);
   const [board, setBoard] = useState<ProductionBoard | null>(null);
   const [scriptSessions, setScriptSessions] = useState<ScriptWriterSession[]>([]);
   const [spineLoading, setSpineLoading] = useState(false);
@@ -73,14 +69,10 @@ export default function ProjectDetailPage() {
     [agreements, id]
   );
   const projectAccess = useProjectAccess(id, project?.ownerUserId);
-  const showScout =
-    canUseShotScout(appUser) || projectAccess.canAccessScout;
-  const showScripts =
-    canUseShotScout(appUser) || projectAccess.canAccessScripts;
-  const { data: allScoutSessions } = useScoutProjects(user?.uid, showScout);
+  const showScripts = canUseProductionTools(appUser) || projectAccess.canAccessScripts;
   const showProduction =
     canManageProjects(appUser) ||
-    canUseShotScout(appUser) ||
+    canUseProductionTools(appUser) ||
     projectAccess.canAccessProduction ||
     projectAccess.canAccessShots;
   const canCreateDeal = canCreateQuotes(appUser);
@@ -98,56 +90,19 @@ export default function ProjectDetailPage() {
     [scriptSessions, id]
   );
 
-  const scriptScoutIds = useMemo(
-    () =>
-      [primaryScript?.linkedScoutProjectId, primaryScript?.appliedScoutProjectId].filter(
-        (value): value is string => Boolean(value?.trim())
-      ),
-    [primaryScript?.linkedScoutProjectId, primaryScript?.appliedScoutProjectId]
-  );
-
-  const scoutSessions = useMemo(
-    () =>
-      pickScoutSessionsForProject([...allScoutSessions, ...boardOnlyScouts], id, {
-        boardLinkedScoutIds: board?.linkedScoutProjectIds,
-        scriptScoutIds,
-        projectName: project?.projectName,
-      }),
-    [
-      allScoutSessions,
-      boardOnlyScouts,
-      id,
-      board?.linkedScoutProjectIds,
-      scriptScoutIds,
-      project?.projectName,
-    ]
-  );
-
   useEffect(() => {
-    const boardIds = board?.linkedScoutProjectIds ?? [];
-    const missing = boardIds.filter((scoutId) => !allScoutSessions.some((s) => s.id === scoutId));
-    if (!missing.length) {
-      setBoardOnlyScouts([]);
-      return;
-    }
-    getScoutProjectsByIds(missing)
-      .then(setBoardOnlyScouts)
-      .catch(() => setBoardOnlyScouts([]));
-  }, [board?.linkedScoutProjectIds, allScoutSessions]);
-
-  useEffect(() => {
-    if (!showScout || !id) return;
+    if (!id || !showProduction) return;
     getProductionBoardByProject(id).then(setBoard).catch(() => setBoard(null));
-  }, [id, showScout]);
+  }, [id, showProduction]);
 
   useEffect(() => {
-    if (!user || (!showScout && !showScripts)) return;
+    if (!user || (!showProduction && !showScripts)) return;
     setSpineLoading(true);
     scriptWriterListSessions(() => user.getIdToken())
       .then((res) => setScriptSessions(res.sessions as ScriptWriterSession[]))
       .catch(() => setScriptSessions([]))
       .finally(() => setSpineLoading(false));
-  }, [user, showScout, showScripts]);
+  }, [user, showProduction, showScripts]);
 
   if (loading) return <LoadingSpinner className="py-20" />;
   if (!project) {
@@ -200,14 +155,6 @@ export default function ProjectDetailPage() {
                 </Button>
               </Link>
             )}
-            {showScout && (
-              <Link href={scoutHrefForProject(project.id, scoutSessions)}>
-                <Button size="touch" variant="outline">
-                  <Clapperboard className="mr-2 h-5 w-5" />
-                  {scoutSessions.length ? "Open scout" : "Scout scene"}
-                </Button>
-              </Link>
-            )}
             {canCreateDeal ? (
               <Link href={`/agreements/new?projectId=${project.id}`}>
                 <Button size="touch">
@@ -233,7 +180,7 @@ export default function ProjectDetailPage() {
         </p>
       )}
 
-      {spineLoading && (showScout || showScripts) ? (
+      {spineLoading && (showProduction || showScripts) ? (
         <LoadingSpinner className="py-8 mb-8" />
       ) : (
         <ProjectSpine
@@ -242,10 +189,8 @@ export default function ProjectDetailPage() {
           clientName={project.clientName}
           scriptSession={primaryScript}
           board={board}
-          scoutSessions={scoutSessions}
           agreements={projectAgreements}
           showProduction={showProduction}
-          showScout={showScout}
           showScripts={showScripts}
           canCreateDeal={canCreateDeal}
         />
@@ -357,53 +302,6 @@ export default function ProjectDetailPage() {
                         ) : (
                           <ArrowRight className="ml-3 h-4 w-4 shrink-0 text-slate-300" />
                         )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardBody>
-          </Card>
-        )}
-
-        {showScout && (
-          <Card className={showScout ? "" : "lg:col-span-2"}>
-            <CardBody>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Clapperboard className="h-5 w-5 text-sky-600" />
-                  Shot Scout sessions
-                </h2>
-                <Link href={scoutNewHrefForProject(project.id, scoutSessions.length > 0)}>
-                  <Button size="sm" variant="outline">
-                    {scoutSessions.length ? "Add another scout" : "Add scout session"}
-                  </Button>
-                </Link>
-              </div>
-              {scoutSessions.length === 0 ? (
-                <p className="text-sm text-slate-500">No location scouts linked to this project yet.</p>
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {scoutSessions.map((s) => (
-                    <li key={s.id}>
-                      <div className="flex items-center justify-between py-3 hover:bg-slate-50 -mx-2 px-2 rounded-lg">
-                        <Link href={`/scout/${s.id}`} className="min-w-0 flex-1">
-                          <p className="font-medium">{s.projectName}</p>
-                          <p className="text-xs text-slate-500">
-                            {s.latestDpPlan ? "DP plan ready" : "In progress"}
-                          </p>
-                        </Link>
-                        <div className="ml-3 flex shrink-0 items-center gap-2">
-                          <Badge>{s.status.replace(/_/g, " ")}</Badge>
-                          {s.latestDpPlan ? (
-                            <Link
-                              href={`/scout/${s.id}/export`}
-                              className="text-xs font-medium text-sky-700 hover:underline"
-                            >
-                              Export PDF
-                            </Link>
-                          ) : null}
-                        </div>
                       </div>
                     </li>
                   ))}

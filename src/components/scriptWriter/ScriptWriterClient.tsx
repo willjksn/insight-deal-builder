@@ -43,6 +43,7 @@ import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { cn } from "@/lib/utils/cn";
 import { ScriptEditorPanel } from "@/components/scriptWriter/ScriptEditorPanel";
 import { ScriptSuggestedShotsPanel } from "@/components/scriptWriter/ScriptSuggestedShotsPanel";
+import { ScriptStoryboardPanel } from "@/components/scriptWriter/ScriptStoryboardPanel";
 import { ShotListOptions } from "@/components/scriptWriter/StoryboardModeToggle";
 import { canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPanel";
@@ -241,8 +242,6 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
     try {
       const result = await scriptWriterApplyToProject(() => user.getIdToken(), sessionId, {
         projectId: targetProjectId,
-        createScout: true,
-        updateExistingScout: Boolean(session?.linkedScoutProjectId),
       });
       setSession((s) =>
         s
@@ -287,8 +286,6 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         sessionId,
         {
           projectName: name,
-          createScout: true,
-          updateExistingScout: Boolean(session?.linkedScoutProjectId),
         }
       );
       setSession((s) =>
@@ -630,6 +627,20 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
               </p>
             )}
           </div>
+          {script &&
+          (storyboardMode || (script.storyboardFrames?.length ?? 0) > 0) ? (
+            <ScriptStoryboardPanel
+              script={script}
+              inspirationImages={session.inspirationImages}
+              appliedProjectId={session.appliedProjectId ?? session.linkedProjectId}
+            />
+          ) : storyboardMode && !script ? (
+            <div className="border-b border-slate-100 px-4 py-3">
+              <p className="text-xs text-amber-800">
+                Storyboard mode is on — scene frames will appear here after you write the script.
+              </p>
+            </div>
+          ) : null}
           {script && script.suggestedShots.length > 0 ? (
             <ScriptSuggestedShotsPanel shots={script.suggestedShots} />
           ) : null}

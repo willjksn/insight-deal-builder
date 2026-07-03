@@ -1,14 +1,13 @@
 # ShootSpine
 
-**[shootspine.com](https://shootspine.com)** · Script. Scout. Shoot. Sign.
+**[shootspine.com](https://shootspine.com)** · Script. Plan. Shoot. Sign.
 
-The project spine for video production — script, scout, shoot, and sign — built for **Insight Media Group** and partner teams.
+The project spine for video production — script, plan, shoot, and sign — built for **Insight Media Group** and partner teams.
 
 ## What it covers
 
 - **Script writer** — text or inspiration-driven scripts with production packs and optional storyboard mode
 - **Pre-production boards** — cast, crew, shoot days, locations, call sheets, and shot lists per project
-- **Shot Scout** — location photos, AI analysis, DP plans, and shot lists
 - **Stage planner** — top-down lighting diagrams with props, walls, and notes
 - **Reference guide** — iPad-friendly FX6 / lens quick reference (admin can draft with Gemini + Tavily)
 - **Agreements** — quotes, signatures, payouts, gear use, and client sign-off
@@ -18,7 +17,7 @@ The project spine for video production — script, scout, shoot, and sign — bu
 
 - Next.js (App Router) + TypeScript + Tailwind CSS
 - Firebase Auth, Firestore, and Storage
-- Google Gemini (Vertex) for Script writer and Shot Scout AI
+- Google Gemini (Vertex) for Script writer and production AI features
 - jsPDF for PDF generation
 - react-signature-canvas for iPad/Apple Pencil signatures
 - Resend for transactional email
@@ -60,14 +59,12 @@ The project spine for video production — script, scout, shoot, and sign — bu
 | Stage planner | `/stage`, `/projects/[id]/stage` |
 | Reference guide | `/reference` |
 | Script writer | `/script-writer`, `/script-writer/[id]` |
-| Shot Scout | `/scout`, `/scout/[id]` |
 | Agreements | `/agreements`, `/agreements/new`, `/agreements/[id]` |
-| Scout settings | `/settings/scout-gear`, `/settings/lights` |
 | Admin | `/admin` |
 
 ## Permissions
 
-Access is role- and checkbox-based. Production tools (Script writer, Shot Scout) require the Shot Scout permission. Agreement creation requires quote permissions. Admins manage users from `/admin`.
+Access is role- and checkbox-based. Production tools (Script writer, stage planner, reference guide, production boards) require the **Production tools** permission (`useShotScout` in Firestore). Agreement creation requires quote permissions. Admins manage users from `/admin`.
 
 **Legacy users:** profiles imported before the approval flow may omit the `approved` field — those users are treated as already approved. New signups stay pending until an admin assigns company and permissions.
 
@@ -81,7 +78,6 @@ Access is role- and checkbox-based. Production tools (Script writer, Shot Scout)
 4. Optional uptime monitors: `HEALTH_CHECK_SECRET` or reuse `CRON_SECRET` for `/api/health/firebase` and `/api/health/email` (Bearer or `x-health-secret` header).
 5. Deploy Firebase rules/indexes/storage after rule changes.
 6. Verify admin health endpoints after deploy:
-   - `GET /api/health/scout-ai` (admin auth)
    - `GET /api/health/email` (admin auth or health secret)
 7. CI runs on push/PR to `main`: lint, tests, and production build.
 
@@ -92,4 +88,3 @@ Access is role- and checkbox-based. Production tools (Script writer, Shot Scout)
 | `/api/health` | Public | Liveness (`ok`, timestamp only) |
 | `/api/health/firebase` | Admin or health secret | Firebase Admin connectivity |
 | `/api/health/email` | Admin or health secret | Resend configuration |
-| `/api/health/scout-ai` | Admin auth | Gemini / Vertex probe |

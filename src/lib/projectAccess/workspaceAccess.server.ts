@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { Firestore, FieldValue } from "firebase-admin/firestore";
 import { AppUser } from "@/lib/types";
 import { canManageProjects, canManageUsers } from "@/lib/utils/permissions";
-import { SCOUT_PROJECTS_COLLECTION } from "@/lib/firebase/scoutFirestore";
 import {
   canAdminOpenPrivateWorkspace,
   WorkspaceAccessOptions,
@@ -61,10 +60,6 @@ export async function tryAdminWorkspaceReadAccess(
     resourceId: context.resourceId,
   });
 
-  if (context.resourceType === "scout") {
-    await ensureScoutAdminSupportReader(db, context.resourceId, context.adminUserId);
-  }
-
   return true;
 }
 
@@ -83,17 +78,5 @@ export async function logAdminWorkspaceAccess(
     ...entry,
     action: "open",
     createdAt: FieldValue.serverTimestamp(),
-  });
-}
-
-async function ensureScoutAdminSupportReader(
-  db: Firestore,
-  scoutId: string,
-  adminUserId: string
-): Promise<void> {
-  const ref = db.collection(SCOUT_PROJECTS_COLLECTION).doc(scoutId);
-  await ref.update({
-    [`adminSupportReaders.${adminUserId}`]: new Date().toISOString(),
-    updatedAt: FieldValue.serverTimestamp(),
   });
 }
