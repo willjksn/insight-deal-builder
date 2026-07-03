@@ -18,7 +18,7 @@ import {
   saveProductionBoard,
 } from "@/lib/firebase/productionFirestore";
 import { ProductionShotListEditor } from "@/components/production/ProductionShotListEditor";
-import { shotsFromScoutList } from "@/lib/production/scoutImport";
+import { scoutShotsFromProductionList } from "@/lib/production/shotListSync";
 import { ProductionBoard, ProductionDayShot } from "@/lib/production/types";
 import { uploadScoutImage } from "@/lib/scout/storage";
 import {
@@ -130,7 +130,7 @@ export default function ScoutProjectPage() {
             const { id: boardId, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } =
               nextBoard;
             await saveProductionBoard(boardId, rest);
-            await scoutSaveShotList(id, shotsFromScoutList(nextShots));
+            await scoutSaveShotList(id, scoutShotsFromProductionList(nextShots));
           } finally {
             setShotListSaving(false);
           }

@@ -50,7 +50,6 @@ export default function SettingsPage() {
     pushEnabled,
     registering,
     error: pushError,
-    diagnostics,
     notifyEmail,
     notifyPush,
     isStandalonePwa,
@@ -175,13 +174,6 @@ export default function SettingsPage() {
             ) : null}
             {pushStatus === "loading" ? (
               <p className="text-sm text-slate-500">Checking push support…</p>
-            ) : pushStatus === "missing_vapid" ? (
-              <InfoCallout variant="sky">
-                <strong>Push is not configured yet.</strong> Add{" "}
-                <code className="text-xs">NEXT_PUBLIC_FIREBASE_VAPID_KEY</code> in Vercel (and{" "}
-                <code className="text-xs">.env.local</code> for local dev). In Firebase Console → Project Settings →
-                Cloud Messaging → Web Push certificates, copy the key pair value, redeploy, then try again.
-              </InfoCallout>
             ) : pushStatus === "ios_install_required" ? (
               <InfoCallout variant="sky">
                 Add ShootSpine to your Home Screen first, then open it from the icon — iOS will not offer push from
@@ -214,47 +206,12 @@ export default function SettingsPage() {
                   </p>
                 ) : null}
                 {pushError ? <p className="text-sm text-red-600">{pushError}</p> : null}
-                {diagnostics ? (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
-                    <p className="font-medium text-slate-700">Device check</p>
-                    <ul className="mt-1 space-y-0.5">
-                      <li>Home screen app: {diagnostics.standalone ? "Yes" : "No"}</li>
-                      <li>Notification permission: {diagnostics.notificationPermission}</li>
-                      <li>Push API: {diagnostics.pushManager ? "Yes" : "No"}</li>
-                      <li>Service worker: {diagnostics.serviceWorkerState}</li>
-                      <li>VAPID configured: {diagnostics.vapidConfigured ? "Yes" : "No"}</li>
-                    </ul>
-                    {!diagnostics.vapidConfigured ? (
-                      <p className="mt-2 text-amber-800">
-                        Server is missing the VAPID key — push cannot work on any device until it is added in Vercel
-                        and the app is redeployed.
-                      </p>
-                    ) : null}
-                    {diagnostics.notificationPermission === "denied" ? (
-                      <p className="mt-2 text-amber-800">
-                        {isIosDevice
-                          ? "Permission was denied. Go to Settings → Notifications → ShootSpine → Allow Notifications, then tap Enable push again."
-                          : "Permission was denied. Allow notifications in your browser site settings (lock icon in the address bar), then try again."}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
             ) : (
               <InfoCallout variant="sky">{pushSupportMessage}</InfoCallout>
             )}
             {pushStatus !== "ready" && !isStandalonePwa && pushError ? (
               <p className="text-sm text-red-600">{pushError}</p>
-            ) : null}
-            {diagnostics && pushStatus !== "ready" && pushStatus !== "loading" && !isStandalonePwa ? (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
-                <p className="font-medium text-slate-700">Device check</p>
-                <ul className="mt-1 space-y-0.5">
-                  <li>VAPID configured: {diagnostics.vapidConfigured ? "Yes" : "No"}</li>
-                  <li>Notification permission: {diagnostics.notificationPermission}</li>
-                  <li>Push API: {diagnostics.pushManager ? "Yes" : "No"}</li>
-                </ul>
-              </div>
             ) : null}
             <InfoCallout variant="emerald">
               Push alerts cover client signatures, new signup approvals (admins), and shared resource notes. You need
