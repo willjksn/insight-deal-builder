@@ -125,6 +125,23 @@ Camera settings do not create the look by themselves. Lighting ratio, white bala
       body: "For faces, start with key and shadow side, then background. Write readings down so you can recreate the look.",
     },
     {
+      id: "color-wheel",
+      category: "lighting",
+      title: "Color wheel & palettes",
+      summary: "RYB relationships for harmony, contrast, and grade direction.",
+      body: `The color wheel maps how hues relate — use it when choosing wardrobe, gels, art direction, and grade direction.
+
+Primary colors (red, yellow, blue) cannot be mixed from others. Secondaries (orange, green, violet) mix two primaries. Tertiaries sit between them.
+
+In video, color sets mood and guides the eye: match scenes for consistency, push warm for nostalgia or cool for tension, and use contrast to separate subject from background.`,
+      tips: [
+        "Complementary pairs (opposites): red–green, orange–blue, yellow–violet",
+        "Analogous sets (neighbors) feel natural — blue, blue-green, green for a cool scene",
+        "Triadic (three evenly spaced hues) adds energy — balance one dominant with two accents",
+        "Grade after correction: lock white balance and exposure, then move hue/saturation toward your palette",
+      ],
+    },
+    {
       id: "look-matrix-1",
       category: "looks",
       title: "Look recipe matrix (part 1)",

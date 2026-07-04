@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ColorWheelReference } from "@/components/reference/ColorWheelReference";
 import { REFERENCE_CATEGORIES } from "@/lib/reference/categories";
 import { DEFAULT_REFERENCE_GUIDE, mergeReferenceSections } from "@/lib/reference/defaultGuide";
 import { ReferenceGuideDocument, ReferenceSection } from "@/lib/reference/types";
@@ -55,6 +56,7 @@ function SectionBlock({ section }: { section: ReferenceSection }) {
           ))}
         </ul>
       ) : null}
+      {section.id === "color-wheel" ? <ColorWheelReference /> : null}
     </article>
   );
 }
@@ -216,6 +218,18 @@ export function ReferenceGuideView({
               );
             })}
           </div>
+          <a
+            href="#color-wheel"
+            onClick={(e) => {
+              e.preventDefault();
+              setCategory("lighting");
+              setQuery("");
+              scrollToSection("color-wheel");
+            }}
+            className="block text-xs font-medium text-sky-700 hover:underline"
+          >
+            Jump to color wheel →
+          </a>
           <a
             href="#screenplay-overview"
             onClick={(e) => {
