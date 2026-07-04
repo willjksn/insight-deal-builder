@@ -16,7 +16,12 @@ export function shotListDetailRows(shot: ScriptSuggestedShot): ShotListDetailRow
   add("What we see", shot.description);
   add("Action", shot.subjectAction);
   add("Camera", shot.cameraMovement);
+  add("Body", shot.cameraBody);
   add("Lens", shot.lens);
+  add("Support", shot.support);
+  if (shot.assignedLights?.length) add("Lights", shot.assignedLights.join(" · "));
+  if (shot.assignedProps?.length) add("Props", shot.assignedProps.join(" · "));
+  add("Dolly move", shot.dollyMoveRef);
   add("Framing", shot.framing);
   add("Height", shot.cameraHeight);
   add("Blocking", shot.blocking);
@@ -24,6 +29,7 @@ export function shotListDetailRows(shot: ScriptSuggestedShot): ShotListDetailRow
   add("Exposure", shot.exposureNotes);
   add("Audio", shot.audioNotes);
   add("Setup", shot.setupNotes);
+  add("Edit", shot.editNote);
   add("Duration", shot.duration);
   add("Purpose", shot.purpose);
 
@@ -41,7 +47,12 @@ export function shotListNotesBlock(shot: ScriptSuggestedShot): string {
   push("See", shot.description);
   push("Action", shot.subjectAction);
   push("Cam", shot.cameraMovement);
+  push("Body", shot.cameraBody);
   push("Lens", shot.lens);
+  push("Support", shot.support);
+  if (shot.assignedLights?.length) push("Lights", shot.assignedLights.join(" · "));
+  if (shot.assignedProps?.length) push("Props", shot.assignedProps.join(" · "));
+  if (shot.dollyMoveRef?.trim()) push("Move", shot.dollyMoveRef);
   push("Frame", shot.framing);
   push("Height", shot.cameraHeight);
   push("Block", shot.blocking);
@@ -49,6 +60,7 @@ export function shotListNotesBlock(shot: ScriptSuggestedShot): string {
   push("Exp", shot.exposureNotes);
   push("Audio", shot.audioNotes);
   push("Setup", shot.setupNotes);
+  push("Edit", shot.editNote);
   push("Hold", shot.duration);
   push("Why", shot.purpose);
 

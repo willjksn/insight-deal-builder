@@ -11,6 +11,7 @@ import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient"
 import { getScriptSessionForRequest } from "@/lib/projectAccess/requestAccess";
 import { inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
 import { resolveScriptGenerationOptions } from "@/lib/scriptWriter/generationOptions";
+import { resolveShootingKitForSession } from "@/lib/scriptWriter/resolveShootingKit";
 import { resolveSessionBrief, scriptWriterGenerate } from "@/lib/scriptWriter/scriptWriterAi";
 import { archiveScriptVersion } from "@/lib/scriptWriter/scriptVersions";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
@@ -55,12 +56,15 @@ export async function POST(
           }
         : undefined;
 
+    const shootingKit = await resolveShootingKitForSession(db, session);
+
     const script = await scriptWriterGenerate(brief, session.messages, {
       detailLevel,
       inspiration,
       trendsResearch: session.trendsResearch ?? null,
       detailedShotList,
       storyboardMode,
+      shootingKit,
     });
 
     if (session.script) {

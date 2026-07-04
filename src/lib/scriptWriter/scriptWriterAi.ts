@@ -18,6 +18,8 @@ import {
 } from "@/lib/scriptWriter/prompts";
 import { shotListPromptRules } from "@/lib/scriptWriter/detailedShotListPrompt";
 import { storyboardPromptRules } from "@/lib/scriptWriter/storyboardPrompt";
+import { formatShootingKitForPrompt } from "@/lib/scriptWriter/shootingKitPrompt";
+import { ProductionShootingKit } from "@/lib/production/shootingKit";
 import {
   buildInspirationMediaBundle,
   hasInspirationInput,
@@ -379,10 +381,12 @@ export async function scriptWriterGenerate(
     trendsResearch?: ScriptTrendsResearch | null;
     detailedShotList?: boolean;
     storyboardMode?: boolean;
+    shootingKit?: ProductionShootingKit | null;
   }
 ): Promise<ScriptDocument> {
   const detailedShotList = options?.detailedShotList !== false;
   const storyboardMode = options?.storyboardMode ?? false;
+  const kitBlock = detailedShotList ? formatShootingKitForPrompt(options?.shootingKit) : "";
 
   if (aiUsesMock()) {
     return mockScript(brief, detailedShotList, storyboardMode);
@@ -399,6 +403,8 @@ export async function scriptWriterGenerate(
       ...contextLines,
       "",
       options?.trendsResearch ? formatTrendsForPrompt(options.trendsResearch) : "",
+      "",
+      kitBlock,
       "",
       `Detail level: ${detailLevel}`,
       "",
@@ -423,6 +429,8 @@ export async function scriptWriterGenerate(
     formatBriefForPrompt(brief),
     "",
     options?.trendsResearch ? formatTrendsForPrompt(options.trendsResearch) : "",
+    "",
+    kitBlock,
     "",
     "Conversation:",
     ...messages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`),
@@ -460,10 +468,12 @@ export async function scriptWriterRefineScript(
     trendsResearch?: ScriptTrendsResearch | null;
     detailedShotList?: boolean;
     storyboardMode?: boolean;
+    shootingKit?: ProductionShootingKit | null;
   }
 ): Promise<ScriptDocument> {
   const detailedShotList = options?.detailedShotList !== false;
   const storyboardMode = options?.storyboardMode ?? false;
+  const kitBlock = detailedShotList ? formatShootingKitForPrompt(options?.shootingKit) : "";
 
   if (aiUsesMock()) {
     return { ...currentScript, title: currentScript.title };
@@ -493,6 +503,8 @@ export async function scriptWriterRefineScript(
       : "",
     options?.trendsResearch ? formatTrendsForPrompt(options.trendsResearch) : "",
     ...contextLines,
+    "",
+    kitBlock,
     "",
     "CURRENT SCRIPT JSON:",
     JSON.stringify(currentScript),

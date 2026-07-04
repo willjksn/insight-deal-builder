@@ -1,6 +1,7 @@
 import { Timestamp } from "firebase/firestore";
 import { ProductionChecklistItem, ProductionChecklistMode } from "@/lib/production/checklist";
 import { CrewPrintoutPacket } from "@/lib/production/crewPacketTypes";
+import { ProductionShootingKit } from "@/lib/production/shootingKit";
 
 export type ProductionPersonGroup = "cast" | "production_team" | "camera_department";
 
@@ -135,6 +136,8 @@ export interface ProductionBoard {
   inspirationImages: ProductionInspirationImage[];
   locations: ProductionLocationEntry[];
   gearItems: string[];
+  /** Structured pre-production kit — drives detailed shot list gear assignment. */
+  shootingKit?: ProductionShootingKit;
   gearNotes?: string;
   filmingNotes?: string;
   musicLink?: string;

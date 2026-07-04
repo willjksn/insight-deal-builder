@@ -204,6 +204,7 @@ export function buildChecklistAutoSignals(opts: {
     scriptSessionId?: string;
     scriptFountain?: string;
     gearItems?: string[];
+    shootingKit?: import("@/lib/production/shootingKit").ProductionShootingKit;
     productionDays?: { shootDate?: string; schedule?: unknown[]; shots?: { done: boolean }[] }[];
   };
   agreement?: { status: string } | null;
@@ -221,7 +222,15 @@ export function buildChecklistAutoSignals(opts: {
     hasSchedule: Boolean(
       dayOne?.shootDate?.trim() || (dayOne?.schedule?.length ?? 0) > 0
     ),
-    hasGear: (opts.board.gearItems?.length ?? 0) > 0,
+    hasGear:
+      (opts.board.gearItems?.length ?? 0) > 0 ||
+      Boolean(
+        opts.board.shootingKit &&
+          (opts.board.shootingKit.cameraBodies?.length ||
+            opts.board.shootingKit.lenses?.length ||
+            opts.board.shootingKit.supports?.length ||
+            opts.board.shootingKit.lights?.length)
+      ),
     hasShots: shots.length > 0,
     allShotsCaptured: shots.length > 0 && shots.every((s) => s.done),
   };

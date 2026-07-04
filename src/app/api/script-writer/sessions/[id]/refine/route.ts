@@ -13,6 +13,7 @@ import { inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
 import { resolveSessionBrief, scriptWriterRefineScript } from "@/lib/scriptWriter/scriptWriterAi";
 import { archiveScriptVersion } from "@/lib/scriptWriter/scriptVersions";
 import { resolveScriptGenerationOptions } from "@/lib/scriptWriter/generationOptions";
+import { resolveShootingKitForSession } from "@/lib/scriptWriter/resolveShootingKit";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 import { prepareScriptDocumentForFirestore } from "@/lib/screenplay/serialize";
 
@@ -65,11 +66,20 @@ export async function POST(
 
     const { detailedShotList, storyboardMode } = resolveScriptGenerationOptions(body, session);
 
+    const shootingKit = await resolveShootingKitForSession(db, session);
+
     const script = await scriptWriterRefineScript(
       brief,
       session.script as ScriptDocument,
       message,
-      { detailLevel, inspiration, trendsResearch: session.trendsResearch ?? null, detailedShotList, storyboardMode }
+      {
+        detailLevel,
+        inspiration,
+        trendsResearch: session.trendsResearch ?? null,
+        detailedShotList,
+        storyboardMode,
+        shootingKit,
+      }
     );
 
     await archiveScriptVersion(db, id, session.script as ScriptDocument, "refine", message.slice(0, 120));

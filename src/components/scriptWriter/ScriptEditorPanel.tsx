@@ -37,6 +37,30 @@ interface ScriptEditorPanelProps {
 
 type ScriptViewMode = "preview" | "edit";
 
+function EditActionButtons({
+  saving,
+  onSave,
+  onCancel,
+  className,
+}: {
+  saving: boolean;
+  onSave: () => void;
+  onCancel: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      <Button type="button" size="sm" disabled={saving} onClick={onSave}>
+        {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+        Save edits
+      </Button>
+      <Button type="button" size="sm" variant="outline" disabled={saving} onClick={onCancel}>
+        Cancel
+      </Button>
+    </div>
+  );
+}
+
 export function ScriptEditorPanel({
   sessionId,
   script,
@@ -125,6 +149,12 @@ export function ScriptEditorPanel({
     }
   };
 
+  const cancelEdit = () => {
+    setDraft(normalizedScript);
+    setEditing(false);
+    setViewMode("preview");
+  };
+
   const activeScript = editing ? draft : normalizedScript;
   const elements = getScriptElements(activeScript);
 
@@ -151,25 +181,11 @@ export function ScriptEditorPanel({
         </div>
 
         {!readOnly && editing ? (
-          <>
-            <Button type="button" size="sm" disabled={saving} onClick={() => void save()}>
-              {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-              Save edits
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={saving}
-              onClick={() => {
-                setDraft(normalizedScript);
-                setEditing(false);
-                setViewMode("preview");
-              }}
-            >
-              Cancel
-            </Button>
-          </>
+          <EditActionButtons
+            saving={saving}
+            onSave={() => void save()}
+            onCancel={cancelEdit}
+          />
         ) : !readOnly ? (
           <Button
             type="button"
@@ -316,6 +332,15 @@ export function ScriptEditorPanel({
               zoom={previewState.zoom}
             />
           )}
+
+          {!readOnly && editing ? (
+            <EditActionButtons
+              saving={saving}
+              onSave={() => void save()}
+              onCancel={cancelEdit}
+              className="border-t border-slate-100 pt-4"
+            />
+          ) : null}
         </div>
       </div>
     </div>

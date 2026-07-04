@@ -1,6 +1,7 @@
 import { Timestamp } from "firebase/firestore";
 import { ScriptWriterBrief, ScriptContentType } from "@/lib/scriptWriter/brief";
 import { ScriptElement } from "@/lib/screenplay/types";
+import { ProductionShootingKit } from "@/lib/production/shootingKit";
 
 export type ScriptWriterSessionStatus =
   | "interviewing"
@@ -111,6 +112,18 @@ export interface ScriptSuggestedShot {
   setupNotes?: string;
   /** Approx hold length e.g. "3–5 sec". */
   duration?: string;
+  /** From pre-production kit — body used for this shot. */
+  cameraBody?: string;
+  /** Dolly, gimbal, slider, tripod/sticks, handheld, locked. */
+  support?: string;
+  /** Lights from kit assigned to this shot. */
+  assignedLights?: string[];
+  /** Props from kit visible in frame. */
+  assignedProps?: string[];
+  /** Links to productionPack.dollyMoves id when shot uses a planned move. */
+  dollyMoveRef?: string;
+  /** Post/edit note for this shot (selects, speed ramp, sound cue). */
+  editNote?: string;
 }
 
 /** One storyboard panel per scene — hero frame for grid view / client PDF. */
@@ -140,6 +153,30 @@ export interface ScriptEditTimelineRow {
   audio: string;
 }
 
+export interface ScriptLensPlanRow {
+  lens: string;
+  use: string;
+}
+
+export interface ScriptDollyMove {
+  id: string;
+  track: string;
+  lens: string;
+  purpose: string;
+  execution: string;
+}
+
+export interface ScriptCameraSetupRow {
+  setting: string;
+  value: string;
+  why?: string;
+}
+
+export interface ScriptEditPlanStep {
+  step: number | string;
+  action: string;
+}
+
 export interface ScriptProductionPack {
   premise?: string;
   tone?: string;
@@ -153,6 +190,16 @@ export interface ScriptProductionPack {
   props?: string[];
   editTimeline?: ScriptEditTimelineRow[];
   cameraGearNotes?: string;
+  /** Per-lens story beat assignment (PDF lens plan). */
+  lensPlan?: ScriptLensPlanRow[];
+  /** Named dolly moves with track, lens, purpose, execution. */
+  dollyMoves?: ScriptDollyMove[];
+  /** ASCII/text blocking map — talent, props, dolly start. */
+  blockingMap?: string;
+  /** Camera body settings table (codec, fps, profile, WB, ISO). */
+  cameraSetup?: ScriptCameraSetupRow[];
+  /** Picture edit + sound design steps. */
+  editPlan?: ScriptEditPlanStep[];
   locationNotes?: string[];
 }
 
@@ -224,6 +271,8 @@ export interface ScriptWriterSession {
   detailedShotList?: boolean;
   /** When true, Gemini outputs scene storyboardFrames and applies reference images */
   storyboardMode?: boolean;
+  /** Pre-production shooting kit for this session (also loads from linked project board). */
+  shootingKit?: ProductionShootingKit;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

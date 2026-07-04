@@ -48,6 +48,7 @@ import { ScriptStoryboardPanel } from "@/components/scriptWriter/ScriptStoryboar
 import { ShotListOptions } from "@/components/scriptWriter/StoryboardModeToggle";
 import { canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPanel";
+import { ScriptShootingKitPanel } from "@/components/scriptWriter/ScriptShootingKitPanel";
 import { SharedNotesPanel } from "@/components/sharedNotes/SharedNotesPanel";
 
 interface ScriptWriterClientProps {
@@ -444,6 +445,21 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         loading={researchingTrends}
         onResearch={session.status !== "applied" ? () => void researchTrends() : undefined}
       />
+
+      {detailedShotList && user ? (
+        <ScriptShootingKitPanel
+          sessionId={sessionId}
+          shootingKit={session.shootingKit}
+          linkedProjectId={
+            (session.linkedProjectId ?? session.appliedProjectId ?? projectId) || undefined
+          }
+          getToken={() => user.getIdToken()}
+          readOnly={adminReadOnly || session.status === "applied"}
+          onSaved={(kit) => setSession((prev) => (prev ? { ...prev, shootingKit: kit } : prev))}
+          className="mb-4"
+          compact
+        />
+      ) : null}
 
       <div className="flex min-w-0 flex-col gap-6">
         <section className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">

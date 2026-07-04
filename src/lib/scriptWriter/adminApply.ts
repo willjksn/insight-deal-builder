@@ -15,6 +15,7 @@ import {
   productionShotsFromScript,
   sceneNumbersFromScript,
 } from "@/lib/scriptWriter/scriptMappers";
+import { flattenShootingKit, normalizeShootingKit, shootingKitHasGear } from "@/lib/production/shootingKit";
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
 
@@ -136,6 +137,18 @@ export async function applyScriptToProject(params: {
     ? `${board.filmingNotes.trim()}\n\n— From script writer\n${notesPrefix}`
     : notesPrefix;
 
+  const sessionKit = normalizeShootingKit(session.shootingKit);
+  const boardKit = normalizeShootingKit(board.shootingKit);
+  const shootingKit =
+    shootingKitHasGear(sessionKit) && !shootingKitHasGear(boardKit)
+      ? sessionKit
+      : shootingKitHasGear(boardKit)
+        ? boardKit
+        : sessionKit;
+  const gearItems = shootingKitHasGear(shootingKit)
+    ? flattenShootingKit(shootingKit)
+    : board.gearItems ?? [];
+
   await db.collection(PRODUCTION_BOARDS_COLLECTION).doc(board.id).update(
     stripUndefined({
       filmTitle: script.title,
@@ -150,6 +163,7 @@ export async function applyScriptToProject(params: {
       productionDays: updatedDays,
       scriptSessionId: session.id,
       scriptFountain: script.fountain ?? "",
+      ...(shootingKitHasGear(shootingKit) ? { shootingKit, gearItems } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     })
   );

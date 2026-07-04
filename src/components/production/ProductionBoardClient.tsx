@@ -62,6 +62,17 @@ import { musicEmbedUrl } from "@/lib/utils/musicEmbed";
 import { uploadProductionDocument, uploadProductionImage } from "@/lib/production/storage";
 import { isInspirationStoryLink } from "@/lib/production/storyLinks";
 import { imageFilesFromZip, isImageFile, isZipFile } from "@/lib/production/zipImages";
+import {
+  flattenShootingKit,
+  normalizeShootingKit,
+  ProductionShootingKit,
+  shootingKitFromLegacy,
+  shootingKitItemCount,
+} from "@/lib/production/shootingKit";
+import {
+  ShootingKitEditor,
+  shootingKitSummary,
+} from "@/components/production/ShootingKitEditor";
 import { cn } from "@/lib/utils/cn";
 
 interface ProductionBoardClientProps {
@@ -315,18 +326,28 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
               onChangeBudgetLink={(budgetLink) => patch({ budgetLink })}
             />
             <GearCard
-              items={board.gearItems}
+              shootingKit={shootingKitFromLegacy(board.shootingKit, board.gearItems)}
               notes={board.gearNotes ?? ""}
               hasAgreement={Boolean(primaryAgreement)}
               onImportFromAgreement={
                 primaryAgreement
-                  ? () =>
+                  ? () => {
+                      const imported = importGearFromAgreement(board.gearItems, primaryAgreement);
+                      const kit = shootingKitFromLegacy(board.shootingKit, imported);
                       patch({
-                        gearItems: importGearFromAgreement(board.gearItems, primaryAgreement),
-                      })
+                        shootingKit: kit,
+                        gearItems: flattenShootingKit(kit),
+                      });
+                    }
                   : undefined
               }
-              onChange={(gearItems, gearNotes) => patch({ gearItems, gearNotes })}
+              onChange={(shootingKit, gearNotes) =>
+                patch({
+                  shootingKit,
+                  gearItems: flattenShootingKit(shootingKit),
+                  gearNotes: gearNotes ?? "",
+                })
+              }
             />
           </BoardColumn>
 
@@ -1235,114 +1256,45 @@ function InspirationEditor({
 }
 
 function GearCard({
-  items,
+  shootingKit,
   notes,
   onChange,
   hasAgreement,
   onImportFromAgreement,
 }: {
-  items: string[];
+  shootingKit: ProductionShootingKit;
   notes: string;
-  onChange: (items: string[], notes: string) => void;
+  onChange: (kit: ProductionShootingKit, notes?: string) => void;
   hasAgreement?: boolean;
   onImportFromAgreement?: () => void;
 }) {
-  const [draft, setDraft] = useState("");
-  const [importError, setImportError] = useState<string | null>(null);
-
-  const addItem = () => {
-    const next = draft.trim();
-    if (!next) return;
-    onChange([...items, next], notes);
-    setDraft("");
-  };
-
-  const summary = items.length
-    ? `${items.length} item${items.length === 1 ? "" : "s"}`
-    : "Tap to add gear";
+  const kit = normalizeShootingKit(shootingKit);
+  const summary =
+    shootingKitItemCount(kit) > 0 || kit.cameraSettingsNotes?.trim()
+      ? shootingKitSummary(kit)
+      : "Add cameras, lenses, dolly, lights…";
 
   return (
     <BoardCard
-      title="Gearlist"
+      title="Shooting kit"
       collapsible
       defaultOpen={false}
       summary={summary}
       bodyClassName="p-3"
     >
-      <div className="space-y-3">
-        {items.length > 0 ? (
-          <BoardScrollArea className="max-h-52">
-            <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
-              {items.map((item, i) => (
-                <li key={`${item}-${i}`} className="flex items-start gap-2.5 px-3 py-2">
-                  <span className="mt-0.5 h-4 w-4 shrink-0 rounded border border-slate-300 bg-white" />
-                  <span className="min-w-0 flex-1 text-sm text-slate-800">{item}</span>
-                  <button
-                    type="button"
-                    className="shrink-0 text-slate-300 hover:text-red-500"
-                    onClick={() => onChange(items.filter((_, j) => j !== i), notes)}
-                    title="Remove"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </BoardScrollArea>
-        ) : (
-          <p className="text-sm text-slate-500">No gear listed yet. Add items below.</p>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <div className="min-w-0 flex-1">
-              <Input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Add gear item…"
-                className="text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addItem();
-                  }
-                }}
-              />
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              onClick={addItem}
-              disabled={!draft.trim()}
-              className="shrink-0 px-2.5"
-              aria-label="Add gear item"
-              title="Add gear item"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          {hasAgreement && onImportFromAgreement ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={onImportFromAgreement}
-              className="w-full text-xs"
-            >
+      <ShootingKitEditor
+        kit={kit}
+        notes={notes}
+        onChange={onChange}
+        compact
+        footerActions={
+          hasAgreement && onImportFromAgreement ? (
+            <Button type="button" size="sm" variant="outline" onClick={onImportFromAgreement} className="text-xs">
               Import from agreement
             </Button>
-          ) : null}
-          {importError ? <p className="text-xs text-red-600">{importError}</p> : null}
-        </div>
-
-        <textarea
-          value={notes}
-          onChange={(e) => onChange(items, e.target.value)}
-          placeholder="Gear notes (rentals, who brings what, etc.)"
-          rows={2}
-          className="w-full resize-none rounded-lg border border-slate-200 px-2.5 py-2 text-xs text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/20"
-        />
-      </div>
+          ) : null
+        }
+      />
     </BoardCard>
   );
 }

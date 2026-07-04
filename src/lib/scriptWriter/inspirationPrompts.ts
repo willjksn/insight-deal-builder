@@ -39,10 +39,11 @@ export function scriptWriterInspirationGenerateSystem(
 - premise, tone
 - timedBeats: array covering the full runtime in seconds (e.g. 0-3, 3-6...) with visual, audio, dialogue, onScreenText
 - editTimeline: rows with time, visual, audio columns
+- lensPlan, dollyMoves, blockingMap, cameraSetup, editPlan (when detailed shot list is on)
 - cinematicLook: lighting, color, cameraStyle
 - soundDesign: bullet list
 - props: bullet list
-- cameraGearNotes: practical camera/lens suggestions
+- cameraGearNotes: practical camera/lens suggestions from AVAILABLE SHOOTING KIT
 - locationNotes: one note per location from images`
       : detailLevel === "production"
         ? `Include productionPack with premise, tone, timedBeats (if short), cinematicLook, soundDesign, props, locationNotes`

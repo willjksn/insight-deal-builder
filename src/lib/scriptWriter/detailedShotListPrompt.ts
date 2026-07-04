@@ -15,16 +15,30 @@ REQUIRED fields on EVERY suggestedShots row (detailed mode):
   description (what the frame contains — composition, depth, foreground/background),
   subjectAction (what talent/props do during the take),
   cameraMovement (specific: static, slow dolly in 18" over 4s, handheld micro-sway, pan L→R follow, etc.),
-  lens (e.g. 24mm, 50mm, 85mm, 100mm macro),
+  cameraBody (from AVAILABLE SHOOTING KIT — e.g. Sony FX3),
+  lens (from kit — e.g. 24mm, 50mm, 85mm, 100mm macro),
+  support (from kit — dolly, gimbal, slider, tripod/sticks, handheld, locked),
+  assignedLights (array — which lights from kit motivate this shot),
+  assignedProps (array — props from kit in frame),
+  dollyMoveRef (optional — id letter linking to productionPack.dollyMoves when this shot executes a planned move),
   framing (screen direction, headroom, lead room, angle — e.g. "MCU screen-left, negative space right for figure"),
   cameraHeight (eye level, low angle, high angle, tabletop for insert, exact note if relevant),
   blocking (where talent/props are in the space relative to camera and set),
   lighting (key/fill/rim/practical sources, ratio, color temp, what motivates the light),
   exposureNotes (fps/shutter if not project default, T-stop or aperture, EI/ISO, IRE targets for S-Cinetone or Log),
   audioNotes (dialogue/mos, wild lines, room tone, SFX to capture, mic strategy if relevant),
-  setupNotes (tripod/slider/gimbal, lens swap, flags/diffusion, safety, slate, plate/clean plate needs),
+  setupNotes (flags/diffusion, lens swap, safety, slate, plate/clean plate — complement support field),
+  editNote (optional — how this shot is used in edit: hold, speed ramp, match cut, sound sting),
   purpose (story/emotional beat this shot serves),
   duration (approx hold length e.g. "3–5 sec" or "until action completes").
+
+When detailed mode is on, productionPack MUST also include:
+  lensPlan: [{ lens, use }] — which lenses cover which story beats
+  dollyMoves: [{ id, track, lens, purpose, execution }] — named moves (A, B, C…) with track placement, speed, talent path
+  blockingMap: ASCII/text floor plan — couch, screen, figure positions, dolly track, start mark
+  cameraSetup: [{ setting, value, why }] — body codec, fps, shutter, profile, WB, ISO guidance from kit defaults
+  editPlan: [{ step, action }] — picture edit order + sound design stack for trailer/spot
+  editTimeline: [{ time, visual, audio }] — optional timed cut list
 
 Quality bar — each shot should answer:
   Where is the camera? What lens? How is it mounted and moving?
@@ -42,7 +56,12 @@ Example row (match this depth, adapt to the script):
   "description": "MCU on Stormi screen-left; home-theater screen soft OOF in BG right; face lit primarily by screen flicker.",
   "subjectAction": "Stormi exhales, brow furrows, reaches for remote but hesitates.",
   "cameraMovement": "static on sticks; optional 2% slow push-in last 2 sec",
+  "cameraBody": "Sony FX3",
   "lens": "100mm",
+  "support": "tripod / sticks",
+  "assignedLights": ["6500K projector screen (practical key)"],
+  "assignedProps": ["remote control"],
+  "dollyMoveRef": "",
   "framing": "MCU, eyes upper third, lead room screen-right toward the glitch source",
   "cameraHeight": "eye level, lens height ~5'4\" aligned with Stormi seated",
   "blocking": "Stormi center couch; screen dominates BG; remote in right hand at chest",

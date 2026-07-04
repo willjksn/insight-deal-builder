@@ -1,4 +1,5 @@
 import { ScriptWriterBrief } from "@/lib/scriptWriter/brief";
+import { ProductionShootingKit } from "@/lib/production/shootingKit";
 import {
   ScriptInspirationImage,
   ScriptInspirationUrl,
@@ -151,6 +152,19 @@ export async function scriptWriterGenerateScript(
       detailedShotList: options?.detailedShotList,
       storyboardMode: options?.storyboardMode,
     }),
+  });
+  return parseJson<{ session: unknown }>(res);
+}
+
+export async function scriptWriterUpdateShootingKit(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  shootingKit: ProductionShootingKit
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/shooting-kit`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ shootingKit }),
   });
   return parseJson<{ session: unknown }>(res);
 }
