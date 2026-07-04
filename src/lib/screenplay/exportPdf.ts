@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { APP_NAME } from "@/lib/brand";
+import { shotListDetailRows, shotListTitle } from "@/lib/scriptWriter/shotListDisplay";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 import { getScriptElements } from "@/lib/screenplay/normalize";
 import { paginateScreenplay } from "@/lib/screenplay/paginate";
@@ -291,10 +292,27 @@ export function downloadProductionPackPdf(script: ScriptDocument): void {
   if (script.suggestedShots?.length) {
     addHeading("Shot list");
     for (const shot of script.suggestedShots) {
-      y = ensureSpace(doc, y, LINE_HEIGHT * 2);
-      const line = `${shot.shotNumber}. ${shot.shotName ?? shot.shotType} — ${shot.description}`;
+      y = ensureSpace(doc, y, LINE_HEIGHT * 3);
       setCourier(doc, 10);
-      y = drawLines(doc, wrapText(doc, line, contentWidth), SCREENPLAY_PAGE.marginLeft, y, contentWidth);
+      y = drawLines(
+        doc,
+        wrapText(doc, shotListTitle(shot), contentWidth),
+        SCREENPLAY_PAGE.marginLeft,
+        y,
+        contentWidth
+      );
+      for (const row of shotListDetailRows(shot)) {
+        y = ensureSpace(doc, y, LINE_HEIGHT * 2);
+        setCourier(doc, 9);
+        y = drawLines(
+          doc,
+          wrapText(doc, `${row.label}: ${row.value}`, contentWidth),
+          SCREENPLAY_PAGE.marginLeft,
+          y,
+          contentWidth
+        );
+      }
+      y += LINE_HEIGHT * 0.5;
     }
   }
 

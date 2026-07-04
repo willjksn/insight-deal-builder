@@ -39,6 +39,13 @@ function shotLabelFromDay(shot: ProductionDay["shots"][0]): string {
 
 function parseLightingFromNotes(notes?: string): string {
   if (!notes?.trim()) return "—";
+  const lightLine = notes.split("\n").find((line) => /^Light:\s*/i.test(line));
+  if (lightLine) {
+    const expLine = notes.split("\n").find((line) => /^Exp:\s*/i.test(line));
+    const light = lightLine.replace(/^Light:\s*/i, "").trim();
+    const exp = expLine?.replace(/^Exp:\s*/i, "").trim();
+    return [light, exp].filter(Boolean).join(" · ") || light;
+  }
   const parts = notes.split(" · ");
   const lighting = parts.find((p) =>
     /light|t\d|stop|warm|cool|blue|practical|moon|key|fill|rim/i.test(p)
@@ -70,7 +77,9 @@ export function buildMasterShots(
           shot.notes?.split(" · ")[0]?.trim() ||
           shot.label;
         const lightingNotes =
-          suggestedShot?.lighting?.trim() ||
+          [suggestedShot?.lighting?.trim(), suggestedShot?.exposureNotes?.trim()]
+            .filter(Boolean)
+            .join(" · ") ||
           parseLightingFromNotes(shot.notes) ||
           "—";
         return {
@@ -93,7 +102,8 @@ export function buildMasterShots(
         location: scene ? locationFromSceneHeading(scene.heading) : "—",
         shotLabel: shotLabelFromSuggested(shot),
         action: shot.subjectAction?.trim() || shot.description.trim(),
-        lightingNotes: shot.lighting?.trim() || "—",
+        lightingNotes:
+          [shot.lighting?.trim(), shot.exposureNotes?.trim()].filter(Boolean).join(" · ") || "—",
       };
     });
 }

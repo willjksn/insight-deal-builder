@@ -1,6 +1,7 @@
 "use client";
 
 import { ScriptDocument } from "@/lib/scriptWriter/types";
+import { ScriptShotListCard } from "@/components/scriptWriter/ScriptShotListCard";
 
 export function ScriptProductionPackView({ script }: { script: ScriptDocument }) {
   const pack = script.productionPack;
@@ -92,16 +93,11 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
       {script.suggestedShots.length ? (
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shot list</h4>
-          <ol className="mt-2 list-decimal space-y-2 pl-4 text-xs text-slate-700">
+          <div className="mt-2 space-y-3">
             {script.suggestedShots.map((shot) => (
-              <li key={`${shot.sceneNumber}-${shot.shotNumber}`}>
-                <span className="font-medium">{shot.shotName || shot.description.slice(0, 60)}</span>
-                {shot.lens ? <span className="text-slate-500"> · {shot.lens}</span> : null}
-                {shot.lighting ? <p className="text-slate-500">Light: {shot.lighting}</p> : null}
-                {shot.purpose ? <p className="text-slate-500">{shot.purpose}</p> : null}
-              </li>
+              <ScriptShotListCard key={`${shot.sceneNumber}-${shot.shotNumber}`} shot={shot} />
             ))}
-          </ol>
+          </div>
         </div>
       ) : null}
 

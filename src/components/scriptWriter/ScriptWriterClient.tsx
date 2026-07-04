@@ -8,6 +8,7 @@ import {
   FolderPlus,
   FolderOpen,
   Loader2,
+  RefreshCw,
   ScrollText,
   Send,
   Sparkles,
@@ -78,6 +79,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const [storyboardMode, setStoryboardMode] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
   const [applyMode, setApplyMode] = useState<"new" | "existing">("new");
@@ -159,7 +161,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
     }
   };
 
-  const generate = async () => {
+  const generate = async (options?: { closeRegenerateConfirm?: boolean }) => {
     if (!user || generating || adminReadOnly) return;
     setGenerating(true);
     setError(null);
@@ -170,6 +172,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         { detailedShotList, storyboardMode }
       );
       setSession(updated as ScriptWriterSession);
+      if (options?.closeRegenerateConfirm) setShowRegenerateConfirm(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
@@ -600,32 +603,67 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           ) : null}
           {session.refineUsed ? (
             <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
-              Refinement used — start a new session for bigger changes.
+              Refinement used — use <strong>Regenerate script</strong> below for a fresh draft, or start a
+              new session.
             </p>
           ) : null}
         </section>
 
         <section className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-4 py-3">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <ScrollText className="h-4 w-4 text-violet-600" />
-              Script
-            </h2>
-            {script ? (
-              <p className="mt-0.5 text-xs text-slate-500">
-                {script.scenes.length} scenes · {script.suggestedShots.length} shot
-                {script.suggestedShots.length === 1 ? "" : "s"}
-                {storyboardMode
-                  ? ` · ${script.storyboardFrames?.length ?? script.scenes.length} storyboard frame${(script.storyboardFrames?.length ?? script.scenes.length) === 1 ? "" : "s"}`
-                  : ""}
-                {detailedShotList ? " · detailed coverage" : ""}{" "}
-                · {script.characters.length} characters
-              </p>
-            ) : (
-              <p className="mt-0.5 text-xs text-slate-500">
-                Your full screenplay appears here after generation.
-              </p>
-            )}
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <ScrollText className="h-4 w-4 text-violet-600" />
+                  Script
+                </h2>
+                {script ? (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {script.scenes.length} scenes · {script.suggestedShots.length} shot
+                    {script.suggestedShots.length === 1 ? "" : "s"}
+                    {storyboardMode
+                      ? ` · ${script.storyboardFrames?.length ?? script.scenes.length} storyboard frame${(script.storyboardFrames?.length ?? script.scenes.length) === 1 ? "" : "s"}`
+                      : ""}
+                    {detailedShotList ? " · detailed coverage" : ""}{" "}
+                    · {script.characters.length} characters
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Your full screenplay appears here after generation.
+                  </p>
+                )}
+              </div>
+              {script && !adminReadOnly ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={generating}
+                  onClick={() => setShowRegenerateConfirm(true)}
+                >
+                  {generating ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-1.5 h-4 w-4" />
+                  )}
+                  Regenerate script
+                </Button>
+              ) : null}
+            </div>
+            {script && !adminReadOnly ? (
+              <div className="mt-3">
+                <ShotListOptions
+                  storyboardMode={storyboardMode}
+                  onStoryboardChange={setStoryboardMode}
+                  detailedShotList={detailedShotList}
+                  onDetailedChange={setDetailedShotList}
+                  compact
+                />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Shot list and storyboard options apply the next time you regenerate.
+                </p>
+              </div>
+            ) : null}
           </div>
           {script &&
           (storyboardMode || (script.storyboardFrames?.length ?? 0) > 0) ? (
@@ -812,6 +850,23 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           )}
         </section>
       </div>
+
+      <ConfirmDialog
+        open={showRegenerateConfirm}
+        title="Regenerate this script?"
+        description={`A fresh AI draft will replace the current script using your brief and conversation. The current version is saved in version history.${
+          session.status === "applied"
+            ? " Re-apply to your project afterward to update the production board."
+            : ""
+        }`}
+        confirmLabel="Regenerate"
+        cancelLabel="Keep current script"
+        loading={generating}
+        onCancel={() => {
+          if (!generating) setShowRegenerateConfirm(false);
+        }}
+        onConfirm={() => void generate({ closeRegenerateConfirm: true })}
+      />
 
       <ConfirmDialog
         open={showDeleteConfirm}

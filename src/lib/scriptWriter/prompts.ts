@@ -55,13 +55,20 @@ Return JSON matching this structure:
       "sceneNumber": "1",
       "shotNumber": 1,
       "shotType": "master_wide|medium_shot|close_up|insert_shot|reaction_shot|movement_shot|vertical_social_shot",
-      "shotName": "optional short label",
-      "description": "what we see",
-      "subjectAction": "subject action",
-      "cameraMovement": "static|pan|dolly|handheld|etc",
-      "lens": "optional",
-      "lighting": "optional",
-      "purpose": "optional"
+      "shotName": "short label e.g. WS — Home theater establishing",
+      "description": "what the frame contains — composition, depth, FG/BG",
+      "subjectAction": "what talent/props do during the take",
+      "cameraMovement": "specific movement with speed/distance if applicable",
+      "lens": "e.g. 24mm, 50mm, 100mm macro",
+      "framing": "screen direction, headroom, lead room, angle",
+      "cameraHeight": "eye level, low angle, tabletop, etc.",
+      "blocking": "talent/prop positions in the space",
+      "lighting": "key/fill/rim/practicals, ratio, color temp",
+      "exposureNotes": "fps/shutter, T-stop, EI, IRE targets",
+      "audioNotes": "dialogue/MOS, wild lines, room tone, SFX",
+      "setupNotes": "tripod/slider, flags, plates, slate notes",
+      "purpose": "story/emotional beat",
+      "duration": "approx hold e.g. 3–5 sec"
     }
   ],
   "storyboardFrames": [

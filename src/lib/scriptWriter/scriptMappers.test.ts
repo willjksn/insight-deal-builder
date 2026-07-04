@@ -52,5 +52,6 @@ describe("scriptMappers scene numbers", () => {
   it("maps production shots when sceneNumber is numeric", () => {
     const shots = productionShotsFromScript(scriptWithNumericScenes);
     expect(shots[0].sceneRef).toBe("1");
+    expect(shots[0].notes).toContain("See: Wide shot");
   });
 });

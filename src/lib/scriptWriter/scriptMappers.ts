@@ -11,6 +11,7 @@ import {
   pickInspirationForFrame,
 } from "@/lib/production/storyboardMatch";
 import { formatShotTypeLabel } from "@/lib/production/shotLabels";
+import { shotListNotesBlock } from "@/lib/scriptWriter/shotListDisplay";
 import {
   ScriptDocument,
   ScriptInspirationImage,
@@ -74,9 +75,7 @@ export function productionShotsFromScript(script: ScriptDocument): ProductionDay
         ? { sceneRef: normalizeSceneRef(shot.sceneNumber) }
         : {}),
     };
-    const notes = [shot.description, shot.lens, shot.lighting, shot.purpose]
-      .filter(Boolean)
-      .join(" · ");
+    const notes = shotListNotesBlock(shot);
     if (notes) entry.notes = notes;
     return entry;
   });

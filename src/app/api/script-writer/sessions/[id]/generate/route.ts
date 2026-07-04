@@ -72,6 +72,7 @@ export async function POST(
         script: prepareScriptDocumentForFirestore(script),
         title: script.title,
         status: "script_ready",
+        refineUsed: false,
         detailedShotList,
         storyboardMode,
         updatedAt: FieldValue.serverTimestamp(),

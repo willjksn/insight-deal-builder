@@ -199,7 +199,9 @@ export function ProductionShotListEditor({
                       {shot.subjectAction && (
                         <p className="text-xs text-slate-500">{shot.subjectAction}</p>
                       )}
-                      {shot.notes && <p className="text-xs text-slate-400">{shot.notes}</p>}
+                      {shot.notes && (
+                        <p className="whitespace-pre-wrap text-xs text-slate-400">{shot.notes}</p>
+                      )}
                     </div>
                   </td>
                   <td className="min-w-[11rem] py-2 pr-2">

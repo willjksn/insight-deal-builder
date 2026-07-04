@@ -59,7 +59,9 @@ export function ShotListPrintView({
                 <td className="py-2 pr-2">{formatShotTypeLabel(shot.shotType)}</td>
                 <td className="py-2">
                   {formatProductionShotLabel(shot)}
-                  {shot.notes ? <div className="text-slate-500">{shot.notes}</div> : null}
+                  {shot.notes ? (
+                    <div className="mt-0.5 whitespace-pre-wrap text-slate-500">{shot.notes}</div>
+                  ) : null}
                 </td>
                 <td className="py-2 pl-2">{shot.cameraMovement ?? "—"}</td>
               </tr>

@@ -98,6 +98,19 @@ export interface ScriptSuggestedShot {
   lens?: string;
   lighting?: string;
   purpose?: string;
+  /** Composition: screen direction, headroom, lead room, angle. */
+  framing?: string;
+  /** Eye level, low/high angle, tabletop, etc. */
+  cameraHeight?: string;
+  /** Talent/prop positions relative to camera and set. */
+  blocking?: string;
+  /** Shutter, T-stop, EI, IRE targets. */
+  exposureNotes?: string;
+  audioNotes?: string;
+  /** Flags, diffusion, plates, slate, gear notes. */
+  setupNotes?: string;
+  /** Approx hold length e.g. "3–5 sec". */
+  duration?: string;
 }
 
 /** One storyboard panel per scene — hero frame for grid view / client PDF. */

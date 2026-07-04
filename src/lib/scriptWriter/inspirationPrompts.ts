@@ -79,8 +79,9 @@ Output JSON only:
   "scenes": [{ "sceneNumber", "heading", "action", "dialogue": [{ "character", "parenthetical?", "line" }] }],
   "characters": [{ "name", "role", "description" }],
   "suggestedShots": [{
-    "sceneNumber", "shotNumber", "shotType", "shotName?", "description",
-    "subjectAction?", "cameraMovement?", "lens?", "lighting?", "purpose?"
+    "sceneNumber", "shotNumber", "shotType", "shotName", "description",
+    "subjectAction", "cameraMovement", "lens", "framing", "cameraHeight", "blocking",
+    "lighting", "exposureNotes", "audioNotes", "setupNotes", "purpose", "duration"
   }],
   "storyboardFrames": [{
     "sceneNumber", "sceneHeading?", "shotType", "shotName?", "caption", "audioCue?", "inspirationImageId?"
