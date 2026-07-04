@@ -60,10 +60,10 @@ export function getElementBounds(el: StageElement): ElementBounds | null {
   return null;
 }
 
-export type ResizeHandle = "nw" | "ne" | "sw" | "se";
+export type ResizeHandle = "nw" | "ne" | "sw" | "se" | "n" | "s" | "e" | "w";
 
 export function applyCornerResize(
-  handle: ResizeHandle,
+  handle: "nw" | "ne" | "sw" | "se",
   orig: ElementBounds,
   dx: number,
   dy: number,
@@ -94,6 +94,43 @@ export function applyCornerResize(
   }
 
   return { x, y, width, height };
+}
+
+/** Corner + edge resize — edge handles change one axis only. */
+export function applyResize(
+  handle: ResizeHandle,
+  orig: ElementBounds,
+  dx: number,
+  dy: number,
+  minSize = 16
+): ElementBounds {
+  if (handle === "e") {
+    return { ...orig, width: Math.max(minSize, orig.width + dx) };
+  }
+  if (handle === "w") {
+    const nextWidth = Math.max(minSize, orig.width - dx);
+    return { ...orig, x: orig.x + (orig.width - nextWidth), width: nextWidth };
+  }
+  if (handle === "s") {
+    return { ...orig, height: Math.max(minSize, orig.height + dy) };
+  }
+  if (handle === "n") {
+    const nextHeight = Math.max(minSize, orig.height - dy);
+    return { ...orig, y: orig.y + (orig.height - nextHeight), height: nextHeight };
+  }
+  return applyCornerResize(handle as "nw" | "ne" | "sw" | "se", orig, dx, dy, minSize);
+}
+
+export function captureDragOrigin(el: StageElement): {
+  x: number;
+  y: number;
+  x2?: number;
+  y2?: number;
+} {
+  if (el.kind === "wall" || el.kind === "arrow") {
+    return { x: el.x, y: el.y, x2: el.x2, y2: el.y2 };
+  }
+  return { x: el.x, y: el.y };
 }
 
 export function rotateDelta(dx: number, dy: number, degrees: number): { dx: number; dy: number } {
@@ -167,6 +204,8 @@ export function elementRenderRank(el: StageElement): number {
   return 5;
 }
 
+const ROOM_EDGE_HIT = 10;
+
 function pointInBounds(x: number, y: number, bounds: ElementBounds, pad = 0): boolean {
   return (
     x >= bounds.x - pad &&
@@ -195,7 +234,7 @@ function pointNearSegment(
   return Math.hypot(px - projX, py - projY) <= threshold;
 }
 
-/** Topmost element at canvas coordinates (for select tool). */
+/** Topmost element at canvas coordinates (for select tool). Rooms use edge hit zones only. */
 export function hitTestAtPoint(
   x: number,
   y: number,
@@ -203,6 +242,7 @@ export function hitTestAtPoint(
 ): StageElement | null {
   const sorted = [...elements].sort((a, b) => elementRenderRank(b) - elementRenderRank(a));
   for (const el of sorted) {
+    if (el.kind === "room") continue;
     if (el.kind === "wall") {
       if (pointNearSegment(x, y, el.x, el.y, el.x2, el.y2, Math.max(el.thickness / 2 + 8, 12))) {
         return el;
@@ -218,3 +258,17 @@ export function hitTestAtPoint(
   }
   return null;
 }
+
+/** Whether a point is on a room border (for selecting/moving rooms without blocking interior). */
+export function hitTestRoomEdge(
+  x: number,
+  y: number,
+  room: Extract<StageElement, { kind: "room" }>,
+  edge = ROOM_EDGE_HIT
+): boolean {
+  const { x: rx, y: ry, width, height } = room;
+  if (x < rx || x > rx + width || y < ry || y > ry + height) return false;
+  return x - rx < edge || rx + width - x < edge || y - ry < edge || ry + height - y < edge;
+}
+
+export { ROOM_EDGE_HIT };

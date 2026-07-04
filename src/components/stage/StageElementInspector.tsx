@@ -6,6 +6,7 @@ import {
   resolveElementColor,
   STAGE_DEFAULT_COLORS,
 } from "@/lib/stage/elementColor";
+import { elementsInsideRoom } from "@/lib/stage/stageRoomGroup";
 import { findStageProp } from "@/lib/stage/propCatalog";
 import {
   beamValuesFromDefaults,
@@ -22,6 +23,7 @@ import {
 interface StageElementInspectorProps {
   element: StageElement;
   onPatch: (patch: Partial<StageElement>) => void;
+  allElements?: StageElement[];
 }
 
 function ColorField({
@@ -59,7 +61,7 @@ function ColorField({
   );
 }
 
-export function StageElementInspector({ element, onPatch }: StageElementInspectorProps) {
+export function StageElementInspector({ element, onPatch, allElements = [] }: StageElementInspectorProps) {
   const typeLabel = elementTypeLabel(element);
   const color = resolveElementColor(element);
   const beamCapable = element.kind === "prop" && isBeamCapableProp(element.propId);
@@ -108,7 +110,7 @@ export function StageElementInspector({ element, onPatch }: StageElementInspecto
 
       <div className="mt-4 space-y-4">
         <ColorField
-          label={element.kind === "window" ? "Glass tint" : "Color"}
+          label={element.kind === "note" ? "Accent" : element.kind === "window" ? "Glass tint" : "Color"}
           value={color}
           onChange={setColor}
         />
@@ -154,19 +156,39 @@ export function StageElementInspector({ element, onPatch }: StageElementInspecto
         )}
 
         {element.kind === "room" && (
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-700" htmlFor="stage-room-label">
-              Room name
+          <>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-700" htmlFor="stage-room-label">
+                Room name
+              </label>
+              <input
+                id="stage-room-label"
+                type="text"
+                value={element.label ?? ""}
+                onChange={(e) => onPatch({ label: e.target.value })}
+                placeholder="Living room"
+                className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/20"
+              />
+            </div>
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 px-2.5 py-2">
+              <input
+                type="checkbox"
+                checked={element.lockContents === true}
+                onChange={(e) => onPatch({ lockContents: e.target.checked })}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+              />
+              <span className="text-xs leading-snug text-slate-700">
+                <span className="font-medium text-slate-900">Move contents with room</span>
+                <span className="mt-0.5 block text-[10px] text-slate-500">
+                  Props, notes, windows, and doorways whose center is inside this room drag with
+                  it.
+                  {allElements.length
+                    ? ` (${elementsInsideRoom(element, allElements).length} linked now)`
+                    : ""}
+                </span>
+              </span>
             </label>
-            <input
-              id="stage-room-label"
-              type="text"
-              value={element.label ?? ""}
-              onChange={(e) => onPatch({ label: e.target.value })}
-              placeholder="Living room"
-              className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/20"
-            />
-          </div>
+          </>
         )}
 
         {element.kind === "arrow" && (
@@ -177,7 +199,7 @@ export function StageElementInspector({ element, onPatch }: StageElementInspecto
 
         {element.kind === "note" && (
           <p className="text-[10px] leading-snug text-slate-500">
-            Color tints the note header bar.
+            Color accents the left edge — use camera vs light notes to color-code on set.
           </p>
         )}
 

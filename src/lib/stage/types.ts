@@ -137,6 +137,8 @@ export type StageRoomElement = {
   height: number;
   label?: string;
   color?: string;
+  /** When true, props/notes inside the room move with the room. */
+  lockContents?: boolean;
 };
 
 export type StageDoorwayElement = {
@@ -213,15 +215,15 @@ export const STAGE_PROP_CATEGORIES: { id: StagePropCategory; label: string }[] =
 
 export const NOTE_TEMPLATES = {
   camera: {
-    title: "NOTES",
+    title: "",
     body: "FX6\nLens:\n50mm\nf/2.8\n1/50\nISO 800",
   },
   light: {
-    title: "NOTES",
+    title: "",
     body: "Light model\nModifier:\nPower:\nf/ at subject",
   },
   general: {
-    title: "NOTES",
+    title: "",
     body: "Feathered on model, spilling on background",
   },
 } as const;

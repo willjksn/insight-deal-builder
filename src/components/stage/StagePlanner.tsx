@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { StageCanvas } from "@/components/stage/StageCanvas";
 import { StageElementInspector } from "@/components/stage/StageElementInspector";
+import { StageNotesMenu } from "@/components/stage/StageNotesMenu";
 import { StagePropSidebar } from "@/components/stage/StagePropSidebar";
 import { saveStageBoard } from "@/lib/stage/stageFirestore";
 import { isStageRotatable, stageElementRotation } from "@/lib/stage/elementBounds";
@@ -175,12 +176,11 @@ export function StagePlanner({
           </div>
           {!readOnly && (
             <>
-              <Button type="button" size="sm" variant="outline" onClick={() => addNoteTemplate("camera")}>
-                + Camera note
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => addNoteTemplate("light")}>
-                + Light note
-              </Button>
+              <StageNotesMenu
+                disabled={readOnly}
+                onAddTemplate={addNoteTemplate}
+                onPlaceOnCanvas={() => setActiveTool("note")}
+              />
               <Button
                 type="button"
                 size="sm"
@@ -240,6 +240,12 @@ export function StagePlanner({
           )}
         </div>
 
+        {activeTool === "note" && !readOnly && (
+          <p className="text-xs text-sky-700">
+            Click anywhere on the canvas to place a note — or use <strong>Notes</strong> for camera /
+            light presets.
+          </p>
+        )}
         {activeTool === "arrow" && !readOnly && (
           <p className="text-xs text-sky-700">Click start point, then end point for light direction arrow.</p>
         )}
@@ -256,8 +262,10 @@ export function StagePlanner({
         )}
         {activeTool === "select" && selected && !readOnly && (
           <p className="text-xs text-slate-500">
-            Drag to move · corner handles to resize · use the color picker in the panel to match your
-            diagram.
+            {selected.kind === "room"
+              ? "Room selected — drag the border to move. With contents locked, props inside move with the room."
+              : "Drag to move · corner handles to resize · use the color picker in the panel to match your diagram."}
+            {selected.kind === "prop" ? " · Edit the label in the panel for camera/light callouts." : ""}
           </p>
         )}
 
@@ -272,7 +280,11 @@ export function StagePlanner({
             readOnly={readOnly}
           />
           {activeTool === "select" && selected && !readOnly ? (
-            <StageElementInspector element={selected} onPatch={patchSelected} />
+            <StageElementInspector
+              element={selected}
+              onPatch={patchSelected}
+              allElements={elements}
+            />
           ) : null}
         </div>
       </div>

@@ -1,17 +1,20 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { StagePropIcon } from "@/components/stage/StagePropIcon";
 import { StageLightBeam } from "@/components/stage/StageLightBeam";
 import { StageWindowDaylight } from "@/components/stage/StageWindowDaylight";
 import {
-  applyCornerResize,
+  applyResize,
   elementRenderRank,
   getElementBounds,
   getPropDisplaySize,
   hitTestAtPoint,
+  hitTestRoomEdge,
   labelAnchorAboveRotatedBox,
   ResizeHandle,
+  ROOM_EDGE_HIT,
   rotateDelta,
   stageElementRotation,
 } from "@/lib/stage/elementBounds";
@@ -23,14 +26,39 @@ import {
   STAGE_DEFAULT_COLORS,
 } from "@/lib/stage/elementColor";
 import { StageElement, StageTool } from "@/lib/stage/types";
+import {
+  applyDragDelta,
+  groupedDragOrigins,
+  type ElementDragOrigin,
+} from "@/lib/stage/stageRoomGroup";
 import { cn } from "@/lib/utils/cn";
 
 const HANDLE_SIZE = 10;
+const NOTE_MIN_HEIGHT = 40;
+
+function RoomEdgeHitTargets({
+  onPointerDown,
+}: {
+  onPointerDown: (e: React.PointerEvent) => void;
+}) {
+  const edge = ROOM_EDGE_HIT;
+  const strip = "absolute pointer-events-auto cursor-move";
+  return (
+    <>
+      <div className={strip} style={{ left: 0, top: 0, right: 0, height: edge }} onPointerDown={onPointerDown} />
+      <div className={strip} style={{ left: 0, right: 0, bottom: 0, height: edge }} onPointerDown={onPointerDown} />
+      <div className={strip} style={{ left: 0, top: 0, bottom: 0, width: edge }} onPointerDown={onPointerDown} />
+      <div className={strip} style={{ right: 0, top: 0, bottom: 0, width: edge }} onPointerDown={onPointerDown} />
+    </>
+  );
+}
 
 function ResizeHandles({
   onPointerDown,
+  edges,
 }: {
   onPointerDown: (e: React.PointerEvent, handle: ResizeHandle) => void;
+  edges?: boolean;
 }) {
   const handles: { id: ResizeHandle; className: string }[] = [
     { id: "nw", className: "left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize" },
@@ -38,6 +66,14 @@ function ResizeHandles({
     { id: "sw", className: "bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize" },
     { id: "se", className: "bottom-0 right-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize" },
   ];
+  if (edges) {
+    handles.push(
+      { id: "n", className: "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize" },
+      { id: "s", className: "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize" },
+      { id: "e", className: "right-0 top-1/2 translate-x-1/2 -translate-y-1/2 cursor-ew-resize" },
+      { id: "w", className: "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize" }
+    );
+  }
 
   return (
     <>
@@ -67,6 +103,7 @@ type DragState = {
   origY: number;
   origX2?: number;
   origY2?: number;
+  groupedOrigins?: Record<string, ElementDragOrigin>;
 };
 
 type ResizeState = {
@@ -76,6 +113,7 @@ type ResizeState = {
   startY: number;
   orig: { x: number; y: number; width: number; height: number };
   rotation: number;
+  minSize: number;
 };
 
 type DrawState = {
@@ -125,6 +163,8 @@ export function StageCanvas({
   const beginDrag = (el: StageElement, clientX: number, clientY: number) => {
     onSelect(el.id);
     const { x, y } = clientToCanvas(clientX, clientY);
+    const groupedOrigins =
+      el.kind === "room" ? groupedDragOrigins(el, elements) : undefined;
     setDrag({
       id: el.id,
       startX: x,
@@ -132,6 +172,7 @@ export function StageCanvas({
       origX: el.x,
       origY: el.y,
       ...(el.kind === "wall" ? { origX2: el.x2, origY2: el.y2 } : {}),
+      ...(groupedOrigins ? { groupedOrigins } : {}),
     });
   };
 
@@ -154,7 +195,8 @@ export function StageCanvas({
   const onPointerDownResize = (
     e: React.PointerEvent,
     el: StageElement,
-    handle: ResizeHandle
+    handle: ResizeHandle,
+    minSize = 16
   ) => {
     if (readOnly || activeTool !== "select") return;
     const bounds = getElementBounds(el);
@@ -168,6 +210,7 @@ export function StageCanvas({
       startY: y,
       orig: bounds,
       rotation: stageElementRotation(el),
+      minSize,
     });
     captureOnCanvas(e);
   };
@@ -197,6 +240,15 @@ export function StageCanvas({
         captureOnCanvas(e);
         return;
       }
+      const roomEdge = [...elements]
+        .reverse()
+        .find((el) => el.kind === "room" && hitTestRoomEdge(x, y, el));
+      if (roomEdge) {
+        e.stopPropagation();
+        beginDrag(roomEdge, e.clientX, e.clientY);
+        captureOnCanvas(e);
+        return;
+      }
       onSelect(null);
     }
   };
@@ -215,7 +267,7 @@ export function StageCanvas({
       if (resize.rotation) {
         ({ dx, dy } = rotateDelta(dx, dy, resize.rotation));
       }
-      const next = applyCornerResize(resize.handle, resize.orig, dx, dy);
+      const next = applyResize(resize.handle, resize.orig, dx, dy, resize.minSize);
       onChange(
         elements.map((el) =>
           el.id === resize.id ? applyBoundsToElement(el, next) : el
@@ -227,19 +279,25 @@ export function StageCanvas({
     if (drag && !readOnly) {
       const dx = x - drag.startX;
       const dy = y - drag.startY;
-      if (drag.origX2 != null && drag.origY2 != null) {
-        patchElement(drag.id, {
-          x: drag.origX + dx,
-          y: drag.origY + dy,
-          x2: drag.origX2 + dx,
-          y2: drag.origY2 + dy,
-        });
-      } else {
-        patchElement(drag.id, {
-          x: drag.origX + dx,
-          y: drag.origY + dy,
-        });
-      }
+      onChange(
+        elements.map((el) => {
+          if (el.id === drag.id) {
+            if (drag.origX2 != null && drag.origY2 != null && el.kind === "wall") {
+              return {
+                ...el,
+                x: drag.origX + dx,
+                y: drag.origY + dy,
+                x2: drag.origX2 + dx,
+                y2: drag.origY2 + dy,
+              };
+            }
+            return { ...el, x: drag.origX + dx, y: drag.origY + dy };
+          }
+          const origin = drag.groupedOrigins?.[el.id];
+          if (origin) return applyDragDelta(el, origin, dx, dy);
+          return el;
+        })
+      );
       return;
     }
   };
@@ -268,7 +326,7 @@ export function StageCanvas({
       if (width < 16 || height < 16) return;
       onChange([
         ...elements,
-        { id, kind: "room", x, y, width, height, label: "Room" },
+        { id, kind: "room", x, y, width, height, label: "Room", lockContents: true },
       ]);
       onSelect(id);
       return;
@@ -341,7 +399,7 @@ export function StageCanvas({
           y,
           width: 140,
           height: 100,
-          title: "NOTES",
+          title: "",
           body: "Camera / light settings…",
           template: "general",
         },
@@ -446,7 +504,7 @@ export function StageCanvas({
     if (tool === "room") {
       return (
         <div
-          className="pointer-events-none absolute border-2 border-dashed border-slate-500 bg-slate-200/30"
+          className="pointer-events-none absolute border-2 border-dashed border-slate-500 bg-slate-400/15"
           style={{ left: x, top: y, width, height }}
         />
       );
@@ -475,12 +533,15 @@ export function StageCanvas({
   };
 
   const sortedElements = [...elements].sort((a, b) => {
-    if (a.id === selectedId) return 1;
-    if (b.id === selectedId) return -1;
+    const aBump = a.id === selectedId && a.kind !== "room";
+    const bBump = b.id === selectedId && b.kind !== "room";
+    if (aBump) return 1;
+    if (bBump) return -1;
     return elementRenderRank(a) - elementRenderRank(b);
   });
 
   const elementZIndex = (el: StageElement, selected: boolean) => {
+    if (el.kind === "room") return 1;
     if (selected) return 40;
     return 10 + elementRenderRank(el);
   };
@@ -542,26 +603,46 @@ export function StageCanvas({
 
         if (el.kind === "room") {
           const selected = el.id === selectedId;
-          const fill = el.color ?? STAGE_DEFAULT_COLORS.room;
+          const borderColor = selected ? "#0ea5e9" : STAGE_DEFAULT_COLORS.roomBorder;
+          const locked = el.lockContents === true;
           return (
             <div
               key={el.id}
-              className={cn(
-                "absolute cursor-move select-none border-2",
-                selected ? "border-sky-500 ring-2 ring-sky-500/30" : "border-slate-600"
-              )}
+              className="pointer-events-none absolute select-none"
               style={{
                 left: el.x,
                 top: el.y,
                 width: el.width,
                 height: el.height,
-                backgroundColor: fill,
                 zIndex: elementZIndex(el, selected),
               }}
-              onPointerDown={(e) => onPointerDownElement(e, el)}
             >
+              <div
+                className={cn(
+                  "absolute inset-0 border-2 transition-colors",
+                  selected && "ring-2 ring-sky-500/40 ring-offset-1",
+                  locked && !selected && "border-dashed"
+                )}
+                style={{
+                  borderColor,
+                  backgroundColor: selected
+                    ? "rgba(14, 165, 233, 0.07)"
+                    : "rgba(248, 250, 252, 0.35)",
+                }}
+              />
+              {!readOnly && activeTool === "select" && (
+                <RoomEdgeHitTargets
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    onPointerDownElement(e, el);
+                  }}
+                />
+              )}
               {el.label && (
-                <span className="absolute left-1 top-1 text-[10px] font-medium text-slate-500">
+                <span className="pointer-events-auto absolute left-1 top-1 flex items-center gap-1 rounded bg-white/90 px-1 text-[10px] font-medium text-slate-600 shadow-sm">
+                  {locked ? (
+                    <Lock className="h-2.5 w-2.5 shrink-0 text-sky-600" aria-hidden />
+                  ) : null}
                   {readOnly ? (
                     el.label
                   ) : (
@@ -570,13 +651,18 @@ export function StageCanvas({
                       value={el.label}
                       onChange={(ev) => patchElement(el.id, { label: ev.target.value })}
                       onClick={(ev) => ev.stopPropagation()}
-                      onPointerDown={(ev) => ev.stopPropagation()}
+                      onPointerDown={(ev) => {
+                        ev.stopPropagation();
+                        onSelect(el.id);
+                      }}
                     />
                   )}
                 </span>
               )}
               {showResizeHandles(el) && (
-                <ResizeHandles onPointerDown={(e, handle) => onPointerDownResize(e, el, handle)} />
+                <div className="pointer-events-auto absolute inset-0">
+                  <ResizeHandles onPointerDown={(e, handle) => onPointerDownResize(e, el, handle)} />
+                </div>
               )}
             </div>
           );
@@ -745,57 +831,46 @@ export function StageCanvas({
 
         if (el.kind === "note") {
           const selected = el.id === selectedId;
-          const headerColor = el.color ?? STAGE_DEFAULT_COLORS.noteHeader;
+          const accent = el.color ?? STAGE_DEFAULT_COLORS.noteHeader;
           return (
             <div
               key={el.id}
               className={cn(
-                "absolute cursor-move select-none overflow-visible rounded-md border shadow-sm",
+                "absolute flex cursor-move select-none flex-col overflow-visible rounded-md border bg-white shadow-sm",
                 selected ? "ring-2 ring-sky-500" : "border-slate-300"
               )}
               style={{
                 left: el.x,
                 top: el.y,
                 width: el.width,
-                minHeight: el.height,
+                height: el.height,
+                borderLeftWidth: 3,
+                borderLeftColor: accent,
                 zIndex: elementZIndex(el, selected),
               }}
               onPointerDown={(e) => onPointerDownElement(e, el)}
             >
-              <div className="overflow-hidden rounded-md">
-                <div
-                  className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white"
-                  style={{ backgroundColor: headerColor }}
-                >
-                  {readOnly ? (
-                    el.title
-                  ) : (
-                    <input
-                      className="w-full bg-transparent outline-none"
-                      value={el.title}
-                      onChange={(ev) => patchElement(el.id, { title: ev.target.value })}
-                      onClick={(ev) => ev.stopPropagation()}
-                      onPointerDown={(ev) => ev.stopPropagation()}
-                    />
-                  )}
-                </div>
-                {readOnly ? (
-                  <pre className="whitespace-pre-wrap bg-white p-2 text-[11px] leading-snug text-slate-800">
-                    {el.body}
-                  </pre>
-                ) : (
-                  <textarea
-                    className="min-h-[72px] w-full resize-none bg-white p-2 text-[11px] leading-snug text-slate-800 outline-none"
-                    style={{ minHeight: Math.max(72, el.height - 28) }}
-                    value={el.body}
-                    onChange={(ev) => patchElement(el.id, { body: ev.target.value })}
-                    onClick={(ev) => ev.stopPropagation()}
-                    onPointerDown={(ev) => ev.stopPropagation()}
-                  />
-                )}
-              </div>
+              {readOnly ? (
+                <pre className="h-full overflow-auto whitespace-pre-wrap p-2 text-[11px] leading-snug text-slate-800">
+                  {el.body}
+                </pre>
+              ) : (
+                <textarea
+                  className="h-full w-full resize-none overflow-auto bg-transparent p-2 text-[11px] leading-snug text-slate-800 outline-none"
+                  value={el.body}
+                  onChange={(ev) => patchElement(el.id, { body: ev.target.value })}
+                  onClick={(ev) => ev.stopPropagation()}
+                  onPointerDown={(ev) => ev.stopPropagation()}
+                  placeholder="Camera, light, lens…"
+                />
+              )}
               {showResizeHandles(el) && (
-                <ResizeHandles onPointerDown={(e, handle) => onPointerDownResize(e, el, handle)} />
+                <ResizeHandles
+                  edges
+                  onPointerDown={(e, handle) =>
+                    onPointerDownResize(e, el, handle, NOTE_MIN_HEIGHT)
+                  }
+                />
               )}
             </div>
           );
