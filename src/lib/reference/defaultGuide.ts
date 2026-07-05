@@ -35,6 +35,191 @@ Camera settings do not create the look by themselves. Lighting ratio, white bala
       ],
     },
     {
+      id: "cinematic-lighting-workflow",
+      category: "workflow",
+      title: "Cinematic lighting workflow",
+      summary: "A step-by-step guide to lighting any scene — emotion and motivated light first, not gear.",
+      body: `Core principle — before placing any light, ask:
+
+Where is the light supposed to be coming from in the story, and what emotion should the audience feel?
+
+That question controls mood, white balance, key light, practicals, shadows, background, camera exposure, and final look. Cinematic lighting is not about using a lot of lights. It is about using intentional light.
+
+Build every scene in layers: decide emotion → identify motivated source → turn off bad light → set camera and lock WB → place practicals → add and shape key → flag spill → negative fill → fill only if needed → edge light → background → color contrast → check eyes, exposure, highlights → rehearse blocking → test clip → roll.
+
+The five lighting questions (use before every scene):
+1. What is the motivated source? (window, lamp, TV, phone, sun, headlights, moonlight…)
+2. What should the audience feel? (safe, tense, romantic, clean, isolated, dangerous…)
+3. Where should the key come from? (front, side, back, above, below, screen direction)
+4. How dark should the shadows be? (bright commercial → full silhouette)
+5. What should the audience look at first? (face, product, doorway, object, movement)
+
+Simple one-line workflow: Start with story emotion, choose the motivated light source, remove bad light, set camera and white balance, build the key, shape the shadows, add separation, control the background, test the image, then roll.`,
+      tables: [
+        {
+          headers: ["Step", "Phase", "What to do"],
+          rows: [
+            ["1", "Emotion", "Define what the audience should feel — safe, romantic, scary, clean, luxurious, etc."],
+            ["2", "Motivated source", "Identify what in the scene should logically light the space (window, lamp, TV, projector, headlights…)"],
+            ["3", "Remove bad light", "Turn off overheads, harsh room lights, mixed-color lamps, ugly fluorescents, uncontrolled daylight"],
+            ["4", "Camera foundation", "Set fps, shutter, manual WB, ISO/EI, aperture, codec, profile — light for the camera, not your eyes"],
+            ["5", "White balance", "Lock Kelvin manually — do not use AWB for cinematic work"],
+            ["6", "Practicals first", "Place visible sources in frame; hide production lights to make practicals believable if needed"],
+            ["7", "Key light", "Main light on subject — soft or hard, placement defines the scene (start 45° side, slightly above eye level)"],
+            ["8", "Quality", "Soften (large source, diffusion, bounce) or harden (bare, fresnel, small far source) based on mood"],
+            ["9", "Flag spill", "Cutters, barn doors, grids, black wrap — stop light hitting walls, ceiling, wrong areas"],
+            ["10", "Negative fill", "Black flag/blanket/foam board on shadow side — adds contrast before adding more lights"],
+            ["11", "Fill (if needed)", "Subtle, softer than key — do not add fill automatically; reduce if mood is lost"],
+            ["12", "Back / edge light", "Separate subject from background — hair, shoulders; keep subtle"],
+            ["13", "Background", "Pockets of light and darkness — depth, not flat random brightness"],
+            ["14", "Color contrast", "Intentional warm/cool pairs — not random mixed color"],
+            ["15", "Eyes", "Catchlight or enough detail to read expression — motivated, subtle eye light if needed"],
+            ["16", "Exposure", "Expose for face first — do not make image dark by underexposing; darken in post"],
+            ["17", "Highlights", "Protect face; watch lamps, windows, screens, glossy surfaces for clipping"],
+            ["18", "Contrast & shape", "Clear key side, shadow side, subject priority, intentional darkness"],
+            ["19", "Blocking rehearsal", "Actor movement — do they leave the light, block key, kill catchlight, cast crew shadows?"],
+            ["20", "Lighting test", "Record 10–20 sec — mood, skin, noise, shadows, reflections, eye detail"],
+            ["21", "Roll", "Adjust from test, then shoot"],
+          ],
+        },
+        {
+          headers: ["Scene type", "Lighting feel"],
+          rows: [
+            ["Interview", "Clean, soft, professional"],
+            ["Horror", "Dark, selective, high contrast"],
+            ["Drama", "Directional, moody, motivated"],
+            ["Commercial", "Polished, clean highlights, controlled shadows"],
+            ["Lifestyle", "Natural, warm, soft"],
+            ["Music video", "Stylized, colorful, contrasty"],
+            ["Documentary", "Naturalistic, motivated, believable"],
+            ["Luxury", "Soft contrast, clean skin, rich background depth"],
+          ],
+        },
+        {
+          headers: ["Setting", "Recommendation"],
+          rows: [
+            ["Frame rate", "24p for cinematic motion"],
+            ["Shutter", "1/48, 1/50, or 180°"],
+            ["White balance", "Manual Kelvin — not auto"],
+            ["ISO / EI", "Set for camera profile and lighting level"],
+            ["Aperture", "Choose for depth of field"],
+            ["Codec / profile", "Best quality and grade headroom your workflow allows"],
+            ["Monitoring", "Waveform, zebras, false color, test clips — light for the camera"],
+          ],
+        },
+        {
+          headers: ["Source", "Kelvin"],
+          rows: [
+            ["Candle / fire", "1800K–2500K"],
+            ["Warm household lamp", "2700K–3200K"],
+            ["Tungsten", "3200K"],
+            ["Neutral LED", "4000K–4500K"],
+            ["Daylight", "5200K–5600K"],
+            ["Cloudy / shade", "6000K–7000K"],
+            ["Blue hour (neutral)", "7000K+"],
+          ],
+        },
+        {
+          headers: ["Scene", "Starting WB"],
+          rows: [
+            ["Warm interior lamp", "3200K–4000K"],
+            ["Clean interview", "4500K–5600K"],
+            ["Daylight window", "5200K–5600K"],
+            ["Night interior horror", "3800K–4800K"],
+            ["Car at night", "3800K–4500K"],
+            ["Golden hour", "5000K–5600K"],
+          ],
+        },
+        {
+          headers: ["Key placement", "Look"],
+          rows: [
+            ["Front soft key", "Clean, beauty, commercial"],
+            ["45° side key", "Natural, cinematic, flattering"],
+            ["Side key", "Dramatic, moody"],
+            ["Back key", "Mysterious, silhouette"],
+            ["Top key", "Harsh, gritty, dangerous"],
+            ["Low key", "Unnatural, horror"],
+            ["Screen key", "Modern, motivated, eerie"],
+            ["Window key", "Natural, soft, realistic"],
+          ],
+        },
+        {
+          headers: ["Look", "Fill amount"],
+          rows: [
+            ["Beauty", "More fill"],
+            ["Corporate interview", "Moderate fill"],
+            ["Drama", "Low fill"],
+            ["Horror", "Very low fill"],
+            ["Silhouette", "Almost none"],
+          ],
+        },
+        {
+          headers: ["Scene type", "Color contrast"],
+          rows: [
+            ["Horror", "Cool shadows + small warm practicals"],
+            ["Drama", "Warm key + cool background"],
+            ["Night interior", "Cool moonlight + warm lamps"],
+            ["Commercial", "Clean neutral key + rich accents"],
+            ["Sci-fi", "Blue/green sources + dark shadows"],
+            ["Romance", "Warm soft key + warm practicals"],
+            ["Thriller", "Cold key + dark background"],
+          ],
+        },
+        {
+          headers: ["Genre", "Workflow"],
+          rows: [
+            ["Clean interview", "Soft key 45° · moderate fill · edge light · clean background practical · controlled highlights"],
+            ["Horror", "Motivated source only · low fill · negative fill · deep shadows · edge separation · dark background pockets"],
+            ["Commercial", "Controlled soft key · clean product highlights · shaped reflections · deliberate background accents"],
+            ["Drama", "Motivated window/lamp key · soft directional · low–moderate fill · natural contrast · protected skin exposure"],
+            ["Lifestyle", "Soft motivated light · warm practicals · flattering skin · gentle contrast"],
+            ["Thriller", "Side/back motivated key · hard shadows when needed · cool palette · strong negative fill · controlled highlights"],
+          ],
+        },
+        {
+          headers: ["Problem", "Fix"],
+          rows: [
+            ["Scene looks flat", "Move key farther side · reduce fill · add negative fill · darken background · add edge light"],
+            ["Face too dark", "Move key closer · increase power · open aperture · add bounce or subtle eye light"],
+            ["Looks too \"video\"", "Kill overheads · motivate light · flag spill · reduce fill · add contrast and background depth"],
+            ["Background distracting", "Flag spill · dim practicals · change angle · reduce BG exposure · shallow DOF"],
+            ["Ugly colors", "Lock WB · kill mixed lights · gel to match · intentional warm/cool contrast"],
+            ["Noisy image", "Add controlled light · expose properly · faster lens · darken in post, don't starve log"],
+            ["Practical too bright", "Dim bulb · move farther · flag · expose for face, let practical glow"],
+            ["Subject blends into BG", "Edge light · brighten/darken BG behind subject · wardrobe · color separation · pull subject forward"],
+          ],
+        },
+        {
+          headers: ["Before rolling", "Check"],
+          rows: [
+            ["Emotion", "Clear and matches the scene"],
+            ["Motivated source", "Audience believes where light comes from"],
+            ["Bad light", "Overheads and unwanted sources off"],
+            ["White balance", "Locked manually"],
+            ["Practicals", "Brightness, color, placement controlled"],
+            ["Key", "Directional, shaped with diffusion/flags"],
+            ["Shadows", "Negative fill used if needed; fill not too strong"],
+            ["Separation", "Edge/back light if subject merges with background"],
+            ["Background", "Depth — not flat or random"],
+            ["Eyes", "Life and readability"],
+            ["Exposure", "Face correct; not saved by underexposure"],
+            ["Highlights", "Controlled on skin and key details"],
+            ["Blocking", "Actor stays in light through the move"],
+            ["Reflections", "No crew, stands, or unwanted mirrors"],
+            ["Test clip", "Recorded, reviewed, adjustments made"],
+          ],
+        },
+      ],
+      tips: [
+        "Lower Kelvin WB setting → image looks cooler/bluer · Higher Kelvin → warmer/oranger",
+        "Larger light source relative to subject = softer · smaller/farther = harder",
+        "If the shot looks too \"video,\" add negative fill before adding more lights",
+        "Practical trick: keep the lamp in frame, hide a production light nearby so the lamp appears to do the work",
+        "Do not light by eye alone — a room can look dark to you and perfect on camera, or the opposite",
+        "Example horror emotion: isolated, uneasy, claustrophobic — lighting should not feel bright, flat, or safe",
+      ],
+    },
+    {
       id: "lighting-ratios",
       category: "lighting",
       title: "Lighting ratios and stops",
