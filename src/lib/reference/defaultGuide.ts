@@ -220,6 +220,172 @@ Simple one-line workflow: Start with story emotion, choose the motivated light s
       ],
     },
     {
+      id: "dp-composition-workflow",
+      category: "workflow",
+      title: "Practical DP composition workflow",
+      summary: "Frame with intention — every shot answers who to look at, what to feel, and what story to reveal.",
+      body: `The main goal of composition — every frame should answer three questions:
+
+1. Who or what should the audience look at?
+2. What emotion should the frame create?
+3. What story information should the frame reveal?
+
+Before you hit record, the frame should feel intentional.
+
+Start with emotion, not camera or lens. Composition changes based on feeling — a beauty creator shot uses centered framing and clean lines; horror uses negative space and off-center framing with dark doorways; commercial uses symmetry, controlled background, and product placement.
+
+Simple rule: A great composition usually has clear subject + clean background + depth + motivated light + intentional emotion.
+
+Before you shoot, ask: Where do I want the viewer to look first? If the answer is not obvious, fix the composition.
+
+On-set tests before rolling:
+• Thumbnail test — would this freeze frame work as a thumbnail? Is the subject clear? Is there emotion?
+• Squint test — squint at the frame; you should still see subject shape, bright/dark balance, focus point, and distractions
+• Edge check — scan all four edges for cut-off limbs, stands, boom, cables, bright distractions, bad crops
+• Three-layer test — foreground, subject, background; if only "subject against wall," add depth
+• Story test — what does this composition say? (centered = confident · small in room = lonely · dark doorway = unsafe)`,
+      tables: [
+        {
+          headers: ["Step", "Phase", "What to do"],
+          rows: [
+            ["1", "Emotion", "Define feeling first — safe/unsafe, powerful/weak, warm/cold, open/trapped, romantic/scary, clean/chaotic"],
+            ["2", "Shooting direction", "Walk the room — find depth, background interest, clean lines, motivated light, space for stands, no distractions"],
+            ["3", "Subject placement", "Put subject where background supports story — depth, separation, motivated face light, room to move; pull 3–6 ft off walls"],
+            ["4", "Frame size", "Wide = location/blocking · Medium = dialogue/creator · MCU = connection · CU = earned emotion · Insert = hands, product, props"],
+            ["5", "Rule of thirds", "Starting point — eyes/face on upper third; off-center + negative space for tension; center for power/symmetry"],
+            ["6", "Headroom", "Small space above head; eyes not too low; excessive headroom = amateur unless intentional loneliness/scale"],
+            ["7", "Looking room", "Space in front of gaze direction; break it (tight against look edge) for tension, horror, arguments"],
+            ["8", "Negative space", "Empty area creates loneliness, suspense, elegance — horror: subject left, dark hallway right"],
+            ["9", "Depth", "Foreground + midground (subject) + background — doorway, plant FG, practicals, subject off wall, longer lens, shallow DOF"],
+            ["10", "Background scan", "Check all edges, behind head, reflections, cables, clutter, bright windows — what steals attention?"],
+            ["11", "Leading lines", "Counters, hallways, door frames, shelves — lines point toward subject"],
+            ["12", "Frame in frame", "Doorways, windows, mirrors, curtains — adds depth and designed structure"],
+            ["13", "Eyeline", "Interview = slightly off-camera · Creator = into lens · Dialogue = matched · Suspense = look off-screen"],
+            ["14", "Lens choice", "Wide = room/movement (watch face distortion) · 35mm = natural versatile · 50mm = clean interview · 85mm = beauty/emotion"],
+            ["15", "Camera height", "Eye level = neutral · Below = power · Above = vulnerability · Low = dominance · High = fear/isolation"],
+            ["16", "Symmetry", "Centered = clean, premium, controlled, unsettling if overused — podcast, product, luxury, hero intro"],
+            ["17", "Imbalance", "Off-center = human, uneasy — suspense, loneliness, mystery, fear, awkward moments"],
+            ["18", "Foreground", "Shoot past plants, curtains, door frame, lamp, shoulder — depth and \"inside the scene\" feel"],
+            ["19", "Light as composition", "Brightest area gets attention — face brighter than BG, hair light, darken distracting BG, shape with shadow"],
+            ["20", "Clean frame", "Intentional, not empty — simplify BG, improve edges, readable on phone screen"],
+            ["21", "Platform", "16:9 = wider BG, side blocking · 9:16 = centered subject, vertical lines, center-safe for dual crop"],
+            ["22", "Thumbnail test", "Freeze frame — clear subject, emotion, story, intentional look"],
+            ["23", "Squint test", "Subject shape, contrast, focus point, distractions still readable"],
+            ["24", "Edge check", "Four edges — limbs, stands, boom, messy objects, bad crops"],
+            ["25", "Three-layer test", "Foreground · subject · background — add depth if flat"],
+            ["26", "Story test", "What does this frame say? Match composition to emotion and beat"],
+          ],
+        },
+        {
+          headers: ["On-set step", "Action"],
+          rows: [
+            ["1", "Define emotion — warm/premium, scary/tense, clean/professional"],
+            ["2", "Choose best background — depth, practicals, texture, clean lines"],
+            ["3", "Place subject — off wall, where light and BG work"],
+            ["4", "Choose lens — wide/35/50/85 based on room and feel"],
+            ["5", "Set camera height — eye / low power / high vulnerability"],
+            ["6", "Frame subject — headroom, looking room, body crop, eyeline"],
+            ["7", "Add depth — FG object, hallway, lamp, plant, shelf"],
+            ["8", "Clean frame — remove distractions"],
+            ["9", "Shape with light — subject stands out, separation, shadows"],
+            ["10", "Check final crop — horizontal, vertical, thumbnail, social-safe"],
+          ],
+        },
+        {
+          headers: ["Shot size", "Use when"],
+          rows: [
+            ["Wide", "Location, body language, blocking, isolation, power, environment — establishing"],
+            ["Medium", "Dialogue, creator content, interviews, natural performance — safest default"],
+            ["Medium close-up", "Connection, personality, emotion, beauty, reaction — talking head, drama"],
+            ["Close-up", "Fear, realization, intimacy, decision, tension — use when moment matters"],
+            ["Insert", "Hands, phone, door handle, product, eyes, props — makes edit feel pro"],
+          ],
+        },
+        {
+          headers: ["Lens feel", "Best for", "Watch for"],
+          rows: [
+            ["Wide", "Small rooms, movement, environment, gimbal, energy", "Face distortion if too close"],
+            ["35mm", "Natural cinematic, creator, lifestyle, walk-and-talk", "Very versatile default"],
+            ["50mm", "Natural perspective, interviews, MCU, clean separation", "Balanced everyday look"],
+            ["75–85mm", "Beauty, close-ups, compression, emotional, premium", "Needs space in small rooms"],
+            ["APS-C note (FX30)", "33mm APS-C ≈ 50mm full-frame FOV", "Crop makes lenses feel tighter — plan accordingly"],
+          ],
+        },
+        {
+          headers: ["Camera height", "Feeling"],
+          rows: [
+            ["Eye level", "Natural, honest, neutral — interviews, creator, dialogue"],
+            ["Slightly below", "Stronger, powerful, heroic, confident — commercial, authority"],
+            ["Slightly above", "Vulnerable, soft, gentle, intimate — beauty, sadness"],
+            ["Low angle", "Power, intimidation, dominance, scale"],
+            ["High angle", "Weakness, fear, isolation, vulnerability"],
+          ],
+        },
+        {
+          headers: ["Composition says…", "Example framing"],
+          rows: [
+            ["Confident, polished, controlled", "Centered subject, clean background"],
+            ["Lonely, overwhelmed", "Subject small in large room"],
+            ["Unsafe, suspenseful", "Subject near dark doorway, negative space"],
+            ["Identity, duality", "Framed by mirror"],
+            ["Power", "Low angle"],
+            ["Vulnerability", "High angle, too much headroom"],
+            ["Intimate, emotional", "Close-up, shallow depth"],
+          ],
+        },
+        {
+          headers: ["Platform", "Compose for"],
+          rows: [
+            ["16:9 horizontal", "Wider BG design, room depth, side blocking, negative space L–R"],
+            ["9:16 vertical", "Subject more centered, vertical lines (door, curtain, lamp), face readable, avoid edge-critical detail"],
+            ["Both formats", "Frame horizontal first, check vertical crop; center-safe subject; monitor overlay if available"],
+            ["Social / Shorts", "Readable on phone — simplify BG, strong subject, test small screen"],
+          ],
+        },
+        {
+          headers: ["Genre", "Composition setup"],
+          rows: [
+            ["Warm creator", "Centered or slight off-center · soft key · warm practical BG · FG plant/curtain · MCU · eye level · 35–50mm · soft BG blur"],
+            ["Horror living room", "Off-center subject · dark negative space · doorway BG · low fill · strong shadow · wide/medium-wide · FG obstruction"],
+            ["Luxury commercial", "Symmetry · clean BG · controlled practicals · hair light · FG blur · centered hero · product placement"],
+            ["Interview / podcast", "Eyes upper third · slight off-center · BG practicals · depth · soft 45° key · hair light · clean mic · MCU"],
+          ],
+        },
+        {
+          headers: ["Before record", "Check"],
+          rows: [
+            ["Emotion", "Frame matches intended feeling"],
+            ["Subject", "Clear focus · face/eyes placed well · clean headroom · natural body crop"],
+            ["Background", "Interesting not distracting · nothing growing from head · no clutter or bright steals"],
+            ["Depth", "FG + subject + BG · separated from wall · BG light or texture"],
+            ["Lines", "Doorways/counters/windows helping · no crooked distractions"],
+            ["Light", "Subject shaped · BG not too bright · separation · negative fill if needed"],
+            ["Platform", "Works 16:9 and 9:16 · thumbnail-worthy"],
+            ["Technical", "Focus · boom out · no stands/cables · clean reflections · clean edges"],
+          ],
+        },
+        {
+          headers: ["When scouting direction", "Look for"],
+          rows: [
+            ["Depth", "Frame should not feel flat"],
+            ["Background interest", "Lamps, curtains, shelves, windows, hallway, texture"],
+            ["Clean lines", "Counters, door frames, windows, furniture edges"],
+            ["Light motivation", "Window, lamp, TV, hallway, streetlight"],
+            ["Light access", "Room to hide key, hair light, stands"],
+            ["Avoid", "Clutter, cables, bright objects, outlets, weird reflections"],
+          ],
+        },
+      ],
+      tips: [
+        "Rule of thirds is a starting point — center for power, off-center + negative space for tension",
+        "Pull interview subjects 3–6 feet off the wall — instant cinematic depth",
+        "Beginners look at the person; DPs scan the entire frame including all four edges",
+        "Break looking room (subject looks right, framed tight on right edge) for horror, arguments, anxiety",
+        "Brightest important area in frame = where the eye goes first — light is composition",
+        "If answer to \"where should viewer look?\" is unclear, fix composition before rolling",
+      ],
+    },
+    {
       id: "lighting-ratios",
       category: "lighting",
       title: "Lighting ratios and stops",
