@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ColorWheelReference } from "@/components/reference/ColorWheelReference";
+import { ProductionSoundSectionExtras } from "@/components/reference/ProductionSoundDiagrams";
 import { REFERENCE_CATEGORIES } from "@/lib/reference/categories";
 import { DEFAULT_REFERENCE_GUIDE, mergeReferenceSections } from "@/lib/reference/defaultGuide";
 import { ReferenceGuideDocument, ReferenceSection } from "@/lib/reference/types";
@@ -56,6 +57,9 @@ function SectionBlock({ section }: { section: ReferenceSection }) {
           ))}
         </ul>
       ) : null}
+      {section.id.startsWith("production-sound-") ? (
+        <ProductionSoundSectionExtras sectionId={section.id} />
+      ) : null}
       {section.id === "color-wheel" ? <ColorWheelReference /> : null}
     </article>
   );
@@ -85,7 +89,9 @@ export function ReferenceGuideView({
     return displayGuide.sections.filter((s) => {
       if (category !== "all" && s.category !== category) return false;
       if (!q) return true;
-      const hay = [s.title, s.summary, s.body, ...(s.tips ?? [])].join(" ").toLowerCase();
+      const hay = [s.title, s.summary, s.body, ...(s.tips ?? []), ...(s.keywords ?? [])]
+        .join(" ")
+        .toLowerCase();
       return hay.includes(q);
     });
   }, [displayGuide, query, category]);
@@ -218,6 +224,18 @@ export function ReferenceGuideView({
               );
             })}
           </div>
+          <a
+            href="#production-sound-home"
+            onClick={(e) => {
+              e.preventDefault();
+              setCategory("audio");
+              setQuery("");
+              scrollToSection("production-sound-home");
+            }}
+            className="block text-xs font-medium text-sky-700 hover:underline"
+          >
+            Jump to production sound →
+          </a>
           <a
             href="#color-wheel"
             onClick={(e) => {

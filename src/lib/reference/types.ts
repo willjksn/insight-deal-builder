@@ -11,6 +11,8 @@ export type ReferenceSection = {
   body?: string;
   tables?: ReferenceTable[];
   tips?: string[];
+  /** Search keywords — audio gear names, workflows, troubleshooting terms */
+  keywords?: string[];
 };
 
 export type ReferenceGuideDocument = {

@@ -1,4 +1,5 @@
 import { ReferenceGuideDocument } from "@/lib/reference/types";
+import { PRODUCTION_SOUND_SECTIONS } from "@/lib/reference/productionSoundGuide";
 
 /** Baseline on-set reference — seeded from Master Filmmaking Reference Guide + FX6 + lens expansion. */
 export const DEFAULT_REFERENCE_GUIDE: ReferenceGuideDocument = {
@@ -847,6 +848,7 @@ In video, color sets mood and guides the eye: match scenes for consistency, push
       ],
       tips: ["Wide = location · Medium = body language · Close-up = emotion · Insert = story detail"],
     },
+    ...PRODUCTION_SOUND_SECTIONS,
     {
       id: "audio-checklist",
       category: "audio",
