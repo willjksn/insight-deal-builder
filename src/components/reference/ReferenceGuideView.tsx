@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ColorWheelReference } from "@/components/reference/ColorWheelReference";
+import { CameraShotReference } from "@/components/reference/CameraShotReference";
 import { ProductionSoundSectionExtras } from "@/components/reference/ProductionSoundDiagrams";
 import { REFERENCE_CATEGORIES } from "@/lib/reference/categories";
 import { DEFAULT_REFERENCE_GUIDE, mergeReferenceSections } from "@/lib/reference/defaultGuide";
@@ -61,6 +62,7 @@ function SectionBlock({ section }: { section: ReferenceSection }) {
         <ProductionSoundSectionExtras sectionId={section.id} />
       ) : null}
       {section.id === "color-wheel" ? <ColorWheelReference /> : null}
+      {section.id === "camera-shots-visual-reference" ? <CameraShotReference /> : null}
     </article>
   );
 }

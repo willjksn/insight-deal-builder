@@ -387,6 +387,41 @@ On-set tests before rolling:
       ],
     },
     {
+      id: "camera-shots-visual-reference",
+      category: "workflow",
+      title: "Camera shots & angles — visual reference",
+      summary: "Quick visual guide to shot sizes and camera angles — close-up through wide, eye-level through POV.",
+      body: `Use these panels on set when choosing frame size or camera height. Pair with the DP composition workflow section for when each shot fits the story beat.
+
+Shot sizes: close-up and extreme close-up for emotion and detail; medium for dialogue and performance; wide for environment and scale.
+
+Camera angles: eye-level for neutral honesty; low angle for power; high angle for vulnerability; bird's-eye for layout and movement.
+
+Advanced framing: worm's-eye for drama; Dutch angle for tension; over-the-shoulder for dialogue perspective; POV to put the viewer in the character's eyes.`,
+      keywords: [
+        "close-up",
+        "extreme close-up",
+        "medium shot",
+        "wide shot",
+        "eye-level",
+        "low angle",
+        "high angle",
+        "bird's eye",
+        "worm's eye",
+        "Dutch angle",
+        "over the shoulder",
+        "POV",
+        "shot size",
+        "camera angle",
+        "framing reference",
+      ],
+      tips: [
+        "Use the tabs or arrows to switch between the three reference panels",
+        "Match shot size to story beat — don't jump to close-up until the moment earns it",
+        "Low angle + medium shot is a common commercial power combo; high angle + wide reads isolation",
+      ],
+    },
+    {
       id: "lighting-ratios",
       category: "lighting",
       title: "Lighting ratios and stops",

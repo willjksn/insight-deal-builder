@@ -23,6 +23,7 @@ import {
   BarChart3,
   CircleHelp,
   CalendarDays,
+  Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -62,6 +63,7 @@ export function MobileNav() {
     ...(showProduction
       ? [
           { href: "/script-writer", label: "Script", icon: ScrollText },
+          { href: "/content", label: "Ideas", icon: Lightbulb },
           { href: "/stage", label: "Stage", icon: LayoutGrid },
           { href: "/reference", label: "Guide", icon: BookOpen },
         ]

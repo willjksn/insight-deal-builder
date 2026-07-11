@@ -273,6 +273,9 @@ export interface ScriptWriterSession {
   storyboardMode?: boolean;
   /** Pre-production shooting kit for this session (also loads from linked project board). */
   shootingKit?: ProductionShootingKit;
+  sourceIdeaEngine?: boolean;
+  sourceIdeaSessionId?: string;
+  sourceIdeaId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

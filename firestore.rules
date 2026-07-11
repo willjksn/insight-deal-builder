@@ -333,6 +333,15 @@ service cloud.firestore {
       }
     }
 
+    // Weekly Content Idea Engine — server-only (Admin SDK)
+    match /brandProfiles/{profileId} {
+      allow read, write: if false;
+    }
+
+    match /ideaSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
     // Weekly script trend snapshots — server-only (Admin SDK + cron)
     match /trendSnapshots/{contentType} {
       allow read, write: if false;

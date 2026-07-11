@@ -170,6 +170,10 @@ export interface Project {
   status: ProjectStatus;
   /** User who created the project — can manage team access without global manageProjects */
   ownerUserId?: string;
+  /** Created from Weekly Content Idea Engine */
+  sourceIdeaEngine?: boolean;
+  sourceIdeaSessionId?: string;
+  sourceIdeaId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

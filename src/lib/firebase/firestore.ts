@@ -47,6 +47,11 @@ export function stripUndefined<T>(value: T): T {
   return out as T;
 }
 
+/** Deep-remove undefined via JSON (safe for nested arrays/maps; not for FieldValue/Timestamp). */
+export function deepCleanForFirestore<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 export async function getCollection<T>(collectionName: string): Promise<T[]> {
   const database = ensureDb();
   const q = query(

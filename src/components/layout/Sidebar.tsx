@@ -24,6 +24,7 @@ import {
   LayoutGrid,
   CircleHelp,
   CalendarDays,
+  Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -91,6 +92,29 @@ const navGroups: NavGroup[] = [
         href: "/reference",
         label: "Reference guide",
         icon: BookOpen,
+        canAccess: canUseProductionTools,
+      },
+    ],
+  },
+  {
+    label: "Content development",
+    items: [
+      {
+        href: "/content",
+        label: "Weekly idea engine",
+        icon: Lightbulb,
+        canAccess: canUseProductionTools,
+      },
+      {
+        href: "/content/profiles",
+        label: "Brand profiles",
+        icon: UserCircle,
+        canAccess: canUseProductionTools,
+      },
+      {
+        href: "/content/ideas/bank",
+        label: "Saved ideas",
+        icon: FileText,
         canAccess: canUseProductionTools,
       },
     ],
@@ -221,7 +245,9 @@ export function Sidebar() {
                     active={
                       item.href === "/dashboard"
                         ? pathname === "/dashboard"
-                        : pathname.startsWith(item.href)
+                        : item.href === "/content"
+                          ? pathname === "/content" || pathname.startsWith("/content/ideas")
+                          : pathname.startsWith(item.href)
                     }
                   />
                 ))}
