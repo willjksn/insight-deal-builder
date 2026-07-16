@@ -12,6 +12,7 @@ The project spine for video production — script, plan, shoot, and sign — bui
 - **Reference guide** — iPad-friendly FX6 / lens quick reference (admin can draft with Gemini + Tavily)
 - **Agreements** — quotes, signatures, payouts, gear use, and client sign-off
 - **Catalogs** — clients, companies, crew, packages, equipment, and locations
+- **Revenue & opportunities** — IMG client and Stormi brand prospecting (phased rollout; see `docs/revenue-opportunities-overview.md`)
 
 ## Stack
 

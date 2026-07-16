@@ -24,6 +24,7 @@ import {
   CircleHelp,
   CalendarDays,
   Lightbulb,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,7 +40,9 @@ import {
   canManageUsers,
   canAccessReports,
   canUseProductionTools,
+  canAccessRevenueOpportunities,
 } from "@/lib/utils/permissions";
+import { isRevenueOpportunitiesFeatureEnabled } from "@/lib/utils/permissions";
 import { canAccessHowToUseGuide } from "@/lib/guide/access";
 
 type MoreNavItem = {
@@ -69,6 +72,9 @@ export function MobileNav() {
         ]
       : []),
     { href: "/agreements", label: "Deals", icon: FileText },
+    ...(isRevenueOpportunitiesFeatureEnabled() && canAccessRevenueOpportunities(appUser)
+      ? [{ href: "/revenue", label: "Revenue", icon: TrendingUp }]
+      : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

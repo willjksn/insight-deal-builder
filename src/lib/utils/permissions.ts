@@ -147,6 +147,28 @@ export function canUseProductionTools(user: AppUser | null | undefined): boolean
 /** @deprecated use canUseProductionTools */
 export const canUseShotScout = canUseProductionTools;
 
+export { isRevenueOpportunitiesEnabled as isRevenueOpportunitiesFeatureEnabled } from "@/lib/revenueOpportunities/featureFlag";
+
+export function canViewRevenueOpportunities(user: AppUser | null | undefined): boolean {
+  return (
+    isInsightOrgUser(user) &&
+    (hasPermission(user, "viewRevenueOpportunities") ||
+      hasPermission(user, "manageRevenueOpportunities") ||
+      canManageUsers(user))
+  );
+}
+
+export function canManageRevenueOpportunities(user: AppUser | null | undefined): boolean {
+  return (
+    isInsightOrgUser(user) &&
+    (hasPermission(user, "manageRevenueOpportunities") || canManageUsers(user))
+  );
+}
+
+export function canAccessRevenueOpportunities(user: AppUser | null | undefined): boolean {
+  return canViewRevenueOpportunities(user);
+}
+
 /** Record cash received from clients or paid to payees on signed agreements */
 export function canRecordPayments(user: AppUser | null | undefined): boolean {
   return canExportPayments(user);

@@ -144,6 +144,20 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     group: "imgData",
     insightOnly: true,
   },
+  {
+    key: "viewRevenueOpportunities",
+    label: "View revenue & opportunities",
+    description: "Open the revenue command center, pipeline, and read-only opportunity data",
+    group: "imgData",
+    insightOnly: true,
+  },
+  {
+    key: "manageRevenueOpportunities",
+    label: "Manage revenue & opportunities",
+    description: "Create campaigns, approve opportunities, prepare outreach, and convert wins to projects",
+    group: "imgData",
+    insightOnly: true,
+  },
 ];
 
 export const PERMISSION_GROUPS = [
@@ -173,6 +187,8 @@ export const EMPTY_PERMISSIONS: UserPermissions = {
   viewW9Docs: false,
   exportPayments: false,
   useShotScout: false,
+  viewRevenueOpportunities: false,
+  manageRevenueOpportunities: false,
 };
 
 export const FULL_IMG_PERMISSIONS: UserPermissions = {
@@ -196,6 +212,8 @@ export const FULL_IMG_PERMISSIONS: UserPermissions = {
   viewW9Docs: true,
   exportPayments: true,
   useShotScout: true,
+  viewRevenueOpportunities: true,
+  manageRevenueOpportunities: true,
 };
 
 /** Production partner — own quotes only, no IMG client/company/crew access */
@@ -221,6 +239,8 @@ export const PRODUCER_PERMISSIONS: UserPermissions = {
   viewAllOrgDeals: true,
   manageProjects: true,
   useShotScout: true,
+  viewRevenueOpportunities: true,
+  manageRevenueOpportunities: true,
 };
 
 /** @deprecated alias — use PRODUCER_PERMISSIONS */

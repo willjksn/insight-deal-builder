@@ -29,6 +29,10 @@ export interface UserPermissions {
   exportPayments: boolean;
   /** Script writer, stage planner, reference guide, production boards */
   useShotScout: boolean;
+  /** View Revenue & opportunities command center and pipeline */
+  viewRevenueOpportunities: boolean;
+  /** Create campaigns, approve opportunities, outreach, and convert to projects */
+  manageRevenueOpportunities: boolean;
 }
 
 export interface UserProfile {

@@ -25,6 +25,7 @@ import {
   CircleHelp,
   CalendarDays,
   Lightbulb,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,7 +44,9 @@ import {
   canManageUsers,
   canAccessReports,
   canUseProductionTools,
+  canAccessRevenueOpportunities,
 } from "@/lib/utils/permissions";
+import { isRevenueOpportunitiesFeatureEnabled } from "@/lib/utils/permissions";
 import { canAccessHowToUseGuide } from "@/lib/guide/access";
 import { AppUser } from "@/lib/types";
 
@@ -122,6 +125,13 @@ const navGroups: NavGroup[] = [
   {
     label: "Business",
     items: [
+      {
+        href: "/revenue",
+        label: "Revenue & opportunities",
+        icon: TrendingUp,
+        canAccess: (user) =>
+          isRevenueOpportunitiesFeatureEnabled() && canAccessRevenueOpportunities(user),
+      },
       {
         href: "/quick-quote",
         label: "Quick quote",
@@ -247,7 +257,9 @@ export function Sidebar() {
                         ? pathname === "/dashboard"
                         : item.href === "/content"
                           ? pathname === "/content" || pathname.startsWith("/content/ideas")
-                          : pathname.startsWith(item.href)
+                          : item.href === "/revenue"
+                            ? pathname.startsWith("/revenue")
+                            : pathname.startsWith(item.href)
                     }
                   />
                 ))}

@@ -342,6 +342,50 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Revenue & Opportunities — server-only (Admin SDK) — Phase 1 stubs
+    match /revenueCampaigns/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueCampaignRuns/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueOpportunities/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueOutreachActivities/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueEmailThreads/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueFollowUpTasks/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueDiscoverySessions/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueOpportunityProposals/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueAgentRuns/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueWorkflowRuns/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueFeedbackEvents/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueSuppressionList/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueDailyBriefs/{docId} {
+      allow read, write: if false;
+    }
+    match /revenueWeeklyBriefs/{docId} {
+      allow read, write: if false;
+    }
+
     // Weekly script trend snapshots — server-only (Admin SDK + cron)
     match /trendSnapshots/{contentType} {
       allow read, write: if false;

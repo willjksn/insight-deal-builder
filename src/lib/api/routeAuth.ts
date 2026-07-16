@@ -71,6 +71,24 @@ export function assertCanManageProjects(appUser: AppUser): void {
   }
 }
 
+export function assertCanViewRevenueOpportunities(appUser: AppUser): void {
+  if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
+  if (
+    !hasPermission(appUser, "viewRevenueOpportunities") &&
+    !hasPermission(appUser, "manageRevenueOpportunities") &&
+    !hasPermission(appUser, "manageUsers")
+  ) {
+    throw new Error("Not authorized for revenue & opportunities");
+  }
+}
+
+export function assertCanManageRevenueOpportunities(appUser: AppUser): void {
+  if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
+  if (!hasPermission(appUser, "manageRevenueOpportunities") && !hasPermission(appUser, "manageUsers")) {
+    throw new Error("Not authorized to manage revenue & opportunities");
+  }
+}
+
 export function assertApprovedUser(appUser: AppUser): void {
   if (!isUserApproved(appUser)) {
     throw new Error("Not authorized");
