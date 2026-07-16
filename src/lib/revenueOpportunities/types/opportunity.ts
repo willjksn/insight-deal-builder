@@ -1,0 +1,183 @@
+import type {
+  AgentConfidence,
+  AgentEvidence,
+  RevenueApprovalStatus,
+  RevenueOpportunityType,
+  RevenuePipelineStage,
+  RevenueRejectionReason,
+  RevenueTechnicalStatus,
+} from "@/lib/revenueOpportunities/types";
+
+export interface OpportunitySubject {
+  name: string;
+  website?: string;
+  description?: string;
+  industry?: string;
+  subIndustry?: string;
+  city?: string;
+  state?: string;
+  address?: string;
+  distanceMiles?: number;
+  publicPhone?: string;
+  publicEmail?: string;
+  socialLinks?: string;
+}
+
+export interface OpportunityContact {
+  name?: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+  sourceUrl?: string;
+  verificationStatus?: "verified" | "unverified" | "unknown";
+}
+
+export interface OpportunityResearch {
+  observedFacts?: string[];
+  aiInterpretations?: string[];
+  marketingGaps?: string[];
+  whyNowSignals?: string[];
+  growthSignals?: string[];
+  risks?: string[];
+  missingInformation?: string[];
+}
+
+export interface OpportunityScoring {
+  totalScore: number;
+  confidenceScore: number;
+  categoryScores?: Record<string, number>;
+  scoreReasons?: string[];
+  disqualifiers?: string[];
+}
+
+export interface OpportunityRecommendation {
+  serviceId?: string;
+  serviceName?: string;
+  estimatedMinimumValue?: number;
+  estimatedMaximumValue?: number;
+  rationale?: string;
+  stormiInvolvement?: string;
+  imgInvolvement?: string;
+  witmeObjective?: string;
+}
+
+export interface CampaignConceptSummary {
+  title?: string;
+  campaignObjective?: string;
+  targetAudience?: string;
+  coreConcept?: string;
+  hook?: string;
+  storyDirection?: string;
+  recommendedDeliverables?: string[];
+  recommendedPlatforms?: string[];
+  stormiRole?: string;
+  imgRole?: string;
+  businessValue?: string;
+  creatorValue?: string;
+  estimatedComplexity?: "low" | "medium" | "high";
+  estimatedProductionDays?: number;
+  budgetConsiderations?: string[];
+  knownConstraints?: string[];
+  risks?: string[];
+  shootSpineProjectNotes?: string[];
+}
+
+export interface OpportunityWorkflow {
+  pipelineStage: RevenuePipelineStage;
+  technicalStatus: RevenueTechnicalStatus;
+  approvalStatus: RevenueApprovalStatus;
+  assignedTo?: string;
+  nextAction?: string;
+  followUpAt?: string;
+}
+
+export interface OpportunityQualityReview {
+  status?: "pending" | "passed" | "failed";
+  issues?: string[];
+  unsupportedClaims?: string[];
+  verificationWarnings?: string[];
+  recommendedCorrections?: string[];
+}
+
+export interface OpportunityProjectConversion {
+  status?: "none" | "pending" | "converted" | "failed";
+  shootSpineProjectId?: string;
+  convertedAt?: string;
+  convertedBy?: string;
+  lastError?: string;
+}
+
+export interface OpportunityActivityEntry {
+  id: string;
+  type: string;
+  message: string;
+  userId: string;
+  userDisplayName?: string;
+  createdAt: string;
+  metadata?: Record<string, string>;
+}
+
+export interface RevenueOpportunity {
+  id: string;
+  organizationCompany: string;
+  ownerUserId: string;
+  campaignId?: string;
+  campaignName?: string;
+  opportunityType: RevenueOpportunityType;
+  clientId?: string;
+  subject: OpportunitySubject;
+  contact?: OpportunityContact;
+  research?: OpportunityResearch;
+  evidence?: AgentEvidence[];
+  scoring?: OpportunityScoring;
+  confidence?: AgentConfidence;
+  recommendation?: OpportunityRecommendation;
+  campaignConcept?: CampaignConceptSummary;
+  workflow: OpportunityWorkflow;
+  qualityReview?: OpportunityQualityReview;
+  projectConversion?: OpportunityProjectConversion;
+  rejectionReason?: RevenueRejectionReason;
+  rejectionNotes?: string;
+  activityLog: OpportunityActivityEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type RevenueOpportunityCreateInput = Omit<
+  RevenueOpportunity,
+  "id" | "organizationCompany" | "ownerUserId" | "activityLog" | "createdAt" | "updatedAt"
+> & {
+  activityLog?: OpportunityActivityEntry[];
+};
+
+export type RevenueOpportunityUpdateInput = Partial<
+  Omit<RevenueOpportunity, "id" | "organizationCompany" | "ownerUserId" | "createdAt">
+>;
+
+export interface RevenueDashboardSummary {
+  newOpportunities: number;
+  awaitingReview: number;
+  approved: number;
+  outreachReady: number;
+  followUpsDue: number;
+  discoveryCalls: number;
+  proposalsPending: number;
+  won: number;
+  awaitingProjectConversion: number;
+  convertedToProject: number;
+  estimatedPipelineValue: number;
+  revenueWon: number;
+  byStage: Record<string, number>;
+  recentActivity: OpportunityActivityEntry[];
+}
+
+export interface RevenueFeedbackEvent {
+  id: string;
+  organizationCompany: string;
+  opportunityId: string;
+  campaignId?: string;
+  reason: RevenueRejectionReason;
+  notes?: string;
+  userId: string;
+  createdAt: string;
+}

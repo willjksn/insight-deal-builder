@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const status: RevenueFeatureStatus = {
       enabled: true,
       phase: REVENUE_OPPORTUNITIES_PHASE,
-      version: "0.1.0-foundation",
+      version: "0.2.0-manual-workflow",
       integrations: {
         gmail: mockEmailProvider.isAvailable() ? "live" : "not_configured",
         n8n: mockWorkflowProvider.isAvailable() ? "live" : "not_configured",

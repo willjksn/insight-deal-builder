@@ -91,3 +91,6 @@ export interface RevenueFeatureStatus {
     ai: "mock" | "live";
   };
 }
+
+export * from "@/lib/revenueOpportunities/types/campaign";
+export * from "@/lib/revenueOpportunities/types/opportunity";
