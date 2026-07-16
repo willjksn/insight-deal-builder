@@ -10,6 +10,7 @@ import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import type {
+  OpportunityActivityEntry,
   RevenueOpportunity,
   RevenueOpportunityCreateInput,
   RevenueOpportunityUpdateInput,
@@ -27,6 +28,24 @@ function tenantCompany(appUser: AppUser): string {
   const company = appUser.company?.trim();
   if (!company) throw new RevenueOpportunityError("NOT_AUTHORIZED", "Organization company is required");
   return company;
+}
+
+/** Firestore rejects undefined anywhere in nested maps (e.g. activityLog[].metadata). */
+function sanitizeActivityLog(entries: OpportunityActivityEntry[]): OpportunityActivityEntry[] {
+  return entries.map((entry) => stripUndefined(entry) as OpportunityActivityEntry);
+}
+
+function opportunityWritePayload(
+  input: Record<string, unknown>,
+  timestamps: { createdAt?: FirebaseFirestore.FieldValue; updatedAt: FirebaseFirestore.FieldValue }
+): Record<string, unknown> {
+  const activityLog = input.activityLog;
+  const base = stripUndefined({
+    ...input,
+    ...timestamps,
+    ...(Array.isArray(activityLog) ? { activityLog: sanitizeActivityLog(activityLog as OpportunityActivityEntry[]) } : {}),
+  });
+  return base;
 }
 
 export interface ListOpportunitiesOptions {
@@ -88,14 +107,15 @@ export async function createOpportunity(
     ? input.activityLog
     : [newActivity(appUser, "created", "Opportunity created manually")];
 
-  const payload = stripUndefined({
-    ...input,
-    organizationCompany,
-    ownerUserId: appUser.id,
-    activityLog: activity,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  const payload = opportunityWritePayload(
+    {
+      ...input,
+      organizationCompany,
+      ownerUserId: appUser.id,
+      activityLog: activity,
+    },
+    { createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }
+  );
   const ref = await db.collection(REVENUE_OPPORTUNITIES_COLLECTION).add(payload);
   const snap = await ref.get();
   return serializeDoc<RevenueOpportunity>(ref.id, snap.data()!);
@@ -113,7 +133,11 @@ export async function updateOpportunity(
   if (existing.data()!.organizationCompany !== tenantCompany(appUser)) {
     throw new RevenueOpportunityError("NOT_AUTHORIZED", "Opportunity not found");
   }
-  await ref.update(stripUndefined({ ...input, updatedAt: FieldValue.serverTimestamp() }));
+  await ref.update(
+    opportunityWritePayload({ ...input } as Record<string, unknown>, {
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+  );
   const snap = await ref.get();
   return serializeDoc<RevenueOpportunity>(snap.id, snap.data()!);
 }
@@ -181,7 +205,7 @@ export async function rejectOpportunity(
       ...existing.workflow,
       approvalStatus: "rejected",
       pipelineStage: revisitLater ? "revisit_later" : "lost",
-      nextAction: revisitLater ? "Revisit in 90 days" : undefined,
+      ...(revisitLater ? { nextAction: "Revisit in 90 days" } : {}),
     },
     rejectionReason: reason,
     rejectionNotes: notes?.trim(),

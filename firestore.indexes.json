@@ -132,6 +132,23 @@
         { "fieldPath": "agentName", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "revenueCampaignRuns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "revenueCampaignRuns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "campaignId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

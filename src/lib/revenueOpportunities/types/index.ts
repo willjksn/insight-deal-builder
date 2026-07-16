@@ -95,3 +95,4 @@ export interface RevenueFeatureStatus {
 export * from "@/lib/revenueOpportunities/types/campaign";
 export * from "@/lib/revenueOpportunities/types/opportunity";
 export * from "@/lib/revenueOpportunities/types/agentRun";
+export * from "@/lib/revenueOpportunities/types/campaignRun";

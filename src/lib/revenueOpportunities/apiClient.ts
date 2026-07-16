@@ -8,6 +8,7 @@ import type {
 } from "@/lib/revenueOpportunities/types/opportunity";
 import type { RevenueFeatureStatus, RevenuePipelineStage, RevenueRejectionReason } from "@/lib/revenueOpportunities/types";
 import type { RevenueAgentCatalogEntry, RevenueAgentName, RevenueAgentRun } from "@/lib/revenueOpportunities/types/agentRun";
+import type { RevenueCampaignRun } from "@/lib/revenueOpportunities/types/campaignRun";
 
 async function parseJson<T>(res: Response): Promise<T> {
   const data = (await res.json()) as T & { error?: string };
@@ -190,6 +191,35 @@ export async function revenueRunQualityReview(getToken: () => Promise<string | n
 
 export async function revenueRunRevision(getToken: () => Promise<string | null>, opportunityId: string) {
   const res = await fetch(`/api/revenue/opportunities/${opportunityId}/revision`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ run: RevenueAgentRun; opportunity: RevenueOpportunity }>(res);
+}
+
+export async function revenueRunCampaignResearch(getToken: () => Promise<string | null>, campaignId: string) {
+  const res = await fetch(`/api/revenue/campaigns/${campaignId}/research`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    campaignRun: RevenueCampaignRun;
+    agentRun: RevenueAgentRun;
+    opportunities: RevenueOpportunity[];
+  }>(res);
+}
+
+export async function revenueListCampaignRuns(
+  getToken: () => Promise<string | null>,
+  campaignId?: string
+) {
+  const qs = campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : "";
+  const res = await fetch(`/api/revenue/campaign-runs${qs}`, { headers: await authHeaders(getToken) });
+  return parseJson<{ runs: RevenueCampaignRun[] }>(res);
+}
+
+export async function revenueRunCampaignConcept(getToken: () => Promise<string | null>, opportunityId: string) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/campaign-concept`, {
     method: "POST",
     headers: await authHeaders(getToken),
   });

@@ -11,6 +11,7 @@ import {
   revenueRejectOpportunity,
   revenueRunQualityReview,
   revenueRunRevision,
+  revenueRunCampaignConcept,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
@@ -84,6 +85,19 @@ export default function OpportunityDetailPage() {
                 setOpportunity(res.opportunity);
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Revision failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onCampaignConcept={async () => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueRunCampaignConcept(() => user.getIdToken(), id);
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Campaign concept failed");
               } finally {
                 setBusy(false);
               }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Database, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,6 +21,7 @@ import { OpportunitySummaryCards, OpportunityTable } from "@/components/revenue/
 
 export default function RevenueCommandCenterPage() {
   const { user, appUser } = useAuth();
+  const router = useRouter();
   const [summary, setSummary] = useState<RevenueDashboardSummary | null>(null);
   const [reviewQueue, setReviewQueue] = useState<Awaited<ReturnType<typeof revenueListOpportunities>>["opportunities"]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,11 +57,10 @@ export default function RevenueCommandCenterPage() {
     setSeeding(true);
     setError(null);
     try {
-      await revenueSeedDemo(() => user.getIdToken());
-      await load();
+      const res = await revenueSeedDemo(() => user.getIdToken());
+      router.push(`/revenue/campaigns/${res.campaignId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Seed failed");
-    } finally {
       setSeeding(false);
     }
   };
@@ -96,14 +97,15 @@ export default function RevenueCommandCenterPage() {
         <Card className="mb-6 border-dashed border-sky-200 bg-sky-50/40">
           <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-medium text-slate-900">No opportunities yet</p>
+              <p className="font-medium text-slate-900">Get started</p>
               <p className="text-sm text-slate-600">
-                Load demo Orlando hospitality opportunities to explore the manual workflow, or create your own.
+                Load a demo campaign with 5 Orlando sample opportunities, then open the campaign to run live
+                research.
               </p>
             </div>
             <Button size="touch" variant="secondary" disabled={seeding} onClick={handleSeed}>
               <Database className="mr-2 h-4 w-4" />
-              {seeding ? "Loading demo…" : "Load demo data"}
+              {seeding ? "Loading demo…" : "Load demo campaign"}
             </Button>
           </CardBody>
         </Card>

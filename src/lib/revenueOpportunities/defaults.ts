@@ -26,13 +26,16 @@ export function newActivity(
   message: string,
   metadata?: Record<string, string>
 ): OpportunityActivityEntry {
-  return {
+  const entry: OpportunityActivityEntry = {
     id: crypto.randomUUID(),
     type,
     message,
     userId: user.id,
     userDisplayName: user.displayName ?? user.email,
     createdAt: new Date().toISOString(),
-    metadata,
   };
+  if (metadata && Object.keys(metadata).length > 0) {
+    entry.metadata = metadata;
+  }
+  return entry;
 }

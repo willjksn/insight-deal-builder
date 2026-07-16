@@ -1,5 +1,6 @@
 import type { AgentDefinition } from "@/lib/revenueOpportunities/agents/instruction";
 import type { RevenueAgentCatalogEntry, RevenueAgentName } from "@/lib/revenueOpportunities/types/agentRun";
+import { revenueResearchLive } from "@/lib/revenueOpportunities/research/mode";
 
 const registry = new Map<RevenueAgentName, AgentDefinition<unknown, unknown>>();
 
@@ -47,6 +48,7 @@ function agentStatus(name: RevenueAgentName): RevenueAgentCatalogEntry["status"]
     case "img_research":
     case "stormi_research":
     case "campaign_concept":
+      return revenueResearchLive() ? "live" : "stub";
     case "outreach_draft":
       return "planned";
     default:

@@ -11,12 +11,14 @@ export function OpportunityAgentPanel({
   busy,
   onQualityReview,
   onRevision,
+  onCampaignConcept,
 }: {
   opportunity: RevenueOpportunity;
   canManage: boolean;
   busy?: boolean;
   onQualityReview: () => Promise<void>;
   onRevision: () => Promise<void>;
+  onCampaignConcept: () => Promise<void>;
 }) {
   const review = opportunity.qualityReview;
 
@@ -24,7 +26,7 @@ export function OpportunityAgentPanel({
     <Card>
       <CardHeader>
         <h3 className="font-semibold text-slate-900">AI agents</h3>
-        <p className="text-xs text-slate-500">Phase 3 stub agents — rule-based until Phase 4 research integration.</p>
+        <p className="text-xs text-slate-500">Quality review (stub) plus live Tavily + Gemini research when configured.</p>
       </CardHeader>
       <CardBody className="space-y-4">
         {canManage && (
@@ -34,6 +36,9 @@ export function OpportunityAgentPanel({
             </Button>
             <Button size="touch" variant="outline" disabled={busy} onClick={onRevision}>
               Get revision suggestions
+            </Button>
+            <Button size="touch" variant="outline" disabled={busy} onClick={onCampaignConcept}>
+              Generate campaign concept
             </Button>
           </div>
         )}

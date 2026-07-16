@@ -1,22 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Database, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { revenueListCampaigns } from "@/lib/revenueOpportunities/apiClient";
+import { revenueListCampaigns, revenueSeedDemo } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Badge } from "@/components/ui/Badge";
+import { Card, CardBody } from "@/components/ui/Card";
 import { DataTable, DataRow } from "@/components/ui/DataTable";
 
 export default function RevenueCampaignsPage() {
   const { user, appUser } = useAuth();
+  const router = useRouter();
   const [campaigns, setCampaigns] = useState<RevenueCampaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canManage = canManageRevenueOpportunities(appUser);
 
@@ -27,6 +31,19 @@ export default function RevenueCampaignsPage() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   }, [user]);
+
+  const loadDemo = async () => {
+    if (!user) return;
+    setSeeding(true);
+    setError(null);
+    try {
+      const res = await revenueSeedDemo(() => user.getIdToken());
+      router.push(`/revenue/campaigns/${res.campaignId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load demo");
+      setSeeding(false);
+    }
+  };
 
   return (
     <>
@@ -50,8 +67,32 @@ export default function RevenueCampaignsPage() {
       />
       {loading && <LoadingSpinner />}
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {!loading && campaigns.length === 0 && (
-        <p className="text-sm text-slate-600">No campaigns yet. Create one or load demo data from the command center.</p>
+      {!loading && campaigns.length === 0 && canManage && (
+        <Card className="border-dashed border-sky-200 bg-sky-50/40">
+          <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium text-slate-900">No campaigns yet</p>
+              <p className="mt-1 text-sm text-slate-600">
+                Load a demo Orlando hospitality campaign (with sample opportunities), or create your own targeting
+                rules and run research.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="touch" variant="secondary" disabled={seeding} onClick={loadDemo}>
+                <Database className="mr-2 h-4 w-4" />
+                {seeding ? "Loading…" : "Load demo campaign"}
+              </Button>
+              <Link href="/revenue/campaigns/new">
+                <Button size="touch" variant="outline">
+                  Create campaign
+                </Button>
+              </Link>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+      {!loading && campaigns.length === 0 && !canManage && (
+        <p className="text-sm text-slate-600">No campaigns yet.</p>
       )}
       {campaigns.length > 0 && (
         <DataTable headers={["Name", "Type", "Status", "Target", "Min score", "Active"]}>
