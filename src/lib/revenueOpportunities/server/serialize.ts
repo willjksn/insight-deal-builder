@@ -18,7 +18,7 @@ export function isoTimestamp(value: unknown): string {
   return new Date(0).toISOString();
 }
 
-export function serializeDoc<T extends Record<string, unknown>>(id: string, data: FirebaseFirestore.DocumentData): T {
+export function serializeDoc<T>(id: string, data: FirebaseFirestore.DocumentData): T {
   const out = { id, ...data } as Record<string, unknown>;
   if ("createdAt" in out) out.createdAt = isoTimestamp(out.createdAt);
   if ("updatedAt" in out) out.updatedAt = isoTimestamp(out.updatedAt);

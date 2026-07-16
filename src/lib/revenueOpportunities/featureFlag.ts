@@ -1,6 +1,6 @@
 /** Feature flag — set REVENUE_OPPORTUNITIES_ENABLED=false to hide UI and disable API. */
 
-export const REVENUE_OPPORTUNITIES_PHASE = 2;
+export const REVENUE_OPPORTUNITIES_PHASE = 3;
 
 export function isRevenueOpportunitiesEnabled(): boolean {
   const raw = process.env.REVENUE_OPPORTUNITIES_ENABLED;

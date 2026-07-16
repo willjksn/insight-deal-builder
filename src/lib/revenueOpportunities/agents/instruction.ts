@@ -39,9 +39,11 @@ export interface AgentRunRecord {
   createdAt: string;
 }
 
+import type { RevenueAgentName } from "@/lib/revenueOpportunities/types/agentRun";
+
 /** Registry entry — implementation wired in Phase 3+. */
 export interface AgentDefinition<TInput, TOutput> {
-  name: string;
+  name: RevenueAgentName;
   version: string;
   instruction: Omit<AgentInstruction<TInput>, "inputs">;
   execute: (input: TInput) => Promise<AgentRunResult<TOutput>>;

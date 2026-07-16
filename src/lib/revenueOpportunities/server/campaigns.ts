@@ -4,6 +4,7 @@ import { stripUndefined } from "@/lib/firebase/firestore";
 import { REVENUE_CAMPAIGNS_COLLECTION } from "@/lib/revenueOpportunities/collections";
 import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
+import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import type {
   RevenueCampaign,
   RevenueCampaignCreateInput,
@@ -26,12 +27,17 @@ function tenantCompany(appUser: AppUser): string {
 export async function listCampaigns(appUser: AppUser): Promise<RevenueCampaign[]> {
   const db = requireDb();
   const organizationCompany = tenantCompany(appUser);
-  const snap = await db
-    .collection(REVENUE_CAMPAIGNS_COLLECTION)
-    .where("organizationCompany", "==", organizationCompany)
-    .orderBy("updatedAt", "desc")
-    .get();
-  return snap.docs.map((d) => serializeDoc<RevenueCampaign>(d.id, d.data()));
+  const docs = await getOrderedQueryDocs(
+    (ordered) => {
+      let q: FirebaseFirestore.Query = db
+        .collection(REVENUE_CAMPAIGNS_COLLECTION)
+        .where("organizationCompany", "==", organizationCompany);
+      if (ordered) q = q.orderBy("updatedAt", "desc");
+      return q;
+    },
+    "updatedAt"
+  );
+  return docs.map((d) => serializeDoc<RevenueCampaign>(d.id, d.data()));
 }
 
 export async function getCampaign(appUser: AppUser, id: string): Promise<RevenueCampaign> {

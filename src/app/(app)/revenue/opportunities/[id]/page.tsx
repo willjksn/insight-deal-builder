@@ -9,12 +9,15 @@ import {
   revenueApproveOpportunity,
   revenueGetOpportunity,
   revenueRejectOpportunity,
+  revenueRunQualityReview,
+  revenueRunRevision,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { OpportunityDetailView } from "@/components/revenue/OpportunityDetailView";
 import { OpportunityApprovalPanel } from "@/components/revenue/OpportunityApprovalPanel";
+import { OpportunityAgentPanel } from "@/components/revenue/OpportunityAgentPanel";
 
 export default function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,7 +57,38 @@ export default function OpportunityDetailPage() {
         <div className="lg:col-span-2">
           <OpportunityDetailView opportunity={opportunity} />
         </div>
-        <div>
+        <div className="space-y-6">
+          <OpportunityAgentPanel
+            opportunity={opportunity}
+            canManage={canManage}
+            busy={busy}
+            onQualityReview={async () => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueRunQualityReview(() => user.getIdToken(), id);
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Quality review failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onRevision={async () => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueRunRevision(() => user.getIdToken(), id);
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Revision failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
           <OpportunityApprovalPanel
             opportunity={opportunity}
             canManage={canManage}

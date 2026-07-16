@@ -7,6 +7,7 @@ import type {
   RevenueOpportunityUpdateInput,
 } from "@/lib/revenueOpportunities/types/opportunity";
 import type { RevenueFeatureStatus, RevenuePipelineStage, RevenueRejectionReason } from "@/lib/revenueOpportunities/types";
+import type { RevenueAgentCatalogEntry, RevenueAgentName, RevenueAgentRun } from "@/lib/revenueOpportunities/types/agentRun";
 
 async function parseJson<T>(res: Response): Promise<T> {
   const data = (await res.json()) as T & { error?: string };
@@ -154,6 +155,45 @@ export async function revenueSeedDemo(getToken: () => Promise<string | null>) {
     headers: await authHeaders(getToken),
   });
   return parseJson<{ ok: true; campaignId: string; opportunityIds: string[] }>(res);
+}
+
+export async function revenueListAgents(getToken: () => Promise<string | null>) {
+  const res = await fetch("/api/revenue/agents", { headers: await authHeaders(getToken) });
+  return parseJson<{ agents: RevenueAgentCatalogEntry[] }>(res);
+}
+
+export async function revenueListAgentRuns(
+  getToken: () => Promise<string | null>,
+  params?: { opportunityId?: string; agentName?: RevenueAgentName; limit?: number }
+) {
+  const qs = new URLSearchParams();
+  if (params?.opportunityId) qs.set("opportunityId", params.opportunityId);
+  if (params?.agentName) qs.set("agentName", params.agentName);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const res = await fetch(`/api/revenue/agent-runs${suffix}`, { headers: await authHeaders(getToken) });
+  return parseJson<{ runs: RevenueAgentRun[] }>(res);
+}
+
+export async function revenueGetAgentRun(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/agent-runs/${id}`, { headers: await authHeaders(getToken) });
+  return parseJson<{ run: RevenueAgentRun }>(res);
+}
+
+export async function revenueRunQualityReview(getToken: () => Promise<string | null>, opportunityId: string) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/quality-review`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ run: RevenueAgentRun; opportunity: RevenueOpportunity }>(res);
+}
+
+export async function revenueRunRevision(getToken: () => Promise<string | null>, opportunityId: string) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/revision`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ run: RevenueAgentRun; opportunity: RevenueOpportunity }>(res);
 }
 
 export { revenueDisabled };

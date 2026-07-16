@@ -4,5 +4,6 @@ export * from "@/lib/revenueOpportunities/featureFlag";
 export * from "@/lib/revenueOpportunities/nav";
 export * from "@/lib/revenueOpportunities/types";
 export * from "@/lib/revenueOpportunities/agents/instruction";
+export * from "@/lib/revenueOpportunities/agents";
 export * from "@/lib/revenueOpportunities/providers";
 export * from "@/lib/revenueOpportunities/repositories";

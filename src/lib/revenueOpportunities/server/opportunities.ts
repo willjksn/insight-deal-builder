@@ -8,6 +8,7 @@ import {
 import { newActivity } from "@/lib/revenueOpportunities/defaults";
 import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
+import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import type {
   RevenueOpportunity,
   RevenueOpportunityCreateInput,
@@ -54,8 +55,16 @@ export async function listOpportunities(
     q = q.where("workflow.approvalStatus", "==", options.approvalStatus);
   }
 
-  const snap = await q.orderBy("updatedAt", "desc").get();
-  return snap.docs.map((d) => serializeDoc<RevenueOpportunity>(d.id, d.data()));
+  const filterBase = q;
+  const docs = await getOrderedQueryDocs(
+    (ordered) => {
+      let query = filterBase;
+      if (ordered) query = query.orderBy("updatedAt", "desc");
+      return query;
+    },
+    "updatedAt"
+  );
+  return docs.map((d) => serializeDoc<RevenueOpportunity>(d.id, d.data()));
 }
 
 export async function getOpportunity(appUser: AppUser, id: string): Promise<RevenueOpportunity> {
