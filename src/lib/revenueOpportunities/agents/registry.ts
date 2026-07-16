@@ -1,6 +1,7 @@
 import type { AgentDefinition } from "@/lib/revenueOpportunities/agents/instruction";
 import type { RevenueAgentCatalogEntry, RevenueAgentName } from "@/lib/revenueOpportunities/types/agentRun";
 import { revenueResearchLive } from "@/lib/revenueOpportunities/research/mode";
+import { aiUsesMock } from "@/lib/ai/mockAi";
 
 const registry = new Map<RevenueAgentName, AgentDefinition<unknown, unknown>>();
 
@@ -50,7 +51,7 @@ function agentStatus(name: RevenueAgentName): RevenueAgentCatalogEntry["status"]
     case "campaign_concept":
       return revenueResearchLive() ? "live" : "stub";
     case "outreach_draft":
-      return "planned";
+      return aiUsesMock() ? "stub" : "live";
     default:
       return "planned";
   }

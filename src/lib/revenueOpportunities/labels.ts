@@ -80,3 +80,17 @@ export function scorePriorityLabel(totalScore: number): string {
   if (totalScore >= 55) return "Human review";
   return "Below threshold";
 }
+
+export const OUTREACH_CHANNEL_LABELS = {
+  email: "Email",
+  linkedin_dm: "LinkedIn DM",
+  instagram_dm: "Instagram DM",
+} as const;
+
+export const OUTREACH_STATUS_LABELS = {
+  draft: "Draft",
+  pending_review: "Pending review",
+  approved: "Approved",
+  rejected: "Rejected",
+  sent: "Sent",
+} as const;

@@ -7,23 +7,31 @@ import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   revenueApproveOpportunity,
+  revenueApproveOutreach,
   revenueGetOpportunity,
+  revenueListOutreach,
   revenueRejectOpportunity,
+  revenueRejectOutreach,
+  revenueRunCampaignConcept,
+  revenueRunOutreachDraft,
   revenueRunQualityReview,
   revenueRunRevision,
-  revenueRunCampaignConcept,
+  revenueUpdateOutreach,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
+import type { RevenueOutreachActivity } from "@/lib/revenueOpportunities/types/outreach";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { OpportunityDetailView } from "@/components/revenue/OpportunityDetailView";
 import { OpportunityApprovalPanel } from "@/components/revenue/OpportunityApprovalPanel";
 import { OpportunityAgentPanel } from "@/components/revenue/OpportunityAgentPanel";
+import { OpportunityOutreachPanel } from "@/components/revenue/OpportunityOutreachPanel";
 
 export default function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user, appUser } = useAuth();
   const [opportunity, setOpportunity] = useState<RevenueOpportunity | null>(null);
+  const [outreach, setOutreach] = useState<RevenueOutreachActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,8 +39,12 @@ export default function OpportunityDetailPage() {
 
   const reload = async () => {
     if (!user || !id) return;
-    const res = await revenueGetOpportunity(() => user.getIdToken(), id);
-    setOpportunity(res.opportunity);
+    const [oppRes, outreachRes] = await Promise.all([
+      revenueGetOpportunity(() => user.getIdToken(), id),
+      revenueListOutreach(() => user.getIdToken(), { opportunityId: id }),
+    ]);
+    setOpportunity(oppRes.opportunity);
+    setOutreach(outreachRes.activities);
   };
 
   useEffect(() => {
@@ -98,6 +110,65 @@ export default function OpportunityDetailPage() {
                 setOpportunity(res.opportunity);
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Campaign concept failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+          <OpportunityOutreachPanel
+            opportunity={opportunity}
+            canManage={canManage}
+            busy={busy}
+            activities={outreach}
+            onGenerate={async () => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                await revenueRunOutreachDraft(() => user.getIdToken(), id);
+                await reload();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Outreach generation failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onReload={reload}
+            onApprove={async (outreachId, notes) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                await revenueApproveOutreach(() => user.getIdToken(), outreachId, notes);
+                await reload();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Approve failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onReject={async (outreachId, notes) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                await revenueRejectOutreach(() => user.getIdToken(), outreachId, notes);
+                await reload();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Reject failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onSaveDraft={async (outreachId, patch) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                await revenueUpdateOutreach(() => user.getIdToken(), outreachId, patch);
+                await reload();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Save failed");
               } finally {
                 setBusy(false);
               }

@@ -9,6 +9,7 @@ import type {
 import type { RevenueFeatureStatus, RevenuePipelineStage, RevenueRejectionReason } from "@/lib/revenueOpportunities/types";
 import type { RevenueAgentCatalogEntry, RevenueAgentName, RevenueAgentRun } from "@/lib/revenueOpportunities/types/agentRun";
 import type { RevenueCampaignRun } from "@/lib/revenueOpportunities/types/campaignRun";
+import type { RevenueOutreachActivity } from "@/lib/revenueOpportunities/types/outreach";
 
 async function parseJson<T>(res: Response): Promise<T> {
   const data = (await res.json()) as T & { error?: string };
@@ -224,6 +225,73 @@ export async function revenueRunCampaignConcept(getToken: () => Promise<string |
     headers: await authHeaders(getToken),
   });
   return parseJson<{ run: RevenueAgentRun; opportunity: RevenueOpportunity }>(res);
+}
+
+export async function revenueListOutreach(
+  getToken: () => Promise<string | null>,
+  params?: { opportunityId?: string; status?: string }
+) {
+  const qs = new URLSearchParams();
+  if (params?.opportunityId) qs.set("opportunityId", params.opportunityId);
+  if (params?.status) qs.set("status", params.status);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const res = await fetch(`/api/revenue/outreach${suffix}`, { headers: await authHeaders(getToken) });
+  return parseJson<{ activities: RevenueOutreachActivity[] }>(res);
+}
+
+export async function revenueGetOutreach(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/outreach/${id}`, { headers: await authHeaders(getToken) });
+  return parseJson<{ activity: RevenueOutreachActivity }>(res);
+}
+
+export async function revenueUpdateOutreach(
+  getToken: () => Promise<string | null>,
+  id: string,
+  body: Partial<Pick<RevenueOutreachActivity, "subject" | "body" | "recipientName" | "recipientEmail">>
+) {
+  const res = await fetch(`/api/revenue/outreach/${id}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ activity: RevenueOutreachActivity }>(res);
+}
+
+export async function revenueRunOutreachDraft(getToken: () => Promise<string | null>, opportunityId: string) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/outreach-draft`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    agentRun: RevenueAgentRun;
+    activities: RevenueOutreachActivity[];
+  }>(res);
+}
+
+export async function revenueApproveOutreach(
+  getToken: () => Promise<string | null>,
+  id: string,
+  notes?: string
+) {
+  const res = await fetch(`/api/revenue/outreach/${id}/approve`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ notes }),
+  });
+  return parseJson<{ activity: RevenueOutreachActivity; opportunityUpdated: boolean }>(res);
+}
+
+export async function revenueRejectOutreach(
+  getToken: () => Promise<string | null>,
+  id: string,
+  notes?: string
+) {
+  const res = await fetch(`/api/revenue/outreach/${id}/reject`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ notes }),
+  });
+  return parseJson<{ activity: RevenueOutreachActivity }>(res);
 }
 
 export { revenueDisabled };

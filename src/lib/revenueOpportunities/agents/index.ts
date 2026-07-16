@@ -4,6 +4,7 @@ import { revisionAgent } from "@/lib/revenueOpportunities/agents/revision";
 import { imgResearchAgent } from "@/lib/revenueOpportunities/agents/imgResearch";
 import { stormiResearchAgent } from "@/lib/revenueOpportunities/agents/stormiResearch";
 import { campaignConceptAgent } from "@/lib/revenueOpportunities/agents/campaignConcept";
+import { outreachDraftAgent } from "@/lib/revenueOpportunities/agents/outreachDraft";
 
 let initialized = false;
 
@@ -15,8 +16,9 @@ export function initRevenueAgents(): void {
   registerAgent(imgResearchAgent);
   registerAgent(stormiResearchAgent);
   registerAgent(campaignConceptAgent);
+  registerAgent(outreachDraftAgent);
   initialized = true;
 }
 
-export { qualityReviewAgent, revisionAgent, imgResearchAgent, stormiResearchAgent, campaignConceptAgent };
+export { qualityReviewAgent, revisionAgent, imgResearchAgent, stormiResearchAgent, campaignConceptAgent, outreachDraftAgent };
 export * from "@/lib/revenueOpportunities/agents/registry";

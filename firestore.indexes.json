@@ -149,6 +149,32 @@
         { "fieldPath": "campaignId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "revenueOutreachActivities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "revenueOutreachActivities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "revenueOutreachActivities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "opportunityId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
