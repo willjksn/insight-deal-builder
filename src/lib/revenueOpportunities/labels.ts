@@ -92,5 +92,16 @@ export const OUTREACH_STATUS_LABELS = {
   pending_review: "Pending review",
   approved: "Approved",
   rejected: "Rejected",
-  sent: "Sent",
+  sent: "Gmail draft created",
+} as const;
+
+export const EMAIL_CLASSIFICATION_LABELS = {
+  interested: "Interested",
+  question: "Question",
+  not_interested: "Not interested",
+  out_of_office: "Out of office",
+  referral: "Referral",
+  scheduling: "Scheduling",
+  spam: "Spam",
+  unknown: "Unknown",
 } as const;

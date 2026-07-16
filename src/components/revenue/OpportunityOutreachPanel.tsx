@@ -19,6 +19,7 @@ export function OpportunityOutreachPanel({
   onApprove,
   onReject,
   onSaveDraft,
+  onCreateGmailDraft,
 }: {
   opportunity: RevenueOpportunity;
   canManage: boolean;
@@ -29,6 +30,7 @@ export function OpportunityOutreachPanel({
   onApprove: (id: string, notes?: string) => Promise<void>;
   onReject: (id: string, notes?: string) => Promise<void>;
   onSaveDraft: (id: string, patch: { subject?: string; body?: string }) => Promise<void>;
+  onCreateGmailDraft: (id: string) => Promise<void>;
 }) {
   const approved = opportunity.workflow.approvalStatus === "approved";
   const pending = activities.filter((a) => a.status === "pending_review");
@@ -64,6 +66,7 @@ export function OpportunityOutreachPanel({
                 onApprove={onApprove}
                 onReject={onReject}
                 onSave={onSaveDraft}
+                onCreateGmailDraft={onCreateGmailDraft}
               />
             ))}
           </div>
@@ -86,6 +89,7 @@ function OutreachDraftCard({
   onApprove,
   onReject,
   onSave,
+  onCreateGmailDraft,
 }: {
   activity: RevenueOutreachActivity;
   canManage: boolean;
@@ -93,6 +97,7 @@ function OutreachDraftCard({
   onApprove: (id: string, notes?: string) => Promise<void>;
   onReject: (id: string, notes?: string) => Promise<void>;
   onSave: (id: string, patch: { subject?: string; body?: string }) => Promise<void>;
+  onCreateGmailDraft: (id: string) => Promise<void>;
 }) {
   const [subject, setSubject] = useState(activity.subject ?? "");
   const [body, setBody] = useState(activity.body);
@@ -183,6 +188,12 @@ function OutreachDraftCard({
             </Button>
           </div>
         </>
+      )}
+
+      {canManage && activity.status === "approved" && activity.channel === "email" && (
+        <Button size="sm" variant="secondary" disabled={busy} onClick={() => onCreateGmailDraft(activity.id)}>
+          Create Gmail draft
+        </Button>
       )}
     </div>
   );

@@ -10,6 +10,7 @@ import type { RevenueFeatureStatus, RevenuePipelineStage, RevenueRejectionReason
 import type { RevenueAgentCatalogEntry, RevenueAgentName, RevenueAgentRun } from "@/lib/revenueOpportunities/types/agentRun";
 import type { RevenueCampaignRun } from "@/lib/revenueOpportunities/types/campaignRun";
 import type { RevenueOutreachActivity } from "@/lib/revenueOpportunities/types/outreach";
+import type { RevenueEmailThread } from "@/lib/revenueOpportunities/types/emailThread";
 
 async function parseJson<T>(res: Response): Promise<T> {
   const data = (await res.json()) as T & { error?: string };
@@ -292,6 +293,67 @@ export async function revenueRejectOutreach(
     body: JSON.stringify({ notes }),
   });
   return parseJson<{ activity: RevenueOutreachActivity }>(res);
+}
+
+export async function revenueCreateGmailDraftFromOutreach(getToken: () => Promise<string | null>, outreachId: string) {
+  const res = await fetch(`/api/revenue/outreach/${outreachId}/gmail-draft`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ activity: RevenueOutreachActivity; draftId: string; threadId?: string }>(res);
+}
+
+export async function revenueGetGmailStatus(getToken: () => Promise<string | null>) {
+  const res = await fetch("/api/revenue/gmail/status", { headers: await authHeaders(getToken) });
+  return parseJson<{
+    configured: boolean;
+    mode: "not_configured" | "mock" | "live";
+    connected: boolean;
+    email?: string;
+    connectedAt?: string;
+  }>(res);
+}
+
+export async function revenueConnectGmail(getToken: () => Promise<string | null>) {
+  const res = await fetch("/api/revenue/gmail/connect", { headers: await authHeaders(getToken) });
+  return parseJson<{ url: string }>(res);
+}
+
+export async function revenueDisconnectGmail(getToken: () => Promise<string | null>) {
+  const res = await fetch("/api/revenue/gmail/status", {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: true }>(res);
+}
+
+export async function revenueListInbox(
+  getToken: () => Promise<string | null>,
+  params?: { opportunityId?: string; status?: string }
+) {
+  const qs = new URLSearchParams();
+  if (params?.opportunityId) qs.set("opportunityId", params.opportunityId);
+  if (params?.status) qs.set("status", params.status);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const res = await fetch(`/api/revenue/inbox${suffix}`, { headers: await authHeaders(getToken) });
+  return parseJson<{ threads: RevenueEmailThread[] }>(res);
+}
+
+export async function revenueSyncInbox(getToken: () => Promise<string | null>, query?: string) {
+  const res = await fetch("/api/revenue/inbox/sync", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ query }),
+  });
+  return parseJson<{ threads: RevenueEmailThread[] }>(res);
+}
+
+export async function revenueClassifyInboxThread(getToken: () => Promise<string | null>, threadId: string) {
+  const res = await fetch(`/api/revenue/inbox/${threadId}`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ agentRun: RevenueAgentRun; thread: RevenueEmailThread }>(res);
 }
 
 export { revenueDisabled };

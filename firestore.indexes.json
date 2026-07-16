@@ -175,6 +175,31 @@
         { "fieldPath": "opportunityId", "order": "ASCENDING" },
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "revenueEmailThreads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "revenueEmailThreads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "revenueEmailThreads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "gmailThreadId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

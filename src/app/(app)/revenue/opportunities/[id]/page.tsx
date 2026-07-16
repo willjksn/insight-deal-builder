@@ -17,6 +17,7 @@ import {
   revenueRunQualityReview,
   revenueRunRevision,
   revenueUpdateOutreach,
+  revenueCreateGmailDraftFromOutreach,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 import type { RevenueOutreachActivity } from "@/lib/revenueOpportunities/types/outreach";
@@ -169,6 +170,19 @@ export default function OpportunityDetailPage() {
                 await reload();
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Save failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onCreateGmailDraft={async (outreachId) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                await revenueCreateGmailDraftFromOutreach(() => user.getIdToken(), outreachId);
+                await reload();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Gmail draft failed");
               } finally {
                 setBusy(false);
               }

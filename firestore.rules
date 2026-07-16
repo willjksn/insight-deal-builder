@@ -358,6 +358,9 @@ service cloud.firestore {
     match /revenueEmailThreads/{docId} {
       allow read, write: if false;
     }
+    match /revenueGmailConnections/{docId} {
+      allow read, write: if false;
+    }
     match /revenueFollowUpTasks/{docId} {
       allow read, write: if false;
     }

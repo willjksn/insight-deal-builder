@@ -12,9 +12,9 @@ import {
 } from "@/lib/revenueOpportunities/featureFlag";
 import type { RevenueFeatureStatus } from "@/lib/revenueOpportunities/types";
 import {
-  mockEmailProvider,
   mockWorkflowProvider,
 } from "@/lib/revenueOpportunities/providers";
+import { resolveGmailMode } from "@/lib/revenueOpportunities/providers/getEmailProvider";
 
 export const runtime = "nodejs";
 
@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
     const status: RevenueFeatureStatus = {
       enabled: true,
       phase: REVENUE_OPPORTUNITIES_PHASE,
-      version: "0.5.0-outreach",
+      version: "0.6.0-gmail",
       integrations: {
-        gmail: mockEmailProvider.isAvailable() ? "live" : "not_configured",
+        gmail: resolveGmailMode(),
         n8n: mockWorkflowProvider.isAvailable() ? "live" : "not_configured",
         search: tavilyAvailable() ? "live" : "not_configured",
         ai: aiUsesMock() ? "mock" : "live",

@@ -133,7 +133,7 @@ export interface CalendarProvider {
   isAvailable(): boolean;
 }
 
-/** Placeholder providers — Phase 1 foundation only. */
+/** Placeholder providers — Phase 1 foundation; mock inbox in Phase 6. */
 export const mockWorkflowProvider: WorkflowProvider = {
   async trigger() {
     throw new Error("n8n workflow provider not configured (Phase 9)");
@@ -144,12 +144,64 @@ export const mockWorkflowProvider: WorkflowProvider = {
   isAvailable: () => false,
 };
 
+const MOCK_THREADS: EmailThread[] = [
+  {
+    threadId: "mock-thread-1",
+    messages: [
+      {
+        threadId: "mock-thread-1",
+        messageId: "mock-msg-1",
+        subject: "Re: Cinematic content idea for Sunset Resort",
+        from: "alex@sunsetresort.com",
+        snippet: "Thanks for reaching out — we'd love to hear more about the reel concept.",
+        receivedAt: new Date(Date.now() - 86_400_000).toISOString(),
+      },
+      {
+        threadId: "mock-thread-1",
+        messageId: "mock-msg-2",
+        subject: "Re: Cinematic content idea for Sunset Resort",
+        from: "alex@sunsetresort.com",
+        snippet: "Could we schedule a call Thursday afternoon?",
+        receivedAt: new Date(Date.now() - 3_600_000).toISOString(),
+      },
+    ],
+  },
+  {
+    threadId: "mock-thread-2",
+    messages: [
+      {
+        threadId: "mock-thread-2",
+        messageId: "mock-msg-3",
+        subject: "Out of office — Glow Spa",
+        from: "hello@glowspa.com",
+        snippet: "I'm away until next Monday and will reply when I return.",
+        receivedAt: new Date(Date.now() - 172_800_000).toISOString(),
+      },
+    ],
+  },
+];
+
 export const mockEmailProvider: EmailProvider = {
-  async searchMessages() {
-    return [];
+  async searchMessages(query) {
+    const q = query.toLowerCase();
+    const hits = MOCK_THREADS.flatMap((t) => t.messages).filter(
+      (m) =>
+        !q ||
+        m.subject.toLowerCase().includes(q) ||
+        m.from.toLowerCase().includes(q) ||
+        m.snippet.toLowerCase().includes(q)
+    );
+    return hits.map((m) => ({
+      threadId: m.threadId,
+      messageId: m.messageId,
+      subject: m.subject,
+      from: m.from,
+      snippet: m.snippet,
+      receivedAt: m.receivedAt,
+    }));
   },
   async readThread(threadId) {
-    return { threadId, messages: [] };
+    return MOCK_THREADS.find((t) => t.threadId === threadId) ?? { threadId, messages: [] };
   },
   async createDraft(input) {
     return { draftId: `mock-draft-${Date.now()}`, threadId: input.threadId };
@@ -158,9 +210,9 @@ export const mockEmailProvider: EmailProvider = {
     return { draftId: input.draftId };
   },
   async sendDraft(draftId) {
-    return { messageId: `mock-sent-${draftId}` };
+    return { messageId: `mock-sent-${draftId}`, threadId: `mock-thread-${Date.now()}` };
   },
-  isAvailable: () => false,
+  isAvailable: () => true,
 };
 
 export const mockCalendarProvider: CalendarProvider = {

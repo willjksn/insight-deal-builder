@@ -8,7 +8,8 @@ export type RevenueAgentName =
   | "img_research"
   | "stormi_research"
   | "campaign_concept"
-  | "outreach_draft";
+  | "outreach_draft"
+  | "email_receptionist";
 
 export interface RevenueAgentRun {
   id: string;

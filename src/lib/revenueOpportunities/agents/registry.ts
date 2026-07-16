@@ -36,6 +36,8 @@ function agentPhase(name: RevenueAgentName): number {
       return 4;
     case "outreach_draft":
       return 5;
+    case "email_receptionist":
+      return 6;
     default:
       return 10;
   }
@@ -51,6 +53,8 @@ function agentStatus(name: RevenueAgentName): RevenueAgentCatalogEntry["status"]
     case "campaign_concept":
       return revenueResearchLive() ? "live" : "stub";
     case "outreach_draft":
+      return aiUsesMock() ? "stub" : "live";
+    case "email_receptionist":
       return aiUsesMock() ? "stub" : "live";
     default:
       return "planned";

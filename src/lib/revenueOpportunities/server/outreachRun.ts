@@ -81,7 +81,7 @@ export async function approveOutreachAndAdvancePipeline(
       workflow: {
         ...opportunity.workflow,
         pipelineStage: "contacted",
-        nextAction: "Send approved outreach (Gmail in Phase 6)",
+        nextAction: "Create Gmail draft from approved email outreach",
       },
       activityLog: [
         ...opportunity.activityLog,
