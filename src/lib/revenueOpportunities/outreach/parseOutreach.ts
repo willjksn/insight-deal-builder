@@ -20,13 +20,14 @@ export function parseOutreachDrafts(raw: unknown): OutreachDraftItem[] {
     const channel = str(o.channel);
     const body = str(o.body);
     if (!channel || !VALID_CHANNELS.has(channel) || !body) continue;
-    out.push({
-      channel: channel as OutreachDraftItem["channel"],
-      subject: str(o.subject),
-      body,
-      recipientName: str(o.recipientName),
-      recipientEmail: str(o.recipientEmail),
-    });
+    const draft: OutreachDraftItem = { channel: channel as OutreachDraftItem["channel"], body };
+    const subject = str(o.subject);
+    const recipientName = str(o.recipientName);
+    const recipientEmail = str(o.recipientEmail);
+    if (subject) draft.subject = subject;
+    if (recipientName) draft.recipientName = recipientName;
+    if (recipientEmail) draft.recipientEmail = recipientEmail;
+    out.push(draft);
   }
 
   return out;
@@ -43,7 +44,9 @@ export function mockOutreachDrafts(opportunity: RevenueOpportunity): OutreachDra
       channel: "email",
       subject: `Cinematic content idea for ${name}`,
       recipientName: opportunity.contact?.name ?? "Marketing team",
-      recipientEmail: opportunity.contact?.email ?? opportunity.subject.publicEmail,
+      ...(opportunity.contact?.email ?? opportunity.subject.publicEmail
+        ? { recipientEmail: opportunity.contact?.email ?? opportunity.subject.publicEmail }
+        : {}),
       body: `Hi${opportunity.contact?.name ? ` ${opportunity.contact.name}` : ""},
 
 I came across ${name} while researching ${industry} brands in ${city}. Your visual presence stands out, and I think there's a strong opportunity for ${concept.toLowerCase()}.

@@ -53,6 +53,10 @@ export async function createAgentRunRecord(
   return ref.id;
 }
 
+function sanitizeAgentRunField<T>(value: T): T {
+  return stripUndefined(JSON.parse(JSON.stringify(value)) as T);
+}
+
 export async function finalizeAgentRun(
   runId: string,
   patch: Partial<
@@ -73,7 +77,14 @@ export async function finalizeAgentRun(
   const ref = db.collection(REVENUE_AGENT_RUNS_COLLECTION).doc(runId);
   await ref.update(
     stripUndefined({
-      ...patch,
+      status: patch.status,
+      model: patch.model,
+      estimatedCostUsd: patch.estimatedCostUsd,
+      durationMs: patch.durationMs,
+      errorMessage: patch.errorMessage,
+      output: patch.output ? sanitizeAgentRunField(patch.output) : undefined,
+      confidence: patch.confidence ? sanitizeAgentRunField(patch.confidence) : undefined,
+      evidence: patch.evidence ? sanitizeAgentRunField(patch.evidence) : undefined,
       updatedAt: FieldValue.serverTimestamp(),
       completedAt: FieldValue.serverTimestamp(),
     })
