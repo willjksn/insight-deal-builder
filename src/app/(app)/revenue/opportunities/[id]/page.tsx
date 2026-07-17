@@ -24,12 +24,13 @@ import {
   revenueRunRevision,
   revenueUpdateOutreach,
   revenueCreateGmailDraftFromOutreach,
+  revenueConvertOpportunityToProject,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 import type { RevenueOutreachActivity } from "@/lib/revenueOpportunities/types/outreach";
 import type { RevenueDiscoverySession } from "@/lib/revenueOpportunities/types/discovery";
 import type { RevenueOpportunityProposal } from "@/lib/revenueOpportunities/types/proposal";
-import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
+import { canManageProjects, canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { OpportunityDetailView } from "@/components/revenue/OpportunityDetailView";
 import { OpportunityApprovalPanel } from "@/components/revenue/OpportunityApprovalPanel";
@@ -37,6 +38,7 @@ import { OpportunityAgentPanel } from "@/components/revenue/OpportunityAgentPane
 import { OpportunityOutreachPanel } from "@/components/revenue/OpportunityOutreachPanel";
 import { OpportunityDiscoveryPanel } from "@/components/revenue/OpportunityDiscoveryPanel";
 import { OpportunityProposalPanel } from "@/components/revenue/OpportunityProposalPanel";
+import { OpportunityConversionPanel } from "@/components/revenue/OpportunityConversionPanel";
 
 export default function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -49,6 +51,7 @@ export default function OpportunityDetailPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canManage = canManageRevenueOpportunities(appUser);
+  const canConvert = canManage && canManageProjects(appUser);
 
   const reload = async () => {
     if (!user || !id) return;
@@ -253,6 +256,7 @@ export default function OpportunityDetailPage() {
             proposals={proposals}
             canManage={canManage}
             busy={busy}
+            projectId={opportunity.projectConversion?.shootSpineProjectId}
             onGenerate={async () => {
               if (!user) return;
               setBusy(true);
@@ -272,6 +276,31 @@ export default function OpportunityDetailPage() {
               }
             }}
             onReload={reload}
+          />
+          <OpportunityConversionPanel
+            opportunity={opportunity}
+            latestProposal={proposals[0]}
+            canManage={canConvert}
+            busy={busy}
+            onConvert={async (projectName) => {
+              if (!user) return { projectId: "", alreadyConverted: false };
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueConvertOpportunityToProject(() => user.getIdToken(), id, {
+                  projectName,
+                  proposalId: proposals[0]?.id,
+                });
+                setOpportunity(res.opportunity);
+                await reload();
+                return { projectId: res.projectId, alreadyConverted: res.alreadyConverted };
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Conversion failed");
+                throw e;
+              } finally {
+                setBusy(false);
+              }
+            }}
           />
           <OpportunityApprovalPanel
             opportunity={opportunity}

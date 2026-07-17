@@ -52,6 +52,18 @@ export function OpportunityDetailView({ opportunity }: { opportunity: RevenueOpp
         </p>
       )}
 
+      {opportunity.projectConversion?.shootSpineProjectId && (
+        <p className="text-sm">
+          ShootSpine project:{" "}
+          <Link
+            href={`/projects/${opportunity.projectConversion.shootSpineProjectId}`}
+            className="font-medium text-sky-700 hover:underline"
+          >
+            Open project
+          </Link>
+        </p>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>

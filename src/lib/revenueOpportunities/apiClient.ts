@@ -456,4 +456,35 @@ export async function revenueGetProposalAgreementPrefill(getToken: () => Promise
   return parseJson<{ proposal: RevenueOpportunityProposal; agreementPatch: Partial<Agreement> }>(res);
 }
 
+export async function revenueUpdateProposal(
+  getToken: () => Promise<string | null>,
+  proposalId: string,
+  body: { agreementId?: string; status?: string }
+) {
+  const res = await fetch(`/api/revenue/proposals/${proposalId}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ proposal: RevenueOpportunityProposal }>(res);
+}
+
+export async function revenueConvertOpportunityToProject(
+  getToken: () => Promise<string | null>,
+  opportunityId: string,
+  body?: { projectName?: string; proposalId?: string }
+) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/convert-to-project`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body ?? {}),
+  });
+  return parseJson<{
+    ok: boolean;
+    projectId: string;
+    opportunity: RevenueOpportunity;
+    alreadyConverted: boolean;
+  }>(res);
+}
+
 export { revenueDisabled };

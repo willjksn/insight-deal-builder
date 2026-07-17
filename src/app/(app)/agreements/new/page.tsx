@@ -90,7 +90,7 @@ import {
   clearQuickQuoteDraft,
   loadQuickQuoteDraft,
 } from "@/lib/quickQuote/apply";
-import { revenueGetProposalAgreementPrefill } from "@/lib/revenueOpportunities/apiClient";
+import { revenueGetProposalAgreementPrefill, revenueUpdateProposal } from "@/lib/revenueOpportunities/apiClient";
 import { cn } from "@/lib/utils/cn";
 
 const STEPS = WIZARD_STEP_DEFS.map((s) => ({ id: s.id, label: s.label }));
@@ -268,7 +268,7 @@ function WizardContent() {
         });
         setSelectedTemplateId("client_project");
         setRevenueProposalApplied(true);
-        setStep(2);
+        setStep(1);
       })
       .catch(() => {
         /* prefill optional — wizard still usable without it */
@@ -348,13 +348,15 @@ function WizardContent() {
 
   const saveDraft = async () => {
     const data = buildSavePayload("draft");
+    let agreementId = draftId;
     if (draftId) {
       await update(draftId, data);
     } else {
-      const id = await create(data);
-      setDraftId(id);
-      router.replace(`/agreements/new?id=${id}`);
+      agreementId = await create(data);
+      setDraftId(agreementId);
+      router.replace(`/agreements/new?id=${agreementId}`);
     }
+    await linkRevenueProposalIfNeeded(agreementId);
   };
 
   const finishWizard = async () => {
@@ -365,7 +367,18 @@ function WizardContent() {
     } else {
       id = await create(data);
     }
+    await linkRevenueProposalIfNeeded(id);
     router.push(`/agreements/${id}/sign`);
+  };
+
+  const linkRevenueProposalIfNeeded = async (agreementId: string | null) => {
+    const proposalId = searchParams.get("revenueProposalId");
+    if (!proposalId || !agreementId || !user) return;
+    try {
+      await revenueUpdateProposal(() => user.getIdToken(), proposalId, { agreementId });
+    } catch {
+      /* proposal link is best-effort */
+    }
   };
 
   const addParty = () => {

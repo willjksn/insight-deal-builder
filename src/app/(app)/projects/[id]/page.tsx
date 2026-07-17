@@ -167,6 +167,18 @@ export default function ProjectDetailPage() {
         }
       />
 
+      {project.sourceRevenueOpportunityId && (
+        <p className="mb-4 text-sm text-slate-600">
+          From revenue opportunity:{" "}
+          <Link
+            href={`/revenue/opportunities/${project.sourceRevenueOpportunityId}`}
+            className="font-medium text-sky-700 hover:underline"
+          >
+            View opportunity
+          </Link>
+        </p>
+      )}
+
       {canOpenTeamAccess && (
         <p className="mb-6 text-sm text-slate-500">
           Team and permissions for this project are managed in{" "}

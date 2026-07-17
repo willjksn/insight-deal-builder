@@ -12,12 +12,14 @@ export function OpportunityProposalPanel({
   proposals,
   canManage,
   busy,
+  projectId,
   onGenerate,
   onReload,
 }: {
   proposals: RevenueOpportunityProposal[];
   canManage: boolean;
   busy?: boolean;
+  projectId?: string;
   onGenerate: () => Promise<void>;
   onReload: () => Promise<void>;
 }) {
@@ -62,10 +64,21 @@ export function OpportunityProposalPanel({
               </ul>
             )}
             {canManage && latest.agreementPrefill && (
-              <Link href={`/agreements/new?revenueProposalId=${encodeURIComponent(latest.id)}`}>
+              <Link
+                href={
+                  projectId
+                    ? `/agreements/new?revenueProposalId=${encodeURIComponent(latest.id)}&projectId=${encodeURIComponent(projectId)}`
+                    : `/agreements/new?revenueProposalId=${encodeURIComponent(latest.id)}`
+                }
+              >
                 <Button size="sm" variant="outline">
                   Open in agreement wizard
                 </Button>
+              </Link>
+            )}
+            {latest.agreementId && (
+              <Link href={`/agreements/${latest.agreementId}`} className="mt-2 inline-block text-sky-700 hover:underline">
+                View agreement →
               </Link>
             )}
           </div>

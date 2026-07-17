@@ -178,6 +178,10 @@ export interface Project {
   sourceIdeaEngine?: boolean;
   sourceIdeaSessionId?: string;
   sourceIdeaId?: string;
+  /** Created from Revenue & opportunities conversion */
+  sourceRevenueOpportunity?: boolean;
+  sourceRevenueOpportunityId?: string;
+  sourceRevenueProposalId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
