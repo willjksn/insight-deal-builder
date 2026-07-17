@@ -95,6 +95,20 @@ export const OUTREACH_STATUS_LABELS = {
   sent: "Gmail draft created",
 } as const;
 
+export const PROPOSAL_STATUS_LABELS = {
+  draft: "Draft",
+  review: "In review",
+  approved: "Approved",
+  sent: "Sent",
+  archived: "Archived",
+} as const;
+
+export const DISCOVERY_SESSION_STATUS_LABELS = {
+  scheduled: "Scheduled",
+  completed: "Completed",
+  cancelled: "Cancelled",
+} as const;
+
 export const EMAIL_CLASSIFICATION_LABELS = {
   interested: "Interested",
   question: "Question",

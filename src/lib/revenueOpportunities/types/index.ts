@@ -99,3 +99,5 @@ export * from "@/lib/revenueOpportunities/types/campaignRun";
 export * from "@/lib/revenueOpportunities/types/outreach";
 export * from "@/lib/revenueOpportunities/types/emailThread";
 export * from "@/lib/revenueOpportunities/types/gmailConnection";
+export * from "@/lib/revenueOpportunities/types/discovery";
+export * from "@/lib/revenueOpportunities/types/proposal";

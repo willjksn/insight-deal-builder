@@ -6,6 +6,9 @@ import { stormiResearchAgent } from "@/lib/revenueOpportunities/agents/stormiRes
 import { campaignConceptAgent } from "@/lib/revenueOpportunities/agents/campaignConcept";
 import { outreachDraftAgent } from "@/lib/revenueOpportunities/agents/outreachDraft";
 import { emailReceptionistAgent } from "@/lib/revenueOpportunities/agents/emailReceptionist";
+import { discoveryPrepAgent } from "@/lib/revenueOpportunities/agents/discoveryPrep";
+import { discoveryDebriefAgent } from "@/lib/revenueOpportunities/agents/discoveryDebrief";
+import { proposalDraftAgent } from "@/lib/revenueOpportunities/agents/proposalDraft";
 
 let initialized = false;
 
@@ -19,8 +22,22 @@ export function initRevenueAgents(): void {
   registerAgent(campaignConceptAgent);
   registerAgent(outreachDraftAgent);
   registerAgent(emailReceptionistAgent);
+  registerAgent(discoveryPrepAgent);
+  registerAgent(discoveryDebriefAgent);
+  registerAgent(proposalDraftAgent);
   initialized = true;
 }
 
-export { qualityReviewAgent, revisionAgent, imgResearchAgent, stormiResearchAgent, campaignConceptAgent, outreachDraftAgent, emailReceptionistAgent };
+export {
+  qualityReviewAgent,
+  revisionAgent,
+  imgResearchAgent,
+  stormiResearchAgent,
+  campaignConceptAgent,
+  outreachDraftAgent,
+  emailReceptionistAgent,
+  discoveryPrepAgent,
+  discoveryDebriefAgent,
+  proposalDraftAgent,
+};
 export * from "@/lib/revenueOpportunities/agents/registry";

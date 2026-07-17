@@ -11,6 +11,9 @@ import type { RevenueAgentCatalogEntry, RevenueAgentName, RevenueAgentRun } from
 import type { RevenueCampaignRun } from "@/lib/revenueOpportunities/types/campaignRun";
 import type { RevenueOutreachActivity } from "@/lib/revenueOpportunities/types/outreach";
 import type { RevenueEmailThread } from "@/lib/revenueOpportunities/types/emailThread";
+import type { RevenueDiscoverySession, DiscoveryQuestionNote } from "@/lib/revenueOpportunities/types/discovery";
+import type { RevenueOpportunityProposal } from "@/lib/revenueOpportunities/types/proposal";
+import type { Agreement } from "@/lib/types";
 
 async function parseJson<T>(res: Response): Promise<T> {
   const data = (await res.json()) as T & { error?: string };
@@ -354,6 +357,103 @@ export async function revenueClassifyInboxThread(getToken: () => Promise<string 
     headers: await authHeaders(getToken),
   });
   return parseJson<{ agentRun: RevenueAgentRun; thread: RevenueEmailThread }>(res);
+}
+
+export async function revenueListDiscovery(
+  getToken: () => Promise<string | null>,
+  params?: { opportunityId?: string; status?: string }
+) {
+  const qs = new URLSearchParams();
+  if (params?.opportunityId) qs.set("opportunityId", params.opportunityId);
+  if (params?.status) qs.set("status", params.status);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const res = await fetch(`/api/revenue/discovery${suffix}`, { headers: await authHeaders(getToken) });
+  return parseJson<{ sessions: RevenueDiscoverySession[] }>(res);
+}
+
+export async function revenueRunDiscoveryPrep(
+  getToken: () => Promise<string | null>,
+  opportunityId: string,
+  scheduledAt?: string
+) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/discovery-prep`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ scheduledAt }),
+  });
+  return parseJson<{
+    agentRun: RevenueAgentRun;
+    session: RevenueDiscoverySession;
+    opportunityUpdated: boolean;
+  }>(res);
+}
+
+export async function revenueRunDiscoveryDebrief(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  payload: {
+    callQuestionNotes?: DiscoveryQuestionNote[];
+    additionalCallNotes?: string;
+    callNotes?: string;
+  }
+) {
+  const res = await fetch(`/api/revenue/discovery/${sessionId}/debrief`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(payload),
+  });
+  return parseJson<{ agentRun: RevenueAgentRun; session: RevenueDiscoverySession }>(res);
+}
+
+export async function revenueUpdateDiscoverySession(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  body: {
+    callNotes?: string;
+    callQuestionNotes?: DiscoveryQuestionNote[];
+    additionalCallNotes?: string;
+    scheduledAt?: string;
+    status?: string;
+  }
+) {
+  const res = await fetch(`/api/revenue/discovery/${sessionId}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ session: RevenueDiscoverySession }>(res);
+}
+
+export async function revenueListProposals(
+  getToken: () => Promise<string | null>,
+  params?: { opportunityId?: string; status?: string }
+) {
+  const qs = new URLSearchParams();
+  if (params?.opportunityId) qs.set("opportunityId", params.opportunityId);
+  if (params?.status) qs.set("status", params.status);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const res = await fetch(`/api/revenue/proposals${suffix}`, { headers: await authHeaders(getToken) });
+  return parseJson<{ proposals: RevenueOpportunityProposal[] }>(res);
+}
+
+export async function revenueRunProposalDraft(
+  getToken: () => Promise<string | null>,
+  opportunityId: string,
+  discoverySessionId?: string
+) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/proposal-draft`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ discoverySessionId }),
+  });
+  return parseJson<{ agentRun: RevenueAgentRun; proposal: RevenueOpportunityProposal }>(res);
+}
+
+export async function revenueGetProposalAgreementPrefill(getToken: () => Promise<string | null>, proposalId: string) {
+  const res = await fetch(`/api/revenue/proposals/${proposalId}/agreement-prefill`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ proposal: RevenueOpportunityProposal; agreementPatch: Partial<Agreement> }>(res);
 }
 
 export { revenueDisabled };

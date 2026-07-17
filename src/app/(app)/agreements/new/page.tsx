@@ -90,6 +90,7 @@ import {
   clearQuickQuoteDraft,
   loadQuickQuoteDraft,
 } from "@/lib/quickQuote/apply";
+import { revenueGetProposalAgreementPrefill } from "@/lib/revenueOpportunities/apiClient";
 import { cn } from "@/lib/utils/cn";
 
 const STEPS = WIZARD_STEP_DEFS.map((s) => ({ id: s.id, label: s.label }));
@@ -122,6 +123,7 @@ function WizardContent() {
   const [consentChecked, setConsentChecked] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [quickQuoteApplied, setQuickQuoteApplied] = useState(false);
+  const [revenueProposalApplied, setRevenueProposalApplied] = useState(false);
 
   const isInternal = agreement.agreementType === "internal_collaboration";
   const isRental = agreement.agreementType === "equipment_rental";
@@ -241,6 +243,41 @@ function WizardContent() {
     setQuickQuoteApplied(true);
     setStep(2);
   }, [quickQuoteApplied, searchParams, servicePackages, customTemplates]);
+
+  useEffect(() => {
+    if (revenueProposalApplied) return;
+    const proposalId = searchParams.get("revenueProposalId");
+    if (!proposalId || !user) return;
+
+    let cancelled = false;
+    revenueGetProposalAgreementPrefill(() => user.getIdToken(), proposalId)
+      .then(({ agreementPatch }) => {
+        if (cancelled) return;
+        setAgreement((prev) => {
+          let base = prev;
+          if (base.agreementType !== "client_project") {
+            const empty = createEmptyAgreement("client_project");
+            base = {
+              ...empty,
+              parties: prev.parties,
+              title: prev.title || empty.title,
+            };
+            base = { ...base, ...applyTemplateToAgreement(base, "client_project", customTemplates) };
+          }
+          return { ...base, ...agreementPatch };
+        });
+        setSelectedTemplateId("client_project");
+        setRevenueProposalApplied(true);
+        setStep(2);
+      })
+      .catch(() => {
+        /* prefill optional — wizard still usable without it */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [revenueProposalApplied, searchParams, user, customTemplates]);
 
   useEffect(() => {
     if (!isInternal) return;
