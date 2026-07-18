@@ -69,6 +69,18 @@ export default function RevenueAutomationsPage() {
       .finally(() => setLoading(false));
   }, [user, reload]);
 
+  const hasActiveWorkflowRuns = workflowRuns.some(
+    (r) => r.status === "running" || r.status === "queued"
+  );
+
+  useEffect(() => {
+    if (!user || !hasActiveWorkflowRuns) return;
+    const id = window.setInterval(() => {
+      reload().catch(() => {});
+    }, 2500);
+    return () => window.clearInterval(id);
+  }, [user, hasActiveWorkflowRuns, reload]);
+
   return (
     <>
       <Link href="/revenue" className="mb-4 inline-flex items-center text-sm text-sky-700 hover:underline">

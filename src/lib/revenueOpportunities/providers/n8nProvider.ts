@@ -9,6 +9,8 @@ export interface N8nTriggerPayload {
   trigger: "scheduled" | "manual" | "retry";
   runId: string;
   ownerUserId?: string;
+  /** Hint for n8n callback outputSummary, e.g. "Inbox sync done". */
+  suggestedOutputSummary?: string;
   input?: Record<string, unknown>;
 }
 

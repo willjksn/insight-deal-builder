@@ -160,6 +160,7 @@ export async function triggerRevenueWorkflow(
     trigger: options.trigger === "retry" ? "retry" : options.trigger === "scheduled" ? "scheduled" : "manual",
     runId: run.id,
     ownerUserId: options.ownerUserId ?? appUser?.id,
+    suggestedOutputSummary: `${entry.label} done`,
     input: options.input,
   };
 
@@ -190,11 +191,28 @@ export async function applyWorkflowWebhookUpdate(body: {
   errorSummary?: string;
   outputSummary?: string;
 }): Promise<RevenueWorkflowRun> {
+  const db = requireDb();
+  const existing = await db.collection(REVENUE_WORKFLOW_RUNS_COLLECTION).doc(body.runId).get();
+  if (!existing.exists) throw new RevenueOpportunityError("NOT_FOUND", "Workflow run not found");
+  if (existing.data()!.organizationCompany !== body.organizationCompany) {
+    throw new RevenueOpportunityError("NOT_AUTHORIZED", "Workflow run not found");
+  }
+
+  const workflowName = String(existing.data()!.workflowName ?? "");
+  const entry = getWorkflowCatalogEntry(workflowName);
+  const defaultSummary = `${entry?.label ?? existing.data()!.workflowLabel ?? "Workflow"} done`;
+  const incomingSummary = body.outputSummary?.trim();
+  // n8n duplicates often keep the Follow-up copy — replace with the real workflow label.
+  const copiedFollowUpSummary =
+    incomingSummary === "Follow-up scan done" && workflowName !== "revenue_follow_up_scan";
+  const outputSummary =
+    !incomingSummary || copiedFollowUpSummary ? defaultSummary : incomingSummary;
+
   const patch: Parameters<typeof updateWorkflowRunStatus>[2] = {
     status: body.status,
     externalRunId: body.externalRunId,
     errorSummary: body.errorSummary,
-    outputSummary: body.outputSummary,
+    outputSummary,
   };
   if (body.status === "running" && !patch.startedAt) {
     patch.startedAt = new Date().toISOString();
