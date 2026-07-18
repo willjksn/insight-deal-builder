@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  revenueDeleteWorkflowRun,
   revenueListAgentRuns,
   revenueListAgents,
   revenueListWorkflows,
@@ -18,6 +19,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import { DataTable, DataRow } from "@/components/ui/DataTable";
 import { formatDateTime } from "@/lib/utils/format";
 
@@ -37,6 +39,34 @@ function workflowStatusVariant(status: RevenueWorkflowRun["status"]): "default" 
   return "default";
 }
 
+/** Workflow runs feature started July 2026 — no earlier months in the picker. */
+const WORKFLOW_RUNS_START_MONTH = "2026-07";
+
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
+}
+
+/** Months from July 2026 through the current month (newest first). */
+function monthsFromStart(): { value: string; label: string }[] {
+  const start = new Date(2026, 6, 1); // July 2026
+  const end = new Date();
+  end.setDate(1);
+  const opts: { value: string; label: string }[] = [];
+  for (let d = new Date(end.getFullYear(), end.getMonth(), 1); d >= start; d.setMonth(d.getMonth() - 1)) {
+    const key = monthKey(d);
+    opts.push({ value: key, label: monthLabel(key) });
+  }
+  if (opts.length === 0) {
+    opts.push({ value: WORKFLOW_RUNS_START_MONTH, label: monthLabel(WORKFLOW_RUNS_START_MONTH) });
+  }
+  return opts;
+}
+
 export default function RevenueAutomationsPage() {
   const { user, appUser } = useAuth();
   const canManage = canManageRevenueOpportunities(appUser);
@@ -47,6 +77,14 @@ export default function RevenueAutomationsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** `YYYY-MM` calendar month (defaults to current month). */
+  const [runRange, setRunRange] = useState(() => monthKey(new Date()));
+  const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(new Set());
+
+  const monthOptions = useMemo(() => monthsFromStart(), []);
+  const allVisibleSelected =
+    workflowRuns.length > 0 && workflowRuns.every((r) => selectedRunIds.has(r.id));
+  const someSelected = selectedRunIds.size > 0;
 
   const reload = useCallback(async () => {
     if (!user) return;
@@ -54,16 +92,57 @@ export default function RevenueAutomationsPage() {
     const [a, r, w] = await Promise.all([
       revenueListAgents(token),
       revenueListAgentRuns(token, { limit: 25 }),
-      revenueListWorkflows(token),
+      revenueListWorkflows(token, { month: runRange, limit: 100 }),
     ]);
     setAgents(a.agents);
     setRuns(r.runs);
     setCatalog(w.catalog);
     setWorkflowRuns(w.runs);
-  }, [user]);
+    setSelectedRunIds((prev) => {
+      const visible = new Set(w.runs.map((run) => run.id));
+      return new Set([...prev].filter((id) => visible.has(id)));
+    });
+  }, [user, runRange]);
+
+  const toggleRunSelected = (id: string) => {
+    setSelectedRunIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      setSelectedRunIds(new Set());
+      return;
+    }
+    setSelectedRunIds(new Set(workflowRuns.map((r) => r.id)));
+  };
+
+  const deleteRuns = async (ids: string[]) => {
+    if (!user || ids.length === 0) return;
+    const label =
+      ids.length === 1 ? "Delete this workflow run?" : `Delete ${ids.length} workflow runs?`;
+    if (!window.confirm(label)) return;
+    setBusy("bulk-delete");
+    setError(null);
+    try {
+      const token = () => user.getIdToken();
+      await Promise.all(ids.map((id) => revenueDeleteWorkflowRun(token, id)));
+      setSelectedRunIds(new Set());
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
+    setLoading(true);
     reload()
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
@@ -109,9 +188,7 @@ export default function RevenueAutomationsPage() {
                     )}
                   </div>
                   <p className="mb-2 text-sm text-slate-600">{w.description}</p>
-                  <p className="mb-3 text-xs text-slate-500">
-                    {w.scheduleLabel ?? "On demand"} · <code className="text-[10px]">{w.webhookPath}</code>
-                  </p>
+                  <p className="mb-3 text-xs text-slate-500">{w.scheduleLabel ?? "On demand"}</p>
                   {canManage && (
                     <Button
                       size="sm"
@@ -139,55 +216,138 @@ export default function RevenueAutomationsPage() {
             })}
           </div>
 
-          <h2 className="mb-3 text-lg font-semibold text-slate-900">Workflow runs</h2>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <h2 className="text-lg font-semibold text-slate-900">Workflow runs</h2>
+              {canManage && someSelected && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy === "bulk-delete"}
+                  onClick={() => deleteRuns([...selectedRunIds])}
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4 text-red-500" />
+                  Delete selected ({selectedRunIds.size})
+                </Button>
+              )}
+            </div>
+            <div className="w-40 shrink-0">
+              <Select
+                label="Month"
+                wrapperClassName="w-40"
+                className="w-40"
+                options={monthOptions}
+                value={runRange}
+                onChange={(e) => setRunRange(e.target.value)}
+              />
+            </div>
+          </div>
           {workflowRuns.length === 0 ? (
             <p className="mb-8 text-sm text-slate-600">
-              No n8n workflow runs yet. Use Run now above or wait for the weekday cron schedule.
+              No workflow runs in {monthLabel(runRange)}.
             </p>
           ) : (
             <div className="mb-8">
-              <DataTable headers={["Workflow", "Status", "Trigger", "Summary", "When", ""]}>
-                {workflowRuns.map((run) => (
-                  <DataRow
-                    key={run.id}
-                    cells={[
-                      run.workflowLabel ?? run.workflowName.replace(/_/g, " "),
-                      <Badge key="status" variant={workflowStatusVariant(run.status)}>
-                        {run.status}
-                      </Badge>,
-                      run.trigger,
-                      run.errorSummary ?? run.outputSummary ?? run.inputSummary ?? "—",
-                      formatDateTime(run.createdAt),
-                      canManage && run.status === "failed" ? (
-                        <Button
-                          key="retry"
-                          size="sm"
-                          variant="outline"
-                          disabled={busy === run.id}
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (!user) return;
-                            setBusy(run.id);
-                            setError(null);
-                            try {
-                              await revenueRetryWorkflowRun(() => user.getIdToken(), run.id);
-                              await reload();
-                            } catch (err) {
-                              setError(err instanceof Error ? err.message : "Retry failed");
-                            } finally {
-                              setBusy(null);
-                            }
-                          }}
-                        >
-                          Retry
-                        </Button>
-                      ) : (
-                        ""
-                      ),
-                    ]}
-                  />
-                ))}
+              <DataTable
+                headers={
+                  canManage
+                    ? [
+                        <input
+                          key="select-all"
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-400"
+                          checked={allVisibleSelected}
+                          aria-label="Select all workflow runs"
+                          onChange={toggleSelectAllVisible}
+                        />,
+                        "Workflow",
+                        "Status",
+                        "Trigger",
+                        "Summary",
+                        "When",
+                        "",
+                      ]
+                    : ["Workflow", "Status", "Trigger", "Summary", "When", ""]
+                }
+              >
+                {workflowRuns.map((run) => {
+                  const actionCells = canManage
+                    ? [
+                        <input
+                          key="check"
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-400"
+                          checked={selectedRunIds.has(run.id)}
+                          aria-label={`Select ${run.workflowLabel ?? run.workflowName}`}
+                          onChange={() => toggleRunSelected(run.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />,
+                        run.workflowLabel ?? run.workflowName.replace(/_/g, " "),
+                        <Badge key="status" variant={workflowStatusVariant(run.status)}>
+                          {run.status}
+                        </Badge>,
+                        run.trigger,
+                        run.errorSummary ?? run.outputSummary ?? run.inputSummary ?? "—",
+                        formatDateTime(run.createdAt),
+                        <div key="actions" className="flex flex-wrap items-center gap-2">
+                          {run.status === "failed" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy === run.id || busy === "bulk-delete"}
+                              onClick={async (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!user) return;
+                                setBusy(run.id);
+                                setError(null);
+                                try {
+                                  await revenueRetryWorkflowRun(() => user.getIdToken(), run.id);
+                                  await reload();
+                                } catch (err) {
+                                  setError(err instanceof Error ? err.message : "Retry failed");
+                                } finally {
+                                  setBusy(null);
+                                }
+                              }}
+                            >
+                              Retry
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label="Delete workflow run"
+                            disabled={busy === run.id || busy === "bulk-delete"}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              void deleteRuns([run.id]);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>,
+                      ]
+                    : [
+                        run.workflowLabel ?? run.workflowName.replace(/_/g, " "),
+                        <Badge key="status" variant={workflowStatusVariant(run.status)}>
+                          {run.status}
+                        </Badge>,
+                        run.trigger,
+                        run.errorSummary ?? run.outputSummary ?? run.inputSummary ?? "—",
+                        formatDateTime(run.createdAt),
+                        "",
+                      ];
+
+                  return (
+                    <DataRow
+                      key={run.id}
+                      cells={actionCells}
+                      actionCellIndex={canManage ? 0 : undefined}
+                    />
+                  );
+                })}
               </DataTable>
             </div>
           )}
@@ -203,9 +363,6 @@ export default function RevenueAutomationsPage() {
                   </Badge>
                 </div>
                 <p className="text-sm text-slate-600">{a.description}</p>
-                <p className="mt-2 text-xs text-slate-500">
-                  {a.name} · v{a.version} · Phase {a.phase}
-                </p>
               </div>
             ))}
           </div>

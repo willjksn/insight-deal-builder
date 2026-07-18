@@ -97,6 +97,16 @@ export interface OpportunityQualityReview {
   unsupportedClaims?: string[];
   verificationWarnings?: string[];
   recommendedCorrections?: string[];
+  source?: "rules" | "ai";
+  reviewedAt?: string;
+}
+
+export interface OpportunityRevisionSuggestion {
+  revisionNotes: string[];
+  suggestedFieldUpdates: Record<string, string>;
+  readyForReReview: boolean;
+  source?: "rules" | "ai";
+  generatedAt?: string;
 }
 
 export interface OpportunityProjectConversion {
@@ -135,6 +145,7 @@ export interface RevenueOpportunity {
   campaignConcept?: CampaignConceptSummary;
   workflow: OpportunityWorkflow;
   qualityReview?: OpportunityQualityReview;
+  revisionSuggestion?: OpportunityRevisionSuggestion;
   projectConversion?: OpportunityProjectConversion;
   rejectionReason?: RevenueRejectionReason;
   rejectionNotes?: string;

@@ -21,12 +21,15 @@ export function OpportunityAgentPanel({
   onCampaignConcept: () => Promise<void>;
 }) {
   const review = opportunity.qualityReview;
+  const revision = opportunity.revisionSuggestion;
 
   return (
     <Card>
       <CardHeader>
         <h3 className="font-semibold text-slate-900">AI agents</h3>
-        <p className="text-xs text-slate-500">Quality review (stub) plus live Tavily + Gemini research when configured.</p>
+        <p className="text-xs text-slate-500">
+          Quality review and revision use Gemini when live AI is configured; otherwise rule checks.
+        </p>
       </CardHeader>
       <CardBody className="space-y-4">
         {canManage && (
@@ -45,11 +48,14 @@ export function OpportunityAgentPanel({
 
         {review && (
           <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm">
-            <div className="mb-2 flex items-center gap-2">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
               <span className="font-medium text-slate-900">Latest quality review</span>
               <Badge variant={review.status === "passed" ? "success" : review.status === "failed" ? "danger" : "warning"}>
                 {review.status ?? "pending"}
               </Badge>
+              {review.source && (
+                <Badge variant={review.source === "ai" ? "info" : "default"}>{review.source}</Badge>
+              )}
             </div>
             {review.issues?.length ? (
               <ul className="mb-2 list-inside list-disc text-red-800">
@@ -75,6 +81,42 @@ export function OpportunityAgentPanel({
                 </ul>
               </div>
             ) : null}
+          </div>
+        )}
+
+        {revision && (
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="font-medium text-slate-900">Revision suggestions</span>
+              <Badge variant={revision.readyForReReview ? "success" : "warning"}>
+                {revision.readyForReReview ? "ready for re-review" : "needs work"}
+              </Badge>
+              {revision.source && (
+                <Badge variant={revision.source === "ai" ? "info" : "default"}>{revision.source}</Badge>
+              )}
+            </div>
+            {revision.revisionNotes.length > 0 && (
+              <ul className="mb-2 list-inside list-disc text-slate-700">
+                {revision.revisionNotes.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
+            )}
+            {Object.keys(revision.suggestedFieldUpdates).length > 0 && (
+              <div>
+                <p className="mb-1 font-medium text-slate-800">Suggested field updates</p>
+                <ul className="space-y-1 text-slate-700">
+                  {Object.entries(revision.suggestedFieldUpdates).map(([field, value]) => (
+                    <li key={field}>
+                      <code className="text-xs text-sky-800">{field}</code>
+                      <span className="text-slate-500"> → </span>
+                      {value}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <p className="mt-2 text-xs text-slate-500">Suggestions only — apply changes manually after review.</p>
           </div>
         )}
       </CardBody>

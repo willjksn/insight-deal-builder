@@ -9,7 +9,7 @@ export function DataTable({
   children,
   emptyMessage,
 }: {
-  headers: string[];
+  headers: ReactNode[];
   children: ReactNode;
   emptyMessage?: string;
 }) {
@@ -18,9 +18,9 @@ export function DataTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-100/50">
-            {headers.map((h) => (
+            {headers.map((h, i) => (
               <th
-                key={h}
+                key={i}
                 className="px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-slate-600"
               >
                 {h}

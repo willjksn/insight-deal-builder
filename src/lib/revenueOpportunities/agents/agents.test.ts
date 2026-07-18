@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { initRevenueAgents, listRegisteredAgents, getAgent } from "@/lib/revenueOpportunities/agents";
 import { qualityReviewAgent } from "@/lib/revenueOpportunities/agents/qualityReview";
+import { revisionAgent } from "@/lib/revenueOpportunities/agents/revision";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 
 function minimalOpportunity(overrides: Partial<RevenueOpportunity> = {}): RevenueOpportunity {
@@ -18,7 +19,15 @@ function minimalOpportunity(overrides: Partial<RevenueOpportunity> = {}): Revenu
     activityLog: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    evidence: [{ claim: "Has social presence", sourceUrl: "https://example.com", sourceType: "website", retrievedAt: new Date().toISOString(), confidence: 0.8 }],
+    evidence: [
+      {
+        claim: "Has social presence",
+        sourceUrl: "https://example.com",
+        sourceType: "website",
+        retrievedAt: new Date().toISOString(),
+        confidence: 0.8,
+      },
+    ],
     scoring: { totalScore: 72, confidenceScore: 68 },
     ...overrides,
   };
@@ -33,11 +42,11 @@ describe("revenue agent registry", () => {
     const agents = listRegisteredAgents();
     expect(agents.some((a) => a.name === "quality_review")).toBe(true);
     expect(agents.some((a) => a.name === "revision")).toBe(true);
-    expect(getAgent("quality_review")?.version).toBeTruthy();
+    expect(getAgent("quality_review")?.version).toMatch(/^0\.2/);
   });
 });
 
-describe("qualityReviewAgent stub", () => {
+describe("qualityReviewAgent", () => {
   it("passes when evidence and scores are present", async () => {
     const result = await qualityReviewAgent.execute({ opportunity: minimalOpportunity() });
     expect(result.output.passed).toBe(true);
@@ -50,5 +59,22 @@ describe("qualityReviewAgent stub", () => {
     });
     expect(result.output.passed).toBe(false);
     expect(result.output.review.issues).toContain("No evidence attached");
+  });
+});
+
+describe("revisionAgent", () => {
+  it("suggests evidence when missing", async () => {
+    const result = await revisionAgent.execute({
+      opportunity: minimalOpportunity({
+        evidence: [],
+        qualityReview: {
+          status: "failed",
+          issues: ["No evidence attached"],
+          recommendedCorrections: ["Add a source URL"],
+        },
+      }),
+    });
+    expect(result.output.revisionNotes.length).toBeGreaterThan(0);
+    expect(result.output.suggestedFieldUpdates.evidence).toBeTruthy();
   });
 });

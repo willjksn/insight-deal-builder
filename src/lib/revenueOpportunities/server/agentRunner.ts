@@ -226,8 +226,20 @@ export async function runRevisionForOpportunity(
     }
   );
 
-  const output = result as { revisionNotes: string[]; readyForReReview: boolean };
+  const output = result as {
+    revisionNotes: string[];
+    suggestedFieldUpdates: Record<string, string>;
+    readyForReReview: boolean;
+    source?: "rules" | "ai";
+  };
   const updated = await updateOpportunity(appUser, opportunityId, {
+    revisionSuggestion: {
+      revisionNotes: output.revisionNotes,
+      suggestedFieldUpdates: output.suggestedFieldUpdates ?? {},
+      readyForReReview: output.readyForReReview,
+      generatedAt: new Date().toISOString(),
+      source: output.source ?? "rules",
+    },
     activityLog: [
       ...opportunity.activityLog,
       newActivity(appUser, "agent_revision", output.revisionNotes[0] ?? "Revision agent completed", {

@@ -29,7 +29,13 @@ function tenantCompany(appUser: AppUser): string {
 
 export async function listWorkflowRuns(
   appUser: AppUser,
-  filters?: { status?: RevenueWorkflowRunStatus; workflowName?: string; limit?: number }
+  filters?: {
+    status?: RevenueWorkflowRunStatus;
+    workflowName?: string;
+    limit?: number;
+    /** `YYYY-MM` calendar month in local intent; filters by UTC month bounds. */
+    month?: string;
+  }
 ): Promise<RevenueWorkflowRun[]> {
   const db = requireDb();
   let q: FirebaseFirestore.Query = db
@@ -39,7 +45,15 @@ export async function listWorkflowRuns(
   if (filters?.status) q = q.where("status", "==", filters.status);
   if (filters?.workflowName) q = q.where("workflowName", "==", filters.workflowName);
 
-  const limit = filters?.limit ?? 50;
+  if (filters?.month && /^\d{4}-\d{2}$/.test(filters.month)) {
+    const [y, m] = filters.month.split("-").map(Number);
+    // Local calendar month bounds (matches UI month picker labels).
+    const start = new Date(y, m - 1, 1);
+    const end = new Date(y, m, 1);
+    q = q.where("createdAt", ">=", start).where("createdAt", "<", end);
+  }
+
+  const limit = filters?.limit ?? 10;
   const docs = await getOrderedQueryDocs(
     (ordered) => {
       let query = q;
@@ -50,6 +64,17 @@ export async function listWorkflowRuns(
     limit
   );
   return docs.map((d) => serializeDoc<RevenueWorkflowRun>(d.id, d.data()));
+}
+
+export async function deleteWorkflowRun(appUser: AppUser, id: string): Promise<void> {
+  const db = requireDb();
+  const ref = db.collection(REVENUE_WORKFLOW_RUNS_COLLECTION).doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new RevenueOpportunityError("NOT_FOUND", "Workflow run not found");
+  if (snap.data()!.organizationCompany !== tenantCompany(appUser)) {
+    throw new RevenueOpportunityError("NOT_AUTHORIZED", "Workflow run not found");
+  }
+  await ref.delete();
 }
 
 export async function getWorkflowRun(appUser: AppUser, id: string): Promise<RevenueWorkflowRun> {

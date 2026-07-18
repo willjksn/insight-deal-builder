@@ -51,19 +51,16 @@ function agentStatus(name: RevenueAgentName): RevenueAgentCatalogEntry["status"]
   switch (name) {
     case "quality_review":
     case "revision":
-      return "stub";
-    case "img_research":
-    case "stormi_research":
-    case "campaign_concept":
-      return revenueResearchLive() ? "live" : "stub";
     case "outreach_draft":
-      return aiUsesMock() ? "stub" : "live";
     case "email_receptionist":
-      return aiUsesMock() ? "stub" : "live";
     case "discovery_prep":
     case "discovery_debrief":
     case "proposal_draft":
       return aiUsesMock() ? "stub" : "live";
+    case "img_research":
+    case "stormi_research":
+    case "campaign_concept":
+      return revenueResearchLive() ? "live" : "stub";
     default:
       return "planned";
   }

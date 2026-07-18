@@ -490,11 +490,13 @@ export async function revenueConvertOpportunityToProject(
 
 export async function revenueListWorkflows(
   getToken: () => Promise<string | null>,
-  params?: { status?: string; workflowName?: string }
+  params?: { status?: string; workflowName?: string; month?: string; limit?: number }
 ) {
   const qs = new URLSearchParams();
   if (params?.status) qs.set("status", params.status);
   if (params?.workflowName) qs.set("workflowName", params.workflowName);
+  if (params?.month) qs.set("month", params.month);
+  if (params?.limit != null) qs.set("limit", String(params.limit));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   const res = await fetch(`/api/revenue/workflows${suffix}`, { headers: await authHeaders(getToken) });
   return parseJson<{ catalog: RevenueWorkflowCatalogEntry[]; runs: RevenueWorkflowRun[] }>(res);
@@ -515,6 +517,14 @@ export async function revenueRetryWorkflowRun(getToken: () => Promise<string | n
     headers: await authHeaders(getToken),
   });
   return parseJson<{ run: RevenueWorkflowRun }>(res);
+}
+
+export async function revenueDeleteWorkflowRun(getToken: () => Promise<string | null>, runId: string) {
+  const res = await fetch(`/api/revenue/workflows/${runId}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: boolean }>(res);
 }
 
 export { revenueDisabled };
