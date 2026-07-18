@@ -6,11 +6,14 @@ export function verifyN8nWebhookSecret(request: NextRequest): boolean {
   const secret = n8nWebhookSecret();
   if (!secret) return false;
 
-  const auth = request.headers.get("authorization");
-  if (auth === `Bearer ${secret}`) return true;
+  const auth = request.headers.get("authorization")?.trim();
+  if (auth === `Bearer ${secret}` || auth === secret) return true;
 
-  const header =
-    request.headers.get("x-revenue-webhook-secret") ?? request.headers.get("x-n8n-webhook-secret");
+  const header = (
+    request.headers.get("x-revenue-webhook-secret") ??
+    request.headers.get("x-n8n-webhook-secret") ??
+    request.headers.get("x-webhook-secret")
+  )?.trim();
   return header === secret;
 }
 
