@@ -133,16 +133,10 @@ export interface CalendarProvider {
   isAvailable(): boolean;
 }
 
-/** Placeholder providers — Phase 1 foundation; mock inbox in Phase 6. */
-export const mockWorkflowProvider: WorkflowProvider = {
-  async trigger() {
-    throw new Error("n8n workflow provider not configured (Phase 9)");
-  },
-  async getStatus(runId) {
-    return { runId, workflowName: "unknown", status: "failed", errorSummary: "Not configured" };
-  },
-  isAvailable: () => false,
-};
+import { mockN8nWorkflowProvider } from "@/lib/revenueOpportunities/providers/n8nProvider";
+
+/** @deprecated Use getWorkflowProvider() — kept for backward-compatible imports. */
+export const mockWorkflowProvider: WorkflowProvider = mockN8nWorkflowProvider;
 
 const MOCK_THREADS: EmailThread[] = [
   {

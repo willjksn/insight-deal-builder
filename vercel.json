@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/trend-snapshots",
       "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/cron/revenue-automations",
+      "schedule": "0 13 * * 1-5"
     }
   ]
 }

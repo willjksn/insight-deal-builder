@@ -101,3 +101,4 @@ export * from "@/lib/revenueOpportunities/types/emailThread";
 export * from "@/lib/revenueOpportunities/types/gmailConnection";
 export * from "@/lib/revenueOpportunities/types/discovery";
 export * from "@/lib/revenueOpportunities/types/proposal";
+export * from "@/lib/revenueOpportunities/types/workflowRun";

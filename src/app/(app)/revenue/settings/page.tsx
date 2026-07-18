@@ -9,6 +9,7 @@ import {
   revenueConnectGmail,
   revenueDisconnectGmail,
   revenueGetGmailStatus,
+  revenueGetStatus,
 } from "@/lib/revenueOpportunities/apiClient";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -29,13 +30,18 @@ export default function RevenueSettingsPage() {
     connected: boolean;
     email?: string;
   } | null>(null);
+  const [featureStatus, setFeatureStatus] = useState<{
+    n8n: "not_configured" | "mock" | "live";
+  } | null>(null);
   const canManage = canManageRevenueOpportunities(appUser);
   const gmailParam = searchParams.get("gmail");
 
   const reload = async () => {
     if (!user) return;
-    const res = await revenueGetGmailStatus(() => user.getIdToken());
-    setStatus(res);
+    const token = () => user.getIdToken();
+    const [gmailRes, statusRes] = await Promise.all([revenueGetGmailStatus(token), revenueGetStatus(token)]);
+    setStatus(gmailRes);
+    setFeatureStatus({ n8n: statusRes.status.integrations.n8n });
   };
 
   useEffect(() => {
@@ -51,7 +57,7 @@ export default function RevenueSettingsPage() {
         <ArrowLeft className="mr-1 h-4 w-4" />
         Command center
       </Link>
-      <PageHeader title="Settings" subtitle="Gmail connection, approval modes, and integration status." />
+      <PageHeader title="Settings" subtitle="Gmail, n8n automations, and integration status." />
       {gmailParam === "connected" && (
         <p className="mb-4 text-sm text-emerald-700">Gmail connected successfully.</p>
       )}
@@ -131,6 +137,39 @@ export default function RevenueSettingsPage() {
                 )}
               </div>
             )}
+          </CardBody>
+        </Card>
+      )}
+      {featureStatus && (
+        <Card className="mt-6">
+          <CardHeader>
+            <h3 className="font-semibold text-slate-900">n8n automations</h3>
+            <p className="text-xs text-slate-500">
+              Scheduled workflows and webhook callbacks for follow-ups, inbox sync, and daily briefs.
+            </p>
+          </CardHeader>
+          <CardBody className="space-y-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-slate-600">Mode:</span>
+              <Badge
+                variant={
+                  featureStatus.n8n === "live" ? "success" : featureStatus.n8n === "mock" ? "warning" : "default"
+                }
+              >
+                {featureStatus.n8n}
+              </Badge>
+            </div>
+            {featureStatus.n8n !== "live" && (
+              <p className="text-slate-600">
+                Set <code className="text-xs">N8N_BASE_URL</code> and{" "}
+                <code className="text-xs">N8N_WEBHOOK_SECRET</code> for live workflows. Mock mode runs when{" "}
+                <code className="text-xs">SCOUT_USE_MOCK_AI=true</code>. n8n callbacks POST to{" "}
+                <code className="text-xs">/api/revenue/webhooks/n8n</code> with the shared secret header.
+              </p>
+            )}
+            <Link href="/revenue/automations" className="inline-block text-sky-700 hover:underline">
+              View workflow runs →
+            </Link>
           </CardBody>
         </Card>
       )}

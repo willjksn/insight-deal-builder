@@ -74,7 +74,7 @@ export const REVENUE_NAV_ITEMS: RevenueNavItem[] = [
     href: "/revenue/automations",
     label: "Automations",
     icon: Workflow,
-    description: "Agent registry and run history (n8n workflows in Phase 9)",
+    description: "Agent registry, n8n workflow runs, and failure retries",
   },
   {
     href: "/revenue/analytics",

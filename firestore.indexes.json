@@ -252,6 +252,32 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "revenueWorkflowRuns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "revenueWorkflowRuns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "revenueWorkflowRuns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "workflowName", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

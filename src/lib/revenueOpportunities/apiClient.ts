@@ -13,6 +13,7 @@ import type { RevenueOutreachActivity } from "@/lib/revenueOpportunities/types/o
 import type { RevenueEmailThread } from "@/lib/revenueOpportunities/types/emailThread";
 import type { RevenueDiscoverySession, DiscoveryQuestionNote } from "@/lib/revenueOpportunities/types/discovery";
 import type { RevenueOpportunityProposal } from "@/lib/revenueOpportunities/types/proposal";
+import type { RevenueWorkflowCatalogEntry, RevenueWorkflowRun } from "@/lib/revenueOpportunities/types/workflowRun";
 import type { Agreement } from "@/lib/types";
 
 async function parseJson<T>(res: Response): Promise<T> {
@@ -485,6 +486,35 @@ export async function revenueConvertOpportunityToProject(
     opportunity: RevenueOpportunity;
     alreadyConverted: boolean;
   }>(res);
+}
+
+export async function revenueListWorkflows(
+  getToken: () => Promise<string | null>,
+  params?: { status?: string; workflowName?: string }
+) {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.workflowName) qs.set("workflowName", params.workflowName);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const res = await fetch(`/api/revenue/workflows${suffix}`, { headers: await authHeaders(getToken) });
+  return parseJson<{ catalog: RevenueWorkflowCatalogEntry[]; runs: RevenueWorkflowRun[] }>(res);
+}
+
+export async function revenueTriggerWorkflow(getToken: () => Promise<string | null>, workflowName: string) {
+  const res = await fetch("/api/revenue/workflows/trigger", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ workflowName }),
+  });
+  return parseJson<{ run: RevenueWorkflowRun }>(res);
+}
+
+export async function revenueRetryWorkflowRun(getToken: () => Promise<string | null>, runId: string) {
+  const res = await fetch(`/api/revenue/workflows/${runId}/retry`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ run: RevenueWorkflowRun }>(res);
 }
 
 export { revenueDisabled };

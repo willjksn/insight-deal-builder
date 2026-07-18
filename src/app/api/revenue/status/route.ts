@@ -11,9 +11,7 @@ import {
   isRevenueOpportunitiesEnabled,
 } from "@/lib/revenueOpportunities/featureFlag";
 import type { RevenueFeatureStatus } from "@/lib/revenueOpportunities/types";
-import {
-  mockWorkflowProvider,
-} from "@/lib/revenueOpportunities/providers";
+import { resolveN8nMode } from "@/lib/revenueOpportunities/n8n/config";
 import { resolveGmailMode } from "@/lib/revenueOpportunities/providers/getEmailProvider";
 
 export const runtime = "nodejs";
@@ -33,10 +31,15 @@ export async function GET(request: NextRequest) {
     const status: RevenueFeatureStatus = {
       enabled: true,
       phase: REVENUE_OPPORTUNITIES_PHASE,
-      version: "0.8.0-project-conversion",
+      version: "0.9.0-n8n-automation",
       integrations: {
         gmail: resolveGmailMode(),
-        n8n: mockWorkflowProvider.isAvailable() ? "live" : "not_configured",
+        n8n: (() => {
+          const mode = resolveN8nMode();
+          if (mode === "live") return "live" as const;
+          if (mode === "mock") return "mock" as const;
+          return "not_configured" as const;
+        })(),
         search: tavilyAvailable() ? "live" : "not_configured",
         ai: aiUsesMock() ? "mock" : "live",
       },
