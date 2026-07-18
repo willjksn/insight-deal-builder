@@ -17,6 +17,7 @@ const TOC = [
   { id: "step-7", label: "7. Discovery calls" },
   { id: "step-8", label: "8. Proposals & convert" },
   { id: "step-9", label: "9. Automations" },
+  { id: "step-10", label: "10. Analytics" },
   { id: "screens", label: "Screen map" },
   { id: "daily", label: "Suggested daily rhythm" },
 ] as const;
@@ -141,7 +142,11 @@ export default function RevenueHowToGuidePage() {
                   <Link href="/revenue" className="font-medium text-sky-800 hover:underline">
                     Command Center
                   </Link>{" "}
-                  each day — it shows awaiting review, outreach-ready count, and recent activity.
+                  each day — it shows awaiting review, outreach-ready count, and recent activity. Use{" "}
+                  <Link href="/revenue/analytics" className="font-medium text-sky-800 hover:underline">
+                    Analytics
+                  </Link>{" "}
+                  when you want rates and pipeline value.
                 </Tip>
               </CardBody>
             </Card>
@@ -177,7 +182,7 @@ export default function RevenueHowToGuidePage() {
               </li>
               <li>
                 Set <strong>min opportunity score</strong> and <strong>min confidence</strong> so weak leads don’t
-                clutter review. Keep daily / weekly research limits sensible.
+                clutter review. Keep daily / weekly research limits sensible — the app enforces them.
               </li>
               <li>
                 Set status to <strong>Active</strong> and save. Research only runs on active campaigns.
@@ -185,7 +190,7 @@ export default function RevenueHowToGuidePage() {
             </ol>
             <Tip>
               You can also add a single opportunity manually from Opportunities → Add opportunity if you already
-              know the prospect.
+              know the prospect. Deleting a campaign removes its opportunities and related revenue records.
             </Tip>
           </Step>
 
@@ -199,31 +204,47 @@ export default function RevenueHowToGuidePage() {
                 .
               </li>
               <li>
-                Click <strong>Run research</strong>. The system searches (Tavily when live) and scores prospects
-                with Gemini, then creates opportunity records under that campaign.
+                Click <strong>Run research</strong>. The system searches the web and scores prospects, then creates
+                opportunity records under that campaign.
               </li>
               <li>
-                When it finishes, note how many opportunities were created and whether it used live search or mock
-                mode. New leads land in the review queue.
+                Research may also fill <strong>website</strong>, <strong>social links</strong>, and{" "}
+                <strong>contact</strong> fields when those appear in sources — always verify before outreach.
               </li>
               <li>
-                Open{" "}
+                When it finishes, new leads land in the review queue. Open{" "}
                 <Link href="/revenue/opportunities" className="font-medium text-sky-700 hover:underline">
                   Opportunities
                 </Link>{" "}
-                (filter approval = pending) or use the Command Center review queue.
+                (filter by approval, campaign, or search) or use the Command Center review queue.
               </li>
             </ol>
             <Tip>
-              Research respects your campaign limits. If you get zero results, loosen industry / geo / min score, or
-              widen the objective — then run again.
+              Research respects your campaign daily / weekly limits. If you get zero results, loosen industry / geo /
+              min score, or widen the objective — then run again.
             </Tip>
           </Step>
 
           <Step id="step-3" number={3} title="Review, quality-check, and approve">
             <ol className="list-decimal space-y-2 pl-5">
               <li>
-                Open an opportunity. Read scores, research notes, contact signals, and fit rationale on the left.
+                Open an opportunity. Read scores, research notes, and fit rationale on the left.
+              </li>
+              <li>
+                On the right action column, confirm or fix:
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  <li>
+                    <strong>Website & social</strong> — correct links before you pitch.
+                  </li>
+                  <li>
+                    <strong>Contact person</strong> — decision-maker name, title, email, phone, plus public company
+                    email/phone. Accurate emails also help Inbox auto-link replies later.
+                  </li>
+                  <li>
+                    <strong>Pipeline stage</strong> — set manually anytime if the stage is wrong.
+                  </li>
+                </ul>
+                Scroll to the <strong>Workflow</strong> section below for outreach, discovery, proposals, and convert.
               </li>
               <li>
                 Under <strong>AI agents</strong>:
@@ -266,7 +287,7 @@ export default function RevenueHowToGuidePage() {
             <ol className="list-decimal space-y-2 pl-5">
               <li>
                 On an approved opportunity, open the outreach panel and generate an outreach draft (email / DM
-                variants as available).
+                variants as available). Prefer the contact email you verified in step 3.
               </li>
               <li>
                 Edit the draft in{" "}
@@ -280,7 +301,7 @@ export default function RevenueHowToGuidePage() {
               </li>
               <li>
                 Use <strong>Create Gmail draft</strong> (requires connected Gmail). Review the draft in Gmail, then
-                send from Gmail yourself.
+                send from Gmail yourself. Creating a Gmail draft also links that thread to the opportunity.
               </li>
               <li>
                 After contact, the opportunity should move toward contacted / follow-up stages in the pipeline.
@@ -298,17 +319,31 @@ export default function RevenueHowToGuidePage() {
                 <Link href="/revenue/inbox" className="font-medium text-sky-700 hover:underline">
                   Inbox
                 </Link>
-                . Sync threads when Gmail is connected (or trigger inbox sync from Automations / n8n).
+                . For managers it <strong>auto-syncs Gmail on open</strong>; use <strong>Sync inbox</strong> anytime
+                to refresh.
               </li>
               <li>
-                Review classified replies. When a thread is linked to an opportunity, classification advances the
-                stage automatically (e.g. interested → replied, scheduling → discovery call, not interested → lost).
+                Select a thread. Check the <strong>Opportunity</strong> column — linked threads show the prospect
+                name.
+              </li>
+              <li>
+                If a reply isn’t linked, use <strong>Link to opportunity</strong> in the detail panel and save.
+                Sync also tries to match participant emails to opportunity contact / public email. Unlink if the
+                match is wrong.
+              </li>
+              <li>
+                Run <strong>AI receptionist</strong> to classify the reply. When the thread is linked, classification
+                can advance the pipeline (e.g. interested → replied, scheduling → discovery call, not interested →
+                lost).
               </li>
               <li>
                 Override anytime with the opportunity’s <strong>Pipeline stage</strong> control if the auto move is
                 wrong.
               </li>
             </ol>
+            <Tip>
+              Stage auto-updates only work when the thread is linked to an opportunity. Link first, then classify.
+            </Tip>
           </Step>
 
           <Step id="step-6" number={6} title="Work the pipeline">
@@ -357,12 +392,19 @@ export default function RevenueHowToGuidePage() {
                 From the opportunity, generate a <strong>proposal draft</strong>. Review it under{" "}
                 <Link href="/revenue/proposals" className="font-medium text-sky-700 hover:underline">
                   Proposals
-                </Link>
-                .
+                </Link>{" "}
+                or on the opportunity page.
               </li>
               <li>
-                Use <strong>Edit proposal</strong> on the opportunity to adjust title, scope, deliverables, and
-                investment before converting.
+                Use <strong>Edit proposal</strong> to adjust title, scope, deliverables, timeline, and investment.
+                If you’ve generated more than one draft, pick the version from the dropdown.
+              </li>
+              <li>
+                Set proposal <strong>Status</strong> as you progress (draft → in review → approved → sent).
+              </li>
+              <li>
+                Check the <strong>Agreement prefill checklist</strong>. When it’s green, open{" "}
+                <strong>Open in agreement wizard</strong> to carry scope and fee into Agreements.
               </li>
               <li>
                 When you win, use <strong>Convert to project</strong> on the opportunity (requires manage-projects
@@ -404,6 +446,30 @@ export default function RevenueHowToGuidePage() {
             </Tip>
           </Step>
 
+          <Step id="step-10" number={10} title="Check analytics">
+            <ol className="list-decimal space-y-2 pl-5">
+              <li>
+                Open{" "}
+                <Link href="/revenue/analytics" className="font-medium text-sky-700 hover:underline">
+                  Analytics
+                </Link>{" "}
+                for approval rate, reply rate, estimated pipeline value, revenue won, and estimated AI spend.
+              </li>
+              <li>
+                Use the pipeline snapshot cards to jump into stages that need attention (review, outreach,
+                discovery, proposals, won).
+              </li>
+              <li>
+                Reply rate compares classified reply signals to Gmail drafts created — it improves as you link inbox
+                threads and run the AI receptionist.
+              </li>
+            </ol>
+            <Tip>
+              Analytics is a live read of your opportunity, outreach, inbox, and agent-run data — not a separate
+              reporting warehouse.
+            </Tip>
+          </Step>
+
           <section id="screens" className="scroll-mt-24">
             <Card>
               <CardHeader>
@@ -413,18 +479,34 @@ export default function RevenueHowToGuidePage() {
                 <dl className="space-y-3 text-sm">
                   {[
                     ["Command Center", "Daily snapshot: review queue, pipeline counts, estimated value, activity."],
-                    ["Campaigns", "Targeting rules + Run research."],
-                    ["Opportunities", "All researched leads; open one to approve, agent-run, and advance."],
+                    ["Campaigns", "Targeting rules + Run research + delete (cascades related records)."],
+                    [
+                      "Opportunities",
+                      "All researched leads; search + campaign/approval filters; open one to approve and advance.",
+                    ],
                     ["Outreach", "Draft queue — edit, approve, push Gmail drafts."],
-                    ["Inbox", "Synced Gmail threads and reply handling."],
+                    [
+                      "Inbox",
+                      "Auto-sync on open; link threads to opportunities; classify replies (stage writeback when linked).",
+                    ],
                     ["Pipeline", "Kanban board — drag cards between stages."],
                     ["Discovery", "Call prep, notes, and debriefs."],
-                    ["Proposals", "Proposal drafts before / alongside agreement prefill."],
+                    [
+                      "Proposals",
+                      "Drafts with status, version switch, edit, and agreement prefill checklist.",
+                    ],
                     ["Automations", "Agent registry, n8n runs, retries, cleanup."],
-                    ["Analytics", "Coming soon — conversion and spend dashboards."],
+                    [
+                      "Analytics",
+                      "Approval rate, reply rate, pipeline value, wins, and estimated AI spend.",
+                    ],
                     ["Settings", "Gmail connect/disconnect and n8n mode (live / mock)."],
+                    ["How to use", "This guide."],
                   ].map(([name, desc]) => (
-                    <div key={name} className="grid gap-1 border-b border-slate-100 pb-3 last:border-0 sm:grid-cols-[140px_1fr]">
+                    <div
+                      key={name}
+                      className="grid gap-1 border-b border-slate-100 pb-3 last:border-0 sm:grid-cols-[140px_1fr]"
+                    >
                       <dt className="font-medium text-slate-900">{name}</dt>
                       <dd className="text-slate-600">{desc}</dd>
                     </div>
@@ -443,22 +525,29 @@ export default function RevenueHowToGuidePage() {
                 <ol className="list-decimal space-y-2 pl-5">
                   <li>
                     <strong>Morning — Command Center:</strong> clear awaiting review, note outreach-ready and
-                    proposals in progress.
+                    proposals in progress. Glance at{" "}
+                    <Link href="/revenue/analytics" className="font-medium text-sky-700 hover:underline">
+                      Analytics
+                    </Link>{" "}
+                    weekly for rates.
                   </li>
                   <li>
                     <strong>Research block:</strong> run research on 1–2 active campaigns if the queue is thin.
                   </li>
                   <li>
-                    <strong>Approval block:</strong> quality-review → approve or reject every pending opportunity.
+                    <strong>Approval block:</strong> fix website/contact → quality-review → approve or reject every
+                    pending opportunity.
                   </li>
                   <li>
                     <strong>Outreach block:</strong> approve drafts, create Gmail drafts, send personally.
                   </li>
                   <li>
-                    <strong>Inbox + pipeline:</strong> sync replies, update stages, book discovery or send proposals.
+                    <strong>Inbox + pipeline:</strong> open Inbox (auto-sync), link any unlinked replies, classify,
+                    then drag pipeline stages as needed.
                   </li>
                   <li>
-                    <strong>Close the loop:</strong> convert wins to projects; mark lost / revisit honestly.
+                    <strong>Close the loop:</strong> edit proposals, set status, open agreement wizard when the
+                    checklist is ready; convert wins to projects; mark lost / revisit honestly.
                   </li>
                 </ol>
                 <p className="text-slate-600">

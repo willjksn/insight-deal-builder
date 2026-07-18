@@ -111,11 +111,48 @@ export default function OpportunityDetailPage() {
         )}
       </div>
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+
+      {/* Overview: research left, compact actions right */}
+      <div className="grid items-start gap-8 lg:grid-cols-3">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <OpportunityDetailView opportunity={opportunity} />
         </div>
-        <div className="space-y-6">
+        <aside className="min-w-0 space-y-6 lg:sticky lg:top-6 lg:self-start">
+          <OpportunityApprovalPanel
+            opportunity={opportunity}
+            canManage={canManage}
+            busy={busy}
+            onApprove={async (notes) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueApproveOpportunity(() => user.getIdToken(), id, notes);
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Approve failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onReject={async (reason, notes, revisitLater) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueRejectOpportunity(() => user.getIdToken(), id, {
+                  reason,
+                  notes,
+                  revisitLater,
+                });
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Reject failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
           <OpportunityStagePanel
             opportunity={opportunity}
             canManage={canManage}
@@ -229,6 +266,18 @@ export default function OpportunityDetailPage() {
               }
             }}
           />
+        </aside>
+      </div>
+
+      {/* Workflow panels use full width so they aren't squeezed into the sidebar */}
+      <section className="mt-10 space-y-6">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">Workflow</h3>
+          <p className="text-sm text-slate-600">
+            Outreach, discovery, proposals, and project conversion for this opportunity.
+          </p>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
           <OpportunityOutreachPanel
             opportunity={opportunity}
             canManage={canManage}
@@ -427,43 +476,8 @@ export default function OpportunityDetailPage() {
               }
             }}
           />
-          <OpportunityApprovalPanel
-            opportunity={opportunity}
-            canManage={canManage}
-            busy={busy}
-            onApprove={async (notes) => {
-              if (!user) return;
-              setBusy(true);
-              setError(null);
-              try {
-                const res = await revenueApproveOpportunity(() => user.getIdToken(), id, notes);
-                setOpportunity(res.opportunity);
-              } catch (e) {
-                setError(e instanceof Error ? e.message : "Approve failed");
-              } finally {
-                setBusy(false);
-              }
-            }}
-            onReject={async (reason, notes, revisitLater) => {
-              if (!user) return;
-              setBusy(true);
-              setError(null);
-              try {
-                const res = await revenueRejectOpportunity(() => user.getIdToken(), id, {
-                  reason,
-                  notes,
-                  revisitLater,
-                });
-                setOpportunity(res.opportunity);
-              } catch (e) {
-                setError(e instanceof Error ? e.message : "Reject failed");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
         </div>
-      </div>
+      </section>
       <ConfirmDialog
         open={confirmDelete}
         title="Delete opportunity?"
