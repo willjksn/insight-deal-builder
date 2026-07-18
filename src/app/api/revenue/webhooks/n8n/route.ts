@@ -9,24 +9,41 @@ export const dynamic = "force-dynamic";
 
 const VALID_STATUS = new Set<RevenueWorkflowRunStatus>(["queued", "running", "completed", "failed"]);
 
+type CallbackBody = {
+  runId?: string;
+  organizationCompany?: string;
+  status?: string;
+  externalRunId?: string;
+  errorSummary?: string;
+  outputSummary?: string;
+  webhookSecret?: string;
+};
+
+function parseCallbackBody(raw: string): { body?: CallbackBody; error?: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { error: "Empty body" };
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return { body: parsed as CallbackBody };
+    }
+    return { error: "JSON body must be an object" };
+  } catch {
+    // n8n sometimes double-encodes or sends a JS-like object string; last resort no-op
+    return { error: `Invalid JSON body (received ${trimmed.length} chars)` };
+  }
+}
+
 /** Inbound status callbacks from n8n workflows. */
 export async function POST(request: NextRequest) {
   try {
-    let body: {
-      runId?: string;
-      organizationCompany?: string;
-      status?: string;
-      externalRunId?: string;
-      errorSummary?: string;
-      outputSummary?: string;
-      /** Optional: same value as N8N_WEBHOOK_SECRET (handy when headers are stripped). */
-      webhookSecret?: string;
-    };
-    try {
-      body = (await request.json()) as typeof body;
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    const raw = await request.text();
+    const parsed = parseCallbackBody(raw);
+    if (!parsed.body) {
+      return NextResponse.json({ error: parsed.error ?? "Invalid JSON body" }, { status: 400 });
     }
+    const body = parsed.body;
 
     const expected = n8nWebhookSecret();
     const bodySecret = typeof body.webhookSecret === "string" ? body.webhookSecret.trim() : "";
@@ -37,11 +54,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: "Unauthorized",
-          reason: bodySecret
-            ? "secret_mismatch"
-            : headerAuth.ok
-              ? "secret_missing"
-              : headerAuth.reason,
+          reason: bodySecret ? "secret_mismatch" : headerAuth.reason,
           expectedLength: expected?.length,
           receivedLength: bodySecret
             ? bodySecret.length
