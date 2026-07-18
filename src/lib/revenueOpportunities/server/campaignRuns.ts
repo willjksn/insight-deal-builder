@@ -96,3 +96,20 @@ export async function listCampaignRuns(
   );
   return docs.map((d) => serializeDoc<RevenueCampaignRun>(d.id, d.data()));
 }
+
+/** Count research runs for a campaign since `since` (inclusive). */
+export async function countCampaignRunsSince(
+  appUser: AppUser,
+  campaignId: string,
+  since: Date
+): Promise<number> {
+  const db = requireDb();
+  const organizationCompany = tenantCompany(appUser);
+  const snap = await db
+    .collection(REVENUE_CAMPAIGN_RUNS_COLLECTION)
+    .where("organizationCompany", "==", organizationCompany)
+    .where("campaignId", "==", campaignId)
+    .where("createdAt", ">=", since)
+    .get();
+  return snap.size;
+}

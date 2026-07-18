@@ -106,10 +106,6 @@ export function canDeleteTemplates(user: AppUser | null | undefined): boolean {
   return isInsightOrgUser(user) && hasPermission(user, "deleteTemplates");
 }
 
-export function canLoadDemoData(user: AppUser | null | undefined): boolean {
-  return isInsightOrgUser(user) && hasPermission(user, "loadDemoData");
-}
-
 export function canViewIdentityDocs(user: AppUser | null | undefined): boolean {
   return isInsightOrgUser(user) && (hasPermission(user, "viewIdentityDocs") || canManageUsers(user));
 }

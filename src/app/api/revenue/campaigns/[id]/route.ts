@@ -38,8 +38,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const { appUser } = await requireRevenueManager(request);
     const { id } = await context.params;
-    await deleteCampaign(appUser, id);
-    return NextResponse.json({ ok: true });
+    const result = await deleteCampaign(appUser, id);
+    return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     return revenueApiError(err);
   }

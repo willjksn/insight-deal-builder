@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   revenueApproveOpportunity,
   revenueApproveOutreach,
+  revenueDeleteOpportunity,
   revenueGetOpportunity,
   revenueListDiscovery,
   revenueListOutreach,
@@ -22,9 +23,11 @@ import {
   revenueRunProposalDraft,
   revenueRunQualityReview,
   revenueRunRevision,
+  revenueSetOpportunityStage,
   revenueUpdateOutreach,
   revenueCreateGmailDraftFromOutreach,
   revenueConvertOpportunityToProject,
+  revenueUpdateProposal,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 import type { RevenueOutreachActivity } from "@/lib/revenueOpportunities/types/outreach";
@@ -32,9 +35,12 @@ import type { RevenueDiscoverySession } from "@/lib/revenueOpportunities/types/d
 import type { RevenueOpportunityProposal } from "@/lib/revenueOpportunities/types/proposal";
 import { canManageProjects, canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { OpportunityDetailView } from "@/components/revenue/OpportunityDetailView";
 import { OpportunityApprovalPanel } from "@/components/revenue/OpportunityApprovalPanel";
 import { OpportunityAgentPanel } from "@/components/revenue/OpportunityAgentPanel";
+import { OpportunityStagePanel } from "@/components/revenue/OpportunityStagePanel";
 import { OpportunityOutreachPanel } from "@/components/revenue/OpportunityOutreachPanel";
 import { OpportunityDiscoveryPanel } from "@/components/revenue/OpportunityDiscoveryPanel";
 import { OpportunityProposalPanel } from "@/components/revenue/OpportunityProposalPanel";
@@ -42,6 +48,7 @@ import { OpportunityConversionPanel } from "@/components/revenue/OpportunityConv
 
 export default function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { user, appUser } = useAuth();
   const [opportunity, setOpportunity] = useState<RevenueOpportunity | null>(null);
   const [outreach, setOutreach] = useState<RevenueOutreachActivity[]>([]);
@@ -49,6 +56,8 @@ export default function OpportunityDetailPage() {
   const [proposals, setProposals] = useState<RevenueOpportunityProposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canManage = canManageRevenueOpportunities(appUser);
   const canConvert = canManage && canManageProjects(appUser);
@@ -81,16 +90,47 @@ export default function OpportunityDetailPage() {
 
   return (
     <>
-      <Link href="/revenue/opportunities" className="mb-4 inline-flex items-center text-sm text-sky-700 hover:underline">
-        <ArrowLeft className="mr-1 h-4 w-4" />
-        Opportunities
-      </Link>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <Link href="/revenue/opportunities" className="inline-flex items-center text-sm text-sky-700 hover:underline">
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Opportunities
+        </Link>
+        {canManage && (
+          <Button
+            size="touch"
+            variant="outline"
+            disabled={busy || deleting}
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4 text-red-500" />
+            Delete
+          </Button>
+        )}
+      </div>
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <OpportunityDetailView opportunity={opportunity} />
         </div>
         <div className="space-y-6">
+          <OpportunityStagePanel
+            opportunity={opportunity}
+            canManage={canManage}
+            busy={busy}
+            onSetStage={async (pipelineStage) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueSetOpportunityStage(() => user.getIdToken(), id, pipelineStage);
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Failed to update stage");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
           <OpportunityAgentPanel
             opportunity={opportunity}
             canManage={canManage}
@@ -276,6 +316,32 @@ export default function OpportunityDetailPage() {
               }
             }}
             onReload={reload}
+            onSave={async (proposalId, patch) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const existing = proposals.find((p) => p.id === proposalId);
+                await revenueUpdateProposal(() => user.getIdToken(), proposalId, {
+                  ...patch,
+                  agreementPrefill: {
+                    suggestedTitle: patch.title,
+                    projectOverview: patch.executiveSummary,
+                    deliverables: patch.deliverables,
+                    estimatedFee: patch.investmentMin ?? patch.investmentMax,
+                    paymentStructure:
+                      patch.paymentStructureSuggestion ?? existing?.agreementPrefill?.paymentStructure,
+                    scopeNotes: patch.scopeOutline,
+                  },
+                });
+                await reload();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Failed to save proposal");
+                throw e;
+              } finally {
+                setBusy(false);
+              }
+            }}
           />
           <OpportunityConversionPanel
             opportunity={opportunity}
@@ -339,6 +405,27 @@ export default function OpportunityDetailPage() {
           />
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete opportunity?"
+        description={`Delete “${opportunity.subject.name}”? This cannot be undone.`}
+        confirmLabel="Delete opportunity"
+        loading={deleting}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={async () => {
+          if (!user) return;
+          setDeleting(true);
+          setError(null);
+          try {
+            await revenueDeleteOpportunity(() => user.getIdToken(), id);
+            router.push("/revenue/opportunities");
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "Delete failed");
+            setDeleting(false);
+            setConfirmDelete(false);
+          }
+        }}
+      />
     </>
   );
 }

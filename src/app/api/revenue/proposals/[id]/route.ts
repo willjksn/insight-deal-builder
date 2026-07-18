@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProposal, updateProposal } from "@/lib/revenueOpportunities/server/proposals";
 import { requireRevenueManager, requireRevenueViewer, revenueApiError } from "@/lib/revenueOpportunities/server/routeHelpers";
-import type { RevenueProposalStatus } from "@/lib/revenueOpportunities/types/proposal";
+import type {
+  AgreementProposalPrefill,
+  RevenueProposalStatus,
+} from "@/lib/revenueOpportunities/types/proposal";
 
 export const runtime = "nodejs";
 
@@ -27,6 +30,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       title?: string;
       executiveSummary?: string;
       scopeOutline?: string;
+      deliverables?: string[];
+      timelineNotes?: string;
+      investmentMin?: number;
+      investmentMax?: number;
+      paymentStructureSuggestion?: string;
+      agreementPrefill?: AgreementProposalPrefill;
       agreementId?: string;
     };
     const proposal = await updateProposal(appUser, id, body);

@@ -1,7 +1,17 @@
 import { FieldValue, Firestore } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
-import { REVENUE_CAMPAIGNS_COLLECTION } from "@/lib/revenueOpportunities/collections";
+import {
+  REVENUE_AGENT_RUNS_COLLECTION,
+  REVENUE_CAMPAIGN_RUNS_COLLECTION,
+  REVENUE_CAMPAIGNS_COLLECTION,
+  REVENUE_DISCOVERY_SESSIONS_COLLECTION,
+  REVENUE_EMAIL_THREADS_COLLECTION,
+  REVENUE_FOLLOW_UP_TASKS_COLLECTION,
+  REVENUE_OPPORTUNITIES_COLLECTION,
+  REVENUE_OPPORTUNITY_PROPOSALS_COLLECTION,
+  REVENUE_OUTREACH_ACTIVITIES_COLLECTION,
+} from "@/lib/revenueOpportunities/collections";
 import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
@@ -23,6 +33,39 @@ function tenantCompany(appUser: AppUser): string {
   if (!company) throw new RevenueOpportunityError("NOT_AUTHORIZED", "Organization company is required");
   return company;
 }
+
+async function deleteQueryDocs(
+  db: Firestore,
+  collectionName: string,
+  organizationCompany: string,
+  field: string,
+  value: string
+): Promise<number> {
+  let deleted = 0;
+  while (true) {
+    const snap = await db
+      .collection(collectionName)
+      .where("organizationCompany", "==", organizationCompany)
+      .where(field, "==", value)
+      .limit(400)
+      .get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    for (const doc of snap.docs) batch.delete(doc.ref);
+    await batch.commit();
+    deleted += snap.size;
+  }
+  return deleted;
+}
+
+const OPPORTUNITY_CHILD_COLLECTIONS = [
+  REVENUE_OUTREACH_ACTIVITIES_COLLECTION,
+  REVENUE_DISCOVERY_SESSIONS_COLLECTION,
+  REVENUE_OPPORTUNITY_PROPOSALS_COLLECTION,
+  REVENUE_AGENT_RUNS_COLLECTION,
+  REVENUE_EMAIL_THREADS_COLLECTION,
+  REVENUE_FOLLOW_UP_TASKS_COLLECTION,
+] as const;
 
 export async function listCampaigns(appUser: AppUser): Promise<RevenueCampaign[]> {
   const db = requireDb();
@@ -86,13 +129,57 @@ export async function updateCampaign(
   return serializeDoc<RevenueCampaign>(snap.id, snap.data()!);
 }
 
-export async function deleteCampaign(appUser: AppUser, id: string): Promise<void> {
+export async function deleteCampaign(
+  appUser: AppUser,
+  id: string
+): Promise<{
+  deletedOpportunities: number;
+  deletedCampaignRuns: number;
+  deletedRelated: number;
+}> {
   const db = requireDb();
+  const organizationCompany = tenantCompany(appUser);
   const ref = db.collection(REVENUE_CAMPAIGNS_COLLECTION).doc(id);
   const existing = await ref.get();
   if (!existing.exists) throw new RevenueOpportunityError("NOT_FOUND", "Campaign not found");
-  if (existing.data()!.organizationCompany !== tenantCompany(appUser)) {
+  if (existing.data()!.organizationCompany !== organizationCompany) {
     throw new RevenueOpportunityError("NOT_AUTHORIZED", "Campaign not found");
   }
+
+  const oppSnap = await db
+    .collection(REVENUE_OPPORTUNITIES_COLLECTION)
+    .where("organizationCompany", "==", organizationCompany)
+    .where("campaignId", "==", id)
+    .get();
+  const opportunityIds = oppSnap.docs.map((d) => d.id);
+
+  let deletedRelated = 0;
+  for (const oppId of opportunityIds) {
+    for (const collectionName of OPPORTUNITY_CHILD_COLLECTIONS) {
+      deletedRelated += await deleteQueryDocs(
+        db,
+        collectionName,
+        organizationCompany,
+        "opportunityId",
+        oppId
+      );
+    }
+  }
+
+  const deletedOpportunities = await deleteQueryDocs(
+    db,
+    REVENUE_OPPORTUNITIES_COLLECTION,
+    organizationCompany,
+    "campaignId",
+    id
+  );
+  const deletedCampaignRuns = await deleteQueryDocs(
+    db,
+    REVENUE_CAMPAIGN_RUNS_COLLECTION,
+    organizationCompany,
+    "campaignId",
+    id
+  );
   await ref.delete();
+  return { deletedOpportunities, deletedCampaignRuns, deletedRelated };
 }

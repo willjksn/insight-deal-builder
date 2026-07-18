@@ -5,6 +5,8 @@ import { REVENUE_EMAIL_THREADS_COLLECTION } from "@/lib/revenueOpportunities/col
 import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";
 import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
+import { getOpportunity, setOpportunityPipelineStage } from "@/lib/revenueOpportunities/server/opportunities";
+import type { RevenuePipelineStage } from "@/lib/revenueOpportunities/types";
 import type {
   EmailClassificationResult,
   RevenueEmailMessage,
@@ -12,6 +14,55 @@ import type {
   RevenueEmailThreadStatus,
 } from "@/lib/revenueOpportunities/types/emailThread";
 import { AppUser } from "@/lib/types";
+
+const STAGE_RANK: Record<RevenuePipelineStage, number> = {
+  new: 0,
+  researched: 1,
+  review_required: 2,
+  approved: 3,
+  ready_for_outreach: 4,
+  contacted: 5,
+  follow_up_due: 6,
+  replied: 7,
+  discovery_call: 8,
+  proposal: 9,
+  negotiating: 10,
+  won: 11,
+  converted_to_project: 12,
+  lost: 13,
+  revisit_later: 14,
+};
+
+function stageFromClassification(
+  classification: EmailClassificationResult["classification"]
+): RevenuePipelineStage | null {
+  switch (classification) {
+    case "interested":
+    case "question":
+    case "referral":
+      return "replied";
+    case "scheduling":
+      return "discovery_call";
+    case "out_of_office":
+      return "follow_up_due";
+    case "not_interested":
+    case "spam":
+      return "lost";
+    default:
+      return null;
+  }
+}
+
+function shouldApplyInboxStage(current: RevenuePipelineStage, next: RevenuePipelineStage): boolean {
+  if (current === next) return false;
+  if (current === "converted_to_project") return false;
+  if (current === "won" && next !== "converted_to_project") return false;
+  if (next === "lost" || next === "revisit_later") return true;
+  if (current === "lost" || current === "revisit_later") {
+    return next === "replied" || next === "discovery_call";
+  }
+  return STAGE_RANK[next] >= STAGE_RANK[current];
+}
 
 function requireDb(): Firestore {
   const db = getAdminDb();
@@ -145,6 +196,22 @@ export async function applyThreadClassification(
       updatedAt: FieldValue.serverTimestamp(),
     })
   );
+
+  const opportunityId = existing.data()!.opportunityId as string | undefined;
+  const nextStage = stageFromClassification(result.classification);
+  if (opportunityId && nextStage) {
+    try {
+      const opportunity = await getOpportunity(appUser, opportunityId);
+      if (shouldApplyInboxStage(opportunity.workflow.pipelineStage, nextStage)) {
+        await setOpportunityPipelineStage(appUser, opportunityId, nextStage, {
+          source: "inbox_classification",
+        });
+      }
+    } catch {
+      // Thread classification still succeeds if opportunity is missing or unauthorized.
+    }
+  }
+
   const snap = await ref.get();
   return serializeDoc<RevenueEmailThread>(snap.id, snap.data()!);
 }

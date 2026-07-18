@@ -71,7 +71,12 @@ export async function revenueDeleteCampaign(getToken: () => Promise<string | nul
     method: "DELETE",
     headers: await authHeaders(getToken),
   });
-  return parseJson<{ ok: true }>(res);
+  return parseJson<{
+    ok: true;
+    deletedOpportunities: number;
+    deletedCampaignRuns: number;
+    deletedRelated: number;
+  }>(res);
 }
 
 export async function revenueListOpportunities(
@@ -125,6 +130,19 @@ export async function revenueDeleteOpportunity(getToken: () => Promise<string | 
   return parseJson<{ ok: true }>(res);
 }
 
+export async function revenueSetOpportunityStage(
+  getToken: () => Promise<string | null>,
+  id: string,
+  pipelineStage: RevenuePipelineStage
+) {
+  const res = await fetch(`/api/revenue/opportunities/${id}/stage`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ pipelineStage }),
+  });
+  return parseJson<{ opportunity: RevenueOpportunity }>(res);
+}
+
 export async function revenueApproveOpportunity(
   getToken: () => Promise<string | null>,
   id: string,
@@ -154,14 +172,6 @@ export async function revenueRejectOpportunity(
 export async function revenueGetDashboard(getToken: () => Promise<string | null>) {
   const res = await fetch("/api/revenue/dashboard", { headers: await authHeaders(getToken) });
   return parseJson<{ summary: RevenueDashboardSummary }>(res);
-}
-
-export async function revenueSeedDemo(getToken: () => Promise<string | null>) {
-  const res = await fetch("/api/revenue/seed", {
-    method: "POST",
-    headers: await authHeaders(getToken),
-  });
-  return parseJson<{ ok: true; campaignId: string; opportunityIds: string[] }>(res);
 }
 
 export async function revenueListAgents(getToken: () => Promise<string | null>) {
@@ -460,7 +470,19 @@ export async function revenueGetProposalAgreementPrefill(getToken: () => Promise
 export async function revenueUpdateProposal(
   getToken: () => Promise<string | null>,
   proposalId: string,
-  body: { agreementId?: string; status?: string }
+  body: {
+    agreementId?: string;
+    status?: string;
+    title?: string;
+    executiveSummary?: string;
+    scopeOutline?: string;
+    deliverables?: string[];
+    timelineNotes?: string;
+    investmentMin?: number;
+    investmentMax?: number;
+    paymentStructureSuggestion?: string;
+    agreementPrefill?: RevenueOpportunityProposal["agreementPrefill"];
+  }
 ) {
   const res = await fetch(`/api/revenue/proposals/${proposalId}`, {
     method: "PATCH",

@@ -354,20 +354,6 @@ export const SEED_COMPANIES = [
   },
 ];
 
-export const SEED_CLIENT = {
-  businessName: "Demo Fitness Studio",
-  contactName: "Demo Client",
-  email: "client@example.com",
-  phone: "",
-  address: "",
-  website: "",
-  socialHandle: "",
-  authorizedSignerName: "Demo Client",
-  authorizedSignerTitle: "Owner",
-  billingContact: "",
-  notes: "Demo client for testing",
-};
-
 export const EQUIPMENT_CATALOG_PRESETS = [
   { name: "Sony FX3 Camera Body", category: "Camera", brand: "Sony", model: "FX3", dailyRate: 150, replacementValue: 3900, active: true },
   { name: "Sony 24-70mm f/2.8 GM II", category: "Lens", brand: "Sony", model: "24-70 GM II", dailyRate: 75, replacementValue: 2300, active: true },
@@ -413,17 +399,3 @@ export const LOCATION_CATALOG_PRESETS = [
     propPresets: [{ id: "prop-3", name: "Rolling clothing rack", dailyRate: 25 }],
   },
 ];
-
-export const SEED_PROJECT = {
-  projectName: "Demo Fitness Studio Brand Campaign",
-  agreementType: "client_project" as const,
-  projectType: "Business Brand Package" as ProjectType,
-  shootType: "Photo + Video" as ShootType,
-  totalProjectFee: 3000,
-  shootDate: "",
-  deliveryDate: "",
-  location: "",
-  status: "draft" as const,
-};
-
-// Prefer importing from @/lib/seed/demoData for full seed data

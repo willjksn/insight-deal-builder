@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  revenueDeleteCampaign,
   revenueGetCampaign,
   revenueListCampaignRuns,
   revenueRunCampaignResearch,
@@ -20,16 +21,20 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CampaignForm } from "@/components/revenue/CampaignForm";
 
 export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { user, appUser } = useAuth();
   const [campaign, setCampaign] = useState<RevenueCampaign | null>(null);
   const [runs, setRuns] = useState<RevenueCampaignRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [researching, setResearching] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [researchMessage, setResearchMessage] = useState<string | null>(null);
   const canManage = canManageRevenueOpportunities(appUser);
@@ -66,30 +71,41 @@ export default function CampaignDetailPage() {
         subtitle={`${campaign.campaignType === "stormi_brand" ? "Stormi" : "IMG"} campaign`}
         action={
           canManage ? (
-            <Button
-              size="touch"
-              disabled={researching || !campaign.active}
-              onClick={async () => {
-                if (!user) return;
-                setResearching(true);
-                setError(null);
-                setResearchMessage(null);
-                try {
-                  const res = await revenueRunCampaignResearch(() => user.getIdToken(), id);
-                  setRuns((prev) => [res.campaignRun, ...prev]);
-                  setResearchMessage(
-                    `Research complete — ${res.opportunities.length} opportunit${res.opportunities.length === 1 ? "y" : "ies"} created (${res.campaignRun.usedLiveSearch ? "live Tavily + Gemini" : "mock mode"}).`
-                  );
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : "Research failed");
-                } finally {
-                  setResearching(false);
-                }
-              }}
-            >
-              <Search className="mr-2 h-4 w-4" />
-              {researching ? "Researching…" : "Run research"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="touch"
+                variant="outline"
+                disabled={busy || researching || deleting}
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4 text-red-500" />
+                Delete
+              </Button>
+              <Button
+                size="touch"
+                disabled={researching || deleting || !campaign.active}
+                onClick={async () => {
+                  if (!user) return;
+                  setResearching(true);
+                  setError(null);
+                  setResearchMessage(null);
+                  try {
+                    const res = await revenueRunCampaignResearch(() => user.getIdToken(), id);
+                    setRuns((prev) => [res.campaignRun, ...prev]);
+                    setResearchMessage(
+                      `Research complete — ${res.opportunities.length} opportunit${res.opportunities.length === 1 ? "y" : "ies"} created (${res.campaignRun.usedLiveSearch ? "live Tavily + Gemini" : "mock mode"}).`
+                    );
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Research failed");
+                  } finally {
+                    setResearching(false);
+                  }
+                }}
+              >
+                <Search className="mr-2 h-4 w-4" />
+                {researching ? "Researching…" : "Run research"}
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -148,6 +164,28 @@ export default function CampaignDetailPage() {
       >
         View campaign opportunities →
       </Link>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete campaign?"
+        description={`Delete “${campaign.name}” and all related opportunities, research runs, outreach, discovery, and proposals? This cannot be undone.`}
+        confirmLabel="Delete campaign"
+        loading={deleting}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={async () => {
+          if (!user) return;
+          setDeleting(true);
+          setError(null);
+          try {
+            await revenueDeleteCampaign(() => user.getIdToken(), id);
+            router.push("/revenue/campaigns");
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "Delete failed");
+            setDeleting(false);
+            setConfirmDelete(false);
+          }
+        }}
+      />
     </>
   );
 }

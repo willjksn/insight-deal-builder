@@ -20,7 +20,6 @@ export interface UserPermissions {
   manageTemplates: boolean;
   deleteTemplates: boolean;
   manageUsers: boolean;
-  loadDemoData: boolean;
   /** View government ID photos captured for renters/talent (Insight staff only) */
   viewIdentityDocs: boolean;
   /** Open W-9 PDFs stored for payee agreements (accounting / admin) */

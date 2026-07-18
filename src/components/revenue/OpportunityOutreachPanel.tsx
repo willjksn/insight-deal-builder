@@ -40,7 +40,7 @@ export function OpportunityOutreachPanel({
       <CardHeader>
         <h3 className="font-semibold text-slate-900">Outreach drafts</h3>
         <p className="text-xs text-slate-500">
-          Generate email, LinkedIn, and Instagram drafts for human approval. Sending arrives in Phase 6.
+          Generate email, LinkedIn, and Instagram drafts for human approval. Create a Gmail draft when ready — you send from Gmail.
         </p>
       </CardHeader>
       <CardBody className="space-y-4">

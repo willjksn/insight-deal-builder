@@ -25,6 +25,7 @@ export default function RevenueInboxPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
   const [selected, setSelected] = useState<RevenueEmailThread | null>(null);
   const canManage = canManageRevenueOpportunities(appUser);
 
@@ -34,12 +35,44 @@ export default function RevenueInboxPage() {
     setThreads(res.threads);
   };
 
+  const syncFromGmail = async () => {
+    if (!user) return;
+    const res = await revenueSyncInbox(() => user.getIdToken());
+    setThreads(res.threads);
+    setSyncNote(`Synced ${res.threads.length} thread${res.threads.length === 1 ? "" : "s"} from Gmail`);
+  };
+
   useEffect(() => {
     if (!user) return;
-    reload()
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
-      .finally(() => setLoading(false));
-  }, [user]);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      setSyncNote(null);
+      try {
+        if (canManage) {
+          try {
+            await syncFromGmail();
+          } catch {
+            // Gmail may be disconnected — still show stored threads.
+            await reload();
+            if (!cancelled) {
+              setSyncNote("Showing saved threads. Connect Gmail in Settings, or use Sync inbox.");
+            }
+          }
+        } else {
+          await reload();
+        }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, canManage]);
 
   return (
     <>
@@ -49,19 +82,19 @@ export default function RevenueInboxPage() {
       </Link>
       <PageHeader
         title="Inbox"
-        subtitle="Gmail threads, reply classification, and draft-only AI receptionist."
+        subtitle="Auto-syncs Gmail on open. Classify replies with the draft-only AI receptionist."
         action={
           canManage ? (
             <Button
               size="touch"
-              disabled={busy}
+              disabled={busy || loading}
               onClick={async () => {
                 if (!user) return;
                 setBusy(true);
                 setError(null);
+                setSyncNote(null);
                 try {
-                  const res = await revenueSyncInbox(() => user.getIdToken());
-                  setThreads(res.threads);
+                  await syncFromGmail();
                 } catch (e) {
                   setError(e instanceof Error ? e.message : "Sync failed");
                 } finally {
@@ -69,13 +102,14 @@ export default function RevenueInboxPage() {
                 }
               }}
             >
-              Sync inbox
+              {busy ? "Syncing…" : "Sync inbox"}
             </Button>
           ) : undefined
         }
       />
       {loading && <LoadingSpinner />}
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {!loading && syncNote && <p className="mb-4 text-sm text-slate-600">{syncNote}</p>}
       {!loading && (
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">

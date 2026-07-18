@@ -14,7 +14,6 @@ import { useMutations } from "@/hooks/useMutations";
 import { useAuth } from "@/contexts/AuthContext";
 import { canManageClients } from "@/lib/utils/permissions";
 import { Client } from "@/lib/types";
-import { SEED_CLIENT } from "@/lib/constants/presets";
 import { Trash2 } from "lucide-react";
 
 const emptyClient = {
@@ -43,20 +42,12 @@ export default function ClientsPage() {
     refresh();
   };
 
-  const seedClient = async () => {
-    if (!data.some((c) => c.businessName === SEED_CLIENT.businessName)) await create(SEED_CLIENT);
-    refresh();
-  };
-
   return (
     <div>
       <PageHeader title="Clients" subtitle="Client profiles for project and client agreements" action={
-        <div className="flex gap-2 flex-wrap">
-          {data.length === 0 && canManageClients(appUser) && <Button size="touch" variant="outline" onClick={seedClient}>Load Demo Client</Button>}
-          {canManageClients(appUser) && (
-            <Button size="touch" onClick={() => { setEditingId(null); setForm(emptyClient); setShowForm(true); }}>Add Client</Button>
-          )}
-        </div>
+        canManageClients(appUser) ? (
+          <Button size="touch" onClick={() => { setEditingId(null); setForm(emptyClient); setShowForm(true); }}>Add Client</Button>
+        ) : undefined
       } />
 
       <ListSearchField

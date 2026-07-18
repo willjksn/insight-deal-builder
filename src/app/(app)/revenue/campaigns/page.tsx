@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Database, Plus } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { revenueListCampaigns, revenueSeedDemo } from "@/lib/revenueOpportunities/apiClient";
+import { revenueListCampaigns } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -17,10 +16,8 @@ import { DataTable, DataRow } from "@/components/ui/DataTable";
 
 export default function RevenueCampaignsPage() {
   const { user, appUser } = useAuth();
-  const router = useRouter();
   const [campaigns, setCampaigns] = useState<RevenueCampaign[]>([]);
   const [loading, setLoading] = useState(true);
-  const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canManage = canManageRevenueOpportunities(appUser);
 
@@ -31,19 +28,6 @@ export default function RevenueCampaignsPage() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   }, [user]);
-
-  const loadDemo = async () => {
-    if (!user) return;
-    setSeeding(true);
-    setError(null);
-    try {
-      const res = await revenueSeedDemo(() => user.getIdToken());
-      router.push(`/revenue/campaigns/${res.campaignId}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load demo");
-      setSeeding(false);
-    }
-  };
 
   return (
     <>
@@ -73,21 +57,15 @@ export default function RevenueCampaignsPage() {
             <div>
               <p className="font-medium text-slate-900">No campaigns yet</p>
               <p className="mt-1 text-sm text-slate-600">
-                Load a demo Orlando hospitality campaign (with sample opportunities), or create your own targeting
-                rules and run research.
+                Create a campaign with targeting rules, then run research to find opportunities.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button size="touch" variant="secondary" disabled={seeding} onClick={loadDemo}>
-                <Database className="mr-2 h-4 w-4" />
-                {seeding ? "Loading…" : "Load demo campaign"}
+            <Link href="/revenue/campaigns/new">
+              <Button size="touch">
+                <Plus className="mr-2 h-4 w-4" />
+                Create campaign
               </Button>
-              <Link href="/revenue/campaigns/new">
-                <Button size="touch" variant="outline">
-                  Create campaign
-                </Button>
-              </Link>
-            </div>
+            </Link>
           </CardBody>
         </Card>
       )}

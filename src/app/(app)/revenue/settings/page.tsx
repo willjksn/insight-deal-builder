@@ -57,7 +57,7 @@ export default function RevenueSettingsPage() {
         <ArrowLeft className="mr-1 h-4 w-4" />
         Command center
       </Link>
-      <PageHeader title="Settings" subtitle="Gmail, n8n automations, and integration status." />
+      <PageHeader title="Settings" subtitle="Connect Gmail and check n8n automation status." />
       {gmailParam === "connected" && (
         <p className="mb-4 text-sm text-emerald-700">Gmail connected successfully.</p>
       )}

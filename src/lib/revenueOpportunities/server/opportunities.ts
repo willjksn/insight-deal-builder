@@ -153,6 +153,53 @@ export async function deleteOpportunity(appUser: AppUser, id: string): Promise<v
   await ref.delete();
 }
 
+const STAGE_NEXT_ACTION: Partial<Record<RevenuePipelineStage, string>> = {
+  review_required: "Run quality review and approve or reject",
+  approved: "Prepare outreach draft",
+  ready_for_outreach: "Prepare outreach draft",
+  contacted: "Watch inbox for a reply",
+  follow_up_due: "Send a follow-up",
+  replied: "Answer questions or book discovery",
+  discovery_call: "Capture call notes and run debrief",
+  proposal: "Send or revise the proposal",
+  negotiating: "Close terms and confirm win",
+  won: "Convert to a ShootSpine project",
+  converted_to_project: "Continue in Projects / Agreements",
+  lost: "No further action",
+  revisit_later: "Revisit in ~90 days",
+};
+
+export async function setOpportunityPipelineStage(
+  appUser: AppUser,
+  id: string,
+  pipelineStage: RevenuePipelineStage,
+  options?: { source?: string; nextAction?: string }
+): Promise<RevenueOpportunity> {
+  const existing = await getOpportunity(appUser, id);
+  if (existing.workflow.pipelineStage === pipelineStage) return existing;
+
+  const nextAction =
+    options?.nextAction ?? STAGE_NEXT_ACTION[pipelineStage] ?? existing.workflow.nextAction;
+  const source = options?.source ?? "manual";
+  const activity = [
+    ...existing.activityLog,
+    newActivity(appUser, "stage_updated", `Pipeline stage set to ${pipelineStage}`, {
+      from: existing.workflow.pipelineStage,
+      to: pipelineStage,
+      source,
+    }),
+  ];
+
+  return updateOpportunity(appUser, id, {
+    workflow: {
+      ...existing.workflow,
+      pipelineStage,
+      ...(nextAction ? { nextAction } : {}),
+    },
+    activityLog: activity,
+  });
+}
+
 export async function approveOpportunity(
   appUser: AppUser,
   id: string,

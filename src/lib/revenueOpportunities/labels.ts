@@ -74,6 +74,10 @@ export function pipelineStageLabel(stage: RevenuePipelineStage): string {
   return PIPELINE_STAGE_LABELS[stage] ?? stage;
 }
 
+export const PIPELINE_STAGE_OPTIONS = (
+  Object.entries(PIPELINE_STAGE_LABELS) as [RevenuePipelineStage, string][]
+).map(([value, label]) => ({ value, label }));
+
 export function scorePriorityLabel(totalScore: number): string {
   if (totalScore >= 85) return "High priority";
   if (totalScore >= 70) return "Qualified";

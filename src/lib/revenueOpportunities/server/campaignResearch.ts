@@ -6,12 +6,27 @@ import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";
 import { prospectToOpportunityInput } from "@/lib/revenueOpportunities/research/prospectToOpportunity";
 import { runRevenueAgent } from "@/lib/revenueOpportunities/server/agentRunner";
 import { getCampaign } from "@/lib/revenueOpportunities/server/campaigns";
-import { createCampaignRun, finishCampaignRun } from "@/lib/revenueOpportunities/server/campaignRuns";
+import {
+  countCampaignRunsSince,
+  createCampaignRun,
+  finishCampaignRun,
+} from "@/lib/revenueOpportunities/server/campaignRuns";
 import { createOpportunity, getOpportunity, updateOpportunity } from "@/lib/revenueOpportunities/server/opportunities";
 import type { RevenueCampaignRun } from "@/lib/revenueOpportunities/types/campaignRun";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 import type { RevenueAgentRun } from "@/lib/revenueOpportunities/types/agentRun";
 import { AppUser } from "@/lib/types";
+
+function startOfUtcDay(d = new Date()): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+function startOfUtcWeek(d = new Date()): Date {
+  const day = d.getUTCDay(); // 0 = Sunday
+  const start = startOfUtcDay(d);
+  start.setUTCDate(start.getUTCDate() - day);
+  return start;
+}
 
 export async function runCampaignResearch(
   appUser: AppUser,
@@ -25,6 +40,30 @@ export async function runCampaignResearch(
   const campaign = await getCampaign(appUser, campaignId);
   if (!campaign.active) {
     throw new RevenueOpportunityError("VALIDATION_FAILED", "Campaign must be active to run research");
+  }
+
+  const dailyLimit = campaign.dailyResearchLimit ?? 0;
+  if (dailyLimit > 0) {
+    const usedToday = await countCampaignRunsSince(appUser, campaignId, startOfUtcDay());
+    if (usedToday >= dailyLimit) {
+      throw new RevenueOpportunityError(
+        "BUDGET_EXCEEDED",
+        `Daily research limit reached (${usedToday}/${dailyLimit}). Try again tomorrow or raise the campaign limit.`,
+        { details: { usedToday, dailyLimit } }
+      );
+    }
+  }
+
+  const weeklyLimit = campaign.weeklyResearchLimit ?? 0;
+  if (weeklyLimit > 0) {
+    const usedWeek = await countCampaignRunsSince(appUser, campaignId, startOfUtcWeek());
+    if (usedWeek >= weeklyLimit) {
+      throw new RevenueOpportunityError(
+        "BUDGET_EXCEEDED",
+        `Weekly research limit reached (${usedWeek}/${weeklyLimit}). Raise the campaign limit or wait until next week.`,
+        { details: { usedWeek, weeklyLimit } }
+      );
+    }
   }
 
   const agentName: RevenueAgentName =

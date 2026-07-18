@@ -16,7 +16,7 @@ import { useMutations } from "@/hooks/useMutations";
 import { useAuth } from "@/contexts/AuthContext";
 import { canManageProjects } from "@/lib/utils/permissions";
 import { formatDate } from "@/lib/utils/format";
-import { PROJECT_TYPES, SHOOT_TYPES, SEED_PROJECT } from "@/lib/constants/presets";
+import { PROJECT_TYPES, SHOOT_TYPES } from "@/lib/constants/presets";
 import { Client, Project, ProjectStatus } from "@/lib/types";
 import { Trash2, FileText } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -38,12 +38,6 @@ export default function ProjectsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const seedProject = async () => {
-    const client = clients.find((c) => c.businessName === "Demo Fitness Studio");
-    await create({ ...SEED_PROJECT, clientId: client?.id, clientName: client?.businessName || "Demo Fitness Studio" });
-    refresh();
-  };
-
   const confirmDeleteProject = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -59,12 +53,9 @@ export default function ProjectsPage() {
   return (
     <div>
       <PageHeader title="Projects" subtitle="Video/photo production projects" action={
-        <div className="flex gap-2 flex-wrap">
-          {projects.length === 0 && canManageProjects(appUser) && <Button size="touch" variant="outline" onClick={seedProject}>Load Demo Project</Button>}
-          {canManageProjects(appUser) && (
-            <Button size="touch" onClick={() => { setEditingId(null); setForm(emptyProject); setShowForm(true); }}>New Project</Button>
-          )}
-        </div>
+        canManageProjects(appUser) ? (
+          <Button size="touch" onClick={() => { setEditingId(null); setForm(emptyProject); setShowForm(true); }}>New Project</Button>
+        ) : undefined
       } />
 
       {showForm && (

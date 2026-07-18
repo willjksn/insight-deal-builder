@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
+  BookOpen,
   Briefcase,
   Inbox,
   LayoutDashboard,
@@ -50,13 +51,13 @@ export const REVENUE_NAV_ITEMS: RevenueNavItem[] = [
     href: "/revenue/inbox",
     label: "Inbox",
     icon: Inbox,
-    description: "Gmail threads and AI receptionist (Phase 6)",
+    description: "Gmail threads and reply classification",
   },
   {
     href: "/revenue/pipeline",
     label: "Pipeline",
     icon: Briefcase,
-    description: "Sales stages from new to won or lost",
+    description: "Kanban board — drag opportunities between stages",
   },
   {
     href: "/revenue/discovery",
@@ -80,13 +81,19 @@ export const REVENUE_NAV_ITEMS: RevenueNavItem[] = [
     href: "/revenue/analytics",
     label: "Analytics",
     icon: BarChart3,
-    description: "Conversion rates, revenue, and AI spend",
+    description: "Coming soon — conversion and spend dashboards",
   },
   {
     href: "/revenue/settings",
     label: "Settings",
     icon: Settings,
-    description: "Budgets, approval modes, and integrations",
+    description: "Gmail and n8n integration status",
+  },
+  {
+    href: "/revenue/guide",
+    label: "How to use",
+    icon: BookOpen,
+    description: "Step-by-step guide for campaigns through conversion",
   },
 ];
 

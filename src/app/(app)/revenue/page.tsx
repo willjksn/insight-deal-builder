@@ -1,14 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Database, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   revenueGetDashboard,
   revenueListOpportunities,
-  revenueSeedDemo,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueDashboardSummary } from "@/lib/revenueOpportunities/types/opportunity";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
@@ -21,12 +19,10 @@ import { OpportunitySummaryCards, OpportunityTable } from "@/components/revenue/
 
 export default function RevenueCommandCenterPage() {
   const { user, appUser } = useAuth();
-  const router = useRouter();
   const [summary, setSummary] = useState<RevenueDashboardSummary | null>(null);
   const [reviewQueue, setReviewQueue] = useState<Awaited<ReturnType<typeof revenueListOpportunities>>["opportunities"]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [seeding, setSeeding] = useState(false);
   const canManage = canManageRevenueOpportunities(appUser);
 
   const load = async () => {
@@ -51,19 +47,6 @@ export default function RevenueCommandCenterPage() {
   useEffect(() => {
     load();
   }, [user]);
-
-  const handleSeed = async () => {
-    if (!user) return;
-    setSeeding(true);
-    setError(null);
-    try {
-      const res = await revenueSeedDemo(() => user.getIdToken());
-      router.push(`/revenue/campaigns/${res.campaignId}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Seed failed");
-      setSeeding(false);
-    }
-  };
 
   return (
     <>
@@ -99,14 +82,15 @@ export default function RevenueCommandCenterPage() {
             <div>
               <p className="font-medium text-slate-900">Get started</p>
               <p className="text-sm text-slate-600">
-                Load a demo campaign with 5 Orlando sample opportunities, then open the campaign to run live
-                research.
+                Create a campaign with your targeting rules, then run research to find opportunities.
               </p>
             </div>
-            <Button size="touch" variant="secondary" disabled={seeding} onClick={handleSeed}>
-              <Database className="mr-2 h-4 w-4" />
-              {seeding ? "Loading demo…" : "Load demo campaign"}
-            </Button>
+            <Link href="/revenue/campaigns/new">
+              <Button size="touch">
+                <Plus className="mr-2 h-4 w-4" />
+                New campaign
+              </Button>
+            </Link>
           </CardBody>
         </Card>
       )}
