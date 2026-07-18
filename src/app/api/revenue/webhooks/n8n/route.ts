@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyN8nWebhookSecret } from "@/lib/revenueOpportunities/n8n/webhookAuth";
+import { inspectN8nWebhookSecret } from "@/lib/revenueOpportunities/n8n/webhookAuth";
 import { applyWorkflowWebhookUpdate } from "@/lib/revenueOpportunities/server/workflowRuns";
 import type { RevenueWorkflowRunStatus } from "@/lib/revenueOpportunities/types/workflowRun";
 
@@ -11,8 +11,17 @@ const VALID_STATUS = new Set<RevenueWorkflowRunStatus>(["queued", "running", "co
 /** Inbound status callbacks from n8n workflows. */
 export async function POST(request: NextRequest) {
   try {
-    if (!verifyN8nWebhookSecret(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = inspectN8nWebhookSecret(request);
+    if (!auth.ok) {
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+          reason: auth.reason,
+          expectedLength: auth.expectedLength,
+          receivedLength: auth.receivedLength,
+        },
+        { status: 401 }
+      );
     }
 
     let body: {
