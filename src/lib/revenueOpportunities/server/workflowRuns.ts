@@ -5,7 +5,7 @@ import { REVENUE_WORKFLOW_RUNS_COLLECTION } from "@/lib/revenueOpportunities/col
 import { getWorkflowCatalogEntry } from "@/lib/revenueOpportunities/n8n/catalog";
 import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";
 import { getWorkflowProvider } from "@/lib/revenueOpportunities/providers/getWorkflowProvider";
-import type { N8nTriggerPayload } from "@/lib/revenueOpportunities/providers/n8nProvider";
+import type { N8nTriggerPayload, N8nTriggerResponse } from "@/lib/revenueOpportunities/providers/n8nProvider";
 import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import type {
@@ -164,7 +164,7 @@ export async function triggerRevenueWorkflow(
   };
 
   try {
-    const result = await provider.trigger(workflowName, payload);
+    const result = await provider.trigger<N8nTriggerPayload, N8nTriggerResponse>(workflowName, payload);
     const status = result.status ?? "running";
     return updateWorkflowRunStatus(run.id, options.organizationCompany, {
       status: status === "completed" ? "completed" : "running",

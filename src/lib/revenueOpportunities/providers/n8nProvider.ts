@@ -22,10 +22,8 @@ export interface N8nTriggerResponse {
 export const liveN8nWorkflowProvider: WorkflowProvider = {
   isAvailable: () => n8nConfigured(),
 
-  async trigger<TInput extends N8nTriggerPayload, TOutput = N8nTriggerResponse>(
-    workflowName: string,
-    input: TInput
-  ): Promise<TOutput> {
+  async trigger<TInput, TOutput>(workflowName: string, input: TInput): Promise<TOutput> {
+    const payload = input as N8nTriggerPayload;
     const entry = getWorkflowCatalogEntry(workflowName);
     if (!entry) throw new Error(`Unknown workflow: ${workflowName}`);
     const base = n8nBaseUrl();
@@ -35,7 +33,7 @@ export const liveN8nWorkflowProvider: WorkflowProvider = {
     const res = await fetch(url, {
       method: "POST",
       headers: n8nOutboundHeaders(),
-      body: JSON.stringify(input),
+      body: JSON.stringify(payload),
     });
 
     const text = await res.text();
@@ -53,7 +51,7 @@ export const liveN8nWorkflowProvider: WorkflowProvider = {
     }
 
     return {
-      runId: data.externalRunId ?? data.runId ?? input.runId,
+      runId: data.externalRunId ?? data.runId ?? payload.runId,
       externalRunId: data.externalRunId ?? data.runId,
       status: data.status ?? "running",
       message: data.message,
@@ -72,13 +70,14 @@ export const liveN8nWorkflowProvider: WorkflowProvider = {
 export const mockN8nWorkflowProvider: WorkflowProvider = {
   isAvailable: () => true,
 
-  async trigger<TInput extends N8nTriggerPayload>(workflowName: string, input: TInput) {
+  async trigger<TInput, TOutput>(workflowName: string, input: TInput): Promise<TOutput> {
+    const payload = input as N8nTriggerPayload;
     return {
-      runId: input.runId,
+      runId: payload.runId,
       externalRunId: `mock-n8n-${Date.now()}`,
       status: "completed" as const,
       message: `Mock n8n completed ${workflowName}`,
-    };
+    } as TOutput;
   },
 
   async getStatus(runId: string): Promise<WorkflowRunStatus> {

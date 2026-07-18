@@ -37,23 +37,23 @@ function num(v: unknown, fallback = 0): number {
 function parseEvidence(raw: unknown): AgentEvidence[] {
   if (!Array.isArray(raw)) return [];
   const now = new Date().toISOString();
-  return raw
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const o = item as Record<string, unknown>;
-      const claim = str(o.claim);
-      const sourceUrl = str(o.sourceUrl);
-      if (!claim || !sourceUrl) return null;
-      return {
+  return raw.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const o = item as Record<string, unknown>;
+    const claim = str(o.claim);
+    const sourceUrl = str(o.sourceUrl);
+    if (!claim || !sourceUrl) return [];
+    return [
+      {
         claim,
         sourceUrl,
         sourceTitle: str(o.sourceTitle),
         sourceType: str(o.sourceType) ?? "website",
         retrievedAt: now,
         confidence: Math.min(1, Math.max(0, num(o.confidence, 0.7))),
-      };
-    })
-    .filter((e): e is AgentEvidence => e !== null);
+      },
+    ];
+  });
 }
 
 function parseSubject(raw: unknown): OpportunitySubject | null {
