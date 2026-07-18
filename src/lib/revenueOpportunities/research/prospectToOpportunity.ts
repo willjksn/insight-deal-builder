@@ -6,11 +6,17 @@ export function prospectToOpportunityInput(
   prospect: ParsedResearchProspect,
   campaign: RevenueCampaign
 ): RevenueOpportunityCreateInput {
+  const hasContact =
+    Boolean(prospect.contact?.email) ||
+    Boolean(prospect.contact?.name) ||
+    Boolean(prospect.subject.publicEmail);
+
   return {
     campaignId: campaign.id,
     campaignName: campaign.name,
     opportunityType: campaign.campaignType,
     subject: prospect.subject,
+    contact: prospect.contact,
     research: prospect.research,
     evidence: prospect.evidence,
     scoring: prospect.scoring,
@@ -18,7 +24,7 @@ export function prospectToOpportunityInput(
       confidenceScore: prospect.scoring.confidenceScore,
       confidenceReasons: prospect.scoreReasons ?? ["Research agent scoring"],
       assumptions: prospect.evidence.length ? [] : ["Limited evidence in research pass"],
-      missingInformation: ["Decision-maker contact not verified"],
+      missingInformation: hasContact ? [] : ["Decision-maker contact not verified"],
     },
     recommendation: {
       serviceName: campaign.img?.serviceToPromote ?? "Business Brand Package",

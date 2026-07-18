@@ -81,7 +81,7 @@ export const REVENUE_NAV_ITEMS: RevenueNavItem[] = [
     href: "/revenue/analytics",
     label: "Analytics",
     icon: BarChart3,
-    description: "Coming soon — conversion and spend dashboards",
+    description: "Approval rate, reply rate, pipeline value, and AI spend",
   },
   {
     href: "/revenue/settings",

@@ -36,6 +36,21 @@ export function OpportunityDetailView({ opportunity }: { opportunity: RevenueOpp
               {opportunity.subject.socialLinks.trim()}
             </p>
           )}
+          {(opportunity.contact?.name ||
+            opportunity.contact?.email ||
+            opportunity.subject.publicEmail) && (
+            <p className="mt-2 text-sm text-slate-600">
+              Contact:{" "}
+              {[
+                opportunity.contact?.name,
+                opportunity.contact?.title,
+                opportunity.contact?.email ?? opportunity.subject.publicEmail,
+                opportunity.contact?.phone ?? opportunity.subject.publicPhone,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="info">{pipelineStageLabel(opportunity.workflow.pipelineStage)}</Badge>

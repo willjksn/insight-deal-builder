@@ -43,6 +43,7 @@ import { OpportunityApprovalPanel } from "@/components/revenue/OpportunityApprov
 import { OpportunityAgentPanel } from "@/components/revenue/OpportunityAgentPanel";
 import { OpportunityStagePanel } from "@/components/revenue/OpportunityStagePanel";
 import { OpportunitySubjectLinksPanel } from "@/components/revenue/OpportunitySubjectLinksPanel";
+import { OpportunityContactPanel } from "@/components/revenue/OpportunityContactPanel";
 import { OpportunityOutreachPanel } from "@/components/revenue/OpportunityOutreachPanel";
 import { OpportunityDiscoveryPanel } from "@/components/revenue/OpportunityDiscoveryPanel";
 import { OpportunityProposalPanel } from "@/components/revenue/OpportunityProposalPanel";
@@ -152,6 +153,32 @@ export default function OpportunityDetailPage() {
                 setOpportunity(res.opportunity);
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Failed to save links");
+                throw e;
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+          <OpportunityContactPanel
+            opportunity={opportunity}
+            canManage={canManage}
+            busy={busy}
+            onSave={async ({ contact, publicEmail, publicPhone }) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueUpdateOpportunity(() => user.getIdToken(), id, {
+                  contact,
+                  subject: {
+                    ...opportunity.subject,
+                    publicEmail: publicEmail?.trim() || "",
+                    publicPhone: publicPhone?.trim() || "",
+                  },
+                });
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Failed to save contact");
                 throw e;
               } finally {
                 setBusy(false);
@@ -349,17 +376,22 @@ export default function OpportunityDetailPage() {
               setError(null);
               try {
                 const existing = proposals.find((p) => p.id === proposalId);
+                const { status, ...content } = patch;
                 await revenueUpdateProposal(() => user.getIdToken(), proposalId, {
-                  ...patch,
-                  agreementPrefill: {
-                    suggestedTitle: patch.title,
-                    projectOverview: patch.executiveSummary,
-                    deliverables: patch.deliverables,
-                    estimatedFee: patch.investmentMin ?? patch.investmentMax,
-                    paymentStructure:
-                      patch.paymentStructureSuggestion ?? existing?.agreementPrefill?.paymentStructure,
-                    scopeNotes: patch.scopeOutline,
-                  },
+                  ...content,
+                  ...(status ? { status } : {}),
+                  agreementPrefill: content.title
+                    ? {
+                        suggestedTitle: content.title,
+                        projectOverview: content.executiveSummary ?? existing?.executiveSummary ?? "",
+                        deliverables: content.deliverables ?? existing?.deliverables ?? [],
+                        estimatedFee: content.investmentMin ?? content.investmentMax,
+                        paymentStructure:
+                          content.paymentStructureSuggestion ??
+                          existing?.agreementPrefill?.paymentStructure,
+                        scopeNotes: content.scopeOutline ?? existing?.scopeOutline,
+                      }
+                    : existing?.agreementPrefill,
                 });
                 await reload();
               } catch (e) {

@@ -1,6 +1,10 @@
 import { parseAddressHeader } from "@/lib/revenueOpportunities/providers/gmailProvider";
 import { getEmailProviderForUser } from "@/lib/revenueOpportunities/providers/getEmailProvider";
-import { upsertEmailThreadFromGmail } from "@/lib/revenueOpportunities/server/emailThreads";
+import {
+  matchOpportunityIdByParticipants,
+  upsertEmailThreadFromGmail,
+} from "@/lib/revenueOpportunities/server/emailThreads";
+import { listOpportunities } from "@/lib/revenueOpportunities/server/opportunities";
 import type { RevenueEmailThread } from "@/lib/revenueOpportunities/types/emailThread";
 import { AppUser } from "@/lib/types";
 
@@ -16,6 +20,7 @@ export async function syncInboxThreads(appUser: AppUser, query?: string): Promis
     byThread.set(s.threadId, list);
   }
 
+  const opportunities = await listOpportunities(appUser);
   const synced: RevenueEmailThread[] = [];
   for (const [threadId, msgs] of byThread) {
     const thread = await provider.readThread(threadId);
@@ -23,10 +28,12 @@ export async function syncInboxThreads(appUser: AppUser, query?: string): Promis
       new Set(thread.messages.map((m) => parseAddressHeader(m.from)).filter(Boolean))
     );
     const subject = thread.messages[0]?.subject ?? msgs[0]?.subject ?? "(no subject)";
+    const opportunityId = matchOpportunityIdByParticipants(opportunities, participants);
     const record = await upsertEmailThreadFromGmail(appUser, {
       gmailThreadId: threadId,
       subject,
       participants,
+      opportunityId,
       messages: thread.messages.map((m) => ({
         messageId: m.messageId,
         from: m.from,

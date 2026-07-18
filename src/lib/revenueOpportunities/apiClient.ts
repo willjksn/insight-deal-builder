@@ -370,6 +370,19 @@ export async function revenueClassifyInboxThread(getToken: () => Promise<string 
   return parseJson<{ agentRun: RevenueAgentRun; thread: RevenueEmailThread }>(res);
 }
 
+export async function revenueLinkInboxThread(
+  getToken: () => Promise<string | null>,
+  threadId: string,
+  opportunityId: string | null
+) {
+  const res = await fetch(`/api/revenue/inbox/${threadId}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ opportunityId }),
+  });
+  return parseJson<{ thread: RevenueEmailThread }>(res);
+}
+
 export async function revenueListDiscovery(
   getToken: () => Promise<string | null>,
   params?: { opportunityId?: string; status?: string }

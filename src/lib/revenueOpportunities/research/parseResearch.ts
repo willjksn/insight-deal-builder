@@ -1,10 +1,14 @@
 import type { AgentEvidence } from "@/lib/revenueOpportunities/types";
-import type { CampaignConceptSummary } from "@/lib/revenueOpportunities/types/opportunity";
-import type { OpportunitySubject } from "@/lib/revenueOpportunities/types/opportunity";
+import type {
+  CampaignConceptSummary,
+  OpportunityContact,
+  OpportunitySubject,
+} from "@/lib/revenueOpportunities/types/opportunity";
 import { calculateImgOpportunityScore } from "@/lib/revenueOpportunities/scoring/imgScoring";
 
 export interface ParsedResearchProspect {
   subject: OpportunitySubject;
+  contact?: OpportunityContact;
   research?: {
     observedFacts?: string[];
     marketingGaps?: string[];
@@ -103,6 +107,13 @@ function parseEvidence(raw: unknown): AgentEvidence[] {
   });
 }
 
+function emailStr(v: unknown): string | undefined {
+  const t = str(v);
+  if (!t) return undefined;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return undefined;
+  return t;
+}
+
 function parseSubject(raw: unknown): OpportunitySubject | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -116,6 +127,27 @@ function parseSubject(raw: unknown): OpportunitySubject | null {
     industry: str(o.industry),
     city: str(o.city),
     state: str(o.state),
+    publicEmail: emailStr(o.publicEmail),
+    publicPhone: str(o.publicPhone),
+  };
+}
+
+function parseContact(raw: unknown): OpportunityContact | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const name = str(o.name);
+  const title = str(o.title);
+  const email = emailStr(o.email);
+  const phone = str(o.phone);
+  const sourceUrl = websiteUrl(o.sourceUrl) ?? str(o.sourceUrl);
+  if (!name && !email && !phone && !title) return undefined;
+  return {
+    name,
+    title,
+    email,
+    phone,
+    sourceUrl,
+    verificationStatus: "unverified",
   };
 }
 
@@ -171,6 +203,7 @@ export function parseResearchProspects(raw: unknown): ParsedResearchProspect[] {
 
     out.push({
       subject,
+      contact: parseContact(o.contact),
       research:
         o.research && typeof o.research === "object"
           ? {

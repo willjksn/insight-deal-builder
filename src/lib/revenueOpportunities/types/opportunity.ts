@@ -180,6 +180,15 @@ export interface RevenueDashboardSummary {
   revenueWon: number;
   byStage: Record<string, number>;
   recentActivity: OpportunityActivityEntry[];
+  /** Analytics rates (0–100), null when denominator is zero */
+  totalOpportunities: number;
+  approvalApproved: number;
+  approvalRejected: number;
+  approvalRate: number | null;
+  outreachSent: number;
+  replySignals: number;
+  replyRate: number | null;
+  aiSpendUsd: number;
 }
 
 export interface RevenueFeedbackEvent {

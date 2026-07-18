@@ -6,10 +6,13 @@ import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   revenueClassifyInboxThread,
+  revenueLinkInboxThread,
   revenueListInbox,
+  revenueListOpportunities,
   revenueSyncInbox,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueEmailThread } from "@/lib/revenueOpportunities/types/emailThread";
+import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -17,22 +20,30 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Card, CardBody } from "@/components/ui/Card";
 import { InboxTable } from "@/components/revenue/InboxTable";
 import { Badge } from "@/components/ui/Badge";
+import { Select } from "@/components/ui/Select";
 import { EMAIL_CLASSIFICATION_LABELS } from "@/lib/revenueOpportunities/labels";
 
 export default function RevenueInboxPage() {
   const { user, appUser } = useAuth();
   const [threads, setThreads] = useState<RevenueEmailThread[]>([]);
+  const [opportunities, setOpportunities] = useState<RevenueOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [selected, setSelected] = useState<RevenueEmailThread | null>(null);
+  const [linkOpportunityId, setLinkOpportunityId] = useState("");
   const canManage = canManageRevenueOpportunities(appUser);
 
   const reload = async () => {
     if (!user) return;
-    const res = await revenueListInbox(() => user.getIdToken());
-    setThreads(res.threads);
+    const token = () => user.getIdToken();
+    const [inbox, opps] = await Promise.all([
+      revenueListInbox(token),
+      revenueListOpportunities(token),
+    ]);
+    setThreads(inbox.threads);
+    setOpportunities(opps.opportunities);
   };
 
   const syncFromGmail = async () => {
@@ -53,8 +64,9 @@ export default function RevenueInboxPage() {
         if (canManage) {
           try {
             await syncFromGmail();
+            const opps = await revenueListOpportunities(() => user.getIdToken());
+            if (!cancelled) setOpportunities(opps.opportunities);
           } catch {
-            // Gmail may be disconnected — still show stored threads.
             await reload();
             if (!cancelled) {
               setSyncNote("Showing saved threads. Connect Gmail in Settings, or use Sync inbox.");
@@ -74,6 +86,14 @@ export default function RevenueInboxPage() {
     };
   }, [user, canManage]);
 
+  useEffect(() => {
+    setLinkOpportunityId(selected?.opportunityId ?? "");
+  }, [selected?.id, selected?.opportunityId]);
+
+  const linkedOpportunity = selected?.opportunityId
+    ? opportunities.find((o) => o.id === selected.opportunityId)
+    : undefined;
+
   return (
     <>
       <Link href="/revenue" className="mb-4 inline-flex items-center text-sm text-sky-700 hover:underline">
@@ -82,7 +102,7 @@ export default function RevenueInboxPage() {
       </Link>
       <PageHeader
         title="Inbox"
-        subtitle="Auto-syncs Gmail on open. Classify replies with the draft-only AI receptionist."
+        subtitle="Auto-syncs Gmail on open. Link threads to opportunities so classification can move pipeline stages."
         action={
           canManage ? (
             <Button
@@ -115,6 +135,7 @@ export default function RevenueInboxPage() {
           <div className="lg:col-span-2">
             <InboxTable
               threads={threads}
+              opportunities={opportunities}
               selectedId={selected?.id}
               onSelect={setSelected}
             />
@@ -138,6 +159,93 @@ export default function RevenueInboxPage() {
                         {selected.suggestedReply}
                       </div>
                     )}
+
+                    <div className="space-y-2 border-t border-slate-100 pt-3">
+                      <p className="text-xs font-medium text-slate-500">Linked opportunity</p>
+                      {linkedOpportunity ? (
+                        <Link
+                          href={`/revenue/opportunities/${linkedOpportunity.id}`}
+                          className="block font-medium text-sky-700 hover:underline"
+                        >
+                          {linkedOpportunity.subject.name}
+                        </Link>
+                      ) : (
+                        <p className="text-slate-500">Not linked — stage auto-updates need a link.</p>
+                      )}
+                      {canManage && (
+                        <>
+                          <Select
+                            label="Link to opportunity"
+                            touch
+                            value={linkOpportunityId}
+                            onChange={(e) => setLinkOpportunityId(e.target.value)}
+                            options={[
+                              { value: "", label: "No opportunity" },
+                              ...opportunities.map((o) => ({
+                                value: o.id,
+                                label: o.subject.name,
+                              })),
+                            ]}
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy || linkOpportunityId === (selected.opportunityId ?? "")}
+                              onClick={async () => {
+                                if (!user || !selected) return;
+                                setBusy(true);
+                                setError(null);
+                                try {
+                                  const res = await revenueLinkInboxThread(
+                                    () => user.getIdToken(),
+                                    selected.id,
+                                    linkOpportunityId || null
+                                  );
+                                  setSelected(res.thread);
+                                  await reload();
+                                } catch (e) {
+                                  setError(e instanceof Error ? e.message : "Failed to link thread");
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                            >
+                              Save link
+                            </Button>
+                            {selected.opportunityId && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={async () => {
+                                  if (!user || !selected) return;
+                                  setBusy(true);
+                                  setError(null);
+                                  try {
+                                    const res = await revenueLinkInboxThread(
+                                      () => user.getIdToken(),
+                                      selected.id,
+                                      null
+                                    );
+                                    setSelected(res.thread);
+                                    setLinkOpportunityId("");
+                                    await reload();
+                                  } catch (e) {
+                                    setError(e instanceof Error ? e.message : "Failed to unlink");
+                                  } finally {
+                                    setBusy(false);
+                                  }
+                                }}
+                              >
+                                Unlink
+                              </Button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
                     {canManage && (
                       <Button
                         size="sm"
@@ -148,7 +256,10 @@ export default function RevenueInboxPage() {
                           setBusy(true);
                           setError(null);
                           try {
-                            const res = await revenueClassifyInboxThread(() => user.getIdToken(), selected.id);
+                            const res = await revenueClassifyInboxThread(
+                              () => user.getIdToken(),
+                              selected.id
+                            );
                             setSelected(res.thread);
                             await reload();
                           } catch (e) {

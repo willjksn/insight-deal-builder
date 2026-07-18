@@ -134,6 +134,12 @@ export async function upsertEmailThreadFromGmail(
       ? input.messages.reduce((latest, m) => (m.receivedAt > latest ? m.receivedAt : latest), input.messages[0].receivedAt)
       : new Date().toISOString();
 
+  const existingOpportunityId = existing.empty
+    ? undefined
+    : (existing.docs[0].data().opportunityId as string | undefined);
+  // Keep an existing link; only apply caller/match id when the thread is still unlinked.
+  const opportunityId = existingOpportunityId ?? input.opportunityId;
+
   const payload = stripUndefined({
     organizationCompany: tenantCompany(appUser),
     ownerUserId: appUser.id,
@@ -143,7 +149,7 @@ export async function upsertEmailThreadFromGmail(
     messages: input.messages,
     messageCount: input.messages.length,
     lastMessageAt,
-    opportunityId: input.opportunityId,
+    opportunityId,
     outreachActivityId: input.outreachActivityId,
     status: "open" as RevenueEmailThreadStatus,
     autopilotMode: "draft_only" as const,
@@ -163,6 +169,62 @@ export async function upsertEmailThreadFromGmail(
   await ref.set(payload, { merge: true });
   const snap = await ref.get();
   return serializeDoc<RevenueEmailThread>(ref.id, snap.data()!);
+}
+
+export async function updateEmailThreadOpportunity(
+  appUser: AppUser,
+  threadId: string,
+  opportunityId: string | null
+): Promise<RevenueEmailThread> {
+  const db = requireDb();
+  const ref = db.collection(REVENUE_EMAIL_THREADS_COLLECTION).doc(threadId);
+  const existing = await ref.get();
+  if (!existing.exists) throw new RevenueOpportunityError("NOT_FOUND", "Email thread not found");
+  if (existing.data()!.organizationCompany !== tenantCompany(appUser)) {
+    throw new RevenueOpportunityError("NOT_AUTHORIZED", "Email thread not found");
+  }
+
+  if (opportunityId) {
+    await getOpportunity(appUser, opportunityId);
+    await ref.update({
+      opportunityId,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  } else {
+    await ref.update({
+      opportunityId: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  const snap = await ref.get();
+  return serializeDoc<RevenueEmailThread>(snap.id, snap.data()!);
+}
+
+function extractEmails(participants: string[]): string[] {
+  return participants
+    .map((p) => {
+      const m = p.match(/[\w.+-]+@[\w.-]+\.\w+/i);
+      return m?.[0]?.toLowerCase();
+    })
+    .filter((e): e is string => Boolean(e));
+}
+
+/** Match thread participants to opportunity contact/public email (exact email only). */
+export function matchOpportunityIdByParticipants(
+  opportunities: { id: string; contact?: { email?: string }; subject: { publicEmail?: string } }[],
+  participants: string[]
+): string | undefined {
+  const emails = new Set(extractEmails(participants));
+  if (emails.size === 0) return undefined;
+
+  for (const opp of opportunities) {
+    const candidates = [opp.contact?.email, opp.subject.publicEmail]
+      .map((e) => e?.trim().toLowerCase())
+      .filter((e): e is string => Boolean(e));
+    if (candidates.some((e) => emails.has(e))) return opp.id;
+  }
+  return undefined;
 }
 
 export async function applyThreadClassification(

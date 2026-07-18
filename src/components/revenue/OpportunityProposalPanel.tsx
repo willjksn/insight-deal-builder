@@ -1,26 +1,53 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import type { RevenueOpportunityProposal } from "@/lib/revenueOpportunities/types/proposal";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  RevenueOpportunityProposal,
+  RevenueProposalStatus,
+} from "@/lib/revenueOpportunities/types/proposal";
 import { PROPOSAL_STATUS_LABELS } from "@/lib/revenueOpportunities/labels";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { Select } from "@/components/ui/Select";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { formatCurrency } from "@/lib/utils/format";
 
 export type ProposalEditPayload = {
-  title: string;
-  executiveSummary: string;
-  scopeOutline: string;
-  deliverables: string[];
+  title?: string;
+  executiveSummary?: string;
+  scopeOutline?: string;
+  deliverables?: string[];
   timelineNotes?: string;
   investmentMin?: number;
   investmentMax?: number;
   paymentStructureSuggestion?: string;
+  status?: RevenueProposalStatus;
 };
+
+const STATUS_OPTIONS = (Object.entries(PROPOSAL_STATUS_LABELS) as [RevenueProposalStatus, string][]).map(
+  ([value, label]) => ({ value, label })
+);
+
+function prefillChecks(proposal: RevenueOpportunityProposal) {
+  const items = [
+    { label: "Title", ok: Boolean(proposal.title?.trim()) },
+    { label: "Executive summary", ok: Boolean(proposal.executiveSummary?.trim()) },
+    { label: "Scope", ok: Boolean(proposal.scopeOutline?.trim()) },
+    { label: "Deliverables", ok: proposal.deliverables.length > 0 },
+    {
+      label: "Investment range",
+      ok: proposal.investmentMin != null || proposal.investmentMax != null,
+    },
+    {
+      label: "Agreement prefill",
+      ok: Boolean(proposal.agreementPrefill?.suggestedTitle && proposal.agreementPrefill?.projectOverview),
+    },
+  ];
+  return items;
+}
 
 export function OpportunityProposalPanel({
   proposals,
@@ -39,40 +66,58 @@ export function OpportunityProposalPanel({
   onReload: () => Promise<void>;
   onSave: (proposalId: string, patch: ProposalEditPayload) => Promise<void>;
 }) {
-  const latest = proposals[0];
+  const [selectedId, setSelectedId] = useState<string | undefined>(proposals[0]?.id);
+  const selected = useMemo(
+    () => proposals.find((p) => p.id === selectedId) ?? proposals[0],
+    [proposals, selectedId]
+  );
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<ProposalEditPayload>({
+  const [form, setForm] = useState({
     title: "",
     executiveSummary: "",
     scopeOutline: "",
-    deliverables: [],
+    deliverables: [] as string[],
+    timelineNotes: "",
+    investmentMin: undefined as number | undefined,
+    investmentMax: undefined as number | undefined,
+    paymentStructureSuggestion: "",
   });
 
   useEffect(() => {
-    if (!latest) {
+    if (!selectedId && proposals[0]) setSelectedId(proposals[0].id);
+    if (selectedId && !proposals.some((p) => p.id === selectedId) && proposals[0]) {
+      setSelectedId(proposals[0].id);
+    }
+  }, [proposals, selectedId]);
+
+  useEffect(() => {
+    if (!selected) {
       setEditing(false);
       return;
     }
     setForm({
-      title: latest.title,
-      executiveSummary: latest.executiveSummary,
-      scopeOutline: latest.scopeOutline,
-      deliverables: latest.deliverables,
-      timelineNotes: latest.timelineNotes,
-      investmentMin: latest.investmentMin,
-      investmentMax: latest.investmentMax,
-      paymentStructureSuggestion: latest.paymentStructureSuggestion,
+      title: selected.title,
+      executiveSummary: selected.executiveSummary,
+      scopeOutline: selected.scopeOutline,
+      deliverables: selected.deliverables,
+      timelineNotes: selected.timelineNotes ?? "",
+      investmentMin: selected.investmentMin,
+      investmentMax: selected.investmentMax,
+      paymentStructureSuggestion: selected.paymentStructureSuggestion ?? "",
     });
     setEditing(false);
-  }, [latest?.id, latest?.updatedAt]);
+  }, [selected?.id, selected?.updatedAt]);
+
+  const checks = selected ? prefillChecks(selected) : [];
+  const prefillReady = checks.every((c) => c.ok);
 
   return (
     <Card>
       <CardHeader>
         <h3 className="font-semibold text-slate-900">Proposals</h3>
         <p className="text-xs text-slate-500">
-          Draft and edit scope and investment here, then open the agreement wizard with prefill.
+          Draft and edit scope and investment, set send status, then open the agreement wizard.
         </p>
       </CardHeader>
       <CardBody className="space-y-4 text-sm">
@@ -82,85 +127,145 @@ export function OpportunityProposalPanel({
           </Button>
         )}
 
-        {!latest && <p className="text-slate-600">No proposal drafts yet.</p>}
+        {!selected && <p className="text-slate-600">No proposal drafts yet.</p>}
 
-        {latest && !editing && (
+        {proposals.length > 1 && (
+          <Select
+            label="Proposal version"
+            touch
+            value={selected?.id ?? ""}
+            onChange={(e) => setSelectedId(e.target.value)}
+            options={proposals.map((p, i) => ({
+              value: p.id,
+              label: `${p.title || "Untitled"} · ${PROPOSAL_STATUS_LABELS[p.status]} · ${
+                i === 0 ? "latest" : new Date(p.updatedAt).toLocaleDateString()
+              }`,
+            }))}
+          />
+        )}
+
+        {selected && !editing && (
           <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="font-medium text-slate-900">{latest.title}</span>
-              <Badge variant="default">{PROPOSAL_STATUS_LABELS[latest.status]}</Badge>
+              <span className="font-medium text-slate-900">{selected.title}</span>
+              <Badge variant="default">{PROPOSAL_STATUS_LABELS[selected.status]}</Badge>
             </div>
-            <p className="mb-2 text-slate-700">{latest.executiveSummary}</p>
-            <p className="mb-2 whitespace-pre-wrap text-slate-600">{latest.scopeOutline}</p>
-            {(latest.investmentMin || latest.investmentMax) && (
+            <p className="mb-2 text-slate-700">{selected.executiveSummary}</p>
+            <p className="mb-2 whitespace-pre-wrap text-slate-600">{selected.scopeOutline}</p>
+            {(selected.investmentMin || selected.investmentMax) && (
               <p className="mb-2 font-medium text-slate-800">
                 Investment:{" "}
-                {latest.investmentMin && latest.investmentMax
-                  ? `${formatCurrency(latest.investmentMin)} – ${formatCurrency(latest.investmentMax)}`
-                  : formatCurrency(latest.investmentMin ?? latest.investmentMax ?? 0)}
+                {selected.investmentMin && selected.investmentMax
+                  ? `${formatCurrency(selected.investmentMin)} – ${formatCurrency(selected.investmentMax)}`
+                  : formatCurrency(selected.investmentMin ?? selected.investmentMax ?? 0)}
               </p>
             )}
-            {latest.timelineNotes && (
+            {selected.timelineNotes && (
               <p className="mb-2 text-slate-600">
-                <span className="font-medium text-slate-800">Timeline:</span> {latest.timelineNotes}
+                <span className="font-medium text-slate-800">Timeline:</span> {selected.timelineNotes}
               </p>
             )}
-            {latest.paymentStructureSuggestion && (
+            {selected.paymentStructureSuggestion && (
               <p className="mb-2 text-slate-600">
                 <span className="font-medium text-slate-800">Payment:</span>{" "}
-                {latest.paymentStructureSuggestion}
+                {selected.paymentStructureSuggestion}
               </p>
             )}
-            {latest.deliverables.length > 0 && (
+            {selected.deliverables.length > 0 && (
               <ul className="mb-3 list-inside list-disc text-slate-700">
-                {latest.deliverables.map((d) => (
+                {selected.deliverables.map((d) => (
                   <li key={d}>{d}</li>
                 ))}
               </ul>
             )}
+
+            {canManage && (
+              <div className="mb-3">
+                <Select
+                  label="Status"
+                  touch
+                  value={selected.status}
+                  disabled={busy || saving}
+                  onChange={async (e) => {
+                    const status = e.target.value as RevenueProposalStatus;
+                    setSaving(true);
+                    try {
+                      await onSave(selected.id, { status });
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  options={STATUS_OPTIONS}
+                />
+              </div>
+            )}
+
+            <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3">
+              <p className="mb-2 text-xs font-medium text-slate-500">Agreement prefill checklist</p>
+              <ul className="space-y-1 text-xs">
+                {checks.map((c) => (
+                  <li key={c.label} className={c.ok ? "text-emerald-700" : "text-amber-700"}>
+                    {c.ok ? "✓" : "○"} {c.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
             <div className="flex flex-wrap gap-2">
               {canManage && (
                 <Button size="sm" variant="outline" disabled={busy || saving} onClick={() => setEditing(true)}>
                   Edit proposal
                 </Button>
               )}
-              {canManage && latest.agreementPrefill && (
+              {canManage && (
                 <Link
                   href={
                     projectId
-                      ? `/agreements/new?revenueProposalId=${encodeURIComponent(latest.id)}&projectId=${encodeURIComponent(projectId)}`
-                      : `/agreements/new?revenueProposalId=${encodeURIComponent(latest.id)}`
+                      ? `/agreements/new?revenueProposalId=${encodeURIComponent(selected.id)}&projectId=${encodeURIComponent(projectId)}`
+                      : `/agreements/new?revenueProposalId=${encodeURIComponent(selected.id)}`
                   }
+                  className={!prefillReady ? "pointer-events-none opacity-50" : undefined}
+                  aria-disabled={!prefillReady}
+                  onClick={(e) => {
+                    if (!prefillReady) e.preventDefault();
+                  }}
                 >
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" disabled={!prefillReady}>
                     Open in agreement wizard
                   </Button>
                 </Link>
               )}
             </div>
-            {latest.agreementId && (
-              <Link href={`/agreements/${latest.agreementId}`} className="mt-2 inline-block text-sky-700 hover:underline">
+            {!prefillReady && canManage && (
+              <p className="mt-2 text-xs text-amber-700">Complete the checklist before opening the wizard.</p>
+            )}
+            {selected.agreementId && (
+              <Link
+                href={`/agreements/${selected.agreementId}`}
+                className="mt-2 inline-block text-sky-700 hover:underline"
+              >
                 View agreement →
               </Link>
             )}
           </div>
         )}
 
-        {latest && editing && canManage && (
+        {selected && editing && canManage && (
           <form
             className="space-y-3 rounded-xl border border-slate-200 bg-white p-3"
             onSubmit={async (e) => {
               e.preventDefault();
               setSaving(true);
               try {
-                await onSave(latest.id, {
-                  ...form,
+                await onSave(selected.id, {
                   title: form.title.trim(),
                   executiveSummary: form.executiveSummary.trim(),
                   scopeOutline: form.scopeOutline.trim(),
                   deliverables: form.deliverables.map((d) => d.trim()).filter(Boolean),
                   timelineNotes: form.timelineNotes?.trim() || undefined,
                   paymentStructureSuggestion: form.paymentStructureSuggestion?.trim() || undefined,
+                  investmentMin: form.investmentMin,
+                  investmentMax: form.investmentMax,
                 });
                 setEditing(false);
               } finally {
@@ -254,14 +359,14 @@ export function OpportunityProposalPanel({
                 onClick={() => {
                   setEditing(false);
                   setForm({
-                    title: latest.title,
-                    executiveSummary: latest.executiveSummary,
-                    scopeOutline: latest.scopeOutline,
-                    deliverables: latest.deliverables,
-                    timelineNotes: latest.timelineNotes,
-                    investmentMin: latest.investmentMin,
-                    investmentMax: latest.investmentMax,
-                    paymentStructureSuggestion: latest.paymentStructureSuggestion,
+                    title: selected.title,
+                    executiveSummary: selected.executiveSummary,
+                    scopeOutline: selected.scopeOutline,
+                    deliverables: selected.deliverables,
+                    timelineNotes: selected.timelineNotes ?? "",
+                    investmentMin: selected.investmentMin,
+                    investmentMax: selected.investmentMax,
+                    paymentStructureSuggestion: selected.paymentStructureSuggestion ?? "",
                   });
                 }}
               >

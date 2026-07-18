@@ -68,6 +68,36 @@ describe("parseResearchProspects", () => {
     expect(result[0].subject.socialLinks).toContain("TikTok:");
   });
 
+  it("parses contact and public email/phone from research", () => {
+    const result = parseResearchProspects({
+      prospects: [
+        {
+          subject: {
+            name: "Contact Co",
+            publicEmail: "hello@contactco.com",
+            publicPhone: "555-0100",
+          },
+          contact: {
+            name: "Alex Rivera",
+            title: "Owner",
+            email: "alex@contactco.com",
+            phone: "555-0101",
+            sourceUrl: "https://contactco.com/about",
+          },
+          categoryScores: { contentOpportunity: 12 },
+          evidence: [],
+        },
+      ],
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].subject.publicEmail).toBe("hello@contactco.com");
+    expect(result[0].subject.publicPhone).toBe("555-0100");
+    expect(result[0].contact?.name).toBe("Alex Rivera");
+    expect(result[0].contact?.email).toBe("alex@contactco.com");
+    expect(result[0].contact?.verificationStatus).toBe("unverified");
+  });
+
   it("drops schema placeholder website/social values", () => {
     const result = parseResearchProspects({
       prospects: [

@@ -11,7 +11,16 @@ Given Tavily web search results, identify real businesses that may buy IMG produ
         "description": "short description or omit",
         "industry": "e.g. Hotels and resorts or omit",
         "city": "city or omit",
-        "state": "2-letter state or omit"
+        "state": "2-letter state or omit",
+        "publicEmail": "public company email from sources or omit",
+        "publicPhone": "public phone from sources or omit"
+      },
+      "contact": {
+        "name": "decision-maker name or omit",
+        "title": "role/title or omit",
+        "email": "direct email from sources or omit",
+        "phone": "direct phone or omit",
+        "sourceUrl": "https://page-where-found or omit"
       },
       "research": {
         "observedFacts": ["max 5 — only from sources"],
@@ -58,6 +67,7 @@ Rules:
 - Omit unknown optional fields instead of inventing placeholders.
 - website must be a real http(s) URL from sources, or omit the field.
 - socialLinks: only include handles/URLs found in sources (Instagram, TikTok, Facebook, LinkedIn, YouTube, X). One per line as "Platform: @handle" or a full URL. Omit if none found — do not invent handles.
+- publicEmail, publicPhone, and contact fields: only include values explicitly found in sources. Never invent emails, phones, or decision-maker names.
 - Every evidence item must cite a URL from the provided sources.
 - categoryScores must respect max weight per category.
 - Prefer businesses with weak video presence but active marketing.`;
@@ -75,7 +85,16 @@ Given Tavily web search results, identify brands that may fit creator-led campai
         "description": "short description or omit",
         "industry": "category or omit",
         "city": "city or omit",
-        "state": "state or omit"
+        "state": "state or omit",
+        "publicEmail": "public company email from sources or omit",
+        "publicPhone": "public phone from sources or omit"
+      },
+      "contact": {
+        "name": "decision-maker name or omit",
+        "title": "role/title or omit",
+        "email": "direct email from sources or omit",
+        "phone": "direct phone or omit",
+        "sourceUrl": "https://page-where-found or omit"
       },
       "research": {
         "observedFacts": ["max 5"],
@@ -122,6 +141,7 @@ Rules:
 - Never copy schema instructions into values (e.g. do not output "string optional").
 - Omit unknown optional fields instead of inventing placeholders.
 - socialLinks: only handles/URLs found in sources; omit if none. Do not invent handles.
+- publicEmail, publicPhone, and contact fields: only include values explicitly found in sources. Never invent emails, phones, or names.
 - Do not invent URLs.`;
 
 export const CAMPAIGN_CONCEPT_SYSTEM = `You are a senior creative strategist for Insight Media Group and Stormi creator campaigns.
