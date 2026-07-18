@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { n8nWebhookSecret } from "@/lib/revenueOpportunities/n8n/config";
 import { inspectN8nWebhookSecret } from "@/lib/revenueOpportunities/n8n/webhookAuth";
 import { applyWorkflowWebhookUpdate } from "@/lib/revenueOpportunities/server/workflowRuns";
 import type { RevenueWorkflowRunStatus } from "@/lib/revenueOpportunities/types/workflowRun";
@@ -11,19 +12,6 @@ const VALID_STATUS = new Set<RevenueWorkflowRunStatus>(["queued", "running", "co
 /** Inbound status callbacks from n8n workflows. */
 export async function POST(request: NextRequest) {
   try {
-    const auth = inspectN8nWebhookSecret(request);
-    if (!auth.ok) {
-      return NextResponse.json(
-        {
-          error: "Unauthorized",
-          reason: auth.reason,
-          expectedLength: auth.expectedLength,
-          receivedLength: auth.receivedLength,
-        },
-        { status: 401 }
-      );
-    }
-
     let body: {
       runId?: string;
       organizationCompany?: string;
@@ -31,11 +19,39 @@ export async function POST(request: NextRequest) {
       externalRunId?: string;
       errorSummary?: string;
       outputSummary?: string;
+      /** Optional: same value as N8N_WEBHOOK_SECRET (handy when headers are stripped). */
+      webhookSecret?: string;
     };
     try {
       body = (await request.json()) as typeof body;
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const expected = n8nWebhookSecret();
+    const bodySecret = typeof body.webhookSecret === "string" ? body.webhookSecret.trim() : "";
+    const headerAuth = inspectN8nWebhookSecret(request);
+    const bodyAuthOk = Boolean(expected && bodySecret && bodySecret === expected);
+
+    if (!headerAuth.ok && !bodyAuthOk) {
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+          reason: bodySecret
+            ? "secret_mismatch"
+            : headerAuth.ok
+              ? "secret_missing"
+              : headerAuth.reason,
+          expectedLength: expected?.length,
+          receivedLength: bodySecret
+            ? bodySecret.length
+            : "receivedLength" in headerAuth
+              ? headerAuth.receivedLength
+              : undefined,
+          hint: "Send header X-Revenue-Webhook-Secret or JSON field webhookSecret matching Vercel N8N_WEBHOOK_SECRET",
+        },
+        { status: 401 }
+      );
     }
 
     const runId = typeof body.runId === "string" ? body.runId.trim() : "";
@@ -59,7 +75,6 @@ export async function POST(request: NextRequest) {
       outputSummary: typeof body.outputSummary === "string" ? body.outputSummary : undefined,
     });
 
-    // Minimal payload — avoid serializing full Firestore docs to n8n.
     return NextResponse.json({
       ok: true,
       runId: run.id,
