@@ -20,15 +20,21 @@ export function OpportunityDetailView({ opportunity }: { opportunity: RevenueOpp
               .filter(Boolean)
               .join(" · ")}
           </p>
-          {opportunity.subject.website && (
+          {opportunity.subject.website &&
+            /^https?:\/\//i.test(opportunity.subject.website) && (
             <a
               href={opportunity.subject.website}
               target="_blank"
               rel="noreferrer"
-              className="text-sm text-sky-700 hover:underline"
+              className="block text-sm text-sky-700 hover:underline"
             >
               {opportunity.subject.website}
             </a>
+          )}
+          {opportunity.subject.socialLinks?.trim() && (
+            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
+              {opportunity.subject.socialLinks.trim()}
+            </p>
           )}
         </div>
         <div className="flex flex-wrap gap-2">

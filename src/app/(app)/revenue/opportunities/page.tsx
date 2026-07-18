@@ -13,7 +13,6 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Select } from "@/components/ui/Select";
-import { ListSearchField } from "@/components/ui/ListSearchField";
 import { OpportunityTable } from "@/components/revenue/OpportunityTable";
 
 export default function RevenueOpportunitiesPage() {
@@ -89,38 +88,42 @@ export default function RevenueOpportunitiesPage() {
           ) : undefined
         }
       />
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <ListSearchField
-          label="Search opportunities"
-          value={search}
-          onChange={setSearch}
-          placeholder="Search name, city, campaign…"
-          className="mb-0 max-w-sm flex-1"
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="w-full">
+          <label htmlFor="opportunity-search" className="mb-1.5 block text-sm font-medium text-slate-700">
+            Search
+          </label>
+          <div className="relative">
+            <input
+              id="opportunity-search"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name, city, campaign…"
+              className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 transition-colors focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/20"
+            />
+          </div>
+        </div>
+        <Select
+          label="Campaign"
+          value={campaignFilter}
+          onChange={(e) => setCampaignFilter(e.target.value)}
+          options={[
+            { value: "", label: "All campaigns" },
+            ...campaigns.map((c) => ({ value: c.id, label: c.name })),
+          ]}
         />
-        <div className="w-full max-w-xs">
-          <Select
-            label="Campaign"
-            value={campaignFilter}
-            onChange={(e) => setCampaignFilter(e.target.value)}
-            options={[
-              { value: "", label: "All campaigns" },
-              ...campaigns.map((c) => ({ value: c.id, label: c.name })),
-            ]}
-          />
-        </div>
-        <div className="w-full max-w-xs">
-          <Select
-            label="Approval"
-            value={approvalFilter}
-            onChange={(e) => setApprovalFilter(e.target.value)}
-            options={[
-              { value: "", label: "All" },
-              { value: "pending", label: "Pending review" },
-              { value: "approved", label: "Approved" },
-              { value: "rejected", label: "Rejected" },
-            ]}
-          />
-        </div>
+        <Select
+          label="Approval"
+          value={approvalFilter}
+          onChange={(e) => setApprovalFilter(e.target.value)}
+          options={[
+            { value: "", label: "All" },
+            { value: "pending", label: "Pending review" },
+            { value: "approved", label: "Approved" },
+            { value: "rejected", label: "Rejected" },
+          ]}
+        />
       </div>
       {loading && <LoadingSpinner />}
       {error && <p className="text-sm text-red-600">{error}</p>}

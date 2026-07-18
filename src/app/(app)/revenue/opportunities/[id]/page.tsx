@@ -27,6 +27,7 @@ import {
   revenueUpdateOutreach,
   revenueCreateGmailDraftFromOutreach,
   revenueConvertOpportunityToProject,
+  revenueUpdateOpportunity,
   revenueUpdateProposal,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
@@ -41,6 +42,7 @@ import { OpportunityDetailView } from "@/components/revenue/OpportunityDetailVie
 import { OpportunityApprovalPanel } from "@/components/revenue/OpportunityApprovalPanel";
 import { OpportunityAgentPanel } from "@/components/revenue/OpportunityAgentPanel";
 import { OpportunityStagePanel } from "@/components/revenue/OpportunityStagePanel";
+import { OpportunitySubjectLinksPanel } from "@/components/revenue/OpportunitySubjectLinksPanel";
 import { OpportunityOutreachPanel } from "@/components/revenue/OpportunityOutreachPanel";
 import { OpportunityDiscoveryPanel } from "@/components/revenue/OpportunityDiscoveryPanel";
 import { OpportunityProposalPanel } from "@/components/revenue/OpportunityProposalPanel";
@@ -126,6 +128,31 @@ export default function OpportunityDetailPage() {
                 setOpportunity(res.opportunity);
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Failed to update stage");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+          <OpportunitySubjectLinksPanel
+            opportunity={opportunity}
+            canManage={canManage}
+            busy={busy}
+            onSave={async ({ website, socialLinks }) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueUpdateOpportunity(() => user.getIdToken(), id, {
+                  subject: {
+                    ...opportunity.subject,
+                    website: website?.trim() || "",
+                    socialLinks: socialLinks?.trim() || "",
+                  },
+                });
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Failed to save links");
+                throw e;
               } finally {
                 setBusy(false);
               }

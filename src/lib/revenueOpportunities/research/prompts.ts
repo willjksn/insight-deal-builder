@@ -5,12 +5,13 @@ Given Tavily web search results, identify real businesses that may buy IMG produ
   "prospects": [
     {
       "subject": {
-        "name": "string (required)",
-        "website": "string optional",
-        "description": "string optional",
-        "industry": "string optional",
-        "city": "string optional",
-        "state": "string optional"
+        "name": "Business Name",
+        "website": "https://example.com or omit if unknown",
+        "socialLinks": "Instagram: @handle\\nTikTok: @handle\\nor https://instagram.com/... — omit if unknown",
+        "description": "short description or omit",
+        "industry": "e.g. Hotels and resorts or omit",
+        "city": "city or omit",
+        "state": "2-letter state or omit"
       },
       "research": {
         "observedFacts": ["max 5 — only from sources"],
@@ -31,17 +32,17 @@ Given Tavily web search results, identify real businesses that may buy IMG produ
       },
       "scoreReasons": ["max 4 short strings"],
       "campaignConcept": {
-        "title": "string",
-        "coreConcept": "string",
-        "hook": "string optional",
+        "title": "concept title",
+        "coreConcept": "one paragraph",
+        "hook": "optional hook or omit",
         "recommendedDeliverables": ["max 5 strings"],
-        "recommendedPlatforms": ["Instagram", "TikTok", etc]
+        "recommendedPlatforms": ["Instagram", "TikTok"]
       },
       "evidence": [
         {
-          "claim": "string",
+          "claim": "factual claim",
           "sourceUrl": "must match a URL from research",
-          "sourceTitle": "string",
+          "sourceTitle": "page title",
           "sourceType": "website|social|press|directory",
           "confidence": 0.0-1.0
         }
@@ -53,6 +54,10 @@ Given Tavily web search results, identify real businesses that may buy IMG produ
 Rules:
 - Return 1-5 distinct prospects max.
 - Do not invent businesses not supported by search results.
+- Never copy schema instructions into values (e.g. do not output "string optional").
+- Omit unknown optional fields instead of inventing placeholders.
+- website must be a real http(s) URL from sources, or omit the field.
+- socialLinks: only include handles/URLs found in sources (Instagram, TikTok, Facebook, LinkedIn, YouTube, X). One per line as "Platform: @handle" or a full URL. Omit if none found — do not invent handles.
 - Every evidence item must cite a URL from the provided sources.
 - categoryScores must respect max weight per category.
 - Prefer businesses with weak video presence but active marketing.`;
@@ -64,12 +69,13 @@ Given Tavily web search results, identify brands that may fit creator-led campai
   "prospects": [
     {
       "subject": {
-        "name": "brand name (required)",
-        "website": "string optional",
-        "description": "string optional",
-        "industry": "string optional",
-        "city": "string optional",
-        "state": "string optional"
+        "name": "Brand Name",
+        "website": "https://example.com or omit if unknown",
+        "socialLinks": "Instagram: @handle\\nTikTok: @handle — omit if unknown",
+        "description": "short description or omit",
+        "industry": "category or omit",
+        "city": "city or omit",
+        "state": "state or omit"
       },
       "research": {
         "observedFacts": ["max 5"],
@@ -90,18 +96,18 @@ Given Tavily web search results, identify brands that may fit creator-led campai
       },
       "scoreReasons": ["max 4"],
       "campaignConcept": {
-        "title": "string",
-        "coreConcept": "string",
-        "stormiRole": "string optional",
-        "imgRole": "string optional",
+        "title": "concept title",
+        "coreConcept": "one paragraph",
+        "stormiRole": "optional or omit",
+        "imgRole": "optional or omit",
         "recommendedDeliverables": ["max 5"],
         "recommendedPlatforms": ["max 4"]
       },
       "evidence": [
         {
-          "claim": "string",
+          "claim": "factual claim",
           "sourceUrl": "from research only",
-          "sourceTitle": "string",
+          "sourceTitle": "page title",
           "sourceType": "website|social|press",
           "confidence": 0.0-1.0
         }
@@ -113,6 +119,9 @@ Given Tavily web search results, identify brands that may fit creator-led campai
 Rules:
 - Return 1-5 brands max.
 - Favor brands active on Instagram/TikTok with creator partnership potential.
+- Never copy schema instructions into values (e.g. do not output "string optional").
+- Omit unknown optional fields instead of inventing placeholders.
+- socialLinks: only handles/URLs found in sources; omit if none. Do not invent handles.
 - Do not invent URLs.`;
 
 export const CAMPAIGN_CONCEPT_SYSTEM = `You are a senior creative strategist for Insight Media Group and Stormi creator campaigns.
@@ -120,28 +129,28 @@ export const CAMPAIGN_CONCEPT_SYSTEM = `You are a senior creative strategist for
 Given an opportunity subject and optional web research, return JSON only:
 {
   "campaignConcept": {
-    "title": "string",
-    "campaignObjective": "string",
-    "targetAudience": "string",
-    "coreConcept": "string",
-    "hook": "string",
-    "storyDirection": "string optional",
+    "title": "concept title",
+    "campaignObjective": "objective",
+    "targetAudience": "audience",
+    "coreConcept": "one paragraph",
+    "hook": "hook line",
+    "storyDirection": "optional or omit",
     "recommendedDeliverables": ["max 6"],
     "recommendedPlatforms": ["max 4"],
-    "stormiRole": "string optional",
-    "imgRole": "string optional",
-    "businessValue": "string",
-    "creatorValue": "string optional",
+    "stormiRole": "optional or omit",
+    "imgRole": "optional or omit",
+    "businessValue": "business value",
+    "creatorValue": "optional or omit",
     "estimatedComplexity": "low|medium|high",
-    "estimatedProductionDays": number,
+    "estimatedProductionDays": 1,
     "budgetConsiderations": ["max 3"],
     "risks": ["max 3"]
   },
   "evidence": [
     {
-      "claim": "string",
+      "claim": "factual claim",
       "sourceUrl": "from research if available",
-      "sourceTitle": "string",
+      "sourceTitle": "page title",
       "sourceType": "website|social|inferred",
       "confidence": 0.0-1.0
     }
@@ -151,4 +160,5 @@ Given an opportunity subject and optional web research, return JSON only:
 Rules:
 - High-level campaign concept only — not scripts or shot lists.
 - Practical for a small cinematic crew.
+- Never copy schema instructions into values.
 - Do not invent URLs not in research.`;

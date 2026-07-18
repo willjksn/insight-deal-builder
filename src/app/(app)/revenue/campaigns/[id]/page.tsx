@@ -93,7 +93,7 @@ export default function CampaignDetailPage() {
                     const res = await revenueRunCampaignResearch(() => user.getIdToken(), id);
                     setRuns((prev) => [res.campaignRun, ...prev]);
                     setResearchMessage(
-                      `Research complete — ${res.opportunities.length} opportunit${res.opportunities.length === 1 ? "y" : "ies"} created (${res.campaignRun.usedLiveSearch ? "live Tavily + Gemini" : "mock mode"}).`
+                      `Research complete — ${res.opportunities.length} opportunit${res.opportunities.length === 1 ? "y" : "ies"} created.`
                     );
                   } catch (e) {
                     setError(e instanceof Error ? e.message : "Research failed");

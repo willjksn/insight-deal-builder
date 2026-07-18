@@ -18,10 +18,57 @@ export interface ParsedResearchProspect {
   scoring: { totalScore: number; confidenceScore: number; categoryScores: Record<string, number>; scoreReasons?: string[] };
 }
 
+const SCHEMA_PLACEHOLDER =
+  /^(string(\s+optional)?|string\s*\(required\)|number|boolean|max\s+\d+|from research|must match|0-?\d+|low\|medium\|high)$/i;
+
 function str(v: unknown): string | undefined {
   if (typeof v !== "string") return undefined;
   const t = v.trim();
-  return t || undefined;
+  if (!t || SCHEMA_PLACEHOLDER.test(t)) return undefined;
+  return t;
+}
+
+function websiteUrl(v: unknown): string | undefined {
+  const t = str(v);
+  if (!t) return undefined;
+  if (/^https?:\/\//i.test(t)) return t;
+  if (/^[a-z0-9][a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(t)) return `https://${t}`;
+  return undefined;
+}
+
+function socialLinksText(v: unknown): string | undefined {
+  if (typeof v === "string") {
+    const t = str(v);
+    return t;
+  }
+  if (Array.isArray(v)) {
+    const lines = v
+      .map((item) => {
+        if (typeof item === "string") return str(item);
+        if (item && typeof item === "object") {
+          const o = item as Record<string, unknown>;
+          const platform = str(o.platform) ?? str(o.name);
+          const handle = str(o.handle) ?? str(o.url) ?? str(o.value);
+          if (platform && handle) return `${platform}: ${handle}`;
+          return handle;
+        }
+        return undefined;
+      })
+      .filter((x): x is string => Boolean(x));
+    return lines.length ? lines.join("\n") : undefined;
+  }
+  if (v && typeof v === "object") {
+    const lines = Object.entries(v as Record<string, unknown>)
+      .map(([platform, handle]) => {
+        const h = str(handle);
+        if (!h) return undefined;
+        const p = str(platform);
+        return p ? `${p}: ${h}` : h;
+      })
+      .filter((x): x is string => Boolean(x));
+    return lines.length ? lines.join("\n") : undefined;
+  }
+  return undefined;
 }
 
 function strArray(v: unknown, max = 10): string[] {
@@ -63,7 +110,8 @@ function parseSubject(raw: unknown): OpportunitySubject | null {
   if (!name) return null;
   return {
     name,
-    website: str(o.website),
+    website: websiteUrl(o.website),
+    socialLinks: socialLinksText(o.socialLinks),
     description: str(o.description),
     industry: str(o.industry),
     city: str(o.city),

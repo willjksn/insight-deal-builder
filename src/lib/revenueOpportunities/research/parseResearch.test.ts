@@ -43,4 +43,47 @@ describe("parseResearchProspects", () => {
     });
     expect(result).toHaveLength(0);
   });
+
+  it("parses website and socialLinks from subject", () => {
+    const result = parseResearchProspects({
+      prospects: [
+        {
+          subject: {
+            name: "Glow Spa",
+            website: "glowspa.com",
+            socialLinks: {
+              Instagram: "@glowspa",
+              TikTok: "https://tiktok.com/@glowspa",
+            },
+          },
+          categoryScores: { contentOpportunity: 15 },
+          evidence: [],
+        },
+      ],
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].subject.website).toBe("https://glowspa.com");
+    expect(result[0].subject.socialLinks).toContain("Instagram: @glowspa");
+    expect(result[0].subject.socialLinks).toContain("TikTok:");
+  });
+
+  it("drops schema placeholder website/social values", () => {
+    const result = parseResearchProspects({
+      prospects: [
+        {
+          subject: {
+            name: "Bad Placeholder Co",
+            website: "string optional",
+            socialLinks: "string optional",
+          },
+          categoryScores: {},
+          evidence: [],
+        },
+      ],
+    });
+
+    expect(result[0].subject.website).toBeUndefined();
+    expect(result[0].subject.socialLinks).toBeUndefined();
+  });
 });
