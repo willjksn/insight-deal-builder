@@ -3,7 +3,10 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { REVENUE_CAMPAIGN_RUNS_COLLECTION } from "@/lib/revenueOpportunities/collections";
 import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";
-import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
+import {
+  getOrderedQueryDocs,
+  isFirestoreIndexPending,
+} from "@/lib/revenueOpportunities/server/queryHelpers";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import type { RevenueCampaignRun, RevenueCampaignRunStatus } from "@/lib/revenueOpportunities/types/campaignRun";
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
@@ -105,11 +108,38 @@ export async function countCampaignRunsSince(
 ): Promise<number> {
   const db = requireDb();
   const organizationCompany = tenantCompany(appUser);
-  const snap = await db
-    .collection(REVENUE_CAMPAIGN_RUNS_COLLECTION)
-    .where("organizationCompany", "==", organizationCompany)
-    .where("campaignId", "==", campaignId)
-    .where("createdAt", ">=", since)
-    .get();
-  return snap.size;
+  const sinceMs = since.getTime();
+
+  // Prefer a ranged query when the composite index exists; otherwise fall back
+  // to equality filters + in-memory date check (avoids FAILED_PRECONDITION 500s).
+  try {
+    const snap = await db
+      .collection(REVENUE_CAMPAIGN_RUNS_COLLECTION)
+      .where("organizationCompany", "==", organizationCompany)
+      .where("campaignId", "==", campaignId)
+      .where("createdAt", ">=", since)
+      .get();
+    return snap.size;
+  } catch (err) {
+    if (!isFirestoreIndexPending(err)) throw err;
+    const docs = await getOrderedQueryDocs(
+      (ordered) => {
+        let q: FirebaseFirestore.Query = db
+          .collection(REVENUE_CAMPAIGN_RUNS_COLLECTION)
+          .where("organizationCompany", "==", organizationCompany)
+          .where("campaignId", "==", campaignId);
+        if (ordered) q = q.orderBy("createdAt", "desc");
+        return q;
+      },
+      "createdAt"
+    );
+    return docs.filter((d) => {
+      const createdAt = d.get("createdAt") as { toMillis?: () => number } | Date | string | undefined;
+      if (!createdAt) return false;
+      if (typeof createdAt === "string") return new Date(createdAt).getTime() >= sinceMs;
+      if (createdAt instanceof Date) return createdAt.getTime() >= sinceMs;
+      if (typeof createdAt.toMillis === "function") return createdAt.toMillis() >= sinceMs;
+      return false;
+    }).length;
+  }
 }

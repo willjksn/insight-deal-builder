@@ -151,6 +151,15 @@
       ]
     },
     {
+      "collectionGroup": "revenueCampaignRuns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationCompany", "order": "ASCENDING" },
+        { "fieldPath": "campaignId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "revenueOutreachActivities",
       "queryScope": "COLLECTION",
       "fields": [
