@@ -5,7 +5,12 @@ import {
 } from "@/lib/scriptWriter/scriptMappers";
 import type { ScriptDocument, ScriptInspirationImage } from "@/lib/scriptWriter/types";
 
-const MANUAL_IMAGE_SOURCES = new Set(["upload", "scene_migrate", "inspiration"]);
+const MANUAL_IMAGE_SOURCES = new Set([
+  "upload",
+  "scene_migrate",
+  "inspiration",
+  "ai_generate",
+]);
 
 function preferExistingText(existing?: string, incoming?: string): string | undefined {
   const e = existing?.trim();

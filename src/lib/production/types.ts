@@ -66,7 +66,8 @@ export type ProductionShotImageSource =
   | "inspiration"
   | "upload"
   | "script_match"
-  | "scene_migrate";
+  | "scene_migrate"
+  | "ai_generate";
 
 /**
  * Coverage unit: one shot = one storyboard frame.

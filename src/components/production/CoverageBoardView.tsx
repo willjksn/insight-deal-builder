@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, ImageIcon, Upload } from "lucide-react";
+import { Check, ImageIcon, Sparkles, Upload } from "lucide-react";
 import type { ProductionDayShot, ProductionInspirationImage } from "@/lib/production/types";
+import { generateCoverageFrame } from "@/lib/production/coverageApiClient";
 import { formatShotTypeLabel } from "@/lib/production/shotLabels";
 import { uploadProductionImage } from "@/lib/production/storage";
 import { cn } from "@/lib/utils/cn";
@@ -20,6 +21,7 @@ interface CoverageBoardViewProps {
   inspirationImages: ProductionInspirationImage[];
   layout?: "grid" | "linear";
   readOnly?: boolean;
+  getIdToken?: () => Promise<string>;
   onPatchShot: (dayId: string, shotId: string, patch: Partial<ProductionDayShot>) => void;
   className?: string;
 }
@@ -38,6 +40,7 @@ export function CoverageBoardView({
   inspirationImages,
   layout = "grid",
   readOnly,
+  getIdToken,
   onPatchShot,
   className,
 }: CoverageBoardViewProps) {
@@ -45,6 +48,8 @@ export function CoverageBoardView({
   const [pickerShotId, setPickerShotId] = useState<string | null>(null);
   const [uploadTarget, setUploadTarget] = useState<{ dayId: string; shotId: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -89,6 +94,31 @@ export function CoverageBoardView({
     }
   };
 
+  const generateFrame = async (dayId: string, shotId: string, force: boolean) => {
+    if (!getIdToken || readOnly) return;
+    setGeneratingId(shotId);
+    setGenerateError(null);
+    try {
+      const result = await generateCoverageFrame(getIdToken, projectId, {
+        dayId,
+        shotId,
+        force,
+      });
+      applyImage(
+        dayId,
+        shotId,
+        result.referenceImageUrl,
+        result.referenceImageStoragePath,
+        undefined,
+        "ai_generate"
+      );
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : "Could not generate frame");
+    } finally {
+      setGeneratingId(null);
+    }
+  };
+
   if (sorted.length === 0) {
     return (
       <section
@@ -119,6 +149,12 @@ export function CoverageBoardView({
           e.target.value = "";
         }}
       />
+
+      {generateError ? (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {generateError}
+        </p>
+      ) : null}
 
       <div
         className={cn(
@@ -248,11 +284,38 @@ export function CoverageBoardView({
                   </Button>
                   {!readOnly && (
                     <>
+                      {getIdToken ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={Boolean(generatingId) || uploading}
+                          onClick={() =>
+                            void generateFrame(
+                              shot.dayId,
+                              shot.id,
+                              Boolean(shot.referenceImageUrl?.trim())
+                            )
+                          }
+                        >
+                          <Sparkles
+                            className={cn(
+                              "mr-1 h-3.5 w-3.5",
+                              generatingId === shot.id && "animate-pulse"
+                            )}
+                          />
+                          {generatingId === shot.id
+                            ? "Generating…"
+                            : shot.referenceImageUrl
+                              ? "Regen AI"
+                              : "AI frame"}
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        disabled={uploading}
+                        disabled={uploading || Boolean(generatingId)}
                         onClick={() => {
                           setUploadTarget({ dayId: shot.dayId, shotId: shot.id });
                           fileRef.current?.click();
@@ -266,6 +329,7 @@ export function CoverageBoardView({
                           type="button"
                           size="sm"
                           variant="outline"
+                          disabled={Boolean(generatingId)}
                           onClick={() =>
                             setPickerShotId(pickerShotId === shot.id ? null : shot.id)
                           }

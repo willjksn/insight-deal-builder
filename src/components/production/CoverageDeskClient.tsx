@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Clapperboard, LayoutGrid, ListOrdered, RefreshCw } from "lucide-react";
+import { ArrowLeft, Clapperboard, LayoutGrid, ListOrdered, RefreshCw, Sparkles } from "lucide-react";
 import {
   getProductionBoardByProject,
   saveProductionBoard,
@@ -13,6 +13,7 @@ import {
   countCoverageWithImages,
   migrateBoardCoverageDays,
 } from "@/lib/production/coverageMigrate";
+import { generateCoverageFramesBatch } from "@/lib/production/coverageApiClient";
 import { mergeBoardCoverageFromScript } from "@/lib/production/coverageSync";
 import type { ProductionBoard, ProductionDayShot } from "@/lib/production/types";
 import { scriptWriterGetSession } from "@/lib/scriptWriter/apiClient";
@@ -39,6 +40,7 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [fillingFrames, setFillingFrames] = useState(false);
   const [view, setView] = useState<CoverageView>("board");
   const [dayFilter, setDayFilter] = useState<string>("all");
   const [migrateNote, setMigrateNote] = useState<string | null>(null);
@@ -247,6 +249,38 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
     }
   };
 
+  const fillEmptyFrames = async () => {
+    if (!user || !board || !canEdit) return;
+    setFillingFrames(true);
+    setRefreshError(null);
+    try {
+      const result = await generateCoverageFramesBatch(() => user.getIdToken(), projectId, {
+        onlyMissing: true,
+        limit: 12,
+        ...(dayFilter !== "all" ? { dayId: dayFilter } : {}),
+      });
+      const reloaded = await getProductionBoardByProject(projectId);
+      if (reloaded) setBoard(reloaded);
+      const n = result.generated.length;
+      if (n === 0 && result.message) {
+        setMigrateNote(result.message);
+      } else {
+        setMigrateNote(
+          `Generated ${n} AI frame${n === 1 ? "" : "s"}${
+            result.remaining > 0 ? ` — ${result.remaining} still empty (run again)` : ""
+          }.`
+        );
+      }
+      if (result.errors.length) {
+        setRefreshError(result.errors.map((e) => e.error).slice(0, 2).join(" · "));
+      }
+    } catch (e) {
+      setRefreshError(e instanceof Error ? e.message : "Could not generate AI frames");
+    } finally {
+      setFillingFrames(false);
+    }
+  };
+
   if (projectLoading || loading) return <LoadingSpinner />;
   if (!allowed) {
     return <p className="text-sm text-red-600">You don’t have access to coverage for this project.</p>;
@@ -293,11 +327,22 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
         }
         action={
           <div className="flex flex-wrap gap-2">
+            {canEdit && totalShots > withImages && (
+              <Button
+                size="touch"
+                variant="outline"
+                disabled={fillingFrames || saving || refreshing}
+                onClick={() => void fillEmptyFrames()}
+              >
+                <Sparkles className={`mr-2 h-4 w-4 ${fillingFrames ? "animate-pulse" : ""}`} />
+                {fillingFrames ? "Generating…" : "Fill empty frames"}
+              </Button>
+            )}
             {board.scriptSessionId && canEdit && (
               <Button
                 size="touch"
                 variant="outline"
-                disabled={refreshing || saving}
+                disabled={refreshing || saving || fillingFrames}
                 onClick={() => void refreshFromScript()}
               >
                 <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -389,6 +434,7 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
           inspirationImages={board.inspirationImages ?? []}
           layout={view === "linear" ? "linear" : "grid"}
           readOnly={!canEdit}
+          getIdToken={user ? () => user.getIdToken() : undefined}
           onPatchShot={patchShot}
         />
       )}

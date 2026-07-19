@@ -25,6 +25,7 @@ export const AI_USAGE_FEATURE_LABELS: Record<string, string> = {
   scout_preview: "Shot Scout — previs images",
   scout_technique: "Shot Scout — technique lookup",
   scout_gear: "Shot Scout — gear suggest",
+  coverage_frame: "Coverage — AI storyboard frames",
   script_writer_chat: "Script writer — chat",
   script_writer_analyze: "Script writer — inspiration analyze",
   script_writer_generate: "Script writer — generate",

@@ -466,6 +466,7 @@ export default function ShotListDayPage() {
             inspirationImages={board.inspirationImages}
             layout="grid"
             readOnly={!canEditShots}
+            getIdToken={user ? () => user.getIdToken() : undefined}
             onPatchShot={(_dayId, shotId, patch) =>
               patchDay({
                 shots: day.shots.map((s) => (s.id === shotId ? { ...s, ...patch } : s)),

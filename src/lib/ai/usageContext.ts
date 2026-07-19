@@ -37,6 +37,8 @@ export function inferFeatureFromPath(pathname: string): string {
     [/\/api\/agreements\/suggest-scope$/, "agreements.scope"],
     [/\/api\/agreements\/pricing-research$/, "agreements.pricing"],
     [/\/api\/cron\/trend-snapshots$/, "cron.trends"],
+    [/\/api\/projects\/[^/]+\/coverage\/generate-frame$/, "coverage.frame"],
+    [/\/api\/projects\/[^/]+\/coverage\/generate-frames$/, "coverage.frame"],
   ];
   for (const [re, feature] of rules) {
     if (re.test(p)) return feature;
