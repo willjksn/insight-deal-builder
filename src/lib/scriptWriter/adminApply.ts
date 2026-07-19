@@ -125,7 +125,7 @@ export async function applyScriptToProject(params: {
               ...day,
               title: script.title || day.title,
               scenes: sceneNumbersFromScript(script),
-              shots: productionShotsFromScript(script),
+              shots: productionShotsFromScript(script, sessionImages, mergedInspiration),
               sceneFrames,
             })
           : day

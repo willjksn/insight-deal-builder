@@ -52,6 +52,31 @@ describe("scriptMappers scene numbers", () => {
   it("maps production shots when sceneNumber is numeric", () => {
     const shots = productionShotsFromScript(scriptWithNumericScenes);
     expect(shots[0].sceneRef).toBe("1");
+    expect(shots[0].description).toBe("Wide shot");
     expect(shots[0].notes).toContain("See: Wide shot");
+  });
+
+  it("keeps structured DP fields on production shots", () => {
+    const script = {
+      ...scriptWithNumericScenes,
+      suggestedShots: [
+        {
+          sceneNumber: "1",
+          shotNumber: 1,
+          shotType: "close_up",
+          shotName: "Eyes",
+          description: "Tight on eyes",
+          lens: "85mm",
+          framing: "eyes center",
+          cameraHeight: "eye level",
+          blocking: "talent looks camera left",
+        },
+      ],
+    } as ScriptDocument;
+    const shots = productionShotsFromScript(script);
+    expect(shots[0].lens).toBe("85mm");
+    expect(shots[0].framing).toBe("eyes center");
+    expect(shots[0].shotName).toBe("Eyes");
+    expect(shots[0].blocking).toBe("talent looks camera left");
   });
 });

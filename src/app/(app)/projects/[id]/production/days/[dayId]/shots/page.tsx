@@ -135,7 +135,12 @@ export default function ShotListDayPage() {
       }
       const sessionImages = session.inspirationImages ?? [];
       patchDay({
-        shots: mergeProductionShotsFromScript(day.shots, script),
+        shots: mergeProductionShotsFromScript(
+          day.shots,
+          script,
+          sessionImages,
+          board.inspirationImages
+        ),
         sceneFrames: script.scenes?.length
           ? mergeProductionSceneFramesFromScript(
               sceneFrames,
@@ -298,6 +303,11 @@ export default function ShotListDayPage() {
               <Printer className="mr-2 h-5 w-5" />
               {printLabel(viewMode)}
             </Button>
+            <Link href={`/projects/${projectId}/coverage`}>
+              <Button size="touch" variant="outline">
+                Coverage desk
+              </Button>
+            </Link>
             <Link href={`/projects/${projectId}/production/days/${dayId}`}>
               <Button size="touch" variant="outline">
                 Call sheet

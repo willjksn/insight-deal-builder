@@ -53,50 +53,156 @@ function normalizeShotType(raw: string): string {
   return "medium_shot";
 }
 
-export function productionShotsFromScript(script: ScriptDocument): ProductionDayShot[] {
+function optionalTrim(value?: string): string | undefined {
+  const t = value?.trim();
+  return t ? t : undefined;
+}
+
+function scriptShotToProduction(
+  shot: ScriptSuggestedShot,
+  index: number,
+  sceneHeading?: string
+): ProductionDayShot {
+  const shotType = normalizeShotType(shot.shotType);
+  const typeLabel = formatShotTypeLabel(shotType);
+  const name = optionalTrim(shot.shotName);
+  const subject = optionalTrim(shot.subjectAction);
+  const description = optionalTrim(shot.description);
+  const entry: ProductionDayShot = {
+    id: crypto.randomUUID(),
+    label: name
+      ? `${shot.shotNumber}. ${name}`
+      : `${shot.shotNumber}. ${typeLabel}${subject ? ` — ${subject.slice(0, 56)}` : ""}`,
+    done: false,
+    scoutShotNumber: shot.shotNumber,
+    sortOrder: index,
+    shotType,
+    ...(name ? { shotName: name } : {}),
+    ...(description ? { description } : {}),
+    ...(subject ? { subjectAction: subject } : {}),
+    ...(optionalTrim(shot.cameraMovement) ? { cameraMovement: optionalTrim(shot.cameraMovement) } : {}),
+    ...(normalizeSceneRef(shot.sceneNumber)
+      ? { sceneRef: normalizeSceneRef(shot.sceneNumber) }
+      : {}),
+    ...(sceneHeading ? { sceneHeading } : {}),
+    ...(optionalTrim(shot.lens) ? { lens: optionalTrim(shot.lens) } : {}),
+    ...(optionalTrim(shot.lighting) ? { lighting: optionalTrim(shot.lighting) } : {}),
+    ...(optionalTrim(shot.purpose) ? { purpose: optionalTrim(shot.purpose) } : {}),
+    ...(optionalTrim(shot.framing) ? { framing: optionalTrim(shot.framing) } : {}),
+    ...(optionalTrim(shot.cameraHeight) ? { cameraHeight: optionalTrim(shot.cameraHeight) } : {}),
+    ...(optionalTrim(shot.blocking) ? { blocking: optionalTrim(shot.blocking) } : {}),
+    ...(optionalTrim(shot.exposureNotes) ? { exposureNotes: optionalTrim(shot.exposureNotes) } : {}),
+    ...(optionalTrim(shot.audioNotes) ? { audioNotes: optionalTrim(shot.audioNotes) } : {}),
+    ...(optionalTrim(shot.setupNotes) ? { setupNotes: optionalTrim(shot.setupNotes) } : {}),
+    ...(optionalTrim(shot.duration) ? { duration: optionalTrim(shot.duration) } : {}),
+    ...(optionalTrim(shot.cameraBody) ? { cameraBody: optionalTrim(shot.cameraBody) } : {}),
+    ...(optionalTrim(shot.support) ? { support: optionalTrim(shot.support) } : {}),
+    ...(shot.assignedLights?.length ? { assignedLights: shot.assignedLights } : {}),
+    ...(shot.assignedProps?.length ? { assignedProps: shot.assignedProps } : {}),
+    ...(optionalTrim(shot.dollyMoveRef) ? { dollyMoveRef: optionalTrim(shot.dollyMoveRef) } : {}),
+    ...(optionalTrim(shot.editNote) ? { editNote: optionalTrim(shot.editNote) } : {}),
+  };
+  const notes = shotListNotesBlock(shot);
+  if (notes) entry.notes = notes;
+  return entry;
+}
+
+export function productionShotsFromScript(
+  script: ScriptDocument,
+  sessionImages: ScriptInspirationImage[] = [],
+  boardImages: ProductionInspirationImage[] = []
+): ProductionDayShot[] {
+  const headingByScene = new Map(
+    script.scenes.map((s) => [normalizeSceneRef(s.sceneNumber), s.heading] as const)
+  );
+  const pool = buildInspirationPool(sessionImages, boardImages);
+  const usedIds = new Set<string>();
+  const storyFrames =
+    script.storyboardFrames?.length
+      ? script.storyboardFrames
+      : deriveStoryboardFramesFromScript(script);
+  const frameByScene = new Map(
+    storyFrames.map((f) => [normalizeSceneRef(f.sceneNumber), f] as const)
+  );
+  const heroAssigned = new Set<string>();
+
   return script.suggestedShots.map((shot, index) => {
-    const shotType = normalizeShotType(shot.shotType);
-    const typeLabel = formatShotTypeLabel(shotType);
-    const name = shot.shotName?.trim();
-    const subject = shot.subjectAction?.trim();
-    const entry: ProductionDayShot = {
-      id: crypto.randomUUID(),
-      label: name
-        ? `${shot.shotNumber}. ${name}`
-        : `${shot.shotNumber}. ${typeLabel}${subject ? ` — ${subject.slice(0, 56)}` : ""}`,
-      done: false,
-      scoutShotNumber: shot.shotNumber,
-      sortOrder: index,
-      shotType,
-      ...(name ? { shotName: name } : {}),
-      ...(subject ? { subjectAction: subject } : {}),
-      ...(shot.cameraMovement?.trim() ? { cameraMovement: shot.cameraMovement.trim() } : {}),
-      ...(normalizeSceneRef(shot.sceneNumber)
-        ? { sceneRef: normalizeSceneRef(shot.sceneNumber) }
-        : {}),
-    };
-    const notes = shotListNotesBlock(shot);
-    if (notes) entry.notes = notes;
+    const sceneRef = normalizeSceneRef(shot.sceneNumber);
+    const entry = scriptShotToProduction(shot, index, headingByScene.get(sceneRef));
+
+    const frame = frameByScene.get(sceneRef);
+    if (frame?.audioCue?.trim() && !entry.audioCue) {
+      entry.audioCue = frame.audioCue.trim();
+    }
+
+    // Attach matched inspiration to the first (hero) shot of each scene.
+    if (frame && sceneRef && !heroAssigned.has(sceneRef)) {
+      const img = pickInspirationForFrame(frame, pool, usedIds);
+      if (img?.imageUrl) {
+        usedIds.add(img.id);
+        heroAssigned.add(sceneRef);
+        entry.referenceImageUrl = img.imageUrl;
+        if (img.storagePath) entry.referenceImageStoragePath = img.storagePath;
+        entry.referenceImageSource = "script_match";
+        entry.inspirationImageId = img.id;
+        if (!entry.description && frame.caption?.trim()) {
+          entry.description = frame.caption.trim();
+        }
+      }
+    }
+
     return entry;
   });
 }
 
-/** Refresh shot list from script while preserving checkbox state by shot number. */
+type ShotImagePreserve = Pick<
+  ProductionDayShot,
+  | "done"
+  | "referenceImageUrl"
+  | "referenceImageStoragePath"
+  | "referenceImageSource"
+  | "inspirationImageId"
+>;
+
+/** Refresh shot list from script while preserving checkbox + frame images by shot number. */
 export function mergeProductionShotsFromScript(
   existing: ProductionDayShot[],
-  script: ScriptDocument
+  script: ScriptDocument,
+  sessionImages: ScriptInspirationImage[] = [],
+  boardImages: ProductionInspirationImage[] = []
 ): ProductionDayShot[] {
-  const doneByNumber = new Map<number, boolean>();
+  const preserved = new Map<number, ShotImagePreserve>();
   for (const shot of existing) {
-    if (shot.scoutShotNumber != null) {
-      doneByNumber.set(shot.scoutShotNumber, shot.done);
-    }
+    if (shot.scoutShotNumber == null) continue;
+    preserved.set(shot.scoutShotNumber, {
+      done: shot.done,
+      ...(shot.referenceImageUrl ? { referenceImageUrl: shot.referenceImageUrl } : {}),
+      ...(shot.referenceImageStoragePath
+        ? { referenceImageStoragePath: shot.referenceImageStoragePath }
+        : {}),
+      ...(shot.referenceImageSource
+        ? { referenceImageSource: shot.referenceImageSource }
+        : {}),
+      ...(shot.inspirationImageId ? { inspirationImageId: shot.inspirationImageId } : {}),
+    });
   }
-  return productionShotsFromScript(script).map((shot) => {
-    if (shot.scoutShotNumber == null || !doneByNumber.has(shot.scoutShotNumber)) {
+  return productionShotsFromScript(script, sessionImages, boardImages).map((shot) => {
+    if (shot.scoutShotNumber == null || !preserved.has(shot.scoutShotNumber)) {
       return shot;
     }
-    return { ...shot, done: doneByNumber.get(shot.scoutShotNumber)! };
+    const keep = preserved.get(shot.scoutShotNumber)!;
+    return {
+      ...shot,
+      done: keep.done,
+      ...(keep.referenceImageUrl
+        ? {
+            referenceImageUrl: keep.referenceImageUrl,
+            referenceImageStoragePath: keep.referenceImageStoragePath,
+            referenceImageSource: keep.referenceImageSource,
+            inspirationImageId: keep.inspirationImageId,
+          }
+        : {}),
+    };
   });
 }
 
