@@ -21,9 +21,9 @@ import { scriptWriterGetSession } from "@/lib/scriptWriter/apiClient";
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import {
   mergeProductionSceneFramesFromScript,
-  mergeProductionShotsFromScript,
   productionSceneFramesFromScript,
 } from "@/lib/scriptWriter/scriptMappers";
+import { mergeDayShotsFromScript } from "@/lib/production/coverageSync";
 import {
   applyAutoSplitToBoard,
   buildAutoSplitPlan,
@@ -140,7 +140,7 @@ export default function ShotListDayPage() {
       }
       const sessionImages = session.inspirationImages ?? [];
       patchDay({
-        shots: mergeProductionShotsFromScript(
+        shots: mergeDayShotsFromScript(
           day.shots,
           script,
           sessionImages,

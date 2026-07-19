@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Clapperboard, LayoutGrid, ListOrdered } from "lucide-react";
+import { ArrowLeft, Clapperboard, LayoutGrid, ListOrdered, RefreshCw } from "lucide-react";
 import {
   getProductionBoardByProject,
   saveProductionBoard,
@@ -13,7 +13,10 @@ import {
   countCoverageWithImages,
   migrateBoardCoverageDays,
 } from "@/lib/production/coverageMigrate";
+import { mergeBoardCoverageFromScript } from "@/lib/production/coverageSync";
 import type { ProductionBoard, ProductionDayShot } from "@/lib/production/types";
+import { scriptWriterGetSession } from "@/lib/scriptWriter/apiClient";
+import type { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { useDocument } from "@/hooks/useDocument";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,15 +32,17 @@ import { cn } from "@/lib/utils/cn";
 type CoverageView = "board" | "linear" | "list";
 
 export function CoverageDeskClient({ projectId }: { projectId: string }) {
-  const { appUser } = useAuth();
+  const { user, appUser } = useAuth();
   const { data: project, loading: projectLoading } = useDocument<Project>("projects", projectId);
   const projectAccess = useProjectAccess(projectId, project?.ownerUserId);
   const [board, setBoard] = useState<ProductionBoard | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<CoverageView>("board");
   const [dayFilter, setDayFilter] = useState<string>("all");
   const [migrateNote, setMigrateNote] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localEditRef = useRef(false);
   const savingRef = useRef(false);
@@ -208,6 +213,40 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
     });
   };
 
+  const refreshFromScript = async () => {
+    if (!user || !board?.scriptSessionId || !canEdit) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const { session: loaded } = await scriptWriterGetSession(
+        () => user.getIdToken(),
+        board.scriptSessionId
+      );
+      const session = loaded as ScriptWriterSession;
+      const script = session.script as ScriptDocument | null;
+      if (!script?.suggestedShots?.length) {
+        setRefreshError(
+          "Linked script has no suggested shots. Enable shot list / storyboard and regenerate."
+        );
+        return;
+      }
+      const days = mergeBoardCoverageFromScript(
+        board.productionDays,
+        script,
+        session.inspirationImages ?? [],
+        board.inspirationImages ?? []
+      );
+      persistBoard({ ...board, productionDays: days }, true);
+      setMigrateNote(
+        "Synced from script — uploaded frames, day placement, and filled-in DP fields were kept."
+      );
+    } catch (e) {
+      setRefreshError(e instanceof Error ? e.message : "Could not refresh from script");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (projectLoading || loading) return <LoadingSpinner />;
   if (!allowed) {
     return <p className="text-sm text-red-600">You don’t have access to coverage for this project.</p>;
@@ -249,11 +288,22 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
         title="Coverage"
         subtitle={
           project
-            ? `${project.name} — storyboard frames and shot bible. One shot = one frame.`
+            ? `${project.projectName} — storyboard frames and shot bible. One shot = one frame.`
             : "Storyboard frames and shot bible. One shot = one frame."
         }
         action={
           <div className="flex flex-wrap gap-2">
+            {board.scriptSessionId && canEdit && (
+              <Button
+                size="touch"
+                variant="outline"
+                disabled={refreshing || saving}
+                onClick={() => void refreshFromScript()}
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                {refreshing ? "Syncing…" : "Sync from script"}
+              </Button>
+            )}
             <Link href={`/projects/${projectId}/production`}>
               <Button size="touch" variant="outline">
                 Prep board
@@ -315,9 +365,20 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
         </div>
       </div>
 
+      {refreshError && (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {refreshError}
+        </p>
+      )}
       {migrateNote && (
         <p className="mb-4 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-900">
           {migrateNote}
+        </p>
+      )}
+      {!board.scriptSessionId && (
+        <p className="mb-4 text-sm text-slate-500">
+          Link a script via Script writer → Apply to enable <strong>Sync from script</strong> (keeps
+          your uploaded frames and day assignments).
         </p>
       )}
 

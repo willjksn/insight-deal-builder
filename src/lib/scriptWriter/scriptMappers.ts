@@ -155,55 +155,65 @@ export function productionShotsFromScript(
   });
 }
 
-type ShotImagePreserve = Pick<
-  ProductionDayShot,
-  | "done"
-  | "referenceImageUrl"
-  | "referenceImageStoragePath"
-  | "referenceImageSource"
-  | "inspirationImageId"
->;
-
-/** Refresh shot list from script while preserving checkbox + frame images by shot number. */
+/**
+ * @deprecated Prefer `mergeDayShotsFromScript` from coverageSync — kept for call-site compat.
+ * Refresh shot list from script while preserving frames, done state, and non-empty DP fields.
+ */
 export function mergeProductionShotsFromScript(
   existing: ProductionDayShot[],
   script: ScriptDocument,
   sessionImages: ScriptInspirationImage[] = [],
   boardImages: ProductionInspirationImage[] = []
 ): ProductionDayShot[] {
-  const preserved = new Map<number, ShotImagePreserve>();
+  // Lazy require avoided — duplicate thin merge via productionShotsFromScript + field prefer.
+  const incoming = productionShotsFromScript(script, sessionImages, boardImages);
+  const byNumber = new Map<number, ProductionDayShot>();
+  const manual: ProductionDayShot[] = [];
   for (const shot of existing) {
-    if (shot.scoutShotNumber == null) continue;
-    preserved.set(shot.scoutShotNumber, {
-      done: shot.done,
-      ...(shot.referenceImageUrl ? { referenceImageUrl: shot.referenceImageUrl } : {}),
-      ...(shot.referenceImageStoragePath
-        ? { referenceImageStoragePath: shot.referenceImageStoragePath }
-        : {}),
-      ...(shot.referenceImageSource
-        ? { referenceImageSource: shot.referenceImageSource }
-        : {}),
-      ...(shot.inspirationImageId ? { inspirationImageId: shot.inspirationImageId } : {}),
-    });
+    if (shot.scoutShotNumber != null) byNumber.set(shot.scoutShotNumber, shot);
+    else manual.push(shot);
   }
-  return productionShotsFromScript(script, sessionImages, boardImages).map((shot) => {
-    if (shot.scoutShotNumber == null || !preserved.has(shot.scoutShotNumber)) {
-      return shot;
-    }
-    const keep = preserved.get(shot.scoutShotNumber)!;
+  const prefer = (e?: string, i?: string) => (e?.trim() ? e : i?.trim() ? i : undefined);
+  const merged = incoming.map((next, index) => {
+    const prev =
+      next.scoutShotNumber != null ? byNumber.get(next.scoutShotNumber) : undefined;
+    if (!prev) return { ...next, sortOrder: index };
+    byNumber.delete(next.scoutShotNumber!);
+    const keepImage = Boolean(prev.referenceImageUrl?.trim());
     return {
-      ...shot,
-      done: keep.done,
-      ...(keep.referenceImageUrl
+      ...next,
+      id: prev.id,
+      done: prev.done,
+      sortOrder: index,
+      ...(keepImage
         ? {
-            referenceImageUrl: keep.referenceImageUrl,
-            referenceImageStoragePath: keep.referenceImageStoragePath,
-            referenceImageSource: keep.referenceImageSource,
-            inspirationImageId: keep.inspirationImageId,
+            referenceImageUrl: prev.referenceImageUrl,
+            referenceImageStoragePath: prev.referenceImageStoragePath,
+            referenceImageSource: prev.referenceImageSource,
+            inspirationImageId: prev.inspirationImageId,
           }
         : {}),
+      shotName: prefer(prev.shotName, next.shotName),
+      description: prefer(prev.description, next.description),
+      subjectAction: prefer(prev.subjectAction, next.subjectAction),
+      cameraMovement: prefer(prev.cameraMovement, next.cameraMovement),
+      lens: prefer(prev.lens, next.lens),
+      lighting: prefer(prev.lighting, next.lighting),
+      framing: prefer(prev.framing, next.framing),
+      cameraHeight: prefer(prev.cameraHeight, next.cameraHeight),
+      blocking: prefer(prev.blocking, next.blocking),
+      support: prefer(prev.support, next.support),
+      audioCue: prefer(prev.audioCue, next.audioCue),
+      label: prefer(prev.label, next.label) ?? next.label,
+      notes: prefer(prev.notes, next.notes),
     };
   });
+  // Keep leftover numbered shots that have frames or were marked done
+  for (const leftover of byNumber.values()) {
+    if (leftover.referenceImageUrl?.trim() || leftover.done) merged.push(leftover);
+  }
+  for (const m of manual) merged.push(m);
+  return merged.map((s, i) => ({ ...s, sortOrder: i }));
 }
 
 export function sceneNumbersFromScript(script: ScriptDocument): string[] {
