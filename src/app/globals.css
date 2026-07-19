@@ -205,4 +205,14 @@ button {
     box-shadow: none;
     page-break-after: always;
   }
+
+  /* Call sheet / on-set print: strip app chrome, keep the sheet */
+  .app-canvas {
+    background: #fff !important;
+    min-height: 0 !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
 }

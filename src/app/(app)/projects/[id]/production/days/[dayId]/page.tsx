@@ -74,45 +74,47 @@ export default function CallSheetDayPage() {
   }
 
   return (
-    <div className="pb-24">
-      <PageHeader
-        title={`Call sheet — Day ${day.dayNumber}`}
-        subtitle={`${project.projectName} · times, crew, locations`}
-        action={
-          <div className="flex flex-wrap gap-2">
-            {saving && <span className="text-sm text-slate-400">Saving…</span>}
-            <Button size="touch" variant="outline" onClick={() => window.print()}>
-              <Printer className="mr-2 h-5 w-5" />
-              Print call sheet
-            </Button>
-            <Link href={`/projects/${projectId}/coverage`}>
-              <Button size="touch" variant="outline">
-                Coverage
+    <div className="pb-24 print:pb-0">
+      <div className="print:hidden">
+        <PageHeader
+          title={`Call sheet — Day ${day.dayNumber}`}
+          subtitle={`${project.projectName} · times, crew, locations`}
+          action={
+            <div className="flex flex-wrap gap-2">
+              {saving && <span className="text-sm text-slate-400">Saving…</span>}
+              <Button size="touch" variant="outline" onClick={() => window.print()}>
+                <Printer className="mr-2 h-5 w-5" />
+                Print call sheet
               </Button>
-            </Link>
-            <Link href={`/projects/${projectId}/production/days/${dayId}/shots`}>
-              <Button size="touch" variant="outline">
-                Day shots
-              </Button>
-            </Link>
-            <Link href={`/projects/${projectId}/production`}>
-              <Button size="touch" variant="outline">
-                <ArrowLeft className="mr-2 h-5 w-5" />
-                Board
-              </Button>
-            </Link>
-          </div>
-        }
-      />
+              <Link href={`/projects/${projectId}/coverage`}>
+                <Button size="touch" variant="outline">
+                  Coverage
+                </Button>
+              </Link>
+              <Link href={`/projects/${projectId}/production/days/${dayId}/shots`}>
+                <Button size="touch" variant="outline">
+                  Day shots
+                </Button>
+              </Link>
+              <Link href={`/projects/${projectId}/production`}>
+                <Button size="touch" variant="outline">
+                  <ArrowLeft className="mr-2 h-5 w-5" />
+                  Board
+                </Button>
+              </Link>
+            </div>
+          }
+        />
 
-      <ProductionDayNav
-        projectId={projectId}
-        dayId={dayId}
-        sortedDays={sortedDays}
-        activeView="call-sheet"
-        onAddDay={() => void addProductionDay()}
-        onRemoveDay={(id) => void removeProductionDay(id)}
-      />
+        <ProductionDayNav
+          projectId={projectId}
+          dayId={dayId}
+          sortedDays={sortedDays}
+          activeView="call-sheet"
+          onAddDay={() => void addProductionDay()}
+          onRemoveDay={(id) => void removeProductionDay(id)}
+        />
+      </div>
 
       <div className="grid gap-8 lg:grid-cols-2 print:block">
         <div className="space-y-4 print:hidden">

@@ -69,15 +69,17 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-canvas">
-      <Sidebar />
-      <MobileNav />
-      <main className="safe-area-main-pb lg:pl-64 lg:pb-0">
+      <div className="print:hidden">
+        <Sidebar />
+        <MobileNav />
+      </div>
+      <main className="safe-area-main-pb lg:pl-64 lg:pb-0 print:pl-0 print:pb-0">
         {!publicPath ? (
-          <div className="sticky top-0 z-30 flex justify-end border-b border-slate-200/80 bg-white/90 px-4 py-2 backdrop-blur-sm md:px-6">
+          <div className="sticky top-0 z-30 flex justify-end border-b border-slate-200/80 bg-white/90 px-4 py-2 backdrop-blur-sm print:hidden md:px-6">
             <NotificationBell />
           </div>
         ) : null}
-        <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
+        <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8 print:max-w-none print:p-0">
           {children}
         </div>
       </main>
