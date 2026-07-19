@@ -19,7 +19,9 @@ export function RevenueFeatureGate({ children }: { children: ReactNode }) {
         <h2 className="text-lg font-semibold text-slate-900">Revenue & opportunities is disabled</h2>
         <p className="mt-2 text-sm text-slate-600">
           Revenue is off by default so the shoot spine stays focused. Set{" "}
-          <code className="text-xs">REVENUE_OPPORTUNITIES_ENABLED=true</code> to enable.
+          <code className="text-xs">REVENUE_OPPORTUNITIES_ENABLED</code> is set to{" "}
+          <code className="text-xs">false</code>. Remove it or set{" "}
+          <code className="text-xs">true</code> to enable.
         </p>
         <Link href="/dashboard" className="mt-4 inline-block text-sm font-medium text-sky-700 hover:underline">
           Back to command center
