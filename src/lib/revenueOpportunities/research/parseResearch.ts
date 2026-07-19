@@ -200,26 +200,35 @@ export function parseResearchProspects(raw: unknown): ParsedResearchProspect[] {
     const { totalScore, categoryScores: normalized } = calculateImgOpportunityScore(categoryScores);
     const evidence = parseEvidence(o.evidence);
     const scoreReasons = strArray(o.scoreReasons, 5);
+    const research =
+      o.research && typeof o.research === "object"
+        ? {
+            observedFacts: strArray((o.research as Record<string, unknown>).observedFacts, 6),
+            marketingGaps: strArray((o.research as Record<string, unknown>).marketingGaps, 4),
+            whyNowSignals: strArray((o.research as Record<string, unknown>).whyNowSignals, 4),
+            risks: strArray((o.research as Record<string, unknown>).risks, 3),
+          }
+        : undefined;
+    const contact = parseContact(o.contact);
 
     out.push({
       subject,
-      contact: parseContact(o.contact),
-      research:
-        o.research && typeof o.research === "object"
-          ? {
-              observedFacts: strArray((o.research as Record<string, unknown>).observedFacts, 5),
-              marketingGaps: strArray((o.research as Record<string, unknown>).marketingGaps, 4),
-              whyNowSignals: strArray((o.research as Record<string, unknown>).whyNowSignals, 3),
-              risks: strArray((o.research as Record<string, unknown>).risks, 2),
-            }
-          : undefined,
+      contact,
+      research,
       categoryScores: normalized,
       scoreReasons,
       campaignConcept: parseConcept(o.campaignConcept),
       evidence,
       scoring: {
         totalScore,
-        confidenceScore: Math.min(95, Math.max(40, totalScore - (evidence.length === 0 ? 15 : 5))),
+        confidenceScore: confidenceFromEvidence({
+          totalScore,
+          evidenceCount: evidence.length,
+          hasWebsite: Boolean(subject.website),
+          hasContact: Boolean(contact?.email || contact?.phone || subject.publicEmail || subject.publicPhone),
+          factCount: research?.observedFacts?.length ?? 0,
+          whyNowCount: research?.whyNowSignals?.length ?? 0,
+        }),
         categoryScores: normalized,
         scoreReasons,
       },
@@ -227,6 +236,71 @@ export function parseResearchProspects(raw: unknown): ParsedResearchProspect[] {
   }
 
   return out.sort((a, b) => b.scoring.totalScore - a.scoring.totalScore);
+}
+
+export function confidenceFromEvidence(input: {
+  totalScore: number;
+  evidenceCount: number;
+  hasWebsite: boolean;
+  hasContact: boolean;
+  factCount: number;
+  whyNowCount: number;
+}): number {
+  let score = 28;
+  score += Math.min(25, input.evidenceCount * 6);
+  score += Math.min(12, input.factCount * 3);
+  score += Math.min(10, input.whyNowCount * 4);
+  if (input.hasWebsite) score += 8;
+  if (input.hasContact) score += 10;
+  score += Math.min(15, Math.round(input.totalScore * 0.12));
+  return Math.min(95, Math.max(20, score));
+}
+
+export interface DiscoverCandidate {
+  name: string;
+  website?: string;
+  city?: string;
+  state?: string;
+  industry?: string;
+  whyInteresting?: string;
+  sourceUrls: string[];
+}
+
+export function parseDiscoverCandidates(raw: unknown): DiscoverCandidate[] {
+  const root = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const list = Array.isArray(root.candidates)
+    ? root.candidates
+    : Array.isArray(root.prospects)
+      ? root.prospects
+      : [];
+  const out: DiscoverCandidate[] = [];
+  const seen = new Set<string>();
+
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const subject = o.subject && typeof o.subject === "object" ? (o.subject as Record<string, unknown>) : o;
+    const name = str(subject.name);
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const website = websiteUrl(subject.website);
+    const sourceUrls = strArray(o.sourceUrls, 6)
+      .map((u) => websiteUrl(u) ?? u)
+      .filter((u): u is string => Boolean(u && /^https?:\/\//i.test(u)));
+    out.push({
+      name,
+      website,
+      city: str(subject.city),
+      state: str(subject.state),
+      industry: str(subject.industry),
+      whyInteresting: str(o.whyInteresting) ?? str(o.reason),
+      sourceUrls,
+    });
+  }
+
+  return out;
 }
 
 export function parseCampaignConceptResponse(raw: unknown): {

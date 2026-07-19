@@ -8,12 +8,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   revenueDeleteCampaign,
   revenueGetCampaign,
+  revenueGetStatus,
   revenueListCampaignRuns,
   revenueRunCampaignResearch,
   revenueUpdateCampaign,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
 import type { RevenueCampaignRun } from "@/lib/revenueOpportunities/types/campaignRun";
+import type { RevenueFeatureStatus } from "@/lib/revenueOpportunities/types";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { formatDateTime } from "@/lib/utils/format";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -37,17 +39,21 @@ export default function CampaignDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [researchMessage, setResearchMessage] = useState<string | null>(null);
+  const [featureStatus, setFeatureStatus] = useState<RevenueFeatureStatus | null>(null);
   const canManage = canManageRevenueOpportunities(appUser);
+  const researchLive = featureStatus?.integrations.research === "live";
 
   useEffect(() => {
     if (!user || !id) return;
     Promise.all([
       revenueGetCampaign(() => user.getIdToken(), id),
       revenueListCampaignRuns(() => user.getIdToken(), id),
+      revenueGetStatus(() => user.getIdToken()).catch(() => null),
     ])
-      .then(([c, r]) => {
+      .then(([c, r, statusRes]) => {
         setCampaign(c.campaign);
         setRuns(r.runs);
+        if (statusRes?.status) setFeatureStatus(statusRes.status);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
@@ -83,7 +89,17 @@ export default function CampaignDetailPage() {
               </Button>
               <Button
                 size="touch"
-                disabled={researching || deleting || !campaign.active}
+                disabled={
+                  researching ||
+                  deleting ||
+                  !campaign.active ||
+                  (featureStatus != null && !researchLive)
+                }
+                title={
+                  featureStatus != null && !researchLive
+                    ? "Configure live research (Tavily + Gemini, SCOUT_USE_MOCK_AI=false)"
+                    : undefined
+                }
                 onClick={async () => {
                   if (!user) return;
                   setResearching(true);
@@ -92,8 +108,9 @@ export default function CampaignDetailPage() {
                   try {
                     const res = await revenueRunCampaignResearch(() => user.getIdToken(), id);
                     setRuns((prev) => [res.campaignRun, ...prev]);
+                    const live = res.campaignRun.usedLiveSearch ? "deep live" : "research";
                     setResearchMessage(
-                      `Research complete — ${res.opportunities.length} opportunit${res.opportunities.length === 1 ? "y" : "ies"} created.`
+                      `${live} complete — ${res.opportunities.length} opportunit${res.opportunities.length === 1 ? "y" : "ies"} created.`
                     );
                   } catch (e) {
                     setError(e instanceof Error ? e.message : "Research failed");
@@ -103,12 +120,35 @@ export default function CampaignDetailPage() {
                 }}
               >
                 <Search className="mr-2 h-4 w-4" />
-                {researching ? "Researching…" : "Run research"}
+                {researching ? "Deep researching…" : "Run deep research"}
               </Button>
             </div>
           ) : undefined
         }
       />
+      {featureStatus ? (
+        <div
+          className={
+            researchLive
+              ? "mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"
+              : "mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          }
+        >
+          {researchLive ? (
+            <p>
+              <strong>Live deep research ready</strong> — multi-query web search + Gemini qualify per
+              prospect. Dummy data is disabled.
+            </p>
+          ) : (
+            <p>
+              <strong>Live research not configured.</strong> Set{" "}
+              <code className="text-xs">SCOUT_USE_MOCK_AI=false</code>,{" "}
+              <code className="text-xs">TAVILY_API_KEY</code>, and Gemini/Vertex. AI:{" "}
+              {featureStatus.integrations.ai} · Search: {featureStatus.integrations.search}.
+            </p>
+          )}
+        </div>
+      ) : null}
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
       {researchMessage && <p className="mb-4 text-sm text-emerald-700">{researchMessage}</p>}
 

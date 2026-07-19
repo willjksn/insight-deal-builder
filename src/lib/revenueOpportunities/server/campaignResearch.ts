@@ -11,11 +11,27 @@ import {
   createCampaignRun,
   finishCampaignRun,
 } from "@/lib/revenueOpportunities/server/campaignRuns";
-import { createOpportunity, getOpportunity, updateOpportunity } from "@/lib/revenueOpportunities/server/opportunities";
+import {
+  createOpportunity,
+  getOpportunity,
+  listOpportunities,
+  updateOpportunity,
+} from "@/lib/revenueOpportunities/server/opportunities";
 import type { RevenueCampaignRun } from "@/lib/revenueOpportunities/types/campaignRun";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 import type { RevenueAgentRun } from "@/lib/revenueOpportunities/types/agentRun";
 import { AppUser } from "@/lib/types";
+
+function prospectKey(name: string, website?: string): string {
+  const n = name.trim().toLowerCase().replace(/\s+/g, " ");
+  const w = (website ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/$/, "");
+  return w ? `${n}|${w}` : n;
+}
 
 function startOfUtcDay(d = new Date()): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -88,24 +104,66 @@ export async function runCampaignResearch(
     const pass = result as ResearchAgentOutput;
     const created: RevenueOpportunity[] = [];
     const maxCount = Math.min(campaign.opportunityCountRequested, pass.prospects.length);
+    const existing = await listOpportunities(appUser, { campaignId });
+    const seen = new Set(
+      existing.map((o) => prospectKey(o.subject.name, o.subject.website))
+    );
+
+    let skippedDupes = 0;
+    let skippedScore = 0;
 
     for (const prospect of pass.prospects.slice(0, maxCount)) {
-      if (prospect.scoring.totalScore < campaign.minOpportunityScore) continue;
-      if (prospect.scoring.confidenceScore < campaign.minConfidenceScore) continue;
+      if (prospect.scoring.totalScore < campaign.minOpportunityScore) {
+        skippedScore += 1;
+        continue;
+      }
+      if (prospect.scoring.confidenceScore < campaign.minConfidenceScore) {
+        skippedScore += 1;
+        continue;
+      }
 
+      const key = prospectKey(prospect.subject.name, prospect.subject.website);
+      if (seen.has(key)) {
+        skippedDupes += 1;
+        continue;
+      }
+      seen.add(key);
+
+      const modeLabel = pass.usedLiveSearch ? "deep live research" : "research";
       const opp = await createOpportunity(appUser, {
         ...prospectToOpportunityInput(prospect, campaign),
         activityLog: [
-          newActivity(appUser, "agent_research", `Discovered via ${agentName} (score ${prospect.scoring.totalScore})`, {
-            agentRunId: agentRun.id,
-            campaignRunId: campaignRun.id,
-          }),
+          newActivity(
+            appUser,
+            "agent_research",
+            `Discovered via ${agentName} (${modeLabel}, score ${prospect.scoring.totalScore}, confidence ${prospect.scoring.confidenceScore})`,
+            {
+              agentRunId: agentRun.id,
+              campaignRunId: campaignRun.id,
+            }
+          ),
         ],
       });
       created.push(opp);
     }
 
-    const status = created.length === 0 ? "partially_completed" : created.length < maxCount ? "partially_completed" : "completed";
+    const status =
+      created.length === 0
+        ? "partially_completed"
+        : created.length < maxCount
+          ? "partially_completed"
+          : "completed";
+
+    const errorParts: string[] = [];
+    if (created.length === 0) {
+      if (pass.prospects.length === 0) {
+        errorParts.push("No verified prospects from deep research");
+      } else {
+        errorParts.push("No prospects met score/confidence thresholds");
+      }
+      if (skippedDupes) errorParts.push(`${skippedDupes} duplicates skipped`);
+      if (skippedScore) errorParts.push(`${skippedScore} below thresholds`);
+    }
 
     campaignRun = await finishCampaignRun(campaignRun.id, {
       status,
@@ -116,7 +174,7 @@ export async function runCampaignResearch(
       searchQuery: pass.searchQuery,
       usedLiveSearch: pass.usedLiveSearch,
       usedLiveAi: pass.usedLiveAi,
-      errorMessage: created.length === 0 ? "No prospects met score thresholds" : undefined,
+      errorMessage: errorParts.length ? errorParts.join(". ") : undefined,
     });
 
     return { campaignRun, agentRun, opportunities: created };

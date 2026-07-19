@@ -80,17 +80,23 @@ export async function tavilySearch(
   };
 }
 
-export function formatTavilyResultsForPrompt(search: TavilySearchResponse): string {
+export function formatTavilyResultsForPrompt(
+  search: TavilySearchResponse,
+  options?: { maxSnippetChars?: number; maxResults?: number }
+): string {
+  const maxSnippet = options?.maxSnippetChars ?? 1400;
+  const maxResults = options?.maxResults ?? 24;
   const lines = [`Search query: ${search.query}`];
   if (search.answer?.trim()) {
-    lines.push("", "Tavily summary:", search.answer.trim());
+    lines.push("", "Tavily summary:", search.answer.trim().slice(0, 4000));
   }
   if (search.results.length) {
     lines.push("", "Sources:");
-    for (const r of search.results) {
+    for (const r of search.results.slice(0, maxResults)) {
       lines.push(`- ${r.title} (${r.url})`);
       if (r.content.trim()) {
-        lines.push(`  ${r.content.trim().slice(0, 500)}${r.content.length > 500 ? "…" : ""}`);
+        const body = r.content.trim();
+        lines.push(`  ${body.slice(0, maxSnippet)}${body.length > maxSnippet ? "…" : ""}`);
       }
     }
   }

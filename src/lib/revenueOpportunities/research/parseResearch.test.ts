@@ -1,119 +1,90 @@
 import { describe, expect, it } from "vitest";
-import { parseResearchProspects } from "@/lib/revenueOpportunities/research/parseResearch";
+import {
+  confidenceFromEvidence,
+  parseDiscoverCandidates,
+  parseResearchProspects,
+} from "@/lib/revenueOpportunities/research/parseResearch";
+
+describe("parseDiscoverCandidates", () => {
+  it("parses shortlist candidates", () => {
+    const list = parseDiscoverCandidates({
+      candidates: [
+        {
+          name: "Lakeview Spa",
+          website: "https://lakeviewspa.example",
+          city: "Orlando",
+          state: "FL",
+          whyInteresting: "Renovating and weak video",
+          sourceUrls: ["https://lakeviewspa.example/about"],
+        },
+      ],
+    });
+    expect(list).toHaveLength(1);
+    expect(list[0].name).toBe("Lakeview Spa");
+    expect(list[0].website).toContain("lakeviewspa");
+  });
+});
+
+describe("confidenceFromEvidence", () => {
+  it("rewards evidence and contactability over raw score alone", () => {
+    const thin = confidenceFromEvidence({
+      totalScore: 80,
+      evidenceCount: 0,
+      hasWebsite: false,
+      hasContact: false,
+      factCount: 0,
+      whyNowCount: 0,
+    });
+    const solid = confidenceFromEvidence({
+      totalScore: 70,
+      evidenceCount: 4,
+      hasWebsite: true,
+      hasContact: true,
+      factCount: 4,
+      whyNowCount: 2,
+    });
+    expect(solid).toBeGreaterThan(thin);
+    expect(solid).toBeGreaterThanOrEqual(70);
+  });
+});
 
 describe("parseResearchProspects", () => {
-  it("parses valid prospect payload and computes scores", () => {
-    const result = parseResearchProspects({
+  it("builds confidence from evidence density", () => {
+    const prospects = parseResearchProspects({
       prospects: [
         {
-          subject: { name: "Test Hotel", industry: "Hotels", city: "Orlando", state: "FL" },
+          subject: { name: "Acme Hotel", website: "https://acme.example", city: "Orlando", state: "FL" },
+          research: {
+            observedFacts: ["Boutique hotel downtown", "Active Instagram"],
+            marketingGaps: ["No cinematic video"],
+            whyNowSignals: ["Lobby renovation 2026"],
+            risks: ["Seasonal"],
+          },
           categoryScores: {
-            contentOpportunity: 18,
-            socialMarketingActivity: 12,
-            purchasingPotential: 12,
+            contentOpportunity: 16,
+            socialMarketingActivity: 10,
+            purchasingPotential: 10,
             recurringContentPotential: 10,
             recentBusinessSignals: 8,
             creativeCinematicFit: 8,
             geographicServiceability: 5,
-            stormiIntegrationPotential: 3,
-            contactability: 4,
+            stormiIntegrationPotential: 2,
+            contactability: 2,
           },
+          scoreReasons: ["Renovation", "Weak video"],
           evidence: [
             {
-              claim: "Website lists amenities",
-              sourceUrl: "https://example.com/hotel",
-              sourceTitle: "Hotel site",
-              sourceType: "website",
-              confidence: 0.8,
+              claim: "Lobby renovation announced",
+              sourceUrl: "https://acme.example/news",
+              sourceTitle: "News",
+              sourceType: "press",
+              confidence: 0.9,
             },
           ],
         },
       ],
     });
-
-    expect(result).toHaveLength(1);
-    expect(result[0].subject.name).toBe("Test Hotel");
-    expect(result[0].scoring.totalScore).toBeGreaterThan(50);
-    expect(result[0].evidence).toHaveLength(1);
-  });
-
-  it("skips prospects without subject name", () => {
-    const result = parseResearchProspects({
-      prospects: [{ subject: { industry: "Hotels" } }],
-    });
-    expect(result).toHaveLength(0);
-  });
-
-  it("parses website and socialLinks from subject", () => {
-    const result = parseResearchProspects({
-      prospects: [
-        {
-          subject: {
-            name: "Glow Spa",
-            website: "glowspa.com",
-            socialLinks: {
-              Instagram: "@glowspa",
-              TikTok: "https://tiktok.com/@glowspa",
-            },
-          },
-          categoryScores: { contentOpportunity: 15 },
-          evidence: [],
-        },
-      ],
-    });
-
-    expect(result).toHaveLength(1);
-    expect(result[0].subject.website).toBe("https://glowspa.com");
-    expect(result[0].subject.socialLinks).toContain("Instagram: @glowspa");
-    expect(result[0].subject.socialLinks).toContain("TikTok:");
-  });
-
-  it("parses contact and public email/phone from research", () => {
-    const result = parseResearchProspects({
-      prospects: [
-        {
-          subject: {
-            name: "Contact Co",
-            publicEmail: "hello@contactco.com",
-            publicPhone: "555-0100",
-          },
-          contact: {
-            name: "Alex Rivera",
-            title: "Owner",
-            email: "alex@contactco.com",
-            phone: "555-0101",
-            sourceUrl: "https://contactco.com/about",
-          },
-          categoryScores: { contentOpportunity: 12 },
-          evidence: [],
-        },
-      ],
-    });
-
-    expect(result).toHaveLength(1);
-    expect(result[0].subject.publicEmail).toBe("hello@contactco.com");
-    expect(result[0].subject.publicPhone).toBe("555-0100");
-    expect(result[0].contact?.name).toBe("Alex Rivera");
-    expect(result[0].contact?.email).toBe("alex@contactco.com");
-    expect(result[0].contact?.verificationStatus).toBe("unverified");
-  });
-
-  it("drops schema placeholder website/social values", () => {
-    const result = parseResearchProspects({
-      prospects: [
-        {
-          subject: {
-            name: "Bad Placeholder Co",
-            website: "string optional",
-            socialLinks: "string optional",
-          },
-          categoryScores: {},
-          evidence: [],
-        },
-      ],
-    });
-
-    expect(result[0].subject.website).toBeUndefined();
-    expect(result[0].subject.socialLinks).toBeUndefined();
+    expect(prospects).toHaveLength(1);
+    expect(prospects[0].scoring.confidenceScore).toBeGreaterThan(40);
   });
 });

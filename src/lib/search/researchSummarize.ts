@@ -10,10 +10,11 @@ export async function summarizeWebResearch<T>(
     ...contextLines,
     "",
     "=== WEB RESEARCH (via Tavily) ===",
-    formatTavilyResultsForPrompt(search),
+    formatTavilyResultsForPrompt(search, { maxSnippetChars: 1400, maxResults: 28 }),
     "",
-    "Synthesize the research into the requested JSON. Prefer practical, shootable advice.",
-    "Do not invent URLs. Only cite source titles that appear above.",
+    "Synthesize the research into the requested JSON.",
+    "Be evidence-first and skeptical. Prefer fewer solid prospects over weak filler.",
+    "Do not invent URLs, emails, phones, or people. Only cite sources that appear above.",
   ]
     .filter(Boolean)
     .join("\n");

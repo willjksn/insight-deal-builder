@@ -12,10 +12,12 @@ export interface ResearchAgentOutput {
   searchQuery: string;
   usedLiveSearch: boolean;
   usedLiveAi: boolean;
+  discoverCount?: number;
+  enrichedCount?: number;
 }
 
 const AGENT_NAME = "img_research";
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 export const imgResearchAgent: AgentDefinition<ImgResearchInput, ResearchAgentOutput> = {
   name: AGENT_NAME,
@@ -24,15 +26,21 @@ export const imgResearchAgent: AgentDefinition<ImgResearchInput, ResearchAgentOu
     agentName: AGENT_NAME,
     version: VERSION,
     role: "IMG client research agent",
-    goal: "Find and qualify local businesses that may buy cinematic IMG production.",
-    context: "Uses Tavily search + Gemini structured extraction in live mode; mock prospects in dev.",
+    goal: "Find and deeply qualify local businesses that may buy cinematic IMG production.",
+    context: "Live-only: multi-query Tavily discovery + per-prospect Gemini deep research. No dummy prospects.",
     tools: ["tavily", "gemini"],
     constraints: ["Evidence required for factual claims", "Respect campaign geography and industry"],
-    process: ["Build search query", "Tavily search", "Gemini JSON extraction", "Score with IMG model"],
+    process: [
+      "Build multi-query plan",
+      "Tavily advanced searches",
+      "Gemini discover shortlist",
+      "Per-candidate enrich + qualify",
+      "Score with IMG model",
+    ],
     outputSchema: "ResearchAgentOutput",
-    successCriteria: ["1+ qualified prospects", "Evidence URLs from search"],
-    failureConditions: ["No Tavily key in live mode", "Empty parse with no fallback"],
-    fallback: ["Return mock prospects in dev/mock mode"],
+    successCriteria: ["Evidence-backed prospects", "Live search + AI"],
+    failureConditions: ["Mock AI enabled", "Missing Tavily", "Empty discover/enrich"],
+    fallback: ["Fail loudly — never invent dummy businesses"],
   },
   async execute(input: ImgResearchInput): Promise<AgentRunResult<ResearchAgentOutput>> {
     const pass = await runImgResearchPass(input.campaign);
@@ -42,14 +50,16 @@ export const imgResearchAgent: AgentDefinition<ImgResearchInput, ResearchAgentOu
       version: VERSION,
       output: pass,
       confidence: {
-        confidenceScore: Math.min(92, topScore),
-        confidenceReasons: pass.usedLiveSearch ? ["Live Tavily + Gemini pass"] : ["Mock research mode"],
-        assumptions: pass.usedLiveSearch ? [] : ["SCOUT_USE_MOCK_AI or missing TAVILY_API_KEY"],
-        missingInformation: [],
+        confidenceScore: Math.min(92, Math.max(topScore, pass.enrichedCount ? 55 : 0)),
+        confidenceReasons: [
+          `Live deep research: ${pass.discoverCount ?? 0} shortlisted, ${pass.enrichedCount ?? 0} qualified`,
+        ],
+        assumptions: [],
+        missingInformation: pass.prospects.length ? [] : ["No candidates survived discover/enrich"],
       },
       evidence: pass.prospects.flatMap((p) => p.evidence).slice(0, 12),
-      model: pass.usedLiveAi ? "gemini+tavily" : "mock",
-      estimatedCostUsd: pass.usedLiveAi ? 0.05 : 0,
+      model: "gemini+tavily-deep",
+      estimatedCostUsd: 0.15 + (pass.enrichedCount ?? 0) * 0.04,
     };
   },
 };

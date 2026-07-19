@@ -50,6 +50,10 @@ Every recommended opportunity must answer: fit, observable opportunity, timing, 
 
 Revenue is **on by default**. Set `REVENUE_OPPORTUNITIES_ENABLED=false` (and optionally `NEXT_PUBLIC_REVENUE_OPPORTUNITIES_ENABLED=false`) to hide navigation and block API routes.
 
+### Deep research (live only)
+
+Campaign **Run deep research** uses multi-query Tavily discovery + per-prospect Gemini qualify. Requires `SCOUT_USE_MOCK_AI=false`, `TAVILY_API_KEY`, and Gemini/Vertex. Dummy prospects are disabled — misconfigured env fails loudly instead of inventing businesses.
+
 ## Implementation status
 
 | Phase | Status |

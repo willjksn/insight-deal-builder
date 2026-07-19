@@ -89,6 +89,8 @@ export interface RevenueFeatureStatus {
     n8n: "not_configured" | "mock" | "live";
     search: "not_configured" | "live";
     ai: "mock" | "live";
+    /** Multi-query Tavily + Gemini deep research (no dummy prospects). */
+    research: "not_configured" | "live";
   };
 }
 

@@ -13,6 +13,7 @@ import {
 import type { RevenueFeatureStatus } from "@/lib/revenueOpportunities/types";
 import { resolveN8nMode } from "@/lib/revenueOpportunities/n8n/config";
 import { resolveGmailMode } from "@/lib/revenueOpportunities/providers/getEmailProvider";
+import { researchIntegrationStatus } from "@/lib/revenueOpportunities/research/liveRequirements";
 
 export const runtime = "nodejs";
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     const status: RevenueFeatureStatus = {
       enabled: true,
       phase: REVENUE_OPPORTUNITIES_PHASE,
-      version: "0.9.0-n8n-automation",
+      version: "1.0.0-deep-research",
       integrations: {
         gmail: resolveGmailMode(),
         n8n: (() => {
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
         })(),
         search: tavilyAvailable() ? "live" : "not_configured",
         ai: aiUsesMock() ? "mock" : "live",
+        research: researchIntegrationStatus(),
       },
     };
 
