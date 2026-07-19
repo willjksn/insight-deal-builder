@@ -8,7 +8,7 @@ import {
   getProductionBoardByProject,
   saveProductionBoard,
   subscribeProductionBoardByProject,
-} from "@/lib/firebase/productionRepos";
+} from "@/lib/firebase/productionFirestore";
 import {
   countCoverageShots,
   countCoverageWithImages,
