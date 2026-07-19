@@ -48,7 +48,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
         blocks: [
           {
             paragraphs: [
-              "ShootSpine is built around projects — each production follows one spine. A project is a single client job, portfolio piece, or campaign; everything for that shoot lives together: script, board, shot list, and the commercial agreement.",
+              "ShootSpine is built around projects — each production follows one spine. A project is a single client job, portfolio piece, or campaign; everything for that shoot lives together: script, Prep board, Coverage (shot = storyboard frame), call sheets, and the commercial agreement.",
               "Most IMG producers move through the same path. You do not have to use every tool on every job, but the order below is the intended workflow when you are planning a full shoot.",
             ],
           },
@@ -56,9 +56,10 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
             heading: "Recommended workflow",
             bullets: [
               "Open Projects and create a new project (or open an existing one). Give it a working title and link a client if you already have one.",
-              "Go to Script writer. Talk through the concept, turn on detailed shot list if you need full coverage, then generate the script and production pack.",
-              "Open the project → Pre-production. Link the script session, then apply the script to the board so cast, locations, days, and shots populate.",
-              "Open Shot list. Use Auto-split days if you have multiple shoot days, then generate a crew packet for each day you are printing for set.",
+              "Go to Script writer. Develop the concept with the AI coach, edit the screenplay in the editor, turn on detailed shot list / storyboard, then generate.",
+              "Open the project → Prep. Link the script session and Apply so cast, locations, days, and shots seed the board.",
+              "Open Coverage. Review the shot bible, upload or generate AI frames, then Sync from script if the script changed (your frames and day placement are kept).",
+              "Open each shoot day’s Call sheet for logistics; print the denser one-pager for set. Use Day shots for list checkoff, storyboard, and crew packets.",
               "Optional: use Stage planner for a lighting diagram.",
               "When the deal is ready, create an agreement from Quick quote or the full wizard, sign, and send to the client.",
             ],
@@ -67,7 +68,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
           {
             heading: "Where to find things",
             tips: [
-              "The project spine on each project page is your map — each card opens that step and shows whether it is linked yet.",
+              "The project spine on each project page is your map — Script, Prep, Coverage, Stage, Reference, Agreement. Each card shows whether that step is linked yet.",
               "The sidebar only shows areas your account can access. This guide uses the same rules, so you will not see instructions for tools you cannot open.",
             ],
           },
@@ -89,7 +90,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
             heading: "If something is missing",
             bullets: [
               "Ask an admin to enable the permission on your user profile in Admin.",
-              "For freelancers who only need a shot list on one job, use Settings → Project access to add them to that project with scripts, production, or shots only — without giving them the full catalog.",
+              "For freelancers who only need Coverage or day shots on one job, use Settings → Project access to add them to that project with scripts, production, or shots only — without giving them the full catalog.",
               "Partners usually start with quote and agreement permissions only. IMG catalogs (clients, crew, packages) are separate and IMG-only unless explicitly granted.",
             ],
             links: [{ label: "Settings", href: "/settings" }],
@@ -150,7 +151,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
           {
             heading: "What to do here",
             bullets: [
-              "Click a recent project to open its spine and continue pre-production or the shot list.",
+              "Click a recent project to open its spine and continue Prep, Coverage, or call sheets.",
               "Click a recent agreement to resume editing or signing.",
               "Use shortcuts to Reference guide or Stage planner when you have production access.",
               "If you are starting fresh, use the empty-state buttons to create a project or open Script writer.",
@@ -169,20 +170,21 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       {
         id: "projects",
         title: "How to set up and use a project",
-        description: "The hub that ties script, board, and agreements together.",
+        description: "The hub that ties script, Prep, Coverage, and agreements together.",
         canAccess: (user) => canManageProjects(user) || production(user),
         blocks: [
           {
             paragraphs: [
-              "Create a project from Projects → New. The project page shows the spine — a row of cards for Script, Pre-production, Shot list, Stage planner, Reference guide, and Agreement. Green or linked states mean that step is connected; open any card to work there.",
+              "Create a project from Projects → New. The project page shows the spine — Script, Prep, Coverage, Stage planner, Reference guide, and Agreement. Linked or ready states mean that step has data; open any card to work there.",
             ],
           },
           {
             heading: "Typical setup",
             bullets: [
               "Create the project first, even if the script is not written yet — you need a project to apply script data to.",
-              "Open Pre-production from the spine to link a script session and fill the board.",
-              "Add project members under Settings → Project access if freelancers need shot-list-only access.",
+              "Open Prep from the spine to link a script session and fill the board (people, locations, days).",
+              "Open Coverage to work the shot bible and storyboard frames (one shot = one frame).",
+              "Add project members under Settings → Project access if freelancers need coverage- or day-shots-only access.",
             ],
             links: [{ label: "Projects", href: "/projects" }],
           },
@@ -191,41 +193,45 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       {
         id: "script-writer",
         title: "How to use Script writer",
-        description: "Write scripts, generate shot coverage, and push data to the board.",
+        description: "Write screenplays with an AI coach, generate coverage, and apply to the project.",
         canAccess: production,
         blocks: [
           {
             paragraphs: [
-              "Script writer uses AI to help you develop concept, script text, and a production pack. You can work in text chat mode or inspiration mode with reference images and clips.",
+              "Script writer helps you develop a concept, edit a real screenplay, and build a production pack. Once a script exists, the editor is the main canvas and the AI coach stays in a side rail. You can start from text chat or inspiration mode with reference images and clips.",
             ],
           },
           {
-            heading: "Text mode",
+            heading: "Start a session",
             bullets: [
               "Open Script writer → New session (or open an existing session).",
-              "Chat through the concept — audience, tone, locations, talent.",
-              "Before generating, enable Detailed shot list if you want numbered WS/MS/CU rows per scene.",
-              "Enable Storyboard mode if you want one visual frame per scene in the shot list grid later.",
-              "Click Generate when ready. Review the script, then refine with follow-up messages if needed.",
+              "Chat through the concept — audience, tone, locations, talent — or upload inspiration and run analysis first.",
+              "Before generating, enable Detailed shot list for numbered WS/MS/CU coverage rows per scene.",
+              "Enable Storyboard mode if you want hero scene frames matched to inspiration (Coverage still stores one frame per shot).",
+              "Generate, then refine with the coach or edit the screenplay directly.",
             ],
           },
           {
-            heading: "Inspiration mode",
+            heading: "Screenplay editor",
             bullets: [
-              "Upload location photos, mood boards, or reference clips.",
-              "Run analysis and confirm what the AI understood before it writes — this keeps the script aligned with your visual references.",
-              "Generate the same way as text mode once analysis is confirmed.",
+              "Enter creates the next block type (Character → Dialogue, etc.). Shift+Enter is a soft line break inside a block.",
+              "Tab follows a Final Draft–style spine: Action → Character → Dialogue → Parenthetical. Shift+Tab reverses.",
+              "Empty Dialogue + Enter starts the next Character. Cmd/Ctrl+Enter forces a new Action block.",
+              "↑/↓ at the edges of a block move between blocks. Backspace at the start merges or deletes empty blocks.",
+              "Paste Fountain or multi-line screenplay text to import blocks (selection-aware).",
+              "Cmd/Ctrl+1–7 jumps element type (Scene Heading through Shot).",
             ],
           },
           {
             heading: "Apply to your project",
             bullets: [
-              "On the pre-production board, link this script session.",
-              "Use Apply to project (or Refresh from script on the shot list) to push locations, shots, and storyboard frames onto the board.",
+              "On Prep, link this script session, then Apply to project.",
+              "That seeds days, shots, and inspiration onto the board and Coverage.",
+              "Later: use Sync from script on Coverage (or Refresh from script on a day’s shot list) when the script changes — uploaded and AI frames, done checkmarks, and day placement are preserved.",
             ],
             tips: [
-              "If coverage looks thin, regenerate with detailed shot list turned on.",
-              "Always link the script session on the board before refreshing shots — otherwise the shot list will not know which script to pull from.",
+              "If coverage looks thin, regenerate with detailed shot list turned on, then sync again.",
+              "Always link the script session on Prep before syncing — otherwise Coverage will not know which script to pull from.",
             ],
             links: [{ label: "Script writer", href: "/script-writer" }],
           },
@@ -233,13 +239,13 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       },
       {
         id: "preproduction-board",
-        title: "How to use the Pre-production board",
+        title: "How to use Prep (pre-production board)",
         description: "Plan cast, locations, days, and checklist before the shoot.",
         canAccess: production,
         blocks: [
           {
             paragraphs: [
-              "The pre-production board is the planning document for the shoot. Data you enter here feeds call sheets, shot lists, and crew packets.",
+              "Prep (the pre-production board) is the planning document for the shoot. Data you enter here feeds call sheets, Coverage, day shot lists, and crew packets. On the project spine it is labeled Prep.",
             ],
           },
           {
@@ -249,7 +255,8 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
               "Add people under Cast, Production, and Camera — names and roles appear on call sheets.",
               "Add locations and mark them booked; the first booked location can sync to a shoot day.",
               "Work through the production checklist (portfolio vs client mode changes which tasks show).",
-              "Add production days — each day gets its own call sheet and shot list tab.",
+              "Add production days — each day gets its own call sheet and Day shots page.",
+              "Link a script session and Apply when you are ready to seed Coverage.",
             ],
             links: [{ label: "Projects", href: "/projects" }],
           },
@@ -257,50 +264,46 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       },
       {
         id: "shot-list",
-        title: "How to use the shot list, days, and crew packet",
-        description: "Track coverage on set, split across days, and print crew packets.",
+        title: "How to use Coverage and day shots",
+        description: "Shot bible, AI frames, day checkoff, and crew packets.",
         canAccess: production,
         blocks: [
           {
             paragraphs: [
-              "Open a project → Shot list (or Pre-production → a shoot day → Shots). Shots come from the linked script; you check them off on set in List view.",
+              "Coverage is the director/DP desk: one shot equals one storyboard frame, with lens, framing, lighting, and other DP fields. Open it from the project spine (Coverage) or /projects/…/coverage. Day shots (Prep → a shoot day → Day shots) is where you check shots off on set, print storyboards, and generate crew packets.",
             ],
           },
           {
-            heading: "List view on set",
+            heading: "Coverage desk",
             bullets: [
-              "Check off each shot as you capture it.",
-              "If the script changed, use Refresh from script to pull updated coverage (linked session required).",
-              "Switch day tabs at the top to see that day’s shots.",
+              "Use Board, Linear, or List views. Filter by shoot day when needed.",
+              "Upload a frame, pick from the inspiration library, or click AI frame / Regen AI on a card.",
+              "Fill empty frames generates AI stills for shots that still need images (up to 12 at a time).",
+              "Sync from script refreshes shot text from the linked script without wiping uploaded or AI frames, filled DP fields, or day placement.",
+              "Mark shots captured with the checkbox when they are in the can.",
             ],
           },
           {
-            heading: "Move shots between days",
+            heading: "Day shots on set",
             bullets: [
-              "Drag the grip handle on a shot row onto another day tab — use this when weather, talent, or schedule shifts work.",
-              "On iPad, use the Move to… menu on each row instead of drag.",
-            ],
-          },
-          {
-            heading: "Auto-split days",
-            bullets: [
-              "When you have many shots and multiple days, click Auto-split days and enter how many shoot days you need.",
-              "The app groups shots by location and packs roughly 18 shots per day so you stay at one location when possible.",
-              "Confirm the plan — day titles update to the primary location for each day.",
-              "Regenerate crew packets after splitting so each day’s printout matches.",
+              "Open Prep → shoot day → Day shots (or Coverage → Call sheet / Day shot list links).",
+              "List view: check off each shot as you capture it; Refresh from script if coverage changed.",
+              "Storyboard tab: same shot frames as Coverage for that day — upload or AI generate here too.",
+              "Drag the grip handle onto another day tab to move shots (or Move to… on iPad).",
+              "Auto-split days packs shots across days by location when you have a large list.",
             ],
           },
           {
             heading: "Crew packet",
             bullets: [
-              "Open the Crew packet tab on the shot list page for the shoot day you are printing.",
+              "On Day shots, open the Crew packet tab for the day you are printing.",
               "Click Generate (or Regenerate after script or shot changes).",
               "Use the jump chips to preview Director, DP, Gaffer, Sound, Talent, and Art/Props sections.",
               "Click View full packet or Print crew packet for one combined PDF — master shot list plus all role sections.",
             ],
             tips: [
               "Generate one crew packet per shoot day on multi-day jobs.",
-              "Storyboard view is for client-facing frames; shot checkboxes stay in List view.",
+              "Use Coverage to build the bible before the shoot; use Day shots List for checkoff on set.",
             ],
           },
         ],
@@ -308,20 +311,33 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       {
         id: "call-sheet",
         title: "How to use call sheets",
-        description: "Build and print the day-of schedule.",
+        description: "Day logistics plus coverage summary — print a dense one-pager for set.",
         canAccess: production,
         blocks: [
           {
             paragraphs: [
-              "Each production day has its own call sheet. Open the day from Pre-production, then open Call sheet.",
+              "Each production day has its own call sheet. Open Prep → a shoot day → Call sheet (or jump from Coverage). The left column is for editing logistics; the right column is the printable sheet. Printing hides the app chrome and editor so only the sheet goes to paper or PDF.",
             ],
           },
           {
-            heading: "Fill and print",
+            heading: "Coverage on the call sheet",
             bullets: [
-              "Enter crew call, meal times, wrap, weather, and schedule blocks.",
-              "Key contacts auto-fill from people you added on the board — add missing names on the board first if a field is empty.",
-              "Use Print from the call sheet page for a paper copy on set.",
+              "The Coverage for this day strip shows thumbnails, shot names, scene, lens, framing, and done status — a quick bible glance before you print.",
+              "Open Coverage or Day shot list from the strip links to edit frames.",
+              "The printable call sheet includes a Coverage table (frame, shot, scene, lens, framing, done) under the schedule so the one-pager is shot-aware, not only logistics.",
+            ],
+          },
+          {
+            heading: "Fill logistics and print",
+            bullets: [
+              "Enter crew call, meal times, wrap, sunrise/sunset, weather, and schedule blocks.",
+              "Key contacts (Producer, AD, Director, DP) sync from people on the Prep board — add missing names on Prep first if a field is empty.",
+              "Use Sync key contacts from board and Use board location when those helpers apply.",
+              "Click Print call sheet for a dense letter-size one-pager (tight margins, smaller type, compact coverage thumbs).",
+            ],
+            tips: [
+              "Print after Coverage frames are filled so the call sheet shows useful thumbs on set.",
+              "For a full visual bible print, use Day shots → Storyboard → Print storyboard instead of the call sheet.",
             ],
           },
         ],
@@ -753,7 +769,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
         blocks: [
           {
             paragraphs: [
-              "Project access lets you invite someone to one job without giving them the whole app. Permissions are per project: scripts, production, or shots.",
+              "Project access lets you invite someone to one job without giving them the whole app. Permissions are per project: scripts, production (Prep board), or shots (Coverage / day shots / call sheets).",
             ],
           },
           {
@@ -761,7 +777,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
             bullets: [
               "Settings → Project access (or Admin → Project teams).",
               "Pick the project, enter the member’s email, and check the areas they need.",
-              "Shots-only is common for day players who just need the shot list and crew packet.",
+              "Shots-only is common for day players who just need Coverage, day shot checkoff, call sheets, and crew packets.",
             ],
             links: [{ label: "Project access", href: "/settings/project-access" }],
           },
