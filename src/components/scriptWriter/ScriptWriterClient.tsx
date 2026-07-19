@@ -461,22 +461,43 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         />
       ) : null}
 
-      <div className="flex min-w-0 flex-col gap-6">
-        <section className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div
+        className={cn(
+          "min-w-0 gap-6",
+          script
+            ? "grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] lg:items-start"
+            : "flex flex-col"
+        )}
+      >
+        <section
+          className={cn(
+            "flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm",
+            script
+              ? "order-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-5rem)] lg:overflow-hidden"
+              : "order-1"
+          )}
+        >
           <div className="border-b border-slate-100 px-4 py-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <Sparkles className="h-4 w-4 text-violet-600" />
-              {awaitingAnalysisConfirm ? "Analysis" : "Conversation"}
+              {awaitingAnalysisConfirm ? "Analysis" : script ? "AI coach" : "Conversation"}
             </h2>
             <p className="mt-0.5 text-xs text-slate-500">
               {awaitingAnalysisConfirm
                 ? "Confirm what Gemini saw, add a note if needed, then write the full script."
-                : isInspiration
-                  ? "Inspiration flow — one optional refinement after the script is ready."
-                  : "Follow-ups only for what's still unclear."}
+                : script
+                  ? "Ask for rewrites, clarity, or format help — the screenplay stays the main canvas."
+                  : isInspiration
+                    ? "Inspiration flow — one optional refinement after the script is ready."
+                    : "Follow-ups only for what's still unclear."}
             </p>
           </div>
-          <div className="max-h-[min(420px,45vh)] space-y-3 overflow-y-auto px-4 py-4">
+          <div
+            className={cn(
+              "space-y-3 overflow-y-auto px-4 py-4",
+              script ? "min-h-0 flex-1 lg:max-h-none" : "max-h-[min(420px,45vh)]"
+            )}
+          >
             {session.messages.map((msg) => (
               <div
                 key={msg.id}
@@ -625,7 +646,12 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           ) : null}
         </section>
 
-        <section className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <section
+          className={cn(
+            "flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm",
+            script ? "order-1" : "order-2"
+          )}
+        >
           <div className="border-b border-slate-100 px-4 py-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
@@ -727,7 +753,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
               <div className="border-b border-slate-100 px-4 py-3">
                 <h3 className="text-sm font-semibold text-slate-900">Apply to pre-production</h3>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Push this script, shot list, and storyboard into a project production board.
+                  Push this script and shot-level coverage into a project Prep board + Coverage desk.
                 </p>
               </div>
 
@@ -857,11 +883,18 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           )}
           {session.status === "applied" && session.appliedProjectId && (
             <div className="border-t border-slate-100 p-4">
-              <Link href={`/projects/${session.appliedProjectId}/production`}>
-                <Button className="w-full" variant="outline">
-                  Open pre-production board
-                </Button>
-              </Link>
+              <div className="flex flex-col gap-2">
+                <Link href={`/projects/${session.appliedProjectId}/coverage`}>
+                  <Button className="w-full" variant="outline">
+                    Open Coverage
+                  </Button>
+                </Link>
+                <Link href={`/projects/${session.appliedProjectId}/production`}>
+                  <Button className="w-full" variant="ghost">
+                    Open Prep board
+                  </Button>
+                </Link>
+              </div>
             </div>
           )}
         </section>
