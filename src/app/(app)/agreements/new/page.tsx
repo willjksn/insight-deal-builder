@@ -138,7 +138,25 @@ function WizardContent() {
     setStep(target);
   };
 
-  const goNext = () => setStep((s) => advanceWizardStep(s, agreement.agreementType, 1));
+  const prefersProjectLink =
+    agreement.agreementType === "client_project" ||
+    agreement.agreementType === "internal_collaboration";
+
+  const goNext = () => {
+    if (
+      step === 0 &&
+      prefersProjectLink &&
+      !agreement.projectId &&
+      canLinkProjects &&
+      projects.length > 0
+    ) {
+      const ok = window.confirm(
+        "This agreement isn't linked to a project. Linking keeps Prep, Coverage, and the call sheet in sync. Continue without a project?"
+      );
+      if (!ok) return;
+    }
+    setStep((s) => advanceWizardStep(s, agreement.agreementType, 1));
+  };
   const goBack = () => setStep((s) => advanceWizardStep(s, agreement.agreementType, -1));
 
   useEffect(() => {
@@ -608,6 +626,13 @@ function WizardContent() {
               options={[{ value: "", label: "None" }, ...projects.map((p) => ({ value: p.id, label: p.projectName }))]}
               touch
             />
+            {prefersProjectLink && canLinkProjects ? (
+              <p className="text-sm text-slate-500">
+                {agreement.projectId
+                  ? "Linked — Prep can import people and gear from this agreement."
+                  : "Recommended for client and internal jobs so Prep, Coverage, and call sheets stay connected."}
+              </p>
+            ) : null}
           </div>
         );
 

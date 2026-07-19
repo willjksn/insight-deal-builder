@@ -46,10 +46,10 @@ export function ProjectAccessEditor({ projectId, hubCandidates }: ProjectAccessE
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [newPerms, setNewPerms] = useState<ProjectAccessPermissions>({
-    scripts: true,
+    scripts: false,
     scout: false,
     production: false,
-    shots: false,
+    shots: true,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +172,10 @@ export function ProjectAccessEditor({ projectId, hubCandidates }: ProjectAccessE
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
         <p className="text-sm font-medium text-slate-800">Add someone</p>
+        <p className="text-xs text-slate-500">
+          Defaults to Coverage &amp; day shots (on-set freelancers). Add Prep board or Scripts only when
+          they need those.
+        </p>
         {addableCandidates.length === 0 ? (
           <p className="text-sm text-slate-500">
             Everyone in the system is already on this project, or no other users have signed up yet.

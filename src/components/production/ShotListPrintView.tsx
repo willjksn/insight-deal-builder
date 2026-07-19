@@ -21,7 +21,7 @@ export function ShotListPrintView({
   return (
     <div className="text-sm text-slate-900">
       <h1 className="text-lg font-bold">
-        Shot list — Day {day.dayNumber}
+        Day shots — Day {day.dayNumber}
         {day.title && day.title !== `Day ${day.dayNumber}` ? `: ${day.title}` : ""}
       </h1>
       <p className="text-slate-600">

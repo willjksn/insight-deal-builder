@@ -60,9 +60,7 @@ export function MobileNav() {
   const navItems = [
     { href: "/dashboard", label: "Home", icon: LayoutDashboard },
     { href: "/calendar", label: "Calendar", icon: CalendarDays },
-    ...(canManageProjects(appUser)
-      ? [{ href: "/projects", label: "Projects", icon: FolderKanban }]
-      : []),
+    { href: "/projects", label: "Projects", icon: FolderKanban },
     ...(showProduction
       ? [
           { href: "/script-writer", label: "Script", icon: ScrollText },

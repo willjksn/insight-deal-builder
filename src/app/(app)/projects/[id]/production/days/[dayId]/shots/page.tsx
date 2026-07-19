@@ -89,7 +89,7 @@ export default function ShotListDayPage() {
   if (!project || !board || !day) {
     return (
       <div className="py-20 text-center text-slate-500">
-        <p>Shot list not found.</p>
+        <p>Day shots not found.</p>
         <Link href={`/projects/${projectId}/production`}>
           <Button className="mt-4" variant="outline">
             Pre-production board
@@ -266,8 +266,8 @@ export default function ShotListDayPage() {
   return (
     <div className="pb-24">
       <PageHeader
-        title={`Shot list — Day ${day.dayNumber}`}
-        subtitle={`${project.projectName} · ${doneCount}/${day.shots.length} shots captured`}
+        title={`Day shots — Day ${day.dayNumber}`}
+        subtitle={`${project.projectName} · on-set checkoff · ${doneCount}/${day.shots.length} done`}
         action={
           <div className="flex flex-wrap gap-2">
             {saving && <span className="text-sm text-slate-400">Saving…</span>}

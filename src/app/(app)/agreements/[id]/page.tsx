@@ -167,6 +167,23 @@ export default function AgreementDetailPage() {
           <Field label="Shoot Date" value={formatDate(agreement.projectDetails.shootDate)} />
           <Field label="Location" value={agreement.projectDetails.location} />
           <Field label="Overview" value={agreement.projectDetails.projectOverview} />
+          {agreement.projectId ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Link href={`/projects/${agreement.projectId}`}>
+                <Button size="sm" variant="outline">Open project</Button>
+              </Link>
+              <Link href={`/projects/${agreement.projectId}/production`}>
+                <Button size="sm" variant="outline">Prep — import people &amp; gear</Button>
+              </Link>
+              <Link href={`/projects/${agreement.projectId}/coverage`}>
+                <Button size="sm" variant="outline">Coverage</Button>
+              </Link>
+            </div>
+          ) : (
+            <p className="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+              Not linked to a project. Edit the agreement and use Link to Project so Prep can import people and gear.
+            </p>
+          )}
         </CardBody></Card>
 
         <Card><CardBody className="space-y-4 text-sm">

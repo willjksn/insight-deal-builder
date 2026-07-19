@@ -443,14 +443,34 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
 
       {totalShots === 0 && (
         <div className="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-sm text-sky-950">
-          <p className="font-semibold">No coverage shots yet</p>
+          <p className="font-semibold">
+            {board.scriptSessionId
+              ? "Script linked — Apply hasn't run yet"
+              : "No coverage shots yet"}
+          </p>
           <p className="mt-1 text-sky-900/90">
-            From Script writer, use <strong>Apply to Prep + Coverage</strong>, or open Prep and apply
-            the linked script. Then fill frames here (upload, library, or AI).
+            {board.scriptSessionId ? (
+              <>
+                Open the linked script and use <strong>Apply to Prep + Coverage</strong>, or Sync
+                from script above after Apply once. Then fill frames here.
+              </>
+            ) : (
+              <>
+                From Script writer, use <strong>Apply to Prep + Coverage</strong>, or open Prep and
+                apply the linked script. Then fill frames here (upload, library, or AI).
+              </>
+            )}
           </p>
           <div className="mt-3 flex flex-wrap gap-3">
-            <Link href="/script-writer" className="font-medium text-sky-800 underline">
-              Script writer
+            <Link
+              href={
+                board.scriptSessionId
+                  ? `/script-writer/${board.scriptSessionId}`
+                  : "/script-writer"
+              }
+              className="font-medium text-sky-800 underline"
+            >
+              {board.scriptSessionId ? "Open linked script → Apply" : "Script writer"}
             </Link>
             <Link
               href={`/projects/${projectId}/production`}

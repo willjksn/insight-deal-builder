@@ -81,7 +81,11 @@ export default function ProjectsPage() {
       {loading ? <LoadingSpinner className="py-20" /> : projects.length === 0 ? (
         <EmptyState
           title="No projects yet"
-          description="Create a project to start building agreements."
+          description={
+            canManageProjects(appUser)
+              ? "Create a project to start building agreements."
+              : "Ask an admin to add you to a project (Coverage & call sheet for on-set freelancers)."
+          }
           actionLabel={canManageProjects(appUser) ? "New Project" : undefined}
           onAction={
             canManageProjects(appUser)

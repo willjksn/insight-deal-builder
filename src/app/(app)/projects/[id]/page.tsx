@@ -70,13 +70,22 @@ export default function ProjectDetailPage() {
   );
   const projectAccess = useProjectAccess(id, project?.ownerUserId);
   const showScripts = canUseProductionTools(appUser) || projectAccess.canAccessScripts;
-  const showProduction =
+  const showPrepBoard =
     canManageProjects(appUser) ||
     canUseProductionTools(appUser) ||
-    projectAccess.canAccessProduction ||
-    projectAccess.canAccessShots;
+    projectAccess.canAccessProduction;
+  const showShots =
+    canManageProjects(appUser) ||
+    canUseProductionTools(appUser) ||
+    projectAccess.canAccessShots ||
+    projectAccess.canAccessProduction;
+  const showProduction = showPrepBoard || showShots;
+  const shotsOnly = showShots && !showPrepBoard && !showScripts;
   const canCreateDeal = canCreateQuotes(appUser);
   const canOpenTeamAccess = canManageProjects(appUser) || canManageUsers(appUser);
+  const firstDayId = board?.productionDays?.length
+    ? [...board.productionDays].sort((a, b) => a.dayNumber - b.dayNumber)[0]?.id
+    : undefined;
 
   const primaryScript = useMemo(
     () => pickProjectScriptSession(scriptSessions, id, board),
@@ -121,7 +130,21 @@ export default function ProjectDetailPage() {
         subtitle={`${project.clientName || "No client"} · $${project.totalProjectFee.toLocaleString()}`}
         action={
           <div className="flex flex-wrap gap-2">
-            {showProduction && (
+            {showShots && (
+              <Link href={`/projects/${project.id}/coverage`}>
+                <Button size="touch" variant={shotsOnly ? "primary" : "outline"}>
+                  Coverage
+                </Button>
+              </Link>
+            )}
+            {showShots && firstDayId && (
+              <Link href={`/projects/${project.id}/production/days/${firstDayId}`}>
+                <Button size="touch" variant="outline">
+                  Call sheet
+                </Button>
+              </Link>
+            )}
+            {showPrepBoard && (
               <Link href={`/projects/${project.id}/stage`}>
                 <Button size="touch" variant="outline">
                   <LayoutGrid className="mr-2 h-5 w-5" />
@@ -129,7 +152,7 @@ export default function ProjectDetailPage() {
                 </Button>
               </Link>
             )}
-            {showProduction && (
+            {showPrepBoard && (
               <Link href={`/projects/${project.id}/production`}>
                 <Button size="touch" variant="outline">
                   <LayoutGrid className="mr-2 h-5 w-5" />
@@ -192,6 +215,32 @@ export default function ProjectDetailPage() {
         </p>
       )}
 
+      {shotsOnly ? (
+        <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-sm text-sky-950">
+          <p className="font-semibold">On-set access</p>
+          <p className="mt-1 text-sky-900/90">
+            You have Coverage and call sheet for this job. Open Coverage for the shot bible, or the
+            call sheet for logistics and print.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              href={`/projects/${project.id}/coverage`}
+              className="font-medium text-sky-800 underline"
+            >
+              Open Coverage
+            </Link>
+            {firstDayId ? (
+              <Link
+                href={`/projects/${project.id}/production/days/${firstDayId}`}
+                className="font-medium text-sky-800 underline"
+              >
+                Open call sheet
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {spineLoading && (showProduction || showScripts) ? (
         <LoadingSpinner className="py-8 mb-8" />
       ) : (
@@ -202,13 +251,14 @@ export default function ProjectDetailPage() {
           scriptSession={primaryScript}
           board={board}
           agreements={projectAgreements}
-          showProduction={showProduction}
+          showPrepBoard={showPrepBoard}
+          showShots={showShots}
           showScripts={showScripts}
           canCreateDeal={canCreateDeal}
         />
       )}
 
-      {showProduction && board && (
+      {showShots && board && (
         <div className="mb-8">
           <ProjectShotProgressCard projectId={project.id} board={board} />
         </div>
@@ -323,7 +373,7 @@ export default function ProjectDetailPage() {
           </Card>
         )}
 
-        {showProduction && board && (
+        {showPrepBoard && board && (
           <Card className="lg:col-span-2">
             <CardBody>
               <div className="flex flex-wrap items-center justify-between gap-3">

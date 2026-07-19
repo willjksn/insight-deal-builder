@@ -22,7 +22,7 @@ export function ProjectShotProgressCard({ projectId, board }: ProjectShotProgres
         <CardBody>
           <h2 className="mb-2 text-lg font-semibold flex items-center gap-2">
             <Clapperboard className="h-5 w-5 text-violet-600" />
-            Shot list progress
+            Coverage progress
           </h2>
           <p className="text-sm text-slate-500">
             No shots yet. Apply a script with detailed shot list or add shots on{" "}
@@ -42,7 +42,7 @@ export function ProjectShotProgressCard({ projectId, board }: ProjectShotProgres
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Clapperboard className="h-5 w-5 text-violet-600" />
-            Shot list progress
+            Coverage progress
           </h2>
           <span className="text-sm font-medium tabular-nums text-sky-700">
             {doneShots}/{totalShots} captured

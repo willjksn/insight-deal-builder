@@ -72,10 +72,10 @@ export function ProductionShotListEditor({
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-slate-900">Shot list</h2>
+          <h2 className="font-semibold text-slate-900">On-set checkoff</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Drag the grip handle to another day tab, or use Move to… when weather or schedule
-            changes.
+            Mark shots done on set. Edit frames and DP fields on Coverage. Drag to another day when
+            weather or schedule changes.
           </p>
         </div>
         <div className="flex items-center gap-3">

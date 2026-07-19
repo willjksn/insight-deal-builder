@@ -2,6 +2,12 @@ import { GEAR_PACKAGES } from "@/lib/constants/presets";
 import { Agreement } from "@/lib/types";
 import { mergeGearItems } from "@/lib/production/gearImport";
 
+export {
+  countNewPeopleFromAgreement,
+  importPeopleFromAgreement,
+  peopleFromAgreement,
+} from "@/lib/production/agreementImportPeople";
+
 export function agreementsForProject(agreements: Agreement[], projectId: string): Agreement[] {
   return agreements
     .filter((a) => a.projectId === projectId)

@@ -77,7 +77,6 @@ const navGroups: NavGroup[] = [
         href: "/projects",
         label: "Projects",
         icon: FolderKanban,
-        canAccess: canManageProjects,
       },
       {
         href: "/script-writer",
@@ -260,6 +259,14 @@ export function Sidebar() {
               </div>
             </div>
           ))}
+          {!canManageProjects(appUser) &&
+          !canUseProductionTools(appUser) &&
+          !canCreateQuotes(appUser) ? (
+            <p className="mx-3 rounded-lg border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400">
+              Limited access — open <span className="text-slate-300">Projects</span> for jobs you
+              were added to. Ask an admin if Coverage or call sheet is missing.
+            </p>
+          ) : null}
 
           <div>
             <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">

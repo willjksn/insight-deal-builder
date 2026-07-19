@@ -19,12 +19,12 @@ export type AiUsageMonthlySummary = {
 };
 
 export const AI_USAGE_FEATURE_LABELS: Record<string, string> = {
-  scout_analyze: "Shot Scout — location analysis",
-  scout_dp_plan: "Shot Scout — DP plan",
-  scout_shot_list: "Shot Scout — shot list",
-  scout_preview: "Shot Scout — previs images",
-  scout_technique: "Shot Scout — technique lookup",
-  scout_gear: "Shot Scout — gear suggest",
+  scout_analyze: "Legacy scout — location analysis",
+  scout_dp_plan: "Legacy scout — DP plan",
+  scout_shot_list: "Legacy scout — shot list",
+  scout_preview: "Legacy scout — previs images",
+  scout_technique: "Legacy scout — technique lookup",
+  scout_gear: "Legacy scout — gear suggest",
   coverage_frame: "Coverage — AI storyboard frames",
   script_writer_chat: "Script writer — chat",
   script_writer_analyze: "Script writer — inspiration analyze",

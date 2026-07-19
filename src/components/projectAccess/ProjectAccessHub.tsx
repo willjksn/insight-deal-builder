@@ -33,7 +33,7 @@ export function ProjectAccessHub({ initialProjectId = "", onAdminPage = false }:
   const [candidates, setCandidates] = useState<TeamUserCandidate[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId);
   const [selectedScriptId, setSelectedScriptId] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"signup" | "onset" | null>(null);
 
   // Use the site the admin is on now (Vercel URL or custom domain). NEXT_PUBLIC_APP_URL
   // is for server-sent emails only — it may point at a domain not wired up yet.
@@ -41,6 +41,12 @@ export function ProjectAccessHub({ initialProjectId = "", onAdminPage = false }:
     if (typeof window === "undefined") return "/login";
     return `${window.location.origin}/login`;
   }, []);
+
+  const onSetInviteUrl = useMemo(() => {
+    if (typeof window === "undefined" || !selectedProjectId) return signupUrl;
+    const next = `/projects/${selectedProjectId}/coverage`;
+    return `${window.location.origin}/login?next=${encodeURIComponent(next)}`;
+  }, [signupUrl, selectedProjectId]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -89,11 +95,11 @@ export function ProjectAccessHub({ initialProjectId = "", onAdminPage = false }:
     [standaloneScripts]
   );
 
-  const copySignupLink = async () => {
+  const copyLink = async (url: string, kind: "signup" | "onset") => {
     try {
-      await navigator.clipboard.writeText(signupUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(url);
+      setCopied(kind);
+      window.setTimeout(() => setCopied(null), 2000);
     } catch {
       setError("Could not copy link.");
     }
@@ -127,13 +133,21 @@ export function ProjectAccessHub({ initialProjectId = "", onAdminPage = false }:
                 ? "After they register, expand their row above to approve them — or add them to a project now and they will get access once approved."
                 : "After they register, an admin approves their account (or add them to a project now — access starts when approved)."}
             </li>
-            <li>Select a project below and add them with the access they need.</li>
+            <li>
+              Select a project below and add them (defaults to Coverage &amp; call sheet). Copy the
+              on-set link from that section so login lands on Coverage.
+            </li>
           </ol>
           <div className="flex flex-wrap items-center gap-2">
             <code className="rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">{signupUrl}</code>
-            <Button type="button" size="sm" variant="outline" onClick={() => void copySignupLink()}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void copyLink(signupUrl, "signup")}
+            >
               <Copy className="mr-1.5 h-3.5 w-3.5" />
-              {copied ? "Copied" : "Copy link"}
+              {copied === "signup" ? "Copied" : "Copy sign-up"}
             </Button>
             <a href={signupUrl} target="_blank" rel="noreferrer">
               <Button type="button" size="sm" variant="outline">
@@ -166,7 +180,23 @@ export function ProjectAccessHub({ initialProjectId = "", onAdminPage = false }:
             disabled={projects.length === 0}
           />
           {selectedProjectId ? (
-            <ProjectAccessEditor projectId={selectedProjectId} hubCandidates={candidates} />
+            <>
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2">
+                <code className="max-w-full flex-1 truncate text-xs text-sky-900">
+                  {onSetInviteUrl}
+                </code>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void copyLink(onSetInviteUrl, "onset")}
+                >
+                  <Copy className="mr-1.5 h-3.5 w-3.5" />
+                  {copied === "onset" ? "Copied" : "Copy on-set link"}
+                </Button>
+              </div>
+              <ProjectAccessEditor projectId={selectedProjectId} hubCandidates={candidates} />
+            </>
           ) : (
             <p className="text-sm text-slate-500">Select a project to manage its team.</p>
           )}

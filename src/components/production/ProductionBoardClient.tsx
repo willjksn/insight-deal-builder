@@ -55,7 +55,9 @@ import {
 import { createEmptyProductionDay } from "@/lib/production/defaults";
 import {
   budgetLinesFromAgreement,
+  countNewPeopleFromAgreement,
   importGearFromAgreement,
+  importPeopleFromAgreement,
   primaryAgreementForProject,
 } from "@/lib/production/agreementImport";
 import { musicEmbedUrl } from "@/lib/utils/musicEmbed";
@@ -159,6 +161,9 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
 
   const primaryAgreement = primaryAgreementForProject(agreements, project.id);
   const budgetLines = primaryAgreement ? budgetLinesFromAgreement(primaryAgreement) : [];
+  const newPeopleFromAgreement = primaryAgreement
+    ? countNewPeopleFromAgreement(board.people, primaryAgreement)
+    : 0;
   const dayOne = [...board.productionDays].sort((a, b) => a.dayNumber - b.dayNumber)[0];
   const showShootDateSync =
     !shootDateDismissed &&
@@ -238,6 +243,28 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
         primaryAgreement={primaryAgreement ?? undefined}
         onPatch={(partial) => patch(partial)}
       />
+
+      {primaryAgreement && newPeopleFromAgreement > 0 ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50/80 px-4 py-3">
+          <p className="text-sm text-slate-700">
+            <span className="font-medium text-slate-900">{newPeopleFromAgreement}</span>{" "}
+            {newPeopleFromAgreement === 1 ? "person" : "people"} on linked agreement “
+            {primaryAgreement.title}” not on Prep yet.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              patch({
+                people: importPeopleFromAgreement(board.people, primaryAgreement),
+              })
+            }
+          >
+            Import people from agreement
+          </Button>
+        </div>
+      ) : null}
 
       <div className="mt-6 grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-5 lg:gap-6">
           {/* Column 1 — About + Cast */}
@@ -1530,7 +1557,7 @@ function FilmingCard({
                   <Clapperboard className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="font-medium">Shot list — Day {day.dayNumber}</span>
+                  <span className="font-medium">Day shots — Day {day.dayNumber}</span>
                   <p className="truncate text-xs text-slate-500">
                     {day.shots.length} shots · check off on set
                   </p>

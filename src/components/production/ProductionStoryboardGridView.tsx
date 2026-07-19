@@ -100,8 +100,8 @@ export function ProductionStoryboardGridView({
         )}
       >
         <p className="text-sm text-slate-500">
-          No storyboard frames yet. Enable <strong>Storyboard mode</strong> in Script writer,
-          apply the script, or refresh from script.
+          No storyboard frames yet. From Script writer use <strong>Apply to Prep + Coverage</strong>,
+          then open Coverage to fill frames.
         </p>
       </section>
     );

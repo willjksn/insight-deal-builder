@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardBody } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { LegalAcceptanceNotice, LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
+import { safeNextPath } from "@/lib/auth/safeNextPath";
 
 type Mode = "signIn" | "signUp" | "resetPassword";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -22,6 +24,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, resetPassword, signOut, isConfigured } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = safeNextPath(searchParams.get("next"));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +50,7 @@ export default function LoginPage() {
         return;
       }
       await signIn(email, password);
-      router.push("/dashboard");
+      router.push(nextPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
@@ -199,5 +203,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner className="py-20" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

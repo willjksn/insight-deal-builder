@@ -119,7 +119,12 @@ interface ProjectSpineProps {
   scriptSession?: ScriptWriterSession;
   board?: ProductionBoard | null;
   agreements: Agreement[];
-  showProduction: boolean;
+  /** Prep board, Stage, Reference */
+  showPrepBoard?: boolean;
+  /** Coverage + call sheet (on-set) */
+  showShots?: boolean;
+  /** @deprecated use showPrepBoard / showShots */
+  showProduction?: boolean;
   showScripts: boolean;
   canCreateDeal: boolean;
 }
@@ -131,12 +136,16 @@ export function ProjectSpine({
   scriptSession,
   board,
   agreements,
+  showPrepBoard,
+  showShots,
   showProduction,
   showScripts,
   canCreateDeal,
 }: ProjectSpineProps) {
   const idea = `A project for ${clientName || "client"}: ${projectName}`;
   const scriptParams = new URLSearchParams({ idea, title: projectName, projectId });
+  const prep = showPrepBoard ?? showProduction ?? false;
+  const shots = showShots ?? showProduction ?? false;
 
   const steps: SpineStep[] = [];
 
@@ -151,7 +160,7 @@ export function ProjectSpine({
     });
   }
 
-  if (showProduction) {
+  if (prep) {
     steps.push({
       key: "board",
       label: "Prep",
@@ -161,7 +170,9 @@ export function ProjectSpine({
       summary: boardSummary(board),
       detail: "People, locations, days — link & apply script here.",
     });
+  }
 
+  if (shots) {
     steps.push({
       key: "coverage",
       label: "Coverage",
@@ -177,6 +188,15 @@ export function ProjectSpine({
       : undefined;
     if (firstDayId) {
       steps.push({
+        key: "day-shots",
+        label: "Day shots",
+        icon: ListOrdered,
+        href: `/projects/${projectId}/production/days/${firstDayId}/shots`,
+        status: shotsStatus(board),
+        summary: "On-set checkoff for this day",
+        detail: "Mark done on set — edit the bible on Coverage.",
+      });
+      steps.push({
         key: "call-sheet",
         label: "Call sheet",
         icon: FileText,
@@ -186,7 +206,9 @@ export function ProjectSpine({
         detail: "Crew call, schedule, coverage strip. Print the denser one-pager for set.",
       });
     }
+  }
 
+  if (prep) {
     steps.push({
       key: "stage",
       label: "Stage",
@@ -217,6 +239,9 @@ export function ProjectSpine({
       href: latestAgreement ? `/agreements/${latestAgreement.id}` : `/agreements/new?projectId=${projectId}`,
       status: agreementStatus(agreements),
       summary: agreementSummary(agreements),
+      detail: latestAgreement
+        ? `Linked to this project · ${latestAgreement.status.replace(/_/g, " ")} — import people & gear on Prep`
+        : "Start from this project so Prep can pull people and gear",
     });
   }
 
@@ -226,7 +251,9 @@ export function ProjectSpine({
     <section className="mb-8">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Project spine</p>
-        <p className="text-xs text-slate-400">Script → Prep → Coverage → Call sheet → Agreement</p>
+        <p className="text-xs text-slate-400">
+          Script → Prep → Coverage → Day shots → Call sheet → Agreement
+        </p>
       </div>
       <div
         className={cn(

@@ -45,5 +45,5 @@ export const PROJECT_ACCESS_LABELS: Record<ProjectAccessArea, string> = {
   scripts: "Scripts",
   scout: "Legacy scout (unused)",
   production: "Prep board",
-  shots: "Coverage & day shots",
+  shots: "Coverage & call sheet",
 };

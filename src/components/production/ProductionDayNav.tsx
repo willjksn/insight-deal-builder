@@ -156,7 +156,7 @@ export function ProductionDayNav({
             )}
           >
             <Clapperboard className="h-4 w-4" />
-            Shot list
+            Day shots
             {day.shots.length > 0 && (
               <span className="rounded-full bg-white/20 px-1.5 text-xs tabular-nums">
                 {day.shots.filter((s) => s.done).length}/{day.shots.length}
