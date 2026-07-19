@@ -751,9 +751,10 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           {script && session.status !== "applied" && (
             <div className="border-t border-slate-100">
               <div className="border-b border-slate-100 px-4 py-3">
-                <h3 className="text-sm font-semibold text-slate-900">Apply to pre-production</h3>
+                <h3 className="text-sm font-semibold text-slate-900">Apply to Prep + Coverage</h3>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Push this script and shot-level coverage into a project Prep board + Coverage desk.
+                  Required next step — seeds the Prep board and Coverage desk. Without Apply,
+                  Coverage stays empty.
                 </p>
               </div>
 

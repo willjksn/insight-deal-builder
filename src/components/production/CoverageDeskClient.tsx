@@ -302,13 +302,20 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
           <ArrowLeft className="mr-1 h-4 w-4" />
           Project
         </Link>
-        <p className="text-sm text-slate-600">
-          No pre-production board yet.{" "}
-          <Link href={`/projects/${projectId}/production`} className="font-medium text-sky-700 hover:underline">
-            Open Prep
-          </Link>{" "}
-          to create one, then apply a script to seed coverage.
-        </p>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm text-amber-950">
+          <p className="font-semibold">Coverage needs a Prep board first</p>
+          <p className="mt-1 text-amber-900/90">
+            Open Prep, link your Script writer session, and{" "}
+            <strong>Apply</strong> so shots land here. Coverage is the shot bible — one shot = one
+            frame.
+          </p>
+          <Link
+            href={`/projects/${projectId}/production`}
+            className="mt-3 inline-flex font-medium text-sky-800 underline"
+          >
+            Open Prep →
+          </Link>
+        </div>
       </div>
     );
   }
@@ -329,8 +336,8 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
         title="Coverage"
         subtitle={
           project
-            ? `${project.projectName} — storyboard frames and shot bible. One shot = one frame.`
-            : "Storyboard frames and shot bible. One shot = one frame."
+            ? `${project.projectName} — shot bible (edit frames & DP fields here). Day shots = on-set checkoff · Call sheet = logistics print.`
+            : "Shot bible — one shot = one frame. Edit stills and DP fields here."
         }
         action={
           <div className="flex flex-wrap gap-2">
@@ -432,6 +439,27 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
           Link a script via Script writer → Apply to enable <strong>Sync from script</strong> (keeps
           your uploaded frames and day assignments).
         </p>
+      )}
+
+      {totalShots === 0 && (
+        <div className="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-sm text-sky-950">
+          <p className="font-semibold">No coverage shots yet</p>
+          <p className="mt-1 text-sky-900/90">
+            From Script writer, use <strong>Apply to Prep + Coverage</strong>, or open Prep and apply
+            the linked script. Then fill frames here (upload, library, or AI).
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link href="/script-writer" className="font-medium text-sky-800 underline">
+              Script writer
+            </Link>
+            <Link
+              href={`/projects/${projectId}/production`}
+              className="font-medium text-sky-800 underline"
+            >
+              Prep board
+            </Link>
+          </div>
+        </div>
       )}
 
       {(view === "board" || view === "linear") && (

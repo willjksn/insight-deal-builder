@@ -128,9 +128,10 @@ export function CoverageBoardView({
         )}
       >
         <ImageIcon className="mx-auto mb-3 h-8 w-8 text-slate-300" />
-        <p className="font-medium text-slate-800">No coverage yet</p>
+        <p className="font-medium text-slate-800">No shots on this view</p>
         <p className="mt-1 text-sm text-slate-500">
-          Apply a script with suggested shots, or add shots from a shoot day.
+          Apply a script from Script writer / Prep (with detailed shot list on), or add a shot in List
+          view. This desk is where you edit frames and DP fields.
         </p>
       </section>
     );

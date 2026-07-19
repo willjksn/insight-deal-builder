@@ -133,7 +133,8 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   {
     key: "useShotScout",
     label: "Production tools",
-    description: "Script writer, stage planner, reference guide, and pre-production boards",
+    description:
+      "Script writer, Prep board, Coverage, call sheets, stage planner, and reference guide",
     group: "imgData",
     insightOnly: true,
   },

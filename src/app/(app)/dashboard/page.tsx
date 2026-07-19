@@ -139,7 +139,7 @@ export default function DashboardPage() {
                 />
                 {projects.length === 0 ? (
                   <EmptyPanel
-                    text="Start from Projects — script, board, scout, and deals live there."
+                    text="Start from Projects — script, Prep, Coverage, call sheets, and deals live there."
                     action={
                       canManageProjects(appUser) ? (
                         <Link href="/projects">

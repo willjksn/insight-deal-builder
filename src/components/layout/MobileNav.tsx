@@ -15,7 +15,6 @@ import {
   Clapperboard,
   ScrollText,
   BookOpen,
-  LayoutGrid,
   Package,
   HardDrive,
   MapPin,
@@ -43,6 +42,7 @@ import {
   canAccessRevenueOpportunities,
 } from "@/lib/utils/permissions";
 import { isRevenueOpportunitiesFeatureEnabled } from "@/lib/utils/permissions";
+import { isContentIdeasNavEnabled } from "@/lib/contentIdeas/navFlag";
 import { canAccessHowToUseGuide } from "@/lib/guide/access";
 
 type MoreNavItem = {
@@ -66,8 +66,9 @@ export function MobileNav() {
     ...(showProduction
       ? [
           { href: "/script-writer", label: "Script", icon: ScrollText },
-          { href: "/content", label: "Ideas", icon: Lightbulb },
-          { href: "/stage", label: "Stage", icon: LayoutGrid },
+          ...(isContentIdeasNavEnabled()
+            ? [{ href: "/content", label: "Ideas", icon: Lightbulb }]
+            : []),
           { href: "/reference", label: "Guide", icon: BookOpen },
         ]
       : []),

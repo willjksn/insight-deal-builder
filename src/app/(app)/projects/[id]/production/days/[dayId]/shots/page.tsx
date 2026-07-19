@@ -350,29 +350,35 @@ export default function ShotListDayPage() {
         <p className="max-w-xl rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 text-sm text-violet-950">
           {viewMode === "grid" ? (
             <>
-              <strong>Storyboard</strong> — one frame per shot (same as Coverage desk). Upload
-              references, mark captured, expand for DP details. Prefer the project{" "}
+              <strong>Day storyboard</strong> — frames for this day only. For the full shot bible
+              (all days, AI frames, sync), use{" "}
               <Link href={`/projects/${projectId}/coverage`} className="font-medium underline">
                 Coverage
-              </Link>{" "}
-              desk for all days.
+              </Link>
+              .
             </>
           ) : viewMode === "packet" ? (
             <>
-              <strong>Crew packet</strong> — master shot list plus Director, DP, Gaffer, Sound,
-              Talent, and Art/Props sections. Tap a role to jump, or scroll the full preview below.
+              <strong>Crew packet</strong> — print for set roles. Build / edit the bible on{" "}
+              <Link href={`/projects/${projectId}/coverage`} className="font-medium underline">
+                Coverage
+              </Link>
+              , then generate the packet here.
               {sortedDays.length === 1 && (
                 <>
                   {" "}
-                  All script shots start on Day 1 unless you add more shoot days and split them
-                  manually.
+                  All script shots start on Day 1 unless you split across days.
                 </>
               )}
             </>
           ) : (
             <>
-              <strong>Shot list</strong> — drag shots to another day tab, or use Move to… for
-              schedule changes. <strong>Auto-split days</strong> groups by location.
+              <strong>On-set checkoff</strong> — mark shots done and move them between days. Edit
+              lenses, framing, and stills on{" "}
+              <Link href={`/projects/${projectId}/coverage`} className="font-medium underline">
+                Coverage
+              </Link>
+              . <strong>Auto-split</strong> packs by location.
             </>
           )}
         </p>

@@ -119,12 +119,19 @@ export default function CallSheetDayPage() {
       <div className="grid gap-8 lg:grid-cols-2 print:block">
         <div className="space-y-4 print:hidden">
           <p className="rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm text-sky-950">
-            <strong>Call sheet</strong> is logistics for the day — crew call, schedule, locations.
-            What you’re shooting is summarized below; edit frames on{" "}
+            <strong>Call sheet</strong> = day logistics + print. Coverage strip below is a glance
+            only — edit the shot bible on{" "}
             <Link href={`/projects/${projectId}/coverage`} className="font-medium underline">
               Coverage
             </Link>
-            .
+            ; use{" "}
+            <Link
+              href={`/projects/${projectId}/production/days/${dayId}/shots`}
+              className="font-medium underline"
+            >
+              Day shots
+            </Link>{" "}
+            for on-set checkoff and crew packets.
           </p>
 
           <CoverageDayStrip

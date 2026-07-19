@@ -159,6 +159,7 @@ export function ProjectSpine({
       href: `/projects/${projectId}/production`,
       status: boardStatus(board),
       summary: boardSummary(board),
+      detail: "People, locations, days — link & apply script here.",
     });
 
     steps.push({
@@ -168,24 +169,42 @@ export function ProjectSpine({
       href: coverageHref(projectId),
       status: shotsStatus(board),
       summary: shotsSummary(board),
+      detail: "Shot bible — one shot = one frame. Edit DP fields and stills here.",
     });
+
+    const firstDayId = board?.productionDays?.length
+      ? [...board.productionDays].sort((a, b) => a.dayNumber - b.dayNumber)[0]?.id
+      : undefined;
+    if (firstDayId) {
+      steps.push({
+        key: "call-sheet",
+        label: "Call sheet",
+        icon: FileText,
+        href: `/projects/${projectId}/production/days/${firstDayId}`,
+        status: boardStatus(board) === "empty" ? "empty" : "ready",
+        summary: `Day logistics + print · ${board!.productionDays.length} day${board!.productionDays.length === 1 ? "" : "s"}`,
+        detail: "Crew call, schedule, coverage strip. Print the denser one-pager for set.",
+      });
+    }
 
     steps.push({
       key: "stage",
-      label: "Stage planner",
+      label: "Stage",
       icon: LayoutGrid,
       href: `/projects/${projectId}/stage`,
       status: board ? "progress" : "empty",
-      summary: "Top-down lighting diagram for this project",
+      summary: "Optional lighting diagram for this project",
+      detail: "Secondary to Coverage — open when you need a floor plan.",
     });
 
     steps.push({
       key: "reference",
-      label: "Reference guide",
+      label: "Reference",
       icon: BookOpen,
       href: "/reference",
       status: "ready",
-      summary: "FX6, lenses, and on-set quick reference",
+      summary: "Optional on-set camera / lens lookup",
+      detail: "Global guide — not tied to this project’s shots.",
     });
   }
 
@@ -205,7 +224,10 @@ export function ProjectSpine({
 
   return (
     <section className="mb-8">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Project spine</p>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Project spine</p>
+        <p className="text-xs text-slate-400">Script → Prep → Coverage → Call sheet → Agreement</p>
+      </div>
       <div
         className={cn(
           "grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"

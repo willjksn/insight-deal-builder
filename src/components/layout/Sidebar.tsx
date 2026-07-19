@@ -21,7 +21,6 @@ import {
   ScrollText,
   Calculator,
   BookOpen,
-  LayoutGrid,
   CircleHelp,
   CalendarDays,
   Lightbulb,
@@ -47,6 +46,7 @@ import {
   canAccessRevenueOpportunities,
 } from "@/lib/utils/permissions";
 import { isRevenueOpportunitiesFeatureEnabled } from "@/lib/utils/permissions";
+import { isContentIdeasNavEnabled } from "@/lib/contentIdeas/navFlag";
 import { canAccessHowToUseGuide } from "@/lib/guide/access";
 import { AppUser } from "@/lib/types";
 
@@ -86,12 +86,6 @@ const navGroups: NavGroup[] = [
         canAccess: canUseProductionTools,
       },
       {
-        href: "/stage",
-        label: "Stage planner",
-        icon: LayoutGrid,
-        canAccess: canUseProductionTools,
-      },
-      {
         href: "/reference",
         label: "Reference guide",
         icon: BookOpen,
@@ -106,19 +100,19 @@ const navGroups: NavGroup[] = [
         href: "/content",
         label: "Weekly idea engine",
         icon: Lightbulb,
-        canAccess: canUseProductionTools,
+        canAccess: (user) => isContentIdeasNavEnabled() && canUseProductionTools(user),
       },
       {
         href: "/content/profiles",
         label: "Brand profiles",
         icon: UserCircle,
-        canAccess: canUseProductionTools,
+        canAccess: (user) => isContentIdeasNavEnabled() && canUseProductionTools(user),
       },
       {
         href: "/content/ideas/bank",
         label: "Saved ideas",
         icon: FileText,
-        canAccess: canUseProductionTools,
+        canAccess: (user) => isContentIdeasNavEnabled() && canUseProductionTools(user),
       },
     ],
   },

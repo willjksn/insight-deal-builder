@@ -48,7 +48,7 @@ Every recommended opportunity must answer: fit, observable opportunity, timing, 
 
 ## Feature flag
 
-Set `REVENUE_OPPORTUNITIES_ENABLED=false` to hide navigation and disable API routes without removing code.
+Revenue is **off by default**. Set `REVENUE_OPPORTUNITIES_ENABLED=true` to show navigation and enable API routes.
 
 ## Implementation status
 

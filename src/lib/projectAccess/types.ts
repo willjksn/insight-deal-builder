@@ -43,7 +43,7 @@ export interface ResourceMember {
 
 export const PROJECT_ACCESS_LABELS: Record<ProjectAccessArea, string> = {
   scripts: "Scripts",
-  scout: "Shot Scout",
-  production: "Pre-production board",
-  shots: "Call sheet shots",
+  scout: "Legacy scout (unused)",
+  production: "Prep board",
+  shots: "Coverage & day shots",
 };
