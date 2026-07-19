@@ -79,6 +79,68 @@ export function pasteScreenplayAt(
   return reindexElements([...head, ...parsed, ...tail]);
 }
 
+/**
+ * Paste screenplay while replacing a text selection inside the current block.
+ * Keeps text before/after the selection as flanking action/dialogue blocks when needed.
+ */
+export function pasteScreenplayReplacingSelection(
+  elements: ScriptElement[],
+  index: number,
+  selectionStart: number,
+  selectionEnd: number,
+  clipboard: string
+): ScriptElement[] {
+  if (index < 0 || index >= elements.length) return elements;
+  const parsed = fountainToElements(clipboard);
+  if (parsed.length === 0) return elements;
+
+  const current = elements[index];
+  const start = Math.max(0, Math.min(selectionStart, selectionEnd, current.text.length));
+  const end = Math.max(start, Math.min(Math.max(selectionStart, selectionEnd), current.text.length));
+  const before = current.text.slice(0, start);
+  const after = current.text.slice(end);
+
+  if (!before.trim() && !after.trim()) {
+    return pasteScreenplayAt(
+      elements.map((el, i) =>
+        i === index ? { ...el, text: "", updatedAt: new Date().toISOString() } : el
+      ),
+      index,
+      clipboard
+    );
+  }
+
+  const headBlocks = elements.slice(0, index);
+  const tailBlocks = elements.slice(index + 1);
+  const middle: ScriptElement[] = [];
+
+  if (before.trim()) {
+    middle.push({
+      ...current,
+      text: before.replace(/\s+$/, ""),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  middle.push(...parsed);
+  if (after.trim()) {
+    middle.push(
+      createScriptElement(
+        current.type === "character" ? "dialogue" : current.type,
+        after.replace(/^\s+/, ""),
+        0
+      )
+    );
+  }
+
+  return reindexElements([...headBlocks, ...middle, ...tailBlocks]);
+}
+
+/** Enter on empty dialogue/parenthetical → new Character (dual-dialogue style next speaker). */
+export function nextTypeAfterEmptyEnter(type: ScriptElementType): ScriptElementType | null {
+  if (type === "dialogue" || type === "parenthetical") return "character";
+  return null;
+}
+
 export function ensureAtLeastOneElement(
   elements: ScriptElement[],
   fallbackType: ScriptElementType = "action"

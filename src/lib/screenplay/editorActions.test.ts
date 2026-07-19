@@ -4,8 +4,11 @@ import {
   deleteEmptyElement,
   looksLikeScreenplayPaste,
   mergeElementWithPrevious,
+  nextTypeAfterEmptyEnter,
   pasteScreenplayAt,
+  pasteScreenplayReplacingSelection,
 } from "@/lib/screenplay/editorActions";
+import { tabElementType } from "@/lib/screenplay/types";
 
 describe("editorActions", () => {
   it("detects fountain-like paste", () => {
@@ -55,5 +58,31 @@ describe("editorActions", () => {
     const elements = [createScriptElement("action", "", 0)];
     const next = pasteScreenplayAt(elements, 0, "INT. ROOM - NIGHT\n\nDarkness.");
     expect(next[0].type).toBe("scene_heading");
+  });
+
+  it("pastes over a selection inside a block", () => {
+    const elements = [createScriptElement("action", "AAA KEEP BBB", 0)];
+    const next = pasteScreenplayReplacingSelection(
+      elements,
+      0,
+      4,
+      8,
+      "INT. ROOM - DAY\n\nShe enters."
+    );
+    expect(next[0].text).toBe("AAA");
+    expect(next.some((e) => e.type === "scene_heading")).toBe(true);
+    expect(next[next.length - 1].text).toBe("BBB");
+  });
+
+  it("maps empty dialogue enter to character", () => {
+    expect(nextTypeAfterEmptyEnter("dialogue")).toBe("character");
+    expect(nextTypeAfterEmptyEnter("action")).toBeNull();
+  });
+
+  it("tabs along Final Draft dialogue spine", () => {
+    expect(tabElementType("action", "forward")).toBe("character");
+    expect(tabElementType("character", "forward")).toBe("dialogue");
+    expect(tabElementType("dialogue", "forward")).toBe("parenthetical");
+    expect(tabElementType("parenthetical", "backward")).toBe("dialogue");
   });
 });

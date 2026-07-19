@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Clapperboard, LayoutGrid, ListOrdered, RefreshCw, Sparkles } from "lucide-react";
 import {
   getProductionBoardByProject,
@@ -34,6 +35,8 @@ type CoverageView = "board" | "linear" | "list";
 
 export function CoverageDeskClient({ projectId }: { projectId: string }) {
   const { user, appUser } = useAuth();
+  const searchParams = useSearchParams();
+  const dayFromUrl = searchParams.get("day")?.trim() || "";
   const { data: project, loading: projectLoading } = useDocument<Project>("projects", projectId);
   const projectAccess = useProjectAccess(projectId, project?.ownerUserId);
   const [board, setBoard] = useState<ProductionBoard | null>(null);
@@ -42,7 +45,7 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const [fillingFrames, setFillingFrames] = useState(false);
   const [view, setView] = useState<CoverageView>("board");
-  const [dayFilter, setDayFilter] = useState<string>("all");
+  const [dayFilter, setDayFilter] = useState<string>(dayFromUrl || "all");
   const [migrateNote, setMigrateNote] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,6 +67,10 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
   useEffect(() => {
     savingRef.current = saving;
   }, [saving]);
+
+  useEffect(() => {
+    if (dayFromUrl) setDayFilter(dayFromUrl);
+  }, [dayFromUrl]);
 
   const persistBoard = useCallback((next: ProductionBoard, immediate = false) => {
     setBoard(next);

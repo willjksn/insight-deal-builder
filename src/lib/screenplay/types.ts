@@ -114,3 +114,35 @@ export function cycleElementType(
   const next = (index + delta + types.length) % types.length;
   return types[next];
 }
+
+/**
+ * Final Draft–style Tab: jump along the dialogue spine instead of every format.
+ * Shift+Tab reverses. Unlisted types fall back to full cycle.
+ */
+export function tabElementType(
+  type: ScriptElementType,
+  direction: "forward" | "backward"
+): ScriptElementType {
+  const forward: Partial<Record<ScriptElementType, ScriptElementType>> = {
+    scene_heading: "action",
+    action: "character",
+    character: "dialogue",
+    dialogue: "parenthetical",
+    parenthetical: "dialogue",
+    transition: "scene_heading",
+    shot: "action",
+    note: "action",
+  };
+  const backward: Partial<Record<ScriptElementType, ScriptElementType>> = {
+    action: "scene_heading",
+    character: "action",
+    dialogue: "character",
+    parenthetical: "dialogue",
+    scene_heading: "transition",
+    transition: "action",
+    shot: "action",
+    note: "action",
+  };
+  const map = direction === "forward" ? forward : backward;
+  return map[type] ?? cycleElementType(type, direction);
+}

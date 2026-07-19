@@ -1,6 +1,12 @@
 "use client";
 
-import { ProductionBoard, ProductionDay, ProductionPerson } from "@/lib/production/types";
+import {
+  ProductionBoard,
+  ProductionDay,
+  ProductionDayShot,
+  ProductionPerson,
+} from "@/lib/production/types";
+import { formatShotTypeLabel } from "@/lib/production/shotLabels";
 import { cn } from "@/lib/utils/cn";
 
 function peopleForDay(board: ProductionBoard, groups: ProductionPerson["group"][]) {
@@ -119,6 +125,8 @@ export function CallSheetView({ board, day, className, printMode }: CallSheetVie
         </section>
       )}
 
+      {(day.shots?.length ?? 0) > 0 && <CoverageTable shots={day.shots!} />}
+
       {cast.length > 0 && (
         <PeopleTable title="Cast" people={cast} />
       )}
@@ -144,6 +152,66 @@ function InfoCell({
       <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</div>
       <div className="font-medium">{value || "—"}</div>
     </div>
+  );
+}
+
+function coverageShotLabel(shot: ProductionDayShot): string {
+  const num = shot.scoutShotNumber ?? shot.sortOrder + 1;
+  if (shot.shotName?.trim()) return `${num}. ${shot.shotName.trim()}`;
+  if (shot.shotType) return `${num}. ${formatShotTypeLabel(shot.shotType)}`;
+  return `${num}. Shot`;
+}
+
+function CoverageTable({ shots }: { shots: ProductionDayShot[] }) {
+  const sorted = [...shots].sort((a, b) => a.sortOrder - b.sortOrder);
+  return (
+    <section className="mb-6 overflow-x-auto">
+      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+        Coverage ({sorted.filter((s) => s.done).length}/{sorted.length})
+      </h2>
+      <table className="w-full min-w-[560px] border-collapse text-left">
+        <thead>
+          <tr className="border-b border-slate-300 text-xs uppercase text-slate-500">
+            <th className="py-2 pr-2 w-14">Frame</th>
+            <th className="py-2 pr-3">Shot</th>
+            <th className="py-2 pr-3">Sc</th>
+            <th className="py-2 pr-3">Lens</th>
+            <th className="py-2 pr-3">Framing</th>
+            <th className="py-2">Done</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((shot) => (
+            <tr key={shot.id} className="border-b border-slate-100 align-middle">
+              <td className="py-1.5 pr-2">
+                <div className="h-9 w-14 overflow-hidden rounded border border-slate-200 bg-slate-50">
+                  {shot.referenceImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={shot.referenceImageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
+                </div>
+              </td>
+              <td className="py-1.5 pr-3">
+                <div className="font-medium">{coverageShotLabel(shot)}</div>
+                {(shot.description || shot.subjectAction) && (
+                  <div className="text-xs text-slate-500 line-clamp-1">
+                    {shot.description?.trim() || shot.subjectAction}
+                  </div>
+                )}
+              </td>
+              <td className="py-1.5 pr-3 whitespace-nowrap">{shot.sceneRef || "—"}</td>
+              <td className="py-1.5 pr-3 whitespace-nowrap">{shot.lens || "—"}</td>
+              <td className="py-1.5 pr-3">{shot.framing || "—"}</td>
+              <td className="py-1.5">{shot.done ? "✓" : ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }
 

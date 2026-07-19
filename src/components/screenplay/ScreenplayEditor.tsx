@@ -11,12 +11,14 @@ import {
   deleteEmptyElement,
   looksLikeScreenplayPaste,
   mergeElementWithPrevious,
+  nextTypeAfterEmptyEnter,
   pasteScreenplayAt,
+  pasteScreenplayReplacingSelection,
 } from "@/lib/screenplay/editorActions";
 import {
   EDITABLE_SCRIPT_ELEMENT_TYPES,
   nextElementTypeAfterEnter,
-  cycleElementType,
+  tabElementType,
   SCRIPT_ELEMENT_HINTS,
   SCRIPT_ELEMENT_LABELS,
   SCRIPT_ELEMENT_PLACEHOLDERS,
@@ -108,7 +110,7 @@ export function ScreenplayEditor({
 
     if (event.key === "Tab") {
       event.preventDefault();
-      const nextType = cycleElementType(element.type, event.shiftKey ? "backward" : "forward");
+      const nextType = tabElementType(element.type, event.shiftKey ? "backward" : "forward");
       updateElement(element.id, {
         type: nextType,
         text: normalizeElementText(nextType, element.text),
@@ -116,8 +118,22 @@ export function ScreenplayEditor({
       return;
     }
 
+    // Cmd/Ctrl+Enter — always start a new Action block (FD "force action")
+    if (event.key === "Enter" && isMod) {
+      event.preventDefault();
+      insertAfter(index, "action");
+      return;
+    }
+
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
+      if (!element.text.trim()) {
+        const emptyNext = nextTypeAfterEmptyEnter(element.type);
+        if (emptyNext) {
+          insertAfter(index, emptyNext);
+          return;
+        }
+      }
       const nextType = nextElementTypeAfterEnter(element.type);
       insertAfter(index, nextType);
       return;
@@ -168,6 +184,13 @@ export function ScreenplayEditor({
     const text = event.clipboardData.getData("text/plain");
     if (!looksLikeScreenplayPaste(text)) return;
     event.preventDefault();
+    const ta = event.currentTarget;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    if (start !== end) {
+      onChange(pasteScreenplayReplacingSelection(elements, index, start, end, text));
+      return;
+    }
     onChange(pasteScreenplayAt(elements, index, text));
   };
 
@@ -259,9 +282,9 @@ export function ScreenplayEditor({
 
       {!readOnly ? (
         <p className="mx-auto mt-4 max-w-[8.5in] text-xs text-slate-500">
-          Enter = next block · Shift+Enter = line break · Tab / Shift+Tab = format · ↑/↓ at edges
-          move blocks · Backspace at start merges/deletes · Paste Fountain/screenplay to import
-          blocks · Cmd/Ctrl+1–7 jump element type.
+          Enter = next block · empty Dialogue Enter = next Character · Cmd/Ctrl+Enter = Action ·
+          Shift+Enter = line break · Tab = Character→Dialogue→Parenthetical spine · ↑/↓ at edges ·
+          Backspace merges · Paste Fountain (selection-aware) · Cmd/Ctrl+1–7 type jump.
         </p>
       ) : null}
     </div>
