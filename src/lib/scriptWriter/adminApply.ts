@@ -15,6 +15,7 @@ import {
   productionShotsFromScript,
   sceneNumbersFromScript,
 } from "@/lib/scriptWriter/scriptMappers";
+import { mergeBoardCoverageFromScript } from "@/lib/production/coverageSync";
 import { flattenShootingKit, normalizeShootingKit, shootingKitHasGear } from "@/lib/production/shootingKit";
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
@@ -118,14 +119,21 @@ export async function applyScriptToProject(params: {
       : productionSceneFramesFromScript(script, sessionImages, mergedInspiration)
     : existingSceneFrames;
 
-  const updatedDays = boardDays.length
-    ? boardDays.map((day, index) =>
+  const hasExistingShots = boardDays.some((d) => (d.shots?.length ?? 0) > 0);
+  const mergedDays = hasExistingShots
+    ? mergeBoardCoverageFromScript(boardDays, script, sessionImages, mergedInspiration)
+    : boardDays;
+
+  const updatedDays = mergedDays.length
+    ? mergedDays.map((day, index) =>
         index === 0
           ? stripUndefined({
               ...day,
               title: script.title || day.title,
               scenes: sceneNumbersFromScript(script),
-              shots: productionShotsFromScript(script),
+              shots: hasExistingShots
+                ? day.shots
+                : productionShotsFromScript(script, sessionImages, mergedInspiration),
               sceneFrames,
             })
           : day

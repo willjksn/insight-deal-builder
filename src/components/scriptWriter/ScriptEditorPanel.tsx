@@ -69,8 +69,9 @@ export function ScriptEditorPanel({
   readOnly,
 }: ScriptEditorPanelProps) {
   const normalizedScript = useMemo(() => normalizeScriptDocument(script), [script]);
-  const [viewMode, setViewMode] = useState<ScriptViewMode>("preview");
-  const [editing, setEditing] = useState(false);
+  /** Editor-first: open in Edit when the user can change the script. */
+  const [viewMode, setViewMode] = useState<ScriptViewMode>(readOnly ? "preview" : "edit");
+  const [editing, setEditing] = useState(!readOnly);
   const [draft, setDraft] = useState(normalizedScript);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -96,16 +96,20 @@ function shotsStatus(board: ProductionBoard | null | undefined): SpineStep["stat
 }
 
 function shotsSummary(board: ProductionBoard | null | undefined): string {
-  if (!board?.productionDays.length) return "Add shoot days on the pre-production board";
+  if (!board?.productionDays.length) return "Add shoot days on Prep, then build coverage";
   const total = board.productionDays.reduce((n, d) => n + (d.shots?.length ?? 0), 0);
-  if (total) return `${total} shot${total === 1 ? "" : "s"} across ${board.productionDays.length} day${board.productionDays.length === 1 ? "" : "s"}`;
-  return `${board.productionDays.length} shoot day${board.productionDays.length === 1 ? "" : "s"} — add shots`;
+  const framed = board.productionDays.reduce(
+    (n, d) => n + (d.shots?.filter((s) => Boolean(s.referenceImageUrl)).length ?? 0),
+    0
+  );
+  if (total) {
+    return `${total} shot${total === 1 ? "" : "s"} · ${framed} framed · ${board.productionDays.length} day${board.productionDays.length === 1 ? "" : "s"}`;
+  }
+  return `${board.productionDays.length} shoot day${board.productionDays.length === 1 ? "" : "s"} — add coverage`;
 }
 
-function shotsHref(projectId: string, board: ProductionBoard | null | undefined): string {
-  const firstDay = board?.productionDays?.[0];
-  if (firstDay) return `/projects/${projectId}/production/days/${firstDay.id}/shots`;
-  return `/projects/${projectId}/production`;
+function coverageHref(projectId: string): string {
+  return `/projects/${projectId}/coverage`;
 }
 
 interface ProjectSpineProps {
@@ -150,7 +154,7 @@ export function ProjectSpine({
   if (showProduction) {
     steps.push({
       key: "board",
-      label: "Pre-production",
+      label: "Prep",
       icon: LayoutGrid,
       href: `/projects/${projectId}/production`,
       status: boardStatus(board),
@@ -158,10 +162,10 @@ export function ProjectSpine({
     });
 
     steps.push({
-      key: "shots",
-      label: "Shot list",
+      key: "coverage",
+      label: "Coverage",
       icon: ListOrdered,
-      href: shotsHref(projectId, board),
+      href: coverageHref(projectId),
       status: shotsStatus(board),
       summary: shotsSummary(board),
     });

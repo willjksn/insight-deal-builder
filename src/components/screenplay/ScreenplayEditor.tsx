@@ -8,9 +8,17 @@ import {
   reindexElements,
 } from "@/lib/screenplay/elements";
 import {
+  deleteEmptyElement,
+  looksLikeScreenplayPaste,
+  mergeElementWithPrevious,
+  nextTypeAfterEmptyEnter,
+  pasteScreenplayAt,
+  pasteScreenplayReplacingSelection,
+} from "@/lib/screenplay/editorActions";
+import {
   EDITABLE_SCRIPT_ELEMENT_TYPES,
   nextElementTypeAfterEnter,
-  cycleElementType,
+  tabElementType,
   SCRIPT_ELEMENT_HINTS,
   SCRIPT_ELEMENT_LABELS,
   SCRIPT_ELEMENT_PLACEHOLDERS,
@@ -28,6 +36,21 @@ interface ScreenplayEditorProps {
 function autoResize(textarea: HTMLTextAreaElement) {
   textarea.style.height = "auto";
   textarea.style.height = `${textarea.scrollHeight + 2}px`;
+}
+
+function focusBlock(
+  refs: Map<string, HTMLTextAreaElement>,
+  id: string,
+  caret?: number
+) {
+  requestAnimationFrame(() => {
+    const node = refs.get(id);
+    if (!node) return;
+    node.focus();
+    const pos = caret == null ? node.value.length : Math.min(caret, node.value.length);
+    node.setSelectionRange(pos, pos);
+    autoResize(node);
+  });
 }
 
 export function ScreenplayEditor({
@@ -55,16 +78,10 @@ export function ScreenplayEditor({
   const insertAfter = useCallback(
     (index: number, type: ScriptElementType, text = "") => {
       const next = [...elements];
-      next.splice(
-        index + 1,
-        0,
-        createScriptElement(type, text, index + 1)
-      );
-      onChange(reindexElements(next));
-      requestAnimationFrame(() => {
-        const inserted = reindexElements(next)[index + 1];
-        blockRefs.current.get(inserted.id)?.focus();
-      });
+      next.splice(index + 1, 0, createScriptElement(type, text, index + 1));
+      const reindexed = reindexElements(next);
+      onChange(reindexed);
+      focusBlock(blockRefs.current, reindexed[index + 1].id, 0);
     },
     [elements, onChange]
   );
@@ -75,6 +92,9 @@ export function ScreenplayEditor({
     index: number
   ) => {
     const isMod = event.metaKey || event.ctrlKey;
+    const ta = event.currentTarget;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
 
     if (isMod && event.key >= "1" && event.key <= "7") {
       event.preventDefault();
@@ -90,7 +110,7 @@ export function ScreenplayEditor({
 
     if (event.key === "Tab") {
       event.preventDefault();
-      const nextType = cycleElementType(element.type, event.shiftKey ? "backward" : "forward");
+      const nextType = tabElementType(element.type, event.shiftKey ? "backward" : "forward");
       updateElement(element.id, {
         type: nextType,
         text: normalizeElementText(nextType, element.text),
@@ -98,11 +118,80 @@ export function ScreenplayEditor({
       return;
     }
 
+    // Cmd/Ctrl+Enter — always start a new Action block (FD "force action")
+    if (event.key === "Enter" && isMod) {
+      event.preventDefault();
+      insertAfter(index, "action");
+      return;
+    }
+
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
+      if (!element.text.trim()) {
+        const emptyNext = nextTypeAfterEmptyEnter(element.type);
+        if (emptyNext) {
+          insertAfter(index, emptyNext);
+          return;
+        }
+      }
       const nextType = nextElementTypeAfterEnter(element.type);
       insertAfter(index, nextType);
+      return;
     }
+
+    if (event.key === "ArrowUp" && start === 0 && end === 0 && index > 0) {
+      event.preventDefault();
+      const prev = elements[index - 1];
+      focusBlock(blockRefs.current, prev.id, prev.text.length);
+      return;
+    }
+
+    if (
+      event.key === "ArrowDown" &&
+      start === ta.value.length &&
+      end === ta.value.length &&
+      index < elements.length - 1
+    ) {
+      event.preventDefault();
+      focusBlock(blockRefs.current, elements[index + 1].id, 0);
+      return;
+    }
+
+    if (event.key === "Backspace" && start === 0 && end === 0) {
+      if (!element.text.trim()) {
+        const result = deleteEmptyElement(elements, index);
+        if (result) {
+          event.preventDefault();
+          onChange(result.elements);
+          focusBlock(blockRefs.current, result.focusId, result.caret);
+        }
+        return;
+      }
+      const result = mergeElementWithPrevious(elements, index);
+      if (result) {
+        event.preventDefault();
+        onChange(result.elements);
+        focusBlock(blockRefs.current, result.focusId, result.caret);
+      }
+    }
+  };
+
+  const handlePaste = (
+    event: React.ClipboardEvent<HTMLTextAreaElement>,
+    index: number
+  ) => {
+    if (readOnly) return;
+    const text = event.clipboardData.getData("text/plain");
+    if (!looksLikeScreenplayPaste(text)) return;
+    event.preventDefault();
+    const ta = event.currentTarget;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    if (start !== end) {
+      onChange(pasteScreenplayReplacingSelection(elements, index, start, end, text));
+      return;
+    }
+    onChange(pasteScreenplayAt(elements, index, text));
   };
 
   useEffect(() => {
@@ -174,6 +263,7 @@ export function ScreenplayEditor({
                   });
                 }}
                 onKeyDown={(event) => handleKeyDown(event, element, index)}
+                onPaste={(event) => handlePaste(event, index)}
               />
             </div>
           );
@@ -192,8 +282,9 @@ export function ScreenplayEditor({
 
       {!readOnly ? (
         <p className="mx-auto mt-4 max-w-[8.5in] text-xs text-slate-500">
-          Enter moves to the next element type. Tab / Shift+Tab change format. Cmd/Ctrl+1–7 jump to
-          Scene Heading, Action, Character, Dialogue, Parenthetical, Transition, or Shot.
+          Enter = next block · empty Dialogue Enter = next Character · Cmd/Ctrl+Enter = Action ·
+          Shift+Enter = line break · Tab = Character→Dialogue→Parenthetical spine · ↑/↓ at edges ·
+          Backspace merges · Paste Fountain (selection-aware) · Cmd/Ctrl+1–7 type jump.
         </p>
       ) : null}
     </div>

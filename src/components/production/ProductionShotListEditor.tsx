@@ -108,6 +108,7 @@ export function ProductionShotListEditor({
                 <th className="w-36 py-2 pr-2">Type</th>
                 <th className="py-2 pr-2">Shot</th>
                 <th className="min-w-[11rem] py-2 pr-2">Movement</th>
+                <th className="min-w-[6rem] py-2 pr-2">Lens</th>
                 {canMove && <th className="w-28 py-2 pr-2">Move</th>}
                 {!readOnly && <th className="w-10 py-2" />}
               </tr>
@@ -196,11 +197,14 @@ export function ProductionShotListEditor({
                         placeholder="Shot name / description"
                         className="text-sm"
                       />
-                      {shot.subjectAction && (
+                      {shot.description && (
+                        <p className="text-xs text-slate-500 line-clamp-2">{shot.description}</p>
+                      )}
+                      {!shot.description && shot.subjectAction && (
                         <p className="text-xs text-slate-500">{shot.subjectAction}</p>
                       )}
-                      {shot.notes && (
-                        <p className="whitespace-pre-wrap text-xs text-slate-400">{shot.notes}</p>
+                      {shot.framing && (
+                        <p className="text-xs text-slate-400">Frame: {shot.framing}</p>
                       )}
                     </div>
                   </td>
@@ -216,6 +220,18 @@ export function ProductionShotListEditor({
                         placeholder="Static"
                         rows={2}
                         className="min-h-[2.75rem] resize-y py-1.5 text-xs leading-snug"
+                      />
+                    )}
+                  </td>
+                  <td className="min-w-[6rem] py-2 pr-2">
+                    {readOnly ? (
+                      <span className="text-xs text-slate-700">{shot.lens?.trim() || "—"}</span>
+                    ) : (
+                      <Input
+                        value={shot.lens ?? ""}
+                        onChange={(e) => update(shot.id, { lens: e.target.value })}
+                        placeholder="35mm"
+                        className="text-xs"
                       />
                     )}
                   </td>

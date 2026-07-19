@@ -62,24 +62,64 @@ export interface ProductionDayScheduleBlock {
   sortOrder: number;
 }
 
+export type ProductionShotImageSource =
+  | "inspiration"
+  | "upload"
+  | "script_match"
+  | "scene_migrate"
+  | "ai_generate";
+
+/**
+ * Coverage unit: one shot = one storyboard frame.
+ * Rich DP fields mirror ScriptSuggestedShot so apply/refresh no longer collapses into notes only.
+ */
 export interface ProductionDayShot {
   id: string;
   label: string;
   sceneRef?: string;
+  sceneHeading?: string;
   done: boolean;
   scoutShotNumber?: number;
+  /** Freeform / legacy notes; structured fields preferred when present. */
   notes?: string;
   sortOrder: number;
   /** e.g. master_wide, medium_shot, close_up */
   shotType?: string;
   shotName?: string;
+  /** What we see / caption */
+  description?: string;
   subjectAction?: string;
   cameraMovement?: string;
+  lens?: string;
+  lighting?: string;
+  purpose?: string;
+  framing?: string;
+  cameraHeight?: string;
+  blocking?: string;
+  exposureNotes?: string;
+  audioNotes?: string;
+  audioCue?: string;
+  setupNotes?: string;
+  duration?: string;
+  cameraBody?: string;
+  support?: string;
+  assignedLights?: string[];
+  assignedProps?: string[];
+  dollyMoveRef?: string;
+  editNote?: string;
+  /** Storyboard frame image for this shot */
+  referenceImageUrl?: string;
+  referenceImageStoragePath?: string;
+  referenceImageSource?: ProductionShotImageSource;
+  inspirationImageId?: string;
 }
 
 export type ProductionSceneFrameImageSource = "inspiration" | "upload" | "script_match";
 
-/** One storyboard card per scene — grid view and client print. */
+/**
+ * Legacy scene-level storyboard card (one per scene).
+ * Prefer shot-level images on ProductionDayShot; kept for migration + older boards.
+ */
 export interface ProductionSceneFrame {
   id: string;
   sceneRef: string;
