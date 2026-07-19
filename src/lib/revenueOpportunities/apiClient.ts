@@ -234,6 +234,17 @@ export async function revenueListCampaignRuns(
   return parseJson<{ runs: RevenueCampaignRun[] }>(res);
 }
 
+export async function revenueDeleteCampaignRun(
+  getToken: () => Promise<string | null>,
+  runId: string
+) {
+  const res = await fetch(`/api/revenue/campaign-runs/${runId}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: boolean }>(res);
+}
+
 export async function revenueRunCampaignConcept(getToken: () => Promise<string | null>, opportunityId: string) {
   const res = await fetch(`/api/revenue/opportunities/${opportunityId}/campaign-concept`, {
     method: "POST",

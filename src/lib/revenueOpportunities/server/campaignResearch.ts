@@ -10,6 +10,7 @@ import {
   countCampaignRunsSince,
   createCampaignRun,
   finishCampaignRun,
+  pruneCampaignRuns,
 } from "@/lib/revenueOpportunities/server/campaignRuns";
 import {
   createOpportunity,
@@ -176,6 +177,8 @@ export async function runCampaignResearch(
       usedLiveAi: pass.usedLiveAi,
       errorMessage: errorParts.length ? errorParts.join(". ") : undefined,
     });
+
+    await pruneCampaignRuns(appUser, campaignId);
 
     return { campaignRun, agentRun, opportunities: created };
   } catch (err) {

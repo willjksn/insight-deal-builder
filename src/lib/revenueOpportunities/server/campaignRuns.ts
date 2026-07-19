@@ -79,6 +79,9 @@ export async function finishCampaignRun(
   return serializeDoc<RevenueCampaignRun>(snap.id, snap.data()!);
 }
 
+/** Keep the UI tidy — older run history is discarded automatically. */
+export const CAMPAIGN_RUNS_KEEP_LATEST = 10;
+
 export async function listCampaignRuns(
   appUser: AppUser,
   campaignId?: string
@@ -95,9 +98,37 @@ export async function listCampaignRuns(
       return q;
     },
     "createdAt",
-    25
+    40
   );
+
+  if (campaignId && docs.length > CAMPAIGN_RUNS_KEEP_LATEST) {
+    const overflow = docs.slice(CAMPAIGN_RUNS_KEEP_LATEST);
+    await Promise.all(overflow.map((d) => d.ref.delete().catch(() => undefined)));
+    return docs
+      .slice(0, CAMPAIGN_RUNS_KEEP_LATEST)
+      .map((d) => serializeDoc<RevenueCampaignRun>(d.id, d.data()));
+  }
+
   return docs.map((d) => serializeDoc<RevenueCampaignRun>(d.id, d.data()));
+}
+
+export async function deleteCampaignRun(appUser: AppUser, runId: string): Promise<void> {
+  const db = requireDb();
+  const organizationCompany = tenantCompany(appUser);
+  const ref = db.collection(REVENUE_CAMPAIGN_RUNS_COLLECTION).doc(runId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new RevenueOpportunityError("NOT_FOUND", "Research run not found");
+  }
+  if (snap.get("organizationCompany") !== organizationCompany) {
+    throw new RevenueOpportunityError("NOT_AUTHORIZED", "Not allowed to delete this research run");
+  }
+  await ref.delete();
+}
+
+/** After a new run finishes, drop older history for that campaign. */
+export async function pruneCampaignRuns(appUser: AppUser, campaignId: string): Promise<void> {
+  await listCampaignRuns(appUser, campaignId);
 }
 
 /** Count research runs for a campaign since `since` (inclusive). */

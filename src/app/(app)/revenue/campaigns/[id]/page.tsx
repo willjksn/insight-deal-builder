@@ -7,6 +7,7 @@ import { ArrowLeft, Search, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   revenueDeleteCampaign,
+  revenueDeleteCampaignRun,
   revenueGetCampaign,
   revenueGetStatus,
   revenueListCampaignRuns,
@@ -26,6 +27,21 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CampaignForm } from "@/components/revenue/CampaignForm";
 
+function shortRunLabel(run: {
+  opportunitiesCreated: number;
+  searchQuery?: string;
+  errorMessage?: string;
+}) {
+  const created = `${run.opportunitiesCreated} created`;
+  if (run.errorMessage?.trim() && run.opportunitiesCreated === 0) {
+    return `${created} · ${run.errorMessage.trim().slice(0, 80)}`;
+  }
+  const q = run.searchQuery?.trim();
+  if (!q) return created;
+  const first = q.split("|")[0]?.trim() ?? q;
+  return `${created} · ${first.length > 72 ? `${first.slice(0, 72)}…` : first}`;
+}
+
 export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -37,6 +53,7 @@ export default function CampaignDetailPage() {
   const [researching, setResearching] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [researchMessage, setResearchMessage] = useState<string | null>(null);
   const [featureStatus, setFeatureStatus] = useState<RevenueFeatureStatus | null>(null);
@@ -107,7 +124,8 @@ export default function CampaignDetailPage() {
                   setResearchMessage(null);
                   try {
                     const res = await revenueRunCampaignResearch(() => user.getIdToken(), id);
-                    setRuns((prev) => [res.campaignRun, ...prev]);
+                    const listed = await revenueListCampaignRuns(() => user.getIdToken(), id);
+                    setRuns(listed.runs);
                     const live = res.campaignRun.usedLiveSearch ? "deep live" : "research";
                     setResearchMessage(
                       `${live} complete — ${res.opportunities.length} opportunit${res.opportunities.length === 1 ? "y" : "ies"} created.`
@@ -136,8 +154,7 @@ export default function CampaignDetailPage() {
         >
           {researchLive ? (
             <p>
-              <strong>Live deep research ready</strong> — multi-query web search + Gemini qualify per
-              prospect. Dummy data is disabled.
+              <strong>Live deep research ready</strong> — multi-query web search is configured.
             </p>
           ) : (
             <p>
@@ -178,19 +195,57 @@ export default function CampaignDetailPage() {
       {runs.length > 0 && (
         <Card className="mt-8">
           <CardBody>
-            <h3 className="mb-3 font-semibold text-slate-900">Research runs</h3>
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <h3 className="font-semibold text-slate-900">Research runs</h3>
+              <p className="text-xs text-slate-500">Keeps the latest 10 automatically</p>
+            </div>
             <div className="space-y-2 text-sm">
               {runs.map((run) => (
-                <div key={run.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0">
-                  <div>
-                    <p className="font-medium text-slate-900">
-                      {run.opportunitiesCreated} created · {run.searchQuery ?? "Research pass"}
-                    </p>
+                <div
+                  key={run.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-slate-900">{shortRunLabel(run)}</p>
                     <p className="text-xs text-slate-500">{formatDateTime(run.createdAt)}</p>
                   </div>
-                  <Badge variant={run.status === "completed" ? "success" : run.status === "failed" ? "danger" : "warning"}>
-                    {run.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        run.status === "completed"
+                          ? "success"
+                          : run.status === "failed"
+                            ? "danger"
+                            : "warning"
+                      }
+                    >
+                      {run.status}
+                    </Badge>
+                    {canManage ? (
+                      <button
+                        type="button"
+                        className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                        aria-label="Delete research run"
+                        title="Delete research run"
+                        disabled={deletingRunId === run.id || researching || deleting}
+                        onClick={async () => {
+                          if (!user) return;
+                          setDeletingRunId(run.id);
+                          setError(null);
+                          try {
+                            await revenueDeleteCampaignRun(() => user.getIdToken(), run.id);
+                            setRuns((prev) => prev.filter((r) => r.id !== run.id));
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : "Could not delete run");
+                          } finally {
+                            setDeletingRunId(null);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>
