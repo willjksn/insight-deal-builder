@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ProductionDayNav } from "@/components/production/ProductionDayNav";
 import { ProductionShotListEditor } from "@/components/production/ProductionShotListEditor";
-import { ProductionStoryboardGridView } from "@/components/production/ProductionStoryboardGridView";
+import { CoverageBoardView } from "@/components/production/CoverageBoardView";
 import { ShotListPrintView } from "@/components/production/ShotListPrintView";
 import { StoryboardPrintView } from "@/components/production/StoryboardPrintView";
 import { CrewPacketPrintView, scrollToCrewPacketSection } from "@/components/production/CrewPacketPrintView";
@@ -102,7 +102,12 @@ export default function ShotListDayPage() {
   const doneCount = day.shots.filter((s) => s.done).length;
   const scriptSessionId = board.scriptSessionId;
   const sceneFrames = day.sceneFrames ?? [];
-  const hasStoryboard = sceneFrames.length > 0;
+  const dayCoverageShots = (day.shots ?? []).map((shot) => ({
+    ...shot,
+    dayId: day.id,
+    dayNumber: day.dayNumber,
+    dayTitle: day.title,
+  }));
   const crewPacket = day.crewPacket;
   const otherDays = sortedDays
     .filter((d) => d.id !== dayId)
@@ -345,8 +350,12 @@ export default function ShotListDayPage() {
         <p className="max-w-xl rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 text-sm text-violet-950">
           {viewMode === "grid" ? (
             <>
-              <strong>Storyboard</strong> — one reference frame per scene for clients and pre-pro.
-              Coverage checkboxes stay in <strong>List</strong> view.
+              <strong>Storyboard</strong> — one frame per shot (same as Coverage desk). Upload
+              references, mark captured, expand for DP details. Prefer the project{" "}
+              <Link href={`/projects/${projectId}/coverage`} className="font-medium underline">
+                Coverage
+              </Link>{" "}
+              desk for all days.
             </>
           ) : viewMode === "packet" ? (
             <>
@@ -438,26 +447,30 @@ export default function ShotListDayPage() {
         />
       ) : viewMode === "grid" ? (
         <>
-          {!hasStoryboard && scriptSessionId && canEditShots && (
+          {dayCoverageShots.length === 0 && scriptSessionId && canEditShots && (
             <p className="mb-4 text-sm text-slate-600 print:hidden">
-              No storyboard frames yet.{" "}
+              No shots on this day yet. Use <strong>Refresh from script</strong> in List view, or{" "}
               <button
                 type="button"
                 className="font-medium text-amber-700 underline"
                 onClick={() => void buildSceneFramesFromScript()}
               >
-                Build from linked script
-              </button>
+                seed legacy scene frames
+              </button>{" "}
+              (optional).
             </p>
           )}
-          <ProductionStoryboardGridView
+          <CoverageBoardView
             projectId={projectId}
-            projectTitle={board.filmTitle || project.projectName}
-            frames={sceneFrames}
-            shots={day.shots}
+            shots={dayCoverageShots}
             inspirationImages={board.inspirationImages}
-            onChange={(frames) => patchDay({ sceneFrames: frames })}
+            layout="grid"
             readOnly={!canEditShots}
+            onPatchShot={(_dayId, shotId, patch) =>
+              patchDay({
+                shots: day.shots.map((s) => (s.id === shotId ? { ...s, ...patch } : s)),
+              })
+            }
             className="print:hidden"
           />
         </>

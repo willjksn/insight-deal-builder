@@ -45,6 +45,12 @@ export function CallSheetView({ board, day, className, printMode }: CallSheetVie
           {day.scenes.length > 0 && (
             <span><strong>Scenes:</strong> {day.scenes.join(", ")}</span>
           )}
+          {(day.shots?.length ?? 0) > 0 && (
+            <span>
+              <strong>Coverage:</strong> {day.shots!.filter((s) => s.done).length}/{day.shots!.length}{" "}
+              shots
+            </span>
+          )}
         </div>
       </header>
 

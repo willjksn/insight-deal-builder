@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { CallSheetView } from "@/components/production/CallSheetView";
+import { CoverageDayStrip } from "@/components/production/CoverageDayStrip";
 import { ProductionDayNav } from "@/components/production/ProductionDayNav";
 import {
   applyKeyContactsFromBoard,
@@ -84,9 +85,14 @@ export default function CallSheetDayPage() {
               <Printer className="mr-2 h-5 w-5" />
               Print call sheet
             </Button>
+            <Link href={`/projects/${projectId}/coverage`}>
+              <Button size="touch" variant="outline">
+                Coverage
+              </Button>
+            </Link>
             <Link href={`/projects/${projectId}/production/days/${dayId}/shots`}>
               <Button size="touch" variant="outline">
-                Shot list
+                Day shots
               </Button>
             </Link>
             <Link href={`/projects/${projectId}/production`}>
@@ -112,15 +118,19 @@ export default function CallSheetDayPage() {
         <div className="space-y-4 print:hidden">
           <p className="rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm text-sky-950">
             <strong>Call sheet</strong> is logistics for the day — crew call, schedule, locations.
-            Coverage and checkboxes live on the{" "}
-            <Link
-              href={`/projects/${projectId}/production/days/${dayId}/shots`}
-              className="font-medium underline"
-            >
-              shot list page
+            What you’re shooting is summarized below; edit frames on{" "}
+            <Link href={`/projects/${projectId}/coverage`} className="font-medium underline">
+              Coverage
             </Link>
             .
           </p>
+
+          <CoverageDayStrip
+            projectId={projectId}
+            dayId={dayId}
+            dayNumber={day.dayNumber}
+            shots={day.shots ?? []}
+          />
 
           <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
             <h2 className="font-semibold">Day details</h2>
