@@ -14,6 +14,7 @@ import {
   FileText,
   Megaphone,
   IdCard,
+  Mic,
 } from "lucide-react";
 
 export type RevenueNavItem = {
@@ -71,6 +72,12 @@ export const REVENUE_NAV_ITEMS: RevenueNavItem[] = [
     label: "Discovery",
     icon: Phone,
     description: "Call prep and post-call notes",
+  },
+  {
+    href: "/revenue/meetings",
+    label: "Meetings",
+    icon: Mic,
+    description: "Record or upload meetings, transcribe, and extract insights",
   },
   {
     href: "/revenue/proposals",

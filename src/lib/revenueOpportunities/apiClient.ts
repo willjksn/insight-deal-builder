@@ -18,6 +18,11 @@ import type { RevenueOutreachActivity } from "@/lib/revenueOpportunities/types/o
 import type { RevenueEmailThread } from "@/lib/revenueOpportunities/types/emailThread";
 import type { RevenueDiscoverySession, DiscoveryQuestionNote } from "@/lib/revenueOpportunities/types/discovery";
 import type { RevenueOpportunityProposal } from "@/lib/revenueOpportunities/types/proposal";
+import type {
+  RevenueMeeting,
+  RevenueMeetingCreateInput,
+  RevenueMeetingUpdateInput,
+} from "@/lib/revenueOpportunities/types/meeting";
 import type { RevenueWorkflowCatalogEntry, RevenueWorkflowRun } from "@/lib/revenueOpportunities/types/workflowRun";
 import type { Agreement } from "@/lib/types";
 
@@ -297,6 +302,79 @@ export async function revenueRunRevision(getToken: () => Promise<string | null>,
     headers: await authHeaders(getToken),
   });
   return parseJson<{ run: RevenueAgentRun; opportunity: RevenueOpportunity }>(res);
+}
+
+export async function revenueListMeetings(getToken: () => Promise<string | null>) {
+  const res = await fetch(`/api/revenue/meetings`, { headers: await authHeaders(getToken) });
+  return parseJson<{ meetings: RevenueMeeting[] }>(res);
+}
+
+export async function revenueGetMeeting(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/meetings/${id}`, { headers: await authHeaders(getToken) });
+  return parseJson<{ meeting: RevenueMeeting }>(res);
+}
+
+export async function revenueCreateMeeting(
+  getToken: () => Promise<string | null>,
+  body: RevenueMeetingCreateInput
+) {
+  const res = await fetch(`/api/revenue/meetings`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ meeting: RevenueMeeting }>(res);
+}
+
+export async function revenueUpdateMeeting(
+  getToken: () => Promise<string | null>,
+  id: string,
+  body: RevenueMeetingUpdateInput
+) {
+  const res = await fetch(`/api/revenue/meetings/${id}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ meeting: RevenueMeeting }>(res);
+}
+
+export async function revenueDeleteMeeting(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/meetings/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: true }>(res);
+}
+
+export async function revenueTranscribeMeeting(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/meetings/${id}/transcribe`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ meeting: RevenueMeeting; usedLiveAi: boolean }>(res);
+}
+
+export async function revenueAnalyzeMeeting(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/meetings/${id}/analyze`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ meeting: RevenueMeeting; usedLiveAi: boolean }>(res);
+}
+
+export async function revenueResolveMeetingExtraction(
+  getToken: () => Promise<string | null>,
+  id: string,
+  extractionId: string,
+  action: "approve" | "reject"
+) {
+  const res = await fetch(`/api/revenue/meetings/${id}/extraction`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ extractionId, action }),
+  });
+  return parseJson<{ meeting: RevenueMeeting }>(res);
 }
 
 export async function revenueRunVerification(

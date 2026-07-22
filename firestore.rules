@@ -391,6 +391,9 @@ service cloud.firestore {
     match /revenueBusinessProfiles/{docId} {
       allow read, write: if false;
     }
+    match /revenueMeetings/{docId} {
+      allow read, write: if false;
+    }
 
     // Weekly script trend snapshots — server-only (Admin SDK + cron)
     match /trendSnapshots/{contentType} {
