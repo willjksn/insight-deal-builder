@@ -9,6 +9,8 @@ import { emailReceptionistAgent } from "@/lib/revenueOpportunities/agents/emailR
 import { discoveryPrepAgent } from "@/lib/revenueOpportunities/agents/discoveryPrep";
 import { discoveryDebriefAgent } from "@/lib/revenueOpportunities/agents/discoveryDebrief";
 import { proposalDraftAgent } from "@/lib/revenueOpportunities/agents/proposalDraft";
+import { verificationAgent } from "@/lib/revenueOpportunities/agents/verification";
+import { contactFinderAgent } from "@/lib/revenueOpportunities/agents/contactFinder";
 
 let initialized = false;
 
@@ -25,6 +27,8 @@ export function initRevenueAgents(): void {
   registerAgent(discoveryPrepAgent);
   registerAgent(discoveryDebriefAgent);
   registerAgent(proposalDraftAgent);
+  registerAgent(verificationAgent);
+  registerAgent(contactFinderAgent);
   initialized = true;
 }
 
@@ -39,5 +43,7 @@ export {
   discoveryPrepAgent,
   discoveryDebriefAgent,
   proposalDraftAgent,
+  verificationAgent,
+  contactFinderAgent,
 };
 export * from "@/lib/revenueOpportunities/agents/registry";

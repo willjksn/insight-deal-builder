@@ -32,6 +32,30 @@ export interface OpportunityContact {
   verificationStatus?: "verified" | "unverified" | "unknown";
 }
 
+/** Verification agent report (spec Part — specialized agents). Review-only. */
+export interface OpportunityVerification {
+  status: "verified" | "needs_review" | "unverified";
+  /** 0–100 trust score based on evidence coverage and source diversity. */
+  verificationScore: number;
+  verifiedClaims: string[];
+  unverifiedClaims: string[];
+  warnings: string[];
+  sourceDomains: string[];
+  generatedAt: string;
+  source: "rules" | "ai";
+}
+
+/** Contact agent suggestion — applied to the opportunity only on human approval. */
+export interface OpportunityContactSuggestion {
+  contact: OpportunityContact;
+  rationale?: string;
+  /** 0–1 confidence in the suggested contact. */
+  confidence?: number;
+  status: "pending" | "applied" | "dismissed";
+  generatedAt: string;
+  source: "rules" | "ai";
+}
+
 export interface OpportunityResearch {
   observedFacts?: string[];
   aiInterpretations?: string[];
@@ -146,6 +170,8 @@ export interface RevenueOpportunity {
   workflow: OpportunityWorkflow;
   qualityReview?: OpportunityQualityReview;
   revisionSuggestion?: OpportunityRevisionSuggestion;
+  verification?: OpportunityVerification;
+  contactSuggestion?: OpportunityContactSuggestion;
   projectConversion?: OpportunityProjectConversion;
   rejectionReason?: RevenueRejectionReason;
   rejectionNotes?: string;

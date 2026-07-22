@@ -12,6 +12,9 @@ export function OpportunityAgentPanel({
   onQualityReview,
   onRevision,
   onCampaignConcept,
+  onVerify,
+  onFindContact,
+  onResolveContact,
 }: {
   opportunity: RevenueOpportunity;
   canManage: boolean;
@@ -19,9 +22,14 @@ export function OpportunityAgentPanel({
   onQualityReview: () => Promise<void>;
   onRevision: () => Promise<void>;
   onCampaignConcept: () => Promise<void>;
+  onVerify?: () => Promise<void>;
+  onFindContact?: () => Promise<void>;
+  onResolveContact?: (action: "apply" | "dismiss") => Promise<void>;
 }) {
   const review = opportunity.qualityReview;
   const revision = opportunity.revisionSuggestion;
+  const verification = opportunity.verification;
+  const contactSuggestion = opportunity.contactSuggestion;
 
   return (
     <Card>
@@ -43,6 +51,108 @@ export function OpportunityAgentPanel({
             <Button size="touch" variant="outline" disabled={busy} onClick={onCampaignConcept}>
               Generate campaign concept
             </Button>
+            {onVerify && (
+              <Button size="touch" variant="outline" disabled={busy} onClick={onVerify}>
+                Verify evidence
+              </Button>
+            )}
+            {onFindContact && (
+              <Button size="touch" variant="outline" disabled={busy} onClick={onFindContact}>
+                Find decision-maker contact
+              </Button>
+            )}
+          </div>
+        )}
+
+        {verification && (
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="font-medium text-slate-900">Verification</span>
+              <Badge
+                variant={
+                  verification.status === "verified"
+                    ? "success"
+                    : verification.status === "unverified"
+                      ? "danger"
+                      : "warning"
+                }
+              >
+                {verification.status}
+              </Badge>
+              <Badge variant="info">{verification.verificationScore}/100</Badge>
+              <Badge variant={verification.source === "ai" ? "info" : "default"}>
+                {verification.source}
+              </Badge>
+            </div>
+            <p className="text-slate-600">
+              {verification.verifiedClaims.length} verified · {verification.unverifiedClaims.length}{" "}
+              unverified · {verification.sourceDomains.length} source domain(s)
+            </p>
+            {verification.warnings.length > 0 && (
+              <ul className="mt-2 list-inside list-disc text-amber-900">
+                {verification.warnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {contactSuggestion && (
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="font-medium text-slate-900">Suggested contact</span>
+              <Badge
+                variant={
+                  contactSuggestion.status === "applied"
+                    ? "success"
+                    : contactSuggestion.status === "dismissed"
+                      ? "default"
+                      : "warning"
+                }
+              >
+                {contactSuggestion.status}
+              </Badge>
+              <Badge variant={contactSuggestion.source === "ai" ? "info" : "default"}>
+                {contactSuggestion.source}
+              </Badge>
+            </div>
+            <p className="text-slate-700">
+              {[
+                contactSuggestion.contact.name,
+                contactSuggestion.contact.title,
+                contactSuggestion.contact.email,
+                contactSuggestion.contact.phone,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "No details"}
+            </p>
+            {contactSuggestion.rationale && (
+              <p className="mt-1 text-xs text-slate-500">{contactSuggestion.rationale}</p>
+            )}
+            {canManage && onResolveContact && contactSuggestion.status === "pending" && (
+              <div className="mt-2 flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => onResolveContact("apply")}
+                >
+                  Apply to opportunity
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => onResolveContact("dismiss")}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            )}
+            <p className="mt-2 text-xs text-slate-500">
+              Applied only on approval — verify before outreach.
+            </p>
           </div>
         )}
 

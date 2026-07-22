@@ -33,6 +33,8 @@ function agentPhase(name: RevenueAgentName): number {
     case "img_research":
     case "stormi_research":
     case "campaign_concept":
+    case "verification":
+    case "contact_finder":
       return 4;
     case "outreach_draft":
       return 5;
@@ -56,10 +58,12 @@ function agentStatus(name: RevenueAgentName): RevenueAgentCatalogEntry["status"]
     case "discovery_prep":
     case "discovery_debrief":
     case "proposal_draft":
+    case "verification":
       return aiUsesMock() ? "stub" : "live";
     case "img_research":
     case "stormi_research":
     case "campaign_concept":
+    case "contact_finder":
       return revenueResearchLive() ? "live" : "stub";
     default:
       return "planned";

@@ -23,6 +23,9 @@ import {
   revenueRunProposalDraft,
   revenueRunQualityReview,
   revenueRunRevision,
+  revenueRunVerification,
+  revenueFindContact,
+  revenueResolveContactSuggestion,
   revenueSetOpportunityStage,
   revenueUpdateOutreach,
   revenueCreateGmailDraftFromOutreach,
@@ -261,6 +264,45 @@ export default function OpportunityDetailPage() {
                 setOpportunity(res.opportunity);
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Campaign concept failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onVerify={async () => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueRunVerification(() => user.getIdToken(), id);
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Verification failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onFindContact={async () => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueFindContact(() => user.getIdToken(), id);
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Contact search failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onResolveContact={async (action) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueResolveContactSuggestion(() => user.getIdToken(), id, action);
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Could not update contact");
               } finally {
                 setBusy(false);
               }

@@ -9,6 +9,10 @@ import { getOpportunity, updateOpportunity } from "@/lib/revenueOpportunities/se
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import type { RevenueAgentName, RevenueAgentRun } from "@/lib/revenueOpportunities/types/agentRun";
+import type {
+  OpportunityContactSuggestion,
+  OpportunityVerification,
+} from "@/lib/revenueOpportunities/types/opportunity";
 import { AppUser } from "@/lib/types";
 
 function requireDb(): Firestore {
@@ -208,6 +212,114 @@ export async function runQualityReviewForOpportunity(
   });
 
   return { run, opportunity: updated };
+}
+
+export async function runVerificationForOpportunity(
+  appUser: AppUser,
+  opportunityId: string
+): Promise<{ run: RevenueAgentRun; opportunity: Awaited<ReturnType<typeof getOpportunity>> }> {
+  const opportunity = await getOpportunity(appUser, opportunityId);
+  const { run, result } = await runRevenueAgent(
+    appUser,
+    "verification",
+    { opportunity },
+    {
+      opportunityId,
+      campaignId: opportunity.campaignId,
+      inputSummary: `Verify: ${opportunity.subject.name}`,
+    }
+  );
+
+  const output = result as { verification: OpportunityVerification };
+  const updated = await updateOpportunity(appUser, opportunityId, {
+    verification: output.verification,
+    activityLog: [
+      ...opportunity.activityLog,
+      newActivity(
+        appUser,
+        "agent_verification",
+        `Verification: ${output.verification.status} (${output.verification.verificationScore}/100)`,
+        { runId: run.id, agentName: "verification" }
+      ),
+    ],
+  });
+
+  return { run, opportunity: updated };
+}
+
+export async function runContactFinderForOpportunity(
+  appUser: AppUser,
+  opportunityId: string
+): Promise<{ run: RevenueAgentRun; opportunity: Awaited<ReturnType<typeof getOpportunity>> }> {
+  const opportunity = await getOpportunity(appUser, opportunityId);
+  const { run, result } = await runRevenueAgent(
+    appUser,
+    "contact_finder",
+    { opportunity },
+    {
+      opportunityId,
+      campaignId: opportunity.campaignId,
+      inputSummary: `Find contact: ${opportunity.subject.name}`,
+    }
+  );
+
+  const output = result as { suggestion: OpportunityContactSuggestion | null };
+  const suggestion = output.suggestion;
+  const message = suggestion
+    ? `Contact suggested: ${suggestion.contact.name ?? suggestion.contact.email ?? suggestion.contact.phone ?? "contact"}`
+    : "No verifiable contact found";
+
+  const updated = await updateOpportunity(appUser, opportunityId, {
+    ...(suggestion ? { contactSuggestion: suggestion } : {}),
+    activityLog: [
+      ...opportunity.activityLog,
+      newActivity(appUser, "agent_contact_finder", message, {
+        runId: run.id,
+        agentName: "contact_finder",
+      }),
+    ],
+  });
+
+  return { run, opportunity: updated };
+}
+
+/** Apply or dismiss the pending contact suggestion (review-before-write). */
+export async function resolveContactSuggestion(
+  appUser: AppUser,
+  opportunityId: string,
+  action: "apply" | "dismiss"
+): Promise<Awaited<ReturnType<typeof getOpportunity>>> {
+  const opportunity = await getOpportunity(appUser, opportunityId);
+  const suggestion = opportunity.contactSuggestion;
+  if (!suggestion || suggestion.status !== "pending") {
+    throw new RevenueOpportunityError("VALIDATION_FAILED", "No pending contact suggestion");
+  }
+
+  if (action === "dismiss") {
+    return updateOpportunity(appUser, opportunityId, {
+      contactSuggestion: { ...suggestion, status: "dismissed" },
+      activityLog: [
+        ...opportunity.activityLog,
+        newActivity(appUser, "agent_contact_dismissed", "Dismissed suggested contact", {
+          agentName: "contact_finder",
+        }),
+      ],
+    });
+  }
+
+  return updateOpportunity(appUser, opportunityId, {
+    contact: { ...suggestion.contact },
+    contactSuggestion: { ...suggestion, status: "applied" },
+    activityLog: [
+      ...opportunity.activityLog,
+      newActivity(
+        appUser,
+        "agent_contact_applied",
+        `Applied suggested contact: ${suggestion.contact.name ?? suggestion.contact.email ?? suggestion.contact.phone ?? "contact"}`,
+        { agentName: "contact_finder" }
+      ),
+    ],
+  });
 }
 
 export async function runRevisionForOpportunity(

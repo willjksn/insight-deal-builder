@@ -299,6 +299,41 @@ export async function revenueRunRevision(getToken: () => Promise<string | null>,
   return parseJson<{ run: RevenueAgentRun; opportunity: RevenueOpportunity }>(res);
 }
 
+export async function revenueRunVerification(
+  getToken: () => Promise<string | null>,
+  opportunityId: string
+) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/verify`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ run: RevenueAgentRun; opportunity: RevenueOpportunity }>(res);
+}
+
+export async function revenueFindContact(
+  getToken: () => Promise<string | null>,
+  opportunityId: string
+) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/find-contact`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ run: RevenueAgentRun; opportunity: RevenueOpportunity }>(res);
+}
+
+export async function revenueResolveContactSuggestion(
+  getToken: () => Promise<string | null>,
+  opportunityId: string,
+  action: "apply" | "dismiss"
+) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/apply-contact`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ action }),
+  });
+  return parseJson<{ opportunity: RevenueOpportunity }>(res);
+}
+
 export async function revenueRunCampaignResearch(getToken: () => Promise<string | null>, campaignId: string) {
   const res = await fetch(`/api/revenue/campaigns/${campaignId}/research`, {
     method: "POST",
