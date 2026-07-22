@@ -45,6 +45,7 @@ export function inferFeatureFromPath(pathname: string): string {
     [/\/api\/revenue\/business-profiles\/[^/]+\/draft$/, "revenue.profile.draft"],
     [/\/api\/revenue\/opportunities\/[^/]+\/verify$/, "revenue.verify"],
     [/\/api\/revenue\/opportunities\/[^/]+\/find-contact$/, "revenue.contact"],
+    [/\/api\/revenue\/opportunities\/[^/]+\/agents\/[^/]+$/, "revenue.intel"],
     [/\/api\/revenue\/opportunities\/[^/]+\/quality-review$/, "revenue.quality"],
     [/\/api\/revenue\/opportunities\/[^/]+\/revision$/, "revenue.revision"],
     [/\/api\/revenue\/opportunities\/[^/]+\/proposal-draft$/, "revenue.proposal"],

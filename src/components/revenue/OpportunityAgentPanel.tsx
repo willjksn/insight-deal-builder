@@ -1,9 +1,18 @@
 "use client";
 
 import { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
+import type { RevenueIntelAgent } from "@/lib/revenueOpportunities/apiClient";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+
+const INTEL_AGENTS: { key: RevenueIntelAgent; label: string }[] = [
+  { key: "signal", label: "Detect timing signals" },
+  { key: "formal", label: "Find formal openings" },
+  { key: "brand", label: "Find brand partnerships" },
+  { key: "pursuit", label: "Get pursuit plan" },
+  { key: "follow-up", label: "Plan follow-up" },
+];
 
 export function OpportunityAgentPanel({
   opportunity,
@@ -15,6 +24,7 @@ export function OpportunityAgentPanel({
   onVerify,
   onFindContact,
   onResolveContact,
+  onRunIntel,
 }: {
   opportunity: RevenueOpportunity;
   canManage: boolean;
@@ -25,11 +35,17 @@ export function OpportunityAgentPanel({
   onVerify?: () => Promise<void>;
   onFindContact?: () => Promise<void>;
   onResolveContact?: (action: "apply" | "dismiss") => Promise<void>;
+  onRunIntel?: (agent: RevenueIntelAgent) => Promise<void>;
 }) {
   const review = opportunity.qualityReview;
   const revision = opportunity.revisionSuggestion;
   const verification = opportunity.verification;
   const contactSuggestion = opportunity.contactSuggestion;
+  const signals = opportunity.signals;
+  const formalMatches = opportunity.formalMatches;
+  const brandMatches = opportunity.brandMatches;
+  const pursuit = opportunity.pursuit;
+  const followUp = opportunity.followUp;
 
   return (
     <Card>
@@ -61,6 +77,27 @@ export function OpportunityAgentPanel({
                 Find decision-maker contact
               </Button>
             )}
+          </div>
+        )}
+
+        {canManage && onRunIntel && (
+          <div className="space-y-2 border-t border-slate-100 pt-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Opportunity intelligence
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {INTEL_AGENTS.map((a) => (
+                <Button
+                  key={a.key}
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => onRunIntel(a.key)}
+                >
+                  {a.label}
+                </Button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -153,6 +190,144 @@ export function OpportunityAgentPanel({
             <p className="mt-2 text-xs text-slate-500">
               Applied only on approval — verify before outreach.
             </p>
+          </div>
+        )}
+
+        {signals && (
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="font-medium text-slate-900">Timing signals</span>
+              <Badge variant="info">{signals.timingScore}/100</Badge>
+              <Badge variant={signals.source === "ai" ? "info" : "default"}>{signals.source}</Badge>
+            </div>
+            {signals.recommendation && <p className="mb-2 text-slate-600">{signals.recommendation}</p>}
+            {signals.signals.length > 0 ? (
+              <ul className="list-inside list-disc text-slate-700">
+                {signals.signals.map((s, i) => (
+                  <li key={i}>
+                    <span className="text-xs font-medium uppercase text-slate-400">{s.type}</span>{" "}
+                    {s.summary}
+                    {s.sourceUrl && (
+                      <>
+                        {" "}
+                        <a href={s.sourceUrl} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline">
+                          source
+                        </a>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-slate-500">No timing signals found.</p>
+            )}
+          </div>
+        )}
+
+        {formalMatches && (
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="font-medium text-slate-900">Formal openings</span>
+              <Badge variant="info">{formalMatches.matches.length}</Badge>
+              <Badge variant={formalMatches.source === "ai" ? "info" : "default"}>{formalMatches.source}</Badge>
+            </div>
+            {formalMatches.matches.length > 0 ? (
+              <ul className="list-inside list-disc text-slate-700">
+                {formalMatches.matches.map((m, i) => (
+                  <li key={i}>
+                    <span className="text-xs font-medium uppercase text-slate-400">{m.kind}</span>{" "}
+                    {m.url ? (
+                      <a href={m.url} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline">
+                        {m.title}
+                      </a>
+                    ) : (
+                      m.title
+                    )}
+                    {m.deadline && <span className="text-slate-500"> · due {m.deadline}</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-slate-500">No formal openings found.</p>
+            )}
+          </div>
+        )}
+
+        {brandMatches && (
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="font-medium text-slate-900">Brand partnerships</span>
+              <Badge variant="info">{brandMatches.matches.length}</Badge>
+              <Badge variant={brandMatches.source === "ai" ? "info" : "default"}>{brandMatches.source}</Badge>
+            </div>
+            {brandMatches.matches.length > 0 ? (
+              <ul className="list-inside list-disc text-slate-700">
+                {brandMatches.matches.map((m, i) => (
+                  <li key={i}>
+                    <span className="font-medium text-slate-800">
+                      {m.url ? (
+                        <a href={m.url} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline">
+                          {m.brand}
+                        </a>
+                      ) : (
+                        m.brand
+                      )}
+                    </span>
+                    {m.program && <span className="text-slate-500"> · {m.program}</span>}
+                    {m.fitRationale && <p className="text-xs text-slate-500">{m.fitRationale}</p>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-slate-500">No brand partnerships found.</p>
+            )}
+          </div>
+        )}
+
+        {pursuit && (
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="font-medium text-slate-900">Pursuit plan</span>
+              <Badge
+                variant={pursuit.decision === "pursue" ? "success" : pursuit.decision === "pass" ? "danger" : "warning"}
+              >
+                {pursuit.decision}
+              </Badge>
+              <Badge variant="info">{pursuit.priority} priority</Badge>
+              <Badge variant={pursuit.source === "ai" ? "info" : "default"}>{pursuit.source}</Badge>
+            </div>
+            {pursuit.rationale && <p className="mb-2 text-slate-600">{pursuit.rationale}</p>}
+            {pursuit.steps.length > 0 && (
+              <ol className="list-inside list-decimal text-slate-700">
+                {pursuit.steps.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ol>
+            )}
+          </div>
+        )}
+
+        {followUp && (
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="font-medium text-slate-900">Follow-up</span>
+              <Badge variant={followUp.due ? "warning" : "default"}>
+                {followUp.due
+                  ? "due now"
+                  : followUp.dueInDays != null
+                    ? `in ${followUp.dueInDays}d`
+                    : "no date"}
+              </Badge>
+              <Badge variant="info">{followUp.channel}</Badge>
+              <Badge variant={followUp.source === "ai" ? "info" : "default"}>{followUp.source}</Badge>
+            </div>
+            {followUp.angle && <p className="text-slate-600">{followUp.angle}</p>}
+            {followUp.draftMessage && (
+              <p className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-slate-700">
+                {followUp.draftMessage}
+              </p>
+            )}
+            <p className="mt-2 text-xs text-slate-500">Draft only — review before sending.</p>
           </div>
         )}
 

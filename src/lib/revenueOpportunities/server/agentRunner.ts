@@ -10,8 +10,14 @@ import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import type { RevenueAgentName, RevenueAgentRun } from "@/lib/revenueOpportunities/types/agentRun";
 import type {
+  OpportunityBrandMatches,
   OpportunityContactSuggestion,
+  OpportunityFollowUpPlan,
+  OpportunityFormalMatches,
+  OpportunityPursuit,
+  OpportunitySignals,
   OpportunityVerification,
+  RevenueOpportunityUpdateInput,
 } from "@/lib/revenueOpportunities/types/opportunity";
 import { AppUser } from "@/lib/types";
 
@@ -319,6 +325,97 @@ export async function resolveContactSuggestion(
         { agentName: "contact_finder" }
       ),
     ],
+  });
+}
+
+/**
+ * Generic runner for the Phase 4 intelligence agents (signal, formal,
+ * brand, pursuit, follow_up). Runs the agent, then stores its output on the
+ * opportunity as review-only intel and logs an activity entry.
+ */
+async function runIntelAgentForOpportunity(
+  appUser: AppUser,
+  opportunityId: string,
+  agentName: RevenueAgentName,
+  inputSummary: string,
+  apply: (
+    result: unknown
+  ) => { patch: RevenueOpportunityUpdateInput; activityType: string; message: string }
+): Promise<{ run: RevenueAgentRun; opportunity: Awaited<ReturnType<typeof getOpportunity>> }> {
+  const opportunity = await getOpportunity(appUser, opportunityId);
+  const { run, result } = await runRevenueAgent(
+    appUser,
+    agentName,
+    { opportunity },
+    { opportunityId, campaignId: opportunity.campaignId, inputSummary }
+  );
+  const { patch, activityType, message } = apply(result);
+  const updated = await updateOpportunity(appUser, opportunityId, {
+    ...patch,
+    activityLog: [
+      ...opportunity.activityLog,
+      newActivity(appUser, activityType, message, { runId: run.id, agentName }),
+    ],
+  });
+  return { run, opportunity: updated };
+}
+
+export function runSignalForOpportunity(appUser: AppUser, opportunityId: string) {
+  return runIntelAgentForOpportunity(appUser, opportunityId, "signal", "Signals", (result) => {
+    const { signals } = result as { signals: OpportunitySignals };
+    return {
+      patch: { signals },
+      activityType: "agent_signal",
+      message: `Signals: ${signals.signals.length} found · timing ${signals.timingScore}/100`,
+    };
+  });
+}
+
+export function runFormalForOpportunity(appUser: AppUser, opportunityId: string) {
+  return runIntelAgentForOpportunity(appUser, opportunityId, "formal_opportunities", "Formal openings", (result) => {
+    const { formal } = result as { formal: OpportunityFormalMatches };
+    return {
+      patch: { formalMatches: formal },
+      activityType: "agent_formal",
+      message: `Formal openings: ${formal.matches.length} found`,
+    };
+  });
+}
+
+export function runBrandForOpportunity(appUser: AppUser, opportunityId: string) {
+  return runIntelAgentForOpportunity(appUser, opportunityId, "brand_opportunity", "Brand openings", (result) => {
+    const { brand } = result as { brand: OpportunityBrandMatches };
+    return {
+      patch: { brandMatches: brand },
+      activityType: "agent_brand",
+      message: `Brand openings: ${brand.matches.length} found`,
+    };
+  });
+}
+
+export function runPursuitForOpportunity(appUser: AppUser, opportunityId: string) {
+  return runIntelAgentForOpportunity(appUser, opportunityId, "pursuit", "Pursuit plan", (result) => {
+    const { pursuit } = result as { pursuit: OpportunityPursuit };
+    return {
+      patch: { pursuit },
+      activityType: "agent_pursuit",
+      message: `Pursuit: ${pursuit.decision} (${pursuit.priority} priority)`,
+    };
+  });
+}
+
+export function runFollowUpForOpportunity(appUser: AppUser, opportunityId: string) {
+  return runIntelAgentForOpportunity(appUser, opportunityId, "follow_up", "Follow-up plan", (result) => {
+    const { followUp } = result as { followUp: OpportunityFollowUpPlan };
+    return {
+      patch: { followUp },
+      activityType: "agent_follow_up",
+      message: followUp.due
+        ? "Follow-up is due"
+        : followUp.dueInDays != null
+          ? `Follow-up due in ${followUp.dueInDays} day(s)`
+          : "Follow-up planned",
+    };
   });
 }
 

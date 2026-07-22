@@ -26,6 +26,7 @@ import {
   revenueRunVerification,
   revenueFindContact,
   revenueResolveContactSuggestion,
+  revenueRunOpportunityIntel,
   revenueSetOpportunityStage,
   revenueUpdateOutreach,
   revenueCreateGmailDraftFromOutreach,
@@ -303,6 +304,19 @@ export default function OpportunityDetailPage() {
                 setOpportunity(res.opportunity);
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Could not update contact");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onRunIntel={async (agent) => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueRunOpportunityIntel(() => user.getIdToken(), id, agent);
+                setOpportunity(res.opportunity);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Agent run failed");
               } finally {
                 setBusy(false);
               }

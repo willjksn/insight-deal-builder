@@ -11,6 +11,11 @@ import { discoveryDebriefAgent } from "@/lib/revenueOpportunities/agents/discove
 import { proposalDraftAgent } from "@/lib/revenueOpportunities/agents/proposalDraft";
 import { verificationAgent } from "@/lib/revenueOpportunities/agents/verification";
 import { contactFinderAgent } from "@/lib/revenueOpportunities/agents/contactFinder";
+import { signalAgent } from "@/lib/revenueOpportunities/agents/signal";
+import { formalOpportunitiesAgent } from "@/lib/revenueOpportunities/agents/formalOpportunities";
+import { brandOpportunityAgent } from "@/lib/revenueOpportunities/agents/brandOpportunity";
+import { pursuitAgent } from "@/lib/revenueOpportunities/agents/pursuit";
+import { followUpAgent } from "@/lib/revenueOpportunities/agents/followUp";
 
 let initialized = false;
 
@@ -29,6 +34,11 @@ export function initRevenueAgents(): void {
   registerAgent(proposalDraftAgent);
   registerAgent(verificationAgent);
   registerAgent(contactFinderAgent);
+  registerAgent(signalAgent);
+  registerAgent(formalOpportunitiesAgent);
+  registerAgent(brandOpportunityAgent);
+  registerAgent(pursuitAgent);
+  registerAgent(followUpAgent);
   initialized = true;
 }
 
@@ -45,5 +55,10 @@ export {
   proposalDraftAgent,
   verificationAgent,
   contactFinderAgent,
+  signalAgent,
+  formalOpportunitiesAgent,
+  brandOpportunityAgent,
+  pursuitAgent,
+  followUpAgent,
 };
 export * from "@/lib/revenueOpportunities/agents/registry";

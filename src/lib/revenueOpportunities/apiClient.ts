@@ -419,6 +419,21 @@ export async function revenueResolveContactSuggestion(
   return parseJson<{ opportunity: RevenueOpportunity }>(res);
 }
 
+export type RevenueIntelAgent = "signal" | "formal" | "brand" | "pursuit" | "follow-up";
+
+/** Run a Phase 4 intelligence agent (signal, formal, brand, pursuit, follow-up). */
+export async function revenueRunOpportunityIntel(
+  getToken: () => Promise<string | null>,
+  opportunityId: string,
+  agent: RevenueIntelAgent
+) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/agents/${agent}`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ run: RevenueAgentRun; opportunity: RevenueOpportunity }>(res);
+}
+
 export async function revenueRunCampaignResearch(getToken: () => Promise<string | null>, campaignId: string) {
   const res = await fetch(`/api/revenue/campaigns/${campaignId}/research`, {
     method: "POST",

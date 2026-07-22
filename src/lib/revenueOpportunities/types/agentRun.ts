@@ -14,7 +14,12 @@ export type RevenueAgentName =
   | "discovery_debrief"
   | "proposal_draft"
   | "verification"
-  | "contact_finder";
+  | "contact_finder"
+  | "signal"
+  | "formal_opportunities"
+  | "brand_opportunity"
+  | "pursuit"
+  | "follow_up";
 
 export interface RevenueAgentRun {
   id: string;

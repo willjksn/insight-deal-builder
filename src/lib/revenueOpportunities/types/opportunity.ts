@@ -56,6 +56,80 @@ export interface OpportunityContactSuggestion {
   source: "rules" | "ai";
 }
 
+// ─── Phase 4 intelligence agents (review-only outputs) ──────────────────────
+
+export interface OpportunitySignal {
+  type: "funding" | "hiring" | "expansion" | "launch" | "event" | "leadership" | "press" | "other";
+  summary: string;
+  sourceUrl?: string;
+  /** Free-text recency hint, e.g. "3 weeks ago" or "2026-06". */
+  recency?: string;
+  strength: "low" | "medium" | "high";
+}
+
+/** Signal agent — buying/timing signals detected from live research. */
+export interface OpportunitySignals {
+  signals: OpportunitySignal[];
+  /** 0–100 timing score: how "hot" the moment is to engage. */
+  timingScore: number;
+  recommendation?: string;
+  generatedAt: string;
+  source: "rules" | "ai";
+}
+
+export interface FormalOpportunityMatch {
+  title: string;
+  kind: "rfp" | "tender" | "grant" | "open_call" | "sponsorship" | "job" | "other";
+  deadline?: string;
+  requirements?: string[];
+  url?: string;
+  fitRationale?: string;
+}
+
+/** Formal-opportunities agent — structured openings (RFPs, grants, open calls). */
+export interface OpportunityFormalMatches {
+  matches: FormalOpportunityMatch[];
+  generatedAt: string;
+  source: "rules" | "ai";
+}
+
+export interface BrandOpportunityMatch {
+  brand: string;
+  program?: string;
+  fitRationale?: string;
+  contactRoute?: string;
+  url?: string;
+}
+
+/** Brand-opportunity agent — brand-partnership openings (Stormi-oriented). */
+export interface OpportunityBrandMatches {
+  matches: BrandOpportunityMatch[];
+  generatedAt: string;
+  source: "rules" | "ai";
+}
+
+/** Pursuit agent — prioritization + next-best-actions from known data. */
+export interface OpportunityPursuit {
+  decision: "pursue" | "hold" | "pass";
+  priority: "high" | "medium" | "low";
+  rationale?: string;
+  steps: string[];
+  generatedAt: string;
+  source: "rules" | "ai";
+}
+
+/** Follow-up agent — whether/when/how to follow up. */
+export interface OpportunityFollowUpPlan {
+  due: boolean;
+  /** Days until (negative = overdue) the follow-up is due, when computable. */
+  dueInDays?: number;
+  channel: "email" | "call" | "social" | "other";
+  angle?: string;
+  draftMessage?: string;
+  generatedAt: string;
+  source: "rules" | "ai";
+}
+
 export interface OpportunityResearch {
   observedFacts?: string[];
   aiInterpretations?: string[];
@@ -172,6 +246,11 @@ export interface RevenueOpportunity {
   revisionSuggestion?: OpportunityRevisionSuggestion;
   verification?: OpportunityVerification;
   contactSuggestion?: OpportunityContactSuggestion;
+  signals?: OpportunitySignals;
+  formalMatches?: OpportunityFormalMatches;
+  brandMatches?: OpportunityBrandMatches;
+  pursuit?: OpportunityPursuit;
+  followUp?: OpportunityFollowUpPlan;
   projectConversion?: OpportunityProjectConversion;
   rejectionReason?: RevenueRejectionReason;
   rejectionNotes?: string;
