@@ -2,200 +2,26 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  UserCircle,
-  FolderKanban,
-  FileText,
-  FileStack,
-  HardDrive,
-  MapPin,
-  Package,
-  Settings,
-  LogOut,
-  Shield,
-  BarChart3,
-  Clapperboard,
-  ScrollText,
-  Calculator,
-  BookOpen,
-  CircleHelp,
-  CalendarDays,
-  Lightbulb,
-  TrendingUp,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  APP_SHORT_TAGLINE,
-} from "@/lib/brand";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { APP_SHORT_TAGLINE } from "@/lib/brand";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import {
   canCreateQuotes,
-  canManageClients,
-  canManageCompanies,
-  canManageCrew,
   canManageProjects,
-  canManageTemplates,
-  canManageUsers,
-  canAccessReports,
   canUseProductionTools,
-  canAccessRevenueOpportunities,
 } from "@/lib/utils/permissions";
-import { isRevenueOpportunitiesFeatureEnabled } from "@/lib/utils/permissions";
-import { isContentIdeasNavEnabled } from "@/lib/contentIdeas/navFlag";
-import { canAccessHowToUseGuide } from "@/lib/guide/access";
-import { AppUser } from "@/lib/types";
+import {
+  NavItem,
+  getVisibleNavGroups,
+  isNavItemActive,
+} from "@/lib/navigation/navConfig";
 
-type NavItem = {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  canAccess?: (user: AppUser | null) => boolean;
-};
-
-type NavGroup = {
-  label: string;
-  items: NavItem[];
-};
-
-const navGroups: NavGroup[] = [
-  {
-    label: "Overview",
-    items: [
-      { href: "/dashboard", label: "Command center", icon: LayoutDashboard },
-      { href: "/calendar", label: "Calendar", icon: CalendarDays },
-    ],
-  },
-  {
-    label: "Production",
-    items: [
-      {
-        href: "/projects",
-        label: "Projects",
-        icon: FolderKanban,
-      },
-      {
-        href: "/script-writer",
-        label: "Script writer",
-        icon: ScrollText,
-        canAccess: canUseProductionTools,
-      },
-      {
-        href: "/reference",
-        label: "Reference guide",
-        icon: BookOpen,
-        canAccess: canUseProductionTools,
-      },
-    ],
-  },
-  {
-    label: "Content development",
-    items: [
-      {
-        href: "/content",
-        label: "Weekly idea engine",
-        icon: Lightbulb,
-        canAccess: (user) => isContentIdeasNavEnabled() && canUseProductionTools(user),
-      },
-      {
-        href: "/content/profiles",
-        label: "Brand profiles",
-        icon: UserCircle,
-        canAccess: (user) => isContentIdeasNavEnabled() && canUseProductionTools(user),
-      },
-      {
-        href: "/content/ideas/bank",
-        label: "Saved ideas",
-        icon: FileText,
-        canAccess: (user) => isContentIdeasNavEnabled() && canUseProductionTools(user),
-      },
-    ],
-  },
-  {
-    label: "Business",
-    items: [
-      {
-        href: "/revenue",
-        label: "Revenue & opportunities",
-        icon: TrendingUp,
-        canAccess: (user) =>
-          isRevenueOpportunitiesFeatureEnabled() && canAccessRevenueOpportunities(user),
-      },
-      {
-        href: "/quick-quote",
-        label: "Quick quote",
-        icon: Calculator,
-        canAccess: canCreateQuotes,
-      },
-      { href: "/agreements", label: "Agreements", icon: FileText },
-      {
-        href: "/templates",
-        label: "Templates",
-        icon: FileStack,
-        canAccess: canManageTemplates,
-      },
-      {
-        href: "/reports",
-        label: "Reports",
-        icon: BarChart3,
-        canAccess: canAccessReports,
-      },
-    ],
-  },
-  {
-    label: "Catalogs",
-    items: [
-      {
-        href: "/companies",
-        label: "Companies",
-        icon: Building2,
-        canAccess: canManageCompanies,
-      },
-      {
-        href: "/clients",
-        label: "Clients",
-        icon: Users,
-        canAccess: canManageClients,
-      },
-      {
-        href: "/crew",
-        label: "Crew",
-        icon: UserCircle,
-        canAccess: canManageCrew,
-      },
-      {
-        href: "/packages",
-        label: "Packages",
-        icon: Package,
-        canAccess: canManageProjects,
-      },
-      {
-        href: "/equipment",
-        label: "Equipment",
-        icon: HardDrive,
-        canAccess: canManageProjects,
-      },
-      {
-        href: "/locations",
-        label: "Locations",
-        icon: MapPin,
-        canAccess: canManageProjects,
-      },
-    ],
-  },
-];
-
-function NavLink({
-  item,
-  active,
-}: {
-  item: NavItem;
-  active: boolean;
-}) {
+function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
   return (
     <Link
@@ -216,13 +42,9 @@ function NavLink({
 export function Sidebar() {
   const pathname = usePathname();
   const { appUser, signOut } = useAuth();
+  const { workspace } = useWorkspace();
 
-  const visibleGroups = navGroups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => !item.canAccess || item.canAccess(appUser)),
-    }))
-    .filter((group) => group.items.length > 0);
+  const visibleGroups = getVisibleNavGroups(workspace, appUser);
 
   return (
     <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-slate-900 text-white shadow-xl shadow-slate-900/20">
@@ -232,6 +54,10 @@ export function Sidebar() {
             <BrandLogo variant="full" className="h-8 w-auto max-w-[180px]" priority />
           </div>
           <p className="text-[11px] text-slate-400 leading-snug">{APP_SHORT_TAGLINE}</p>
+        </div>
+
+        <div className="px-4 pt-4">
+          <WorkspaceSwitcher variant="sidebar" />
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
@@ -245,15 +71,7 @@ export function Sidebar() {
                   <NavLink
                     key={item.href}
                     item={item}
-                    active={
-                      item.href === "/dashboard"
-                        ? pathname === "/dashboard"
-                        : item.href === "/content"
-                          ? pathname === "/content" || pathname.startsWith("/content/ideas")
-                          : item.href === "/revenue"
-                            ? pathname.startsWith("/revenue")
-                            : pathname.startsWith(item.href)
-                    }
+                    active={isNavItemActive(item, pathname)}
                   />
                 ))}
               </div>
@@ -267,24 +85,6 @@ export function Sidebar() {
               were added to. Ask an admin if Coverage or call sheet is missing.
             </p>
           ) : null}
-
-          <div>
-            <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              System
-            </p>
-            <div className="space-y-0.5">
-              <NavLink item={{ href: "/settings", label: "Settings", icon: Settings }} active={pathname === "/settings"} />
-              {canManageUsers(appUser) || canManageProjects(appUser) ? (
-                <NavLink item={{ href: "/admin", label: "Admin", icon: Shield }} active={pathname.startsWith("/admin")} />
-              ) : null}
-              {canAccessHowToUseGuide(appUser) ? (
-                <NavLink
-                  item={{ href: "/how-to-use", label: "How to use", icon: CircleHelp }}
-                  active={pathname.startsWith("/how-to-use")}
-                />
-              ) : null}
-            </div>
-          </div>
         </nav>
 
         <div className="border-t border-slate-700 p-4">

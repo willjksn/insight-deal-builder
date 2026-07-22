@@ -2,98 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  UserCircle,
-  FolderKanban,
-  FileText,
-  FileStack,
-  Settings,
-  Shield,
-  Clapperboard,
-  ScrollText,
-  BookOpen,
-  Package,
-  HardDrive,
-  MapPin,
-  Calculator,
-  BarChart3,
-  CircleHelp,
-  CalendarDays,
-  Lightbulb,
-  TrendingUp,
-} from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
-import { APP_NAME, APP_SHORT_TAGLINE } from "@/lib/brand";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { APP_NAME } from "@/lib/brand";
 import { BrandLogo } from "@/components/brand/BrandLogo";
-import {
-  canCreateQuotes,
-  canManageClients,
-  canManageCompanies,
-  canManageCrew,
-  canManageProjects,
-  canManageTemplates,
-  canManageUsers,
-  canAccessReports,
-  canUseProductionTools,
-  canAccessRevenueOpportunities,
-} from "@/lib/utils/permissions";
-import { isRevenueOpportunitiesFeatureEnabled } from "@/lib/utils/permissions";
-import { isContentIdeasNavEnabled } from "@/lib/contentIdeas/navFlag";
-import { canAccessHowToUseGuide } from "@/lib/guide/access";
-
-type MoreNavItem = {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  canAccess?: (user: ReturnType<typeof useAuth>["appUser"]) => boolean;
-};
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { getMobileNav, isNavItemActive } from "@/lib/navigation/navConfig";
 
 export function MobileNav() {
   const pathname = usePathname();
   const { appUser } = useAuth();
-  const showProduction = canUseProductionTools(appUser);
+  const { workspace } = useWorkspace();
 
-  const navItems = [
-    { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-    { href: "/calendar", label: "Calendar", icon: CalendarDays },
-    { href: "/projects", label: "Projects", icon: FolderKanban },
-    ...(showProduction
-      ? [
-          { href: "/script-writer", label: "Script", icon: ScrollText },
-          ...(isContentIdeasNavEnabled()
-            ? [{ href: "/content", label: "Ideas", icon: Lightbulb }]
-            : []),
-          { href: "/reference", label: "Guide", icon: BookOpen },
-        ]
-      : []),
-    { href: "/agreements", label: "Deals", icon: FileText },
-    ...(isRevenueOpportunitiesFeatureEnabled() && canAccessRevenueOpportunities(appUser)
-      ? [{ href: "/revenue", label: "Revenue", icon: TrendingUp }]
-      : []),
-    { href: "/settings", label: "Settings", icon: Settings },
-  ];
-
-  const moreItems: MoreNavItem[] = [
-    { href: "/quick-quote", label: "Quick quote", icon: Calculator, canAccess: canCreateQuotes },
-    { href: "/reports", label: "Reports", icon: BarChart3, canAccess: canAccessReports },
-    { href: "/packages", label: "Packages", icon: Package, canAccess: canManageProjects },
-    { href: "/equipment", label: "Equipment", icon: HardDrive, canAccess: canManageProjects },
-    { href: "/locations", label: "Locations", icon: MapPin, canAccess: canManageProjects },
-    { href: "/companies", label: "Companies", icon: Building2, canAccess: canManageCompanies },
-    { href: "/clients", label: "Clients", icon: Users, canAccess: canManageClients },
-    { href: "/crew", label: "Crew", icon: UserCircle, canAccess: canManageCrew },
-    { href: "/templates", label: "Templates", icon: FileStack, canAccess: canManageTemplates },
-    { href: "/admin", label: "Admin", icon: Shield, canAccess: canManageUsers },
-    { href: "/how-to-use", label: "How to use", icon: CircleHelp, canAccess: canAccessHowToUseGuide },
-  ];
-
-  const visibleMoreItems = moreItems.filter(
-    (item) => !item.canAccess || item.canAccess(appUser)
-  );
+  const { primary, more } = getMobileNav(workspace, appUser);
 
   return (
     <>
@@ -103,16 +25,16 @@ export function MobileNav() {
             <div className="flex min-w-0 items-center gap-2.5">
               <BrandLogo variant="icon" className="h-9 w-9 shrink-0" />
               <div className="min-w-0">
-              <h1 className="truncate text-base font-bold text-slate-900">{APP_NAME}</h1>
-              <p className="truncate text-[10px] font-medium text-sky-700/90">{APP_SHORT_TAGLINE}</p>
+                <h1 className="truncate text-base font-bold text-slate-900">{APP_NAME}</h1>
               </div>
             </div>
+            <WorkspaceSwitcher variant="mobile" className="w-[188px] shrink-0" />
           </div>
-          {visibleMoreItems.length > 0 ? (
+          {more.length > 0 ? (
             <nav className="mt-2 flex gap-1 overflow-x-auto pb-1 scrollbar-none">
-              {visibleMoreItems.map((item) => {
+              {more.map((item) => {
                 const Icon = item.icon;
-                const active = pathname.startsWith(item.href);
+                const active = isNavItemActive(item, pathname);
                 return (
                   <Link
                     key={item.href}
@@ -136,12 +58,9 @@ export function MobileNav() {
 
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/80 bg-white/95 backdrop-blur-md safe-area-pb shadow-[0_-4px_20px_rgba(15,23,42,0.06)]">
         <div className="flex items-center justify-around px-1 py-2 overflow-x-auto scrollbar-none">
-          {navItems.map((item) => {
+          {primary.map((item) => {
             const Icon = item.icon;
-            const active =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname.startsWith(item.href);
+            const active = isNavItemActive(item, pathname);
             return (
               <Link
                 key={item.href}
