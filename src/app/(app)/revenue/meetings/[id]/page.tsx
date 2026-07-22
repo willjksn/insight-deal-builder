@@ -144,6 +144,11 @@ export default function MeetingDetailPage() {
       />
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {!error && meeting.status === "failed" && meeting.errorMessage && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Last run failed: {meeting.errorMessage}. Use the buttons below to retry.
+        </div>
+      )}
 
       <div className="space-y-6">
         {meeting.participants.length > 0 && (

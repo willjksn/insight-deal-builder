@@ -74,8 +74,20 @@ export async function convertOpportunityToProject(
       projectName: input.projectName,
       ownerUserId: appUser.id,
     });
-    const projectRef = await db.collection("projects").add(payload);
-    const projectId = projectRef.id;
+    // Idempotency guard: a prior attempt may have created the project before
+    // failing mid-conversion. Reuse it instead of creating a duplicate on retry.
+    let projectId: string;
+    const existingProject = await db
+      .collection("projects")
+      .where("sourceRevenueOpportunityId", "==", opportunityId)
+      .limit(1)
+      .get();
+    if (!existingProject.empty) {
+      projectId = existingProject.docs[0].id;
+    } else {
+      const projectRef = await db.collection("projects").add(payload);
+      projectId = projectRef.id;
+    }
     const convertedAt = new Date().toISOString();
 
     // Bridge to production: link the opportunity's meetings to the new project

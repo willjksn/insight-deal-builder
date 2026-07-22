@@ -213,17 +213,30 @@ export async function analyzeMeeting(
     }
   }
 
-  const { analysis, usedLiveAi } = await analyzeTranscript(transcript, {
-    title: meeting.title,
-    meetingType: meeting.meetingType,
-    subjectName,
-  });
+  try {
+    const { analysis, usedLiveAi } = await analyzeTranscript(transcript, {
+      title: meeting.title,
+      meetingType: meeting.meetingType,
+      subjectName,
+    });
 
-  await ref.update(
-    stripUndefined({ analysis, status: "analyzed", updatedAt: FieldValue.serverTimestamp() })
-  );
-  const snap = await ref.get();
-  return { meeting: serializeDoc<RevenueMeeting>(snap.id, snap.data()!), usedLiveAi };
+    await ref.update(
+      stripUndefined({
+        analysis,
+        status: "analyzed",
+        errorMessage: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+    );
+    const snap = await ref.get();
+    return { meeting: serializeDoc<RevenueMeeting>(snap.id, snap.data()!), usedLiveAi };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Analysis failed";
+    await ref.update(
+      stripUndefined({ status: "failed", errorMessage: message, updatedAt: FieldValue.serverTimestamp() })
+    );
+    throw new RevenueOpportunityError("WORKFLOW_UNAVAILABLE", message, { status: 500 });
+  }
 }
 
 /**
