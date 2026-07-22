@@ -1,5 +1,6 @@
 import { logTavilyUsage } from "@/lib/ai/usageLog";
 import { withAiCallLogging } from "@/lib/ai/aiTelemetry";
+import { assertTavilyBudget, noteTavilyCreditsSpent } from "@/lib/search/tavilyBudget";
 
 export type TavilySearchResult = {
   title: string;
@@ -45,6 +46,9 @@ async function tavilySearchInner(
     throw new Error("TAVILY_API_KEY is not configured");
   }
 
+  // Per-month credit guard — throws when near the cap so callers fall back to rules.
+  await assertTavilyBudget();
+
   const res = await fetch("https://api.tavily.com/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -79,7 +83,9 @@ async function tavilySearchInner(
     }>;
   };
 
-  logTavilyUsage(options?.searchDepth ?? "basic");
+  const depth = options?.searchDepth ?? "basic";
+  logTavilyUsage(depth);
+  noteTavilyCreditsSpent(depth === "advanced" ? 2 : 1);
 
   return {
     query: data.query ?? query,
