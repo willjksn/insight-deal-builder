@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FileText, Plus, LayoutGrid, ScrollText, ArrowRight } from "lucide-react";
+import { FileText, Plus, LayoutGrid, ScrollText, ArrowRight, Mic } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -18,6 +18,12 @@ import { ProductionBoard } from "@/lib/production/types";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { getProductionBoardByProject } from "@/lib/firebase/productionFirestore";
 import { scriptWriterListSessions } from "@/lib/scriptWriter/apiClient";
+import { revenueListMeetings } from "@/lib/revenueOpportunities/apiClient";
+import { RevenueMeeting } from "@/lib/revenueOpportunities/types/meeting";
+import {
+  MEETING_STATUS_LABELS,
+  MEETING_TYPE_LABELS,
+} from "@/lib/revenueOpportunities/meetings/labels";
 import { ProjectSpine } from "@/components/projects/ProjectSpine";
 import { ProjectShotProgressCard } from "@/components/projects/ProjectShotProgressCard";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
@@ -26,6 +32,8 @@ import {
   canUseProductionTools,
   canManageProjects,
   canManageUsers,
+  canViewRevenueOpportunities,
+  canManageRevenueOpportunities,
 } from "@/lib/utils/permissions";
 
 function pickProjectScriptSession(
@@ -60,6 +68,7 @@ export default function ProjectDetailPage() {
   const [board, setBoard] = useState<ProductionBoard | null>(null);
   const [scriptSessions, setScriptSessions] = useState<ScriptWriterSession[]>([]);
   const [spineLoading, setSpineLoading] = useState(false);
+  const [meetings, setMeetings] = useState<RevenueMeeting[]>([]);
 
   const projectAgreements = useMemo(
     () =>
@@ -83,6 +92,8 @@ export default function ProjectDetailPage() {
   const shotsOnly = showShots && !showPrepBoard && !showScripts;
   const canCreateDeal = canCreateQuotes(appUser);
   const canOpenTeamAccess = canManageProjects(appUser) || canManageUsers(appUser);
+  const showMeetings = canViewRevenueOpportunities(appUser);
+  const canCreateMeeting = canManageRevenueOpportunities(appUser);
   const firstDayId = board?.productionDays?.length
     ? [...board.productionDays].sort((a, b) => a.dayNumber - b.dayNumber)[0]?.id
     : undefined;
@@ -103,6 +114,13 @@ export default function ProjectDetailPage() {
     if (!id || !showProduction) return;
     getProductionBoardByProject(id).then(setBoard).catch(() => setBoard(null));
   }, [id, showProduction]);
+
+  useEffect(() => {
+    if (!user || !id || !showMeetings) return;
+    revenueListMeetings(() => user.getIdToken(), { projectId: id })
+      .then((res) => setMeetings(res.meetings))
+      .catch(() => setMeetings([]));
+  }, [user, id, showMeetings]);
 
   useEffect(() => {
     if (!user || (!showProduction && !showScripts)) return;
@@ -365,6 +383,47 @@ export default function ProjectDetailPage() {
                           <ArrowRight className="ml-3 h-4 w-4 shrink-0 text-slate-300" />
                         )}
                       </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
+        {showMeetings && (
+          <Card>
+            <CardBody>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Mic className="h-5 w-5 text-rose-600" />
+                  Meetings
+                </h2>
+                {canCreateMeeting && (
+                  <Link href={`/revenue/meetings/new?projectId=${project.id}`}>
+                    <Button size="sm" variant="outline">New meeting</Button>
+                  </Link>
+                )}
+              </div>
+              {meetings.length === 0 ? (
+                <p className="text-sm text-slate-500">No meetings linked to this project yet.</p>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {meetings.map((m) => (
+                    <li key={m.id}>
+                      <Link
+                        href={`/revenue/meetings/${m.id}`}
+                        className="flex items-center justify-between py-3 hover:bg-slate-50 -mx-2 px-2 rounded-lg"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{m.title}</p>
+                          <p className="text-xs text-slate-500">
+                            {MEETING_TYPE_LABELS[m.meetingType]}
+                            {m.meetingDate ? ` · ${formatDate(m.meetingDate)}` : ""}
+                          </p>
+                        </div>
+                        <Badge>{MEETING_STATUS_LABELS[m.status]}</Badge>
+                      </Link>
                     </li>
                   ))}
                 </ul>

@@ -6,6 +6,7 @@ import { opportunityToProjectPayload } from "@/lib/revenueOpportunities/opportun
 import { ensureClientFromOpportunity } from "@/lib/revenueOpportunities/server/ensureClientFromOpportunity";
 import { getOpportunity, updateOpportunity } from "@/lib/revenueOpportunities/server/opportunities";
 import { getProposal } from "@/lib/revenueOpportunities/server/proposals";
+import { linkOpportunityMeetingsToProject } from "@/lib/revenueOpportunities/server/meetings";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 import { AppUser } from "@/lib/types";
 
@@ -24,6 +25,8 @@ export interface ConvertOpportunityToProjectResult {
   projectId: string;
   opportunity: RevenueOpportunity;
   alreadyConverted: boolean;
+  /** Number of meetings linked from the opportunity to the new project. */
+  meetingsLinked: number;
 }
 
 export async function convertOpportunityToProject(
@@ -36,7 +39,7 @@ export async function convertOpportunityToProject(
 
   const existingProjectId = opportunity.projectConversion?.shootSpineProjectId;
   if (opportunity.projectConversion?.status === "converted" && existingProjectId) {
-    return { projectId: existingProjectId, opportunity, alreadyConverted: true };
+    return { projectId: existingProjectId, opportunity, alreadyConverted: true, meetingsLinked: 0 };
   }
 
   let proposal;
@@ -75,6 +78,15 @@ export async function convertOpportunityToProject(
     const projectId = projectRef.id;
     const convertedAt = new Date().toISOString();
 
+    // Bridge to production: link the opportunity's meetings to the new project
+    // (link, don't copy) so production keeps full context without re-entry.
+    let meetingsLinked = 0;
+    try {
+      meetingsLinked = await linkOpportunityMeetingsToProject(appUser, opportunityId, projectId);
+    } catch (linkErr) {
+      console.error("convertToProject: meeting link error:", linkErr);
+    }
+
     const updated = await updateOpportunity(appUser, opportunityId, {
       projectConversion: {
         status: "converted",
@@ -96,11 +108,12 @@ export async function convertOpportunityToProject(
           projectId,
           ...(workingOpportunity.clientId ? { clientId: workingOpportunity.clientId } : {}),
           ...(proposal?.id ? { proposalId: proposal.id } : {}),
+          ...(meetingsLinked > 0 ? { meetingsLinked: String(meetingsLinked) } : {}),
         }),
       ],
     });
 
-    return { projectId, opportunity: updated, alreadyConverted: false };
+    return { projectId, opportunity: updated, alreadyConverted: false, meetingsLinked };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Project creation failed";
     await updateOpportunity(appUser, opportunityId, {

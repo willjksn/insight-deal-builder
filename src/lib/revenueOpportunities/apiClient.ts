@@ -304,8 +304,15 @@ export async function revenueRunRevision(getToken: () => Promise<string | null>,
   return parseJson<{ run: RevenueAgentRun; opportunity: RevenueOpportunity }>(res);
 }
 
-export async function revenueListMeetings(getToken: () => Promise<string | null>) {
-  const res = await fetch(`/api/revenue/meetings`, { headers: await authHeaders(getToken) });
+export async function revenueListMeetings(
+  getToken: () => Promise<string | null>,
+  filters?: { projectId?: string; opportunityId?: string }
+) {
+  const qs = new URLSearchParams();
+  if (filters?.projectId) qs.set("projectId", filters.projectId);
+  if (filters?.opportunityId) qs.set("opportunityId", filters.opportunityId);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const res = await fetch(`/api/revenue/meetings${suffix}`, { headers: await authHeaders(getToken) });
   return parseJson<{ meetings: RevenueMeeting[] }>(res);
 }
 

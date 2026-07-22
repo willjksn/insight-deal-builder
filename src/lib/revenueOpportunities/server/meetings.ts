@@ -40,7 +40,10 @@ async function loadOwned(appUser: AppUser, id: string) {
   return { ref, meeting };
 }
 
-export async function listMeetings(appUser: AppUser): Promise<RevenueMeeting[]> {
+export async function listMeetings(
+  appUser: AppUser,
+  filters?: { projectId?: string; opportunityId?: string }
+): Promise<RevenueMeeting[]> {
   const db = requireDb();
   const organizationCompany = tenantCompany(appUser);
   const docs = await getOrderedQueryDocs(
@@ -48,12 +51,43 @@ export async function listMeetings(appUser: AppUser): Promise<RevenueMeeting[]> 
       let q: FirebaseFirestore.Query = db
         .collection(REVENUE_MEETINGS_COLLECTION)
         .where("organizationCompany", "==", organizationCompany);
+      if (filters?.projectId) q = q.where("projectId", "==", filters.projectId);
+      if (filters?.opportunityId) q = q.where("opportunityId", "==", filters.opportunityId);
       if (ordered) q = q.orderBy("updatedAt", "desc");
       return q;
     },
     "updatedAt"
   );
   return docs.map((d) => serializeDoc<RevenueMeeting>(d.id, d.data()));
+}
+
+/**
+ * Link every meeting attached to an opportunity to a converted project
+ * (link, don't copy). Idempotent — skips meetings already on the project.
+ * Returns the number of meetings newly linked.
+ */
+export async function linkOpportunityMeetingsToProject(
+  appUser: AppUser,
+  opportunityId: string,
+  projectId: string
+): Promise<number> {
+  const db = requireDb();
+  const organizationCompany = tenantCompany(appUser);
+  const snap = await db
+    .collection(REVENUE_MEETINGS_COLLECTION)
+    .where("organizationCompany", "==", organizationCompany)
+    .where("opportunityId", "==", opportunityId)
+    .get();
+
+  let linked = 0;
+  const batch = db.batch();
+  for (const doc of snap.docs) {
+    if (doc.data().projectId === projectId) continue;
+    batch.update(doc.ref, stripUndefined({ projectId, updatedAt: FieldValue.serverTimestamp() }));
+    linked += 1;
+  }
+  if (linked > 0) await batch.commit();
+  return linked;
 }
 
 export async function getMeeting(appUser: AppUser, id: string): Promise<RevenueMeeting> {

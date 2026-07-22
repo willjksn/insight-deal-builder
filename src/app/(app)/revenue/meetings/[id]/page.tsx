@@ -149,6 +149,14 @@ export default function MeetingDetailPage() {
         {meeting.participants.length > 0 && (
           <p className="text-sm text-slate-600">Participants: {meeting.participants.join(", ")}</p>
         )}
+        {meeting.projectId && (
+          <p className="text-sm">
+            Linked project:{" "}
+            <Link href={`/projects/${meeting.projectId}`} className="text-sky-700 hover:underline">
+              View project →
+            </Link>
+          </p>
+        )}
         {meeting.opportunityId && (
           <p className="text-sm">
             Linked opportunity:{" "}

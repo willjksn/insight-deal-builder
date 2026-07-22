@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { revenueCreateMeeting } from "@/lib/revenueOpportunities/apiClient";
@@ -20,16 +20,22 @@ const TYPE_OPTIONS = (Object.entries(MEETING_TYPE_LABELS) as [RevenueMeetingType
   ([value, label]) => ({ value, label })
 );
 
-export default function NewMeetingPage() {
+function NewMeetingForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, appUser } = useAuth();
   const canManage = canManageRevenueOpportunities(appUser);
 
+  const prefillProjectId = searchParams.get("projectId")?.trim() || "";
+  const prefillOpportunityId = searchParams.get("opportunityId")?.trim() || "";
+
   const [title, setTitle] = useState("");
-  const [meetingType, setMeetingType] = useState<RevenueMeetingType>("discovery");
+  const [meetingType, setMeetingType] = useState<RevenueMeetingType>(
+    prefillProjectId ? "production" : "discovery"
+  );
   const [meetingDate, setMeetingDate] = useState("");
   const [participants, setParticipants] = useState("");
-  const [opportunityId, setOpportunityId] = useState("");
+  const [opportunityId, setOpportunityId] = useState(prefillOpportunityId);
   const [notes, setNotes] = useState("");
   const [transcriptText, setTranscriptText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -54,6 +60,7 @@ export default function NewMeetingPage() {
           .map((p) => p.trim())
           .filter(Boolean),
         opportunityId: opportunityId.trim() || undefined,
+        projectId: prefillProjectId || undefined,
         notes: notes.trim() || undefined,
         transcriptText: transcriptText.trim() || undefined,
       });
@@ -76,6 +83,15 @@ export default function NewMeetingPage() {
       <PageHeader title="New meeting" subtitle="Create the meeting, then upload audio or paste a transcript." />
       <Card>
         <CardBody>
+          {prefillProjectId && (
+            <p className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+              Linked to project{" "}
+              <Link href={`/projects/${prefillProjectId}`} className="font-medium underline">
+                {prefillProjectId}
+              </Link>
+              {" "}· type defaulted to Production.
+            </p>
+          )}
           <form className="space-y-4" onSubmit={submit}>
             <Input
               label="Title"
@@ -137,5 +153,13 @@ export default function NewMeetingPage() {
         </CardBody>
       </Card>
     </>
+  );
+}
+
+export default function NewMeetingPage() {
+  return (
+    <Suspense fallback={null}>
+      <NewMeetingForm />
+    </Suspense>
   );
 }

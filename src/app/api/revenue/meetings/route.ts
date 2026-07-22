@@ -41,7 +41,10 @@ function validateCreate(body: unknown): RevenueMeetingCreateInput {
 export async function GET(request: NextRequest) {
   try {
     const { appUser } = await requireRevenueViewer(request);
-    const meetings = await listMeetings(appUser);
+    const url = new URL(request.url);
+    const projectId = url.searchParams.get("projectId")?.trim() || undefined;
+    const opportunityId = url.searchParams.get("opportunityId")?.trim() || undefined;
+    const meetings = await listMeetings(appUser, { projectId, opportunityId });
     return NextResponse.json({ meetings });
   } catch (err) {
     return revenueApiError(err);
