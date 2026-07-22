@@ -104,6 +104,7 @@ export const PROPOSAL_STATUS_LABELS = {
   review: "In review",
   approved: "Approved",
   sent: "Sent",
+  accepted: "Accepted",
   archived: "Archived",
 } as const;
 

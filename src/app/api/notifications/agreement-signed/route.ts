@@ -5,6 +5,7 @@ import {
   partyHasSignature,
   verifyAuthToken,
 } from "@/lib/notifications/server";
+import { linkSignedAgreementToRevenue } from "@/lib/revenueOpportunities/server/agreementLink";
 import { Agreement } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -65,7 +66,15 @@ export async function POST(request: NextRequest) {
       appUrl,
     });
 
-    return NextResponse.json({ ok: true, ...result });
+    // Best-effort: close the revenue loop (proposal accepted + opportunity won).
+    let revenueLink: Awaited<ReturnType<typeof linkSignedAgreementToRevenue>> | undefined;
+    try {
+      revenueLink = await linkSignedAgreementToRevenue(db, agreementId, uid);
+    } catch (linkErr) {
+      console.error("agreement-signed revenue link error:", linkErr);
+    }
+
+    return NextResponse.json({ ok: true, ...result, revenueLink });
   } catch (err) {
     console.error("agreement-signed notification error:", err);
     const message = err instanceof Error ? err.message : "Notification failed";

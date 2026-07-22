@@ -1,4 +1,10 @@
-export type RevenueProposalStatus = "draft" | "review" | "approved" | "sent" | "archived";
+export type RevenueProposalStatus =
+  | "draft"
+  | "review"
+  | "approved"
+  | "sent"
+  | "accepted"
+  | "archived";
 
 export interface AgreementProposalPrefill {
   suggestedTitle: string;
