@@ -13,6 +13,14 @@ import type {
   BusinessProfileFields,
   BusinessProfileUpdateInput,
 } from "@/lib/revenueOpportunities/types/businessProfile";
+import {
+  generateProfileDraft,
+  type GenerateProfileDraftInput,
+} from "@/lib/revenueOpportunities/profileBuilder/generateProfileDraft";
+import {
+  buildPendingChanges,
+  resolvePendingChanges,
+} from "@/lib/revenueOpportunities/profileBuilder/pendingChanges";
 import { AppUser } from "@/lib/types";
 
 function requireDb(): Firestore {
@@ -190,6 +198,92 @@ export async function updateBusinessProfile(
   });
 
   await ref.update(update);
+  const snap = await ref.get();
+  return serializeDoc<BusinessProfile>(snap.id, snap.data()!);
+}
+
+/**
+ * Run the AI builder over pasted material / a URL and stage the results as
+ * review-only pending changes. Approved fields are never overwritten here.
+ */
+export async function draftBusinessProfile(
+  appUser: AppUser,
+  id: string,
+  input: Pick<GenerateProfileDraftInput, "sourceText" | "sourceUrl">
+): Promise<{ profile: BusinessProfile; usedLiveAi: boolean; notes: string[]; suggestionCount: number }> {
+  const db = requireDb();
+  const ref = db.collection(REVENUE_BUSINESS_PROFILES_COLLECTION).doc(id);
+  const existing = await ref.get();
+  if (!existing.exists) throw new RevenueOpportunityError("NOT_FOUND", "Profile not found");
+  const current = serializeDoc<BusinessProfile>(existing.id, existing.data()!);
+  if (current.organizationCompany !== tenantCompany(appUser)) {
+    throw new RevenueOpportunityError("NOT_AUTHORIZED", "Profile not found");
+  }
+
+  const { draft, usedLiveAi } = await generateProfileDraft({
+    profileType: current.profileType,
+    sourceText: input.sourceText,
+    sourceUrl: input.sourceUrl,
+  });
+
+  const nowIso = new Date().toISOString();
+  const pendingChanges = buildPendingChanges(current.fields ?? {}, draft.fields, {
+    source: usedLiveAi ? "ai" : "manual",
+    confidence: draft.confidence,
+    now: nowIso,
+  });
+
+  await ref.update(
+    stripUndefined({ pendingChanges, updatedAt: FieldValue.serverTimestamp() })
+  );
+  const snap = await ref.get();
+  const profile = serializeDoc<BusinessProfile>(snap.id, snap.data()!);
+  return { profile, usedLiveAi, notes: draft.notes, suggestionCount: pendingChanges.length };
+}
+
+/** Approve or reject staged pending changes (all, or a specific subset). */
+export async function resolveBusinessProfilePending(
+  appUser: AppUser,
+  id: string,
+  action: "approve" | "reject",
+  changeIds?: string[]
+): Promise<BusinessProfile> {
+  const db = requireDb();
+  const ref = db.collection(REVENUE_BUSINESS_PROFILES_COLLECTION).doc(id);
+  const existing = await ref.get();
+  if (!existing.exists) throw new RevenueOpportunityError("NOT_FOUND", "Profile not found");
+  const current = serializeDoc<BusinessProfile>(existing.id, existing.data()!);
+  if (current.organizationCompany !== tenantCompany(appUser)) {
+    throw new RevenueOpportunityError("NOT_AUTHORIZED", "Profile not found");
+  }
+
+  const nowIso = new Date().toISOString();
+  const resolved = resolvePendingChanges(
+    current,
+    action,
+    changeIds,
+    { userId: appUser.id, displayName: appUser.displayName },
+    nowIso
+  );
+
+  const update: Record<string, unknown> = {
+    pendingChanges: resolved.pendingChanges,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  if (action === "approve" && resolved.appliedCount > 0) {
+    update.fields = resolved.fields;
+    update.changeHistory = resolved.changeHistory;
+    update.review = {
+      ...current.review,
+      source: "ai",
+      lastUpdatedAt: nowIso,
+      lastUpdatedByUserId: appUser.id,
+      lastReviewedAt: nowIso,
+      lastReviewedByUserId: appUser.id,
+    };
+  }
+
+  await ref.update(stripUndefined(update));
   const snap = await ref.get();
   return serializeDoc<BusinessProfile>(snap.id, snap.data()!);
 }

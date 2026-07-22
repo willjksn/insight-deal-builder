@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ProfileForm } from "@/components/revenue/ProfileForm";
+import { ProfileAiBuilder } from "@/components/revenue/ProfileAiBuilder";
 
 const TYPE_LABELS: Record<BusinessProfile["profileType"], string> = {
   img: "Insight Media Group",
@@ -128,6 +129,14 @@ export default function ProfileDetailPage() {
       ) : (
         <p className="text-sm text-slate-600">View-only access.</p>
       )}
+
+      {canManage ? (
+        <ProfileAiBuilder
+          profileId={id}
+          pendingChanges={profile.pendingChanges ?? []}
+          onUpdated={setProfile}
+        />
+      ) : null}
 
       {profile.changeHistory && profile.changeHistory.length > 0 && (
         <Card className="mt-8">

@@ -47,9 +47,14 @@ export interface BusinessProfileChangeEntry {
 /** An AI-drafted field update awaiting human approval — never applied silently. */
 export interface BusinessProfilePendingChange {
   id: string;
-  field: string;
+  /** Field key within BusinessProfileFields. */
+  field: keyof BusinessProfileFields;
+  /** Human-readable current value (for the review UI). */
   currentValue?: string;
+  /** Human-readable suggested value (for the review UI). */
   suggestedValue?: string;
+  /** Typed suggested value applied verbatim on approval (avoids lossy round-trips). */
+  rawValue?: string | number | boolean | string[];
   source: BusinessProfileFieldSource;
   confidence?: number;
   rationale?: string;

@@ -83,6 +83,15 @@ export function listToText(value: string[] | undefined): string {
   return (value ?? []).join("\n");
 }
 
+/** Human-readable rendering of any field value, for change logs and diffs. */
+export function displayFieldValue(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (Array.isArray(value)) return value.length ? value.join(", ") : undefined;
+  if (typeof value === "boolean") return value ? "yes" : "no";
+  const s = String(value).trim();
+  return s || undefined;
+}
+
 /** Parse a textarea value back into a trimmed, de-duped string[]. */
 export function textToList(value: string): string[] {
   const seen = new Set<string>();

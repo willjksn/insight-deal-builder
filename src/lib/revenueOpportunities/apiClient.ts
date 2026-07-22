@@ -133,6 +133,38 @@ export async function revenueDeleteProfile(getToken: () => Promise<string | null
   return parseJson<{ ok: true }>(res);
 }
 
+export async function revenueDraftProfile(
+  getToken: () => Promise<string | null>,
+  id: string,
+  body: { sourceText?: string; sourceUrl?: string }
+) {
+  const res = await fetch(`/api/revenue/business-profiles/${id}/draft`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    profile: BusinessProfile;
+    usedLiveAi: boolean;
+    notes: string[];
+    suggestionCount: number;
+  }>(res);
+}
+
+export async function revenueResolveProfilePending(
+  getToken: () => Promise<string | null>,
+  id: string,
+  action: "approve" | "reject",
+  changeIds?: string[]
+) {
+  const res = await fetch(`/api/revenue/business-profiles/${id}/pending`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ action, changeIds }),
+  });
+  return parseJson<{ profile: BusinessProfile }>(res);
+}
+
 export async function revenueListOpportunities(
   getToken: () => Promise<string | null>,
   params?: { pipelineStage?: RevenuePipelineStage; campaignId?: string; approvalStatus?: string }
