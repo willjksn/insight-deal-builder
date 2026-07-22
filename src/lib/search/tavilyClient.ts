@@ -1,4 +1,5 @@
 import { logTavilyUsage } from "@/lib/ai/usageLog";
+import { withAiCallLogging } from "@/lib/ai/aiTelemetry";
 
 export type TavilySearchResult = {
   title: string;
@@ -18,6 +19,20 @@ export function tavilyAvailable(): boolean {
 }
 
 export async function tavilySearch(
+  query: string,
+  options?: {
+    maxResults?: number;
+    searchDepth?: "basic" | "advanced";
+    includeAnswer?: boolean;
+  }
+): Promise<TavilySearchResponse> {
+  return withAiCallLogging(
+    { provider: "tavily", op: "search", meta: { depth: options?.searchDepth ?? "basic" } },
+    () => tavilySearchInner(query, options)
+  );
+}
+
+async function tavilySearchInner(
   query: string,
   options?: {
     maxResults?: number;

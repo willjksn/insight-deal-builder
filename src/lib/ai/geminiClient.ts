@@ -1,4 +1,5 @@
 import { throwGeminiApiError } from "@/lib/ai/geminiErrors";
+import { withAiCallLogging } from "@/lib/ai/aiTelemetry";
 import { logGeminiImageUsage, logGeminiTextUsage } from "@/lib/ai/usageLog";
 import {
   canFallbackToVertexGemini,
@@ -144,6 +145,20 @@ export async function fetchMediaInlineData(
 export type GeminiProvider = "api_key" | "vertex";
 
 export async function callGeminiGenerate(params: {
+  systemPrompt: string;
+  userParts?: GeminiPart[];
+  history?: GeminiChatTurn[];
+  json?: boolean;
+  model?: string;
+  temperature?: number;
+}): Promise<string> {
+  return withAiCallLogging(
+    { provider: "gemini", op: "generate", model: geminiModel(params.model), meta: { json: Boolean(params.json) } },
+    () => callGeminiGenerateInner(params)
+  );
+}
+
+async function callGeminiGenerateInner(params: {
   systemPrompt: string;
   userParts?: GeminiPart[];
   history?: GeminiChatTurn[];

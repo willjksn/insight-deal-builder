@@ -39,10 +39,27 @@ export function inferFeatureFromPath(pathname: string): string {
     [/\/api\/cron\/trend-snapshots$/, "cron.trends"],
     [/\/api\/projects\/[^/]+\/coverage\/generate-frame$/, "coverage.frame"],
     [/\/api\/projects\/[^/]+\/coverage\/generate-frames$/, "coverage.frame"],
+    // Revenue & opportunities — AI/search-backed endpoints.
+    [/\/api\/revenue\/meetings\/[^/]+\/transcribe$/, "revenue.meeting.transcribe"],
+    [/\/api\/revenue\/meetings\/[^/]+\/analyze$/, "revenue.meeting.analyze"],
+    [/\/api\/revenue\/business-profiles\/[^/]+\/draft$/, "revenue.profile.draft"],
+    [/\/api\/revenue\/opportunities\/[^/]+\/verify$/, "revenue.verify"],
+    [/\/api\/revenue\/opportunities\/[^/]+\/find-contact$/, "revenue.contact"],
+    [/\/api\/revenue\/opportunities\/[^/]+\/quality-review$/, "revenue.quality"],
+    [/\/api\/revenue\/opportunities\/[^/]+\/revision$/, "revenue.revision"],
+    [/\/api\/revenue\/opportunities\/[^/]+\/proposal-draft$/, "revenue.proposal"],
+    [/\/api\/revenue\/opportunities\/[^/]+\/outreach-draft$/, "revenue.outreach"],
+    [/\/api\/revenue\/opportunities\/[^/]+\/discovery-prep$/, "revenue.discovery"],
+    [/\/api\/revenue\/opportunities\/[^/]+\/campaign-concept$/, "revenue.concept"],
+    [/\/api\/revenue\/campaigns\/[^/]+\/research$/, "revenue.research"],
+    [/\/api\/revenue\/discovery\/[^/]+\/debrief$/, "revenue.discovery"],
   ];
   for (const [re, feature] of rules) {
     if (re.test(p)) return feature;
   }
+  // Catch-all for remaining revenue endpoints so cost is attributed to the
+  // revenue workspace rather than lumped into "api.other".
+  if (p.startsWith("/api/revenue/")) return "revenue.other";
   if (p.startsWith("/api/")) return "api.other";
   return "unknown";
 }
