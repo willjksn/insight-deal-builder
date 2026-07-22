@@ -1,4 +1,5 @@
 import { loadAiUsageMonthly } from "@/lib/ai/usageLog";
+import { loadSearchMode } from "@/lib/search/searchMode";
 
 /**
  * Lightweight per-month Tavily credit guard.
@@ -82,8 +83,25 @@ export async function tavilyBudgetStatus(): Promise<TavilyBudgetStatus> {
   };
 }
 
-/** Throw a TavilyBudgetError when the monthly credit cap is (nearly) reached. */
+/**
+ * Throw a TavilyBudgetError when live search should be skipped:
+ * - the admin has turned on lightweight (rule-only) mode, or
+ * - the automatic credit guard is enabled and the monthly cap is (nearly) reached.
+ */
 export async function assertTavilyBudget(): Promise<void> {
+  const mode = await loadSearchMode();
+
+  // Manual override: always fall back to rules, regardless of remaining credits.
+  if (mode.lightweightMode) {
+    throw new TavilyBudgetError(
+      "Lightweight search mode is on — using rule-based mode instead of live web search. " +
+        "Turn it off in Admin → Search mode to re-enable Tavily."
+    );
+  }
+
+  // Automatic near-cap guard (opt-out via Admin → Search mode).
+  if (!mode.autoCreditGuard) return;
+
   const cap = tavilyMonthlyCap();
   if (cap <= 0) return;
   const used = await creditsUsedThisMonth();

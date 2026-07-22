@@ -6,7 +6,10 @@ import {
   RESOURCE_MEMBERS_SUBCOLLECTION,
 } from "@/lib/projectAccess/server";
 import { isUserArchived } from "@/lib/users/approval";
-import { canArchivePartnerUser as validateArchivePartner } from "@/lib/users/archivePartner";
+import {
+  canArchivePartnerUser as validateArchivePartner,
+  canRemoveUserAccess as validateRemoveAccess,
+} from "@/lib/users/archivePartner";
 
 export type ArchivePartnerResult = {
   userId: string;
@@ -81,6 +84,40 @@ export async function archivePartnerUser(
     projectMembershipsRemoved,
     resourceSharesRemoved,
   };
+}
+
+/**
+ * Remove a user's access (archive-style, reversible). Works for any non-admin
+ * account, not just partners. Revokes login + permissions and removes all
+ * project/resource memberships; records on agreements are kept.
+ */
+export async function removeUserAccess(
+  db: Firestore,
+  targetUserId: string,
+  adminUserId: string
+): Promise<ArchivePartnerResult> {
+  const userSnap = await db.collection("users").doc(targetUserId).get();
+  if (!userSnap.exists) throw new Error("User not found");
+
+  const target = { id: userSnap.id, ...userSnap.data() } as AppUser;
+  const blockReason = validateRemoveAccess(target, adminUserId);
+  if (blockReason) throw new Error(blockReason);
+
+  const [projectMembershipsRemoved, resourceSharesRemoved] = await Promise.all([
+    removeAllProjectMembershipsForUser(db, targetUserId),
+    removeAllResourceSharesForUser(db, targetUserId),
+  ]);
+
+  await db.collection("users").doc(targetUserId).update({
+    approved: false,
+    permissions: { ...EMPTY_PERMISSIONS },
+    role: "member",
+    archivedAt: new Date().toISOString(),
+    archivedByUserId: adminUserId,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  return { userId: targetUserId, projectMembershipsRemoved, resourceSharesRemoved };
 }
 
 export async function restorePartnerUser(

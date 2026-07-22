@@ -19,3 +19,17 @@ export function canRestorePartnerUser(target: AppUser, adminUserId: string): str
   if (!isUserArchived(target)) return "This user is not archived.";
   return null;
 }
+
+/**
+ * Whether an admin may remove a user's access. Unlike partner archiving this
+ * works for any account (including Insight Media Group members), but protects
+ * the admin's own account and other admins so no one can be locked out.
+ */
+export function canRemoveUserAccess(target: AppUser, adminUserId: string): string | null {
+  if (target.id === adminUserId) return "You cannot remove your own access.";
+  if (isUserArchived(target)) return "This user's access is already removed.";
+  if (resolvePermissions(target).manageUsers) {
+    return "Remove the user-management (Full admin) permission first, then remove access.";
+  }
+  return null;
+}

@@ -21,10 +21,11 @@ import {
 } from "@/lib/utils/permissions";
 import { ProjectAccessHub } from "@/components/projectAccess/ProjectAccessHub";
 import { AiUsagePanel } from "@/components/admin/AiUsagePanel";
+import { SearchModePanel } from "@/components/admin/SearchModePanel";
 import { AdminWorkspacePanel } from "@/components/admin/AdminWorkspacePanel";
 import { ReferenceGuideAdminPanel } from "@/components/admin/ReferenceGuideAdminPanel";
 import { isUserApproved, isUserArchived, isUserPendingApproval, shouldApproveOnAdminSave } from "@/lib/users/approval";
-import { canArchivePartnerUser, canRestorePartnerUser } from "@/lib/users/archivePartner";
+import { canRemoveUserAccess, canRestorePartnerUser } from "@/lib/users/archivePartner";
 import { deleteField } from "firebase/firestore";
 import {
   EMPTY_PERMISSIONS,
@@ -303,9 +304,9 @@ export default function AdminPage() {
     }
   };
 
-  const handleArchivePartner = async (user: AppUser) => {
+  const handleRemoveAccess = async (user: AppUser) => {
     if (!appUser || !firebaseUser) return;
-    const block = canArchivePartnerUser(user, appUser.id);
+    const block = canRemoveUserAccess(user, appUser.id);
     if (block) {
       setError(block);
       return;
@@ -313,7 +314,7 @@ export default function AdminPage() {
     const name = user.displayName || user.email;
     if (
       !confirm(
-        `Archive ${name}?\n\nThey will lose login access and be removed from all project teams and shared scripts. Signed agreements and their work files stay on record.`
+        `Remove access for ${name}?\n\nThey will lose login access and be removed from all project teams and shared scripts. Signed agreements and their work files stay on record. You can restore them later.`
       )
     ) {
       return;
@@ -322,12 +323,12 @@ export default function AdminPage() {
     setError(null);
     try {
       const token = await firebaseUser.getIdToken();
-      const res = await fetch(`/api/admin/users/${user.id}/archive`, {
+      const res = await fetch(`/api/admin/users/${user.id}/remove-access`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Archive failed");
+      if (!res.ok) throw new Error(data.error || "Remove access failed");
       setEdits((prev) => {
         const next = { ...prev };
         delete next[user.id];
@@ -335,7 +336,7 @@ export default function AdminPage() {
       });
       refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Archive failed");
+      setError(err instanceof Error ? err.message : "Remove access failed");
     } finally {
       setArchivingId(null);
     }
@@ -453,6 +454,7 @@ export default function AdminPage() {
       {canManageProjectTeams && <AdminWorkspacePanel users={users.filter((u) => !isUserArchived(u))} />}
 
       {isOrgAdmin && <AiUsagePanel />}
+      {isOrgAdmin && <SearchModePanel />}
       {isOrgAdmin && <ReferenceGuideAdminPanel />}
 
       <PageSection
@@ -525,7 +527,7 @@ export default function AdminPage() {
                 : userSummaryLabel(edit.permissions, edit.company);
             const activePresetId = matchingPresetId(edit.permissions, edit.company);
             const showArchive =
-              isOrgAdmin && !archived && canArchivePartnerUser(user, appUser.id) === null;
+              isOrgAdmin && !archived && canRemoveUserAccess(user, appUser.id) === null;
             const showRestore = isOrgAdmin && archived && canRestorePartnerUser(user, appUser.id) === null;
             const applicableDefs = PERMISSION_DEFINITIONS.filter(
               (d) => !d.insightOnly || edit.company === INSIGHT_MEDIA_GROUP_LLC
@@ -580,12 +582,12 @@ export default function AdminPage() {
                 <CardBody className="space-y-5">
                   {archived && (
                     <InfoCallout variant="blue">
-                      <strong>Archived partner.</strong> Login is disabled and project access was
+                      <strong>Access removed.</strong> Login is disabled and project access was
                       removed. Their agreements and files remain on record. Restore to re-onboard, then
                       assign permissions and save.
                       {user.archivedAt && (
                         <span className="mt-1 block text-xs opacity-80">
-                          Archived {new Date(user.archivedAt).toLocaleString()}
+                          Removed {new Date(user.archivedAt).toLocaleString()}
                         </span>
                       )}
                     </InfoCallout>
@@ -703,10 +705,10 @@ export default function AdminPage() {
                           variant="outline"
                           className="border-red-200 text-red-800 hover:bg-red-50"
                           disabled={archivingId === user.id || saving}
-                          onClick={() => void handleArchivePartner(user)}
+                          onClick={() => void handleRemoveAccess(user)}
                         >
                           <Archive className="mr-2 h-4 w-4" />
-                          {archivingId === user.id ? "Archiving…" : "Archive partner"}
+                          {archivingId === user.id ? "Removing…" : "Remove access"}
                         </Button>
                       )}
                       {showRestore && (
@@ -718,7 +720,7 @@ export default function AdminPage() {
                           onClick={() => void handleRestorePartner(user)}
                         >
                           <RotateCcw className="mr-2 h-4 w-4" />
-                          {archivingId === user.id ? "Restoring…" : "Restore partner"}
+                          {archivingId === user.id ? "Restoring…" : "Restore access"}
                         </Button>
                       )}
                     </div>

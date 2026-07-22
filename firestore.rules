@@ -405,6 +405,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // App settings (e.g. search mode) — server-only (Admin SDK)
+    match /appSettings/{docId} {
+      allow read, write: if false;
+    }
+
     // Client signing links — server-only (Firebase Admin SDK)
     match /signingLinks/{docId} {
       allow read, write: if false;

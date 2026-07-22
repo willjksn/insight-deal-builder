@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { EMPTY_PERMISSIONS } from "@/lib/constants/permissions";
 import { AppUser } from "@/lib/types";
 import { INSIGHT_MEDIA_GROUP_LLC } from "@/lib/utils/permissions";
-import { canArchivePartnerUser, canRestorePartnerUser } from "@/lib/users/archivePartner";
+import {
+  canArchivePartnerUser,
+  canRemoveUserAccess,
+  canRestorePartnerUser,
+} from "@/lib/users/archivePartner";
 
 function partner(overrides: Partial<AppUser> = {}): AppUser {
   return {
@@ -24,6 +28,28 @@ describe("canArchivePartnerUser", () => {
     expect(canArchivePartnerUser(partner({ id: "admin1" }), "admin1")).toBeTruthy();
     expect(
       canArchivePartnerUser(partner({ company: INSIGHT_MEDIA_GROUP_LLC }), "admin1")
+    ).toBeTruthy();
+  });
+});
+
+describe("canRemoveUserAccess", () => {
+  it("allows removing any non-admin account, including IMG staff", () => {
+    expect(canRemoveUserAccess(partner(), "admin1")).toBeNull();
+    expect(
+      canRemoveUserAccess(partner({ company: INSIGHT_MEDIA_GROUP_LLC }), "admin1")
+    ).toBeNull();
+  });
+
+  it("blocks self, already-archived, and user-management admins", () => {
+    expect(canRemoveUserAccess(partner({ id: "admin1" }), "admin1")).toBeTruthy();
+    expect(
+      canRemoveUserAccess(partner({ archivedAt: "2026-01-01T00:00:00.000Z" }), "admin1")
+    ).toBeTruthy();
+    expect(
+      canRemoveUserAccess(
+        partner({ permissions: { ...EMPTY_PERMISSIONS, manageUsers: true } }),
+        "admin1"
+      )
     ).toBeTruthy();
   });
 });
