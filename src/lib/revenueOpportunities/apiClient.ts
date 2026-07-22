@@ -1,6 +1,11 @@
 import { authHeaders } from "@/lib/scriptWriter/apiClient";
 import type { RevenueCampaign, RevenueCampaignCreateInput, RevenueCampaignUpdateInput } from "@/lib/revenueOpportunities/types/campaign";
 import type {
+  BusinessProfile,
+  BusinessProfileCreateInput,
+  BusinessProfileUpdateInput,
+} from "@/lib/revenueOpportunities/types/businessProfile";
+import type {
   RevenueDashboardSummary,
   RevenueOpportunity,
   RevenueOpportunityCreateInput,
@@ -77,6 +82,55 @@ export async function revenueDeleteCampaign(getToken: () => Promise<string | nul
     deletedCampaignRuns: number;
     deletedRelated: number;
   }>(res);
+}
+
+// ---- Business profiles (spec Part 10-11) ---------------------------------
+
+export async function revenueListProfiles(getToken: () => Promise<string | null>) {
+  const res = await fetch("/api/revenue/business-profiles", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ profiles: BusinessProfile[] }>(res);
+}
+
+export async function revenueGetProfile(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/business-profiles/${id}`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ profile: BusinessProfile }>(res);
+}
+
+export async function revenueCreateProfile(
+  getToken: () => Promise<string | null>,
+  body: BusinessProfileCreateInput
+) {
+  const res = await fetch("/api/revenue/business-profiles", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ profile: BusinessProfile }>(res);
+}
+
+export async function revenueUpdateProfile(
+  getToken: () => Promise<string | null>,
+  id: string,
+  body: BusinessProfileUpdateInput
+) {
+  const res = await fetch(`/api/revenue/business-profiles/${id}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ profile: BusinessProfile }>(res);
+}
+
+export async function revenueDeleteProfile(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/business-profiles/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: true }>(res);
 }
 
 export async function revenueListOpportunities(

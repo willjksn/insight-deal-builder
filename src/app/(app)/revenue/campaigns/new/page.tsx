@@ -2,18 +2,30 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { revenueCreateCampaign } from "@/lib/revenueOpportunities/apiClient";
+import { revenueCreateCampaign, revenueListProfiles } from "@/lib/revenueOpportunities/apiClient";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { CampaignForm } from "@/components/revenue/CampaignForm";
+import { CampaignForm, type CampaignProfileOption } from "@/components/revenue/CampaignForm";
 
 export default function NewCampaignPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<CampaignProfileOption[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    revenueListProfiles(() => user.getIdToken())
+      .then((res) =>
+        setProfiles(
+          res.profiles.map((p) => ({ id: p.id, name: p.name, profileType: p.profileType }))
+        )
+      )
+      .catch(() => setProfiles([]));
+  }, [user]);
 
   return (
     <>
@@ -25,6 +37,7 @@ export default function NewCampaignPage() {
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
       <CampaignForm
         busy={busy}
+        profiles={profiles}
         submitLabel="Create campaign"
         onSubmit={async (data) => {
           if (!user) return;

@@ -10,16 +10,25 @@ import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 
+export type CampaignProfileOption = {
+  id: string;
+  name: string;
+  profileType: "img" | "stormi" | "other";
+};
+
 export function CampaignForm({
   initial,
   onSubmit,
   submitLabel = "Save campaign",
   busy,
+  profiles = [],
 }: {
   initial?: RevenueCampaignCreateInput;
   onSubmit: (data: RevenueCampaignCreateInput) => Promise<void>;
   submitLabel?: string;
   busy?: boolean;
+  /** Business-development profiles available to link this mission to. */
+  profiles?: CampaignProfileOption[];
 }) {
   const [form, setForm] = useState<RevenueCampaignCreateInput>(initial ?? emptyCampaignDraft());
 
@@ -28,6 +37,11 @@ export function CampaignForm({
   };
 
   const isImg = form.campaignType === "img_client";
+
+  // Suggest profiles that match this mission's type; always allow "other".
+  const relevantProfiles = profiles.filter(
+    (p) => p.profileType === "other" || p.profileType === (isImg ? "img" : "stormi")
+  );
 
   return (
     <form
@@ -58,6 +72,23 @@ export function CampaignForm({
             onChange={(e) => setField("name", e.target.value)}
             required
           />
+          {relevantProfiles.length > 0 ? (
+            <div className="md:col-span-2">
+              <Select
+                label="Business profile (optional)"
+                value={form.profileId ?? ""}
+                onChange={(e) => setField("profileId", e.target.value || undefined)}
+                options={[
+                  { value: "", label: "No linked profile" },
+                  ...relevantProfiles.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Link this mission to a reusable profile so scoring and outreach share the same
+                identity.
+              </p>
+            </div>
+          ) : null}
           <div className="md:col-span-2">
             <Textarea
               label="Objective"

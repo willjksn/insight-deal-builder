@@ -41,6 +41,8 @@ export interface RevenueCampaign {
   organizationCompany: string;
   ownerUserId: string;
   campaignType: RevenueCampaignType;
+  /** Optional link to a reusable business-development profile (spec Part 10-12). */
+  profileId?: string;
   name: string;
   objective?: string;
   status: RevenueCampaignStatus;

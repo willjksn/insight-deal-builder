@@ -5,6 +5,9 @@ import type {
   OpportunitySubject,
 } from "@/lib/revenueOpportunities/types/opportunity";
 import { calculateImgOpportunityScore } from "@/lib/revenueOpportunities/scoring/imgScoring";
+import { calculateStormiOpportunityScore } from "@/lib/revenueOpportunities/scoring/stormiScoring";
+
+export type ResearchScoringModel = "img" | "stormi";
 
 export interface ParsedResearchProspect {
   subject: OpportunitySubject;
@@ -179,10 +182,15 @@ function parseConcept(raw: unknown): CampaignConceptSummary | undefined {
   };
 }
 
-export function parseResearchProspects(raw: unknown): ParsedResearchProspect[] {
+export function parseResearchProspects(
+  raw: unknown,
+  model: ResearchScoringModel = "img"
+): ParsedResearchProspect[] {
   const root = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const list = Array.isArray(root.prospects) ? root.prospects : [];
   const out: ParsedResearchProspect[] = [];
+  const scoreFn =
+    model === "stormi" ? calculateStormiOpportunityScore : calculateImgOpportunityScore;
 
   for (const item of list) {
     if (!item || typeof item !== "object") continue;
@@ -197,7 +205,7 @@ export function parseResearchProspects(raw: unknown): ParsedResearchProspect[] {
           )
         : {};
 
-    const { totalScore, categoryScores: normalized } = calculateImgOpportunityScore(categoryScores);
+    const { totalScore, categoryScores: normalized } = scoreFn(categoryScores);
     const evidence = parseEvidence(o.evidence);
     const scoreReasons = strArray(o.scoreReasons, 5);
     const research =

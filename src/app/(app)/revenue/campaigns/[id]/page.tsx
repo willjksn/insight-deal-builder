@@ -13,6 +13,7 @@ import {
   revenueListCampaignRuns,
   revenueRunCampaignResearch,
   revenueUpdateCampaign,
+  revenueListProfiles,
 } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
 import type { RevenueCampaignRun } from "@/lib/revenueOpportunities/types/campaignRun";
@@ -25,7 +26,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { CampaignForm } from "@/components/revenue/CampaignForm";
+import { CampaignForm, type CampaignProfileOption } from "@/components/revenue/CampaignForm";
 
 function shortRunLabel(run: {
   opportunitiesCreated: number;
@@ -57,6 +58,7 @@ export default function CampaignDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [researchMessage, setResearchMessage] = useState<string | null>(null);
   const [featureStatus, setFeatureStatus] = useState<RevenueFeatureStatus | null>(null);
+  const [profiles, setProfiles] = useState<CampaignProfileOption[]>([]);
   const canManage = canManageRevenueOpportunities(appUser);
   const researchLive = featureStatus?.integrations.research === "live";
 
@@ -66,11 +68,21 @@ export default function CampaignDetailPage() {
       revenueGetCampaign(() => user.getIdToken(), id),
       revenueListCampaignRuns(() => user.getIdToken(), id),
       revenueGetStatus(() => user.getIdToken()).catch(() => null),
+      revenueListProfiles(() => user.getIdToken()).catch(() => null),
     ])
-      .then(([c, r, statusRes]) => {
+      .then(([c, r, statusRes, profilesRes]) => {
         setCampaign(c.campaign);
         setRuns(r.runs);
         if (statusRes?.status) setFeatureStatus(statusRes.status);
+        if (profilesRes?.profiles) {
+          setProfiles(
+            profilesRes.profiles.map((p) => ({
+              id: p.id,
+              name: p.name,
+              profileType: p.profileType,
+            }))
+          );
+        }
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
@@ -173,6 +185,7 @@ export default function CampaignDetailPage() {
         <CampaignForm
           initial={editable}
           busy={busy}
+          profiles={profiles}
           submitLabel="Save changes"
           onSubmit={async (data) => {
             if (!user) return;

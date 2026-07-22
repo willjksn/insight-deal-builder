@@ -55,7 +55,7 @@ export async function enrichProspect(
     merged,
     buildEnrichContextLines(campaign, candidate)
   );
-  const prospects = parseResearchProspects(raw);
+  const prospects = parseResearchProspects(raw, kind);
   const best = prospects[0];
   if (!best) return null;
 

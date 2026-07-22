@@ -13,6 +13,7 @@ import {
   Workflow,
   FileText,
   Megaphone,
+  IdCard,
 } from "lucide-react";
 
 export type RevenueNavItem = {
@@ -28,6 +29,12 @@ export const REVENUE_NAV_ITEMS: RevenueNavItem[] = [
     label: "Command Center",
     icon: LayoutDashboard,
     description: "Daily priorities, pipeline snapshot, and recommended actions",
+  },
+  {
+    href: "/revenue/profiles",
+    label: "Profiles",
+    icon: IdCard,
+    description: "Business-development profiles for Insight Media Group and Stormi",
   },
   {
     href: "/revenue/campaigns",
