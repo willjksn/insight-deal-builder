@@ -381,6 +381,7 @@ export async function vertexGeminiGenerate(params: {
   json?: boolean;
   model?: string;
   temperature?: number;
+  maxOutputTokens?: number;
 }): Promise<string> {
   const projectId = vertexProjectId();
   if (!projectId) {
@@ -401,6 +402,7 @@ export async function vertexGeminiGenerate(params: {
     generationConfig: {
       ...(params.json ? { responseMimeType: "application/json" } : {}),
       temperature: params.temperature ?? 0.4,
+      ...(params.maxOutputTokens ? { maxOutputTokens: params.maxOutputTokens } : {}),
     },
   };
 

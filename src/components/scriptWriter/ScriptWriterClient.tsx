@@ -33,15 +33,19 @@ import {
   scriptWriterRefineScript,
   scriptWriterResearchTrends,
   scriptWriterResearchReferences,
+  scriptWriterFeatureOutline,
+  scriptWriterFeatureExpandAct,
+  scriptWriterFeatureAssemble,
   scriptWriterSendMessage,
 } from "@/lib/scriptWriter/apiClient";
 import {
   SCRIPT_CAST_SIZE_LABELS,
   SCRIPT_CONTENT_TYPE_LABELS,
+  isFeatureRuntime,
   resolveMoodLabel,
   resolveRuntimeLabel,
 } from "@/lib/scriptWriter/brief";
-import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
+import { FeatureBuildState, ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { cn } from "@/lib/utils/cn";
 import { ScriptEditorPanel } from "@/components/scriptWriter/ScriptEditorPanel";
 import { ScriptSuggestedShotsPanel } from "@/components/scriptWriter/ScriptSuggestedShotsPanel";
@@ -50,6 +54,7 @@ import { ShotListOptions } from "@/components/scriptWriter/StoryboardModeToggle"
 import { canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPanel";
 import { ReferenceResearchPanel } from "@/components/scriptWriter/ReferenceResearchPanel";
+import { FeatureBuildPanel } from "@/components/scriptWriter/FeatureBuildPanel";
 import { ScriptShootingKitPanel } from "@/components/scriptWriter/ScriptShootingKitPanel";
 import { SharedNotesPanel } from "@/components/sharedNotes/SharedNotesPanel";
 
@@ -78,6 +83,8 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const [refining, setRefining] = useState(false);
   const [researchingTrends, setResearchingTrends] = useState(false);
   const [researchingReferences, setResearchingReferences] = useState(false);
+  const [buildingFeature, setBuildingFeature] = useState(false);
+  const [featureStep, setFeatureStep] = useState<string | null>(null);
   const [projectId, setProjectId] = useState("");
   const [detailedShotList, setDetailedShotList] = useState(true);
   const [storyboardMode, setStoryboardMode] = useState(false);
@@ -258,6 +265,54 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
     }
   };
 
+  const runFeatureBuild = async () => {
+    if (!user || buildingFeature || adminReadOnly) return;
+    setBuildingFeature(true);
+    setError(null);
+    const getToken = () => user.getIdToken();
+    try {
+      let build: FeatureBuildState | null = session?.featureBuild ?? null;
+
+      // Pass 1 — outline (skip if already present; supports resume)
+      if (!build?.outline || build.status === "assembled") {
+        setFeatureStep("Outlining the story…");
+        const { session: updated, featureBuild } = await scriptWriterFeatureOutline(getToken, sessionId);
+        setSession(updated as ScriptWriterSession);
+        build = featureBuild as FeatureBuildState;
+      }
+
+      if (!build?.outline) throw new Error("Feature outline is missing");
+      const totalActs = build.outline.acts.length;
+
+      // Passes 2..N — expand each act with continuity, skipping any already done
+      for (let i = 0; i < totalActs; i++) {
+        if (build.acts.some((a) => a.index === i)) continue;
+        setFeatureStep(`Writing act ${i + 1} of ${totalActs}…`);
+        const { session: updated, featureBuild } = await scriptWriterFeatureExpandAct(
+          getToken,
+          sessionId,
+          i
+        );
+        setSession(updated as ScriptWriterSession);
+        build = featureBuild as FeatureBuildState;
+      }
+
+      // Final pass — assemble (no AI)
+      setFeatureStep("Assembling the screenplay…");
+      const { session: updated } = await scriptWriterFeatureAssemble(getToken, sessionId);
+      setSession(updated as ScriptWriterSession);
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? `${e.message} — you can hit Resume to continue from where it stopped.`
+          : "Feature build failed"
+      );
+    } finally {
+      setBuildingFeature(false);
+      setFeatureStep(null);
+    }
+  };
+
   const applyToProject = async (targetProjectId: string) => {
     if (!user || applying || createApplyLock.current) return;
     createApplyLock.current = true;
@@ -348,6 +403,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const isInspiration = session.workflowMode === "inspiration";
   const awaitingAnalysisConfirm = session.status === "analysis_ready";
   const canRefine = Boolean(script && session.status === "script_ready" && !session.refineUsed);
+  const isFeature = session.brief ? isFeatureRuntime(session.brief) : false;
   const adminReadOnly = adminOpen && !!user && session.userId !== user.uid;
   const canDelete = Boolean(user && session.userId === user.uid && !adminReadOnly);
 
@@ -471,6 +527,17 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         loading={researchingReferences}
         onResearch={session.status !== "applied" ? () => void researchReferences() : undefined}
       />
+
+      {isFeature && !isInspiration ? (
+        <FeatureBuildPanel
+          build={session.featureBuild}
+          building={buildingFeature}
+          step={featureStep}
+          onBuild={
+            session.status !== "applied" && !adminReadOnly ? () => void runFeatureBuild() : undefined
+          }
+        />
+      ) : null}
 
       {detailedShotList && user ? (
         <ScriptShootingKitPanel
@@ -607,27 +674,34 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                   onDetailedChange={setDetailedShotList}
                   compact
                 />
-                <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={generating}
-                  onClick={() => void generate()}
-                >
-                  {generating ? (
-                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wand2 className="mr-1.5 h-4 w-4" />
-                  )}
-                  Write script
-                </Button>
-                {readyToWrite && !script && (
-                  <span className="self-center text-xs text-violet-700">
-                    Ready when you are — or keep refining.
-                  </span>
+                {isFeature ? (
+                  <p className="text-xs text-amber-700">
+                    Feature / long-form — use the <strong>Feature build</strong> panel above to
+                    generate the full script in multiple passes.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={generating}
+                      onClick={() => void generate()}
+                    >
+                      {generating ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Wand2 className="mr-1.5 h-4 w-4" />
+                      )}
+                      Write script
+                    </Button>
+                    {readyToWrite && !script && (
+                      <span className="self-center text-xs text-violet-700">
+                        Ready when you are — or keep refining.
+                      </span>
+                    )}
+                  </div>
                 )}
-                </div>
               </div>
             </div>
           ) : null}
@@ -701,7 +775,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                   </p>
                 )}
               </div>
-              {script && !adminReadOnly ? (
+              {script && !adminReadOnly && !isFeature ? (
                 <Button
                   type="button"
                   size="sm"

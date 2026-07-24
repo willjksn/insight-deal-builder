@@ -193,6 +193,41 @@ export async function scriptWriterResearchReferences(
   return parseJson<{ session: unknown; referenceResearch: unknown }>(res);
 }
 
+export async function scriptWriterFeatureOutline(
+  getToken: () => Promise<string | null>,
+  sessionId: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/feature/outline`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ session: unknown; featureBuild: unknown }>(res);
+}
+
+export async function scriptWriterFeatureExpandAct(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  actIndex: number
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/feature/act`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ actIndex }),
+  });
+  return parseJson<{ session: unknown; featureBuild: unknown }>(res);
+}
+
+export async function scriptWriterFeatureAssemble(
+  getToken: () => Promise<string | null>,
+  sessionId: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/feature/assemble`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ session: unknown }>(res);
+}
+
 export async function scriptWriterApplyToProject(
   getToken: () => Promise<string | null>,
   sessionId: string,

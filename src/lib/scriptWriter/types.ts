@@ -230,6 +230,55 @@ export interface ScriptWriterChatResponse {
   readyToWrite: boolean;
 }
 
+/** A character developed during the feature outline pass. */
+export interface FeatureCharacterBio {
+  name: string;
+  role?: string;
+  description: string;
+  arc?: string;
+}
+
+/** One act / sequence in the feature beat sheet. */
+export interface FeatureAct {
+  index: number;
+  title: string;
+  goal: string;
+  beats: string[];
+}
+
+/** Output of the development (outline) pass. */
+export interface FeatureOutline {
+  title?: string;
+  logline: string;
+  theme: string;
+  genre?: string;
+  toneStatement?: string;
+  characters: FeatureCharacterBio[];
+  acts: FeatureAct[];
+  createdAt: string;
+}
+
+/** Output of one act-expansion pass — carries a continuity summary forward. */
+export interface FeatureActDraft {
+  index: number;
+  title: string;
+  scenes: ScriptScene[];
+  /** Running "what happened / where characters stand" continuity note. */
+  summary: string;
+  createdAt: string;
+}
+
+export type FeatureBuildStatus = "idle" | "outlined" | "expanding" | "assembled";
+
+/** Persisted state for the multi-pass feature build (resumable). */
+export interface FeatureBuildState {
+  status: FeatureBuildStatus;
+  totalActs: number;
+  outline: FeatureOutline | null;
+  acts: FeatureActDraft[];
+  updatedAt?: string;
+}
+
 /**
  * Comparable-works research: abstract craft patterns (structure, tone, visual
  * language) drawn from similar films/videos — NOT plots or dialogue — used to
@@ -289,6 +338,8 @@ export interface ScriptWriterSession {
   inspirationAnalysis?: ScriptInspirationAnalysis | null;
   trendsResearch?: ScriptTrendsResearch | null;
   referenceResearch?: ScriptReferenceResearch | null;
+  /** Multi-pass feature build state (only for feature/long-form sessions). */
+  featureBuild?: FeatureBuildState | null;
   refineUsed?: boolean;
   linkedProjectId?: string;
   linkedScoutProjectId?: string;

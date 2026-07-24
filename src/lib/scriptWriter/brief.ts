@@ -37,6 +37,7 @@ export type ScriptRuntime =
   | "2_3min"
   | "5_10min"
   | "longer"
+  | "feature"
   | "custom";
 
 export type ScriptAudienceAge =
@@ -133,6 +134,7 @@ export const SCRIPT_RUNTIME_LABELS: Record<ScriptRuntime, string> = {
   "2_3min": "2–3 minutes",
   "5_10min": "5–10 minutes",
   longer: "Longer piece",
+  feature: "Feature / long-form (multi-pass)",
   custom: "Custom…",
 };
 
@@ -165,6 +167,11 @@ export function resolveRuntimeLabel(brief: Pick<ScriptWriterBrief, "runtime" | "
     return brief.customRuntime?.trim() || "Custom runtime";
   }
   return SCRIPT_RUNTIME_LABELS[brief.runtime];
+}
+
+/** Feature / long-form pieces use the multi-pass generation pipeline. */
+export function isFeatureRuntime(brief: Pick<ScriptWriterBrief, "runtime">): boolean {
+  return brief.runtime === "feature";
 }
 
 export function isBriefComplete(brief: ScriptWriterBrief, hasInspiration = false): boolean {

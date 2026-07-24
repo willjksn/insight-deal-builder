@@ -62,6 +62,7 @@ async function callGeminiApiKeyGenerate(params: {
   json?: boolean;
   model?: string;
   temperature?: number;
+  maxOutputTokens?: number;
 }): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
@@ -85,6 +86,7 @@ async function callGeminiApiKeyGenerate(params: {
       generationConfig: {
         ...(params.json ? { responseMimeType: "application/json" } : {}),
         temperature: params.temperature ?? 0.4,
+        ...(params.maxOutputTokens ? { maxOutputTokens: params.maxOutputTokens } : {}),
       },
     }),
   });
@@ -151,6 +153,7 @@ export async function callGeminiGenerate(params: {
   json?: boolean;
   model?: string;
   temperature?: number;
+  maxOutputTokens?: number;
 }): Promise<string> {
   return withAiCallLogging(
     { provider: "gemini", op: "generate", model: geminiModel(params.model), meta: { json: Boolean(params.json) } },
@@ -165,6 +168,7 @@ async function callGeminiGenerateInner(params: {
   json?: boolean;
   model?: string;
   temperature?: number;
+  maxOutputTokens?: number;
 }): Promise<string> {
   const model = geminiModel(params.model);
 
@@ -355,7 +359,7 @@ export async function callGeminiJson(
 export async function callGeminiJsonWithHistory(
   systemPrompt: string,
   history: GeminiChatTurn[],
-  options?: { model?: string; temperature?: number }
+  options?: { model?: string; temperature?: number; maxOutputTokens?: number }
 ): Promise<unknown> {
   const text = await callGeminiGenerate({
     systemPrompt,
@@ -363,6 +367,7 @@ export async function callGeminiJsonWithHistory(
     json: true,
     model: options?.model,
     temperature: options?.temperature,
+    maxOutputTokens: options?.maxOutputTokens,
   });
   return extractJson(text);
 }
