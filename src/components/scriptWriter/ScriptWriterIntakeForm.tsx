@@ -232,6 +232,20 @@ export function ScriptWriterIntakeForm({
         </div>
       </div>
 
+      {brief.runtime === "feature" ? (
+        <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Feature / long-form uses a multi-pass build</p>
+          <p className="mt-1 text-xs text-amber-800">
+            After you begin, open the <strong>Feature build</strong> panel on the script page. It
+            writes the movie in stages — outline (logline, characters, act beat sheet) → each act
+            expanded with continuity carried forward → final assembled screenplay. That&apos;s a
+            handful of short AI passes so nothing truncates, and it&apos;s resumable if a pass fails.
+            Tip: add Genre, Setting, and Theme above (and optionally run Comparable films on the
+            script page) for a more focused draft.
+          </p>
+        </div>
+      ) : null}
+
       {onResearchTrendsChange ? (
         <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-4 py-3">
           <label className="flex cursor-pointer items-start gap-3">
