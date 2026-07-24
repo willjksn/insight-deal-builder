@@ -516,6 +516,43 @@ Advanced framing: worm's-eye for drama; Dutch angle for tension; over-the-should
       ],
     },
     {
+      id: "false-color-reference",
+      category: "lighting",
+      title: "False color reference",
+      summary: "Color-codes every brightness on the monitor so you can nail exposure — especially skin — at a glance.",
+      body: `False color paints the image by exposure value: cool colors = dark, warm colors = bright, with markers for 18% middle gray and a skin-tone band. Turn it on to place exposure, then turn it off to judge the actual look.
+
+Exact colors vary by camera and monitor (Sony FX, ARRI, SmallHD, Atomos all differ) — always confirm the legend on your device. The scale below is the common Sony FX / general video mapping.`,
+      tables: [
+        {
+          headers: ["Color", "Approx IRE", "Meaning", "Do this"],
+          rows: [
+            ["Red", "100+", "Clipped highlights — detail gone", "Expose down, add ND, or close aperture; pull key off it"],
+            ["Yellow", "90–99", "Very bright, near clip", "OK for practicals/highlights; keep off important detail"],
+            ["Pink / salmon", "~55–70", "Light-skin key band (one stop over mid-gray)", "Aim light/fair skin here for a clean, natural key"],
+            ["Grey", "~48–52", "Neutral mid-tones", "General exposure reference"],
+            ["Green", "~40–45", "18% middle gray", "Match to a gray card to set base exposure"],
+            ["Blue", "~10–20", "Deep shadow, near black", "Fine for shadow side/background, not for key detail"],
+            ["Purple", "0–5", "Crushed — no detail", "Lift with fill or accept as true black"],
+          ],
+        },
+        {
+          headers: ["Skin tone", "Target false-color band"],
+          rows: [
+            ["Fair / light skin", "Pink / salmon (~60–70)"],
+            ["Medium / tan / other skin tones", "Between grey and pink (~50–60)"],
+            ["Deep / dark skin", "Grey / green (~42–55) — shape with edge/eye light, don't force to pink"],
+          ],
+        },
+      ],
+      tips: [
+        "Green = 18% gray: light a gray card to green to set a repeatable base exposure across cameras",
+        "Watch for red on foreheads, cheeks, and shiny practicals — the first places skin and highlights clip",
+        "Don't push every skin tone into the pink band — keep darker skin lower (grey/green) and add shaping light instead",
+        "False color for exposure, waveform/IRE for precision, LIT DUO for the light in the room — use all three together",
+      ],
+    },
+    {
       id: "litduo-workflow",
       category: "lighting",
       title: "LIT DUO workflow",
