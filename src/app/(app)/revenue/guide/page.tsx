@@ -185,6 +185,11 @@ export default function RevenueHowToGuidePage() {
                 clutter review. Keep daily / weekly research limits sensible — the app enforces them.
               </li>
               <li>
+                Set <strong>opportunities requested</strong> (1–8). Each live research run enriches{" "}
+                <strong>up to 8 prospects</strong>, so higher numbers have no extra effect — just run research
+                again when you need more leads.
+              </li>
+              <li>
                 Set status to <strong>Active</strong> and save. Research only runs on active campaigns.
               </li>
             </ol>
@@ -222,6 +227,12 @@ export default function RevenueHowToGuidePage() {
             <Tip>
               Research respects your campaign daily / weekly limits. If you get zero results, loosen industry / geo /
               min score, or widen the objective — then run again.
+            </Tip>
+            <Tip>
+              Each run makes several live web searches (roughly <strong>~50–60 Tavily credits</strong>: a few
+              discovery searches plus deeper searches for each of up to 8 prospects), so requesting more than 8 costs
+              nothing extra. To conserve credits, an admin can enable <strong>lightweight (rule-based) mode</strong>{" "}
+              or the automatic near-cap guard under <strong>Admin → Search mode</strong>.
             </Tip>
           </Step>
 
