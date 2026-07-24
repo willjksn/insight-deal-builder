@@ -80,7 +80,10 @@ function NewMeetingForm() {
         <ArrowLeft className="mr-1 h-4 w-4" />
         Meetings
       </Link>
-      <PageHeader title="New meeting" subtitle="Create the meeting, then upload audio or paste a transcript." />
+      <PageHeader
+        title="New meeting"
+        subtitle="Create the meeting, then upload audio, record in your browser, or paste a transcript."
+      />
       <Card>
         <CardBody>
           {prefillProjectId && (

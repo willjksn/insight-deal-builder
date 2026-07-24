@@ -19,6 +19,7 @@ import {
   MEETING_TYPE_LABELS,
 } from "@/lib/revenueOpportunities/meetings/labels";
 import { MeetingAnalysisPanel } from "@/components/revenue/MeetingAnalysisPanel";
+import { MeetingAudioRecorder } from "@/components/revenue/MeetingAudioRecorder";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -176,7 +177,9 @@ export default function MeetingDetailPage() {
         <Card>
           <CardHeader>
             <h3 className="font-semibold text-slate-900">Audio</h3>
-            <p className="text-xs text-slate-500">Upload meeting audio (under 20 MB) to transcribe with AI.</p>
+            <p className="text-xs text-slate-500">
+              Upload meeting audio or record in your browser (under 20 MB) to transcribe with AI.
+            </p>
           </CardHeader>
           <CardBody className="space-y-3">
             {meeting.audioUrl ? (
@@ -185,7 +188,8 @@ export default function MeetingDetailPage() {
               <p className="text-sm text-slate-500">No audio uploaded yet.</p>
             )}
             {canManage && (
-              <div className="flex flex-wrap items-center gap-3">
+              <>
+                <div className="flex flex-wrap items-center gap-3">
                 <input
                   ref={fileRef}
                   type="file"
@@ -206,7 +210,9 @@ export default function MeetingDetailPage() {
                     {busy ? "Working…" : "Transcribe with AI"}
                   </Button>
                 )}
-              </div>
+                </div>
+                <MeetingAudioRecorder onRecorded={handleUpload} disabled={busy} />
+              </>
             )}
           </CardBody>
         </Card>
