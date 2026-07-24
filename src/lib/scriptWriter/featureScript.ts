@@ -101,12 +101,13 @@ function parseCharacters(value: unknown): FeatureCharacterBio[] {
     const bio = c as Partial<FeatureCharacterBio>;
     const name = typeof bio.name === "string" ? bio.name.trim() : "";
     if (!name) continue;
-    out.push({
+    const entry: FeatureCharacterBio = {
       name,
-      role: typeof bio.role === "string" ? bio.role.trim() : undefined,
       description: typeof bio.description === "string" ? bio.description.trim() : "",
-      arc: typeof bio.arc === "string" ? bio.arc.trim() : undefined,
-    });
+    };
+    if (typeof bio.role === "string" && bio.role.trim()) entry.role = bio.role.trim();
+    if (typeof bio.arc === "string" && bio.arc.trim()) entry.arc = bio.arc.trim();
+    out.push(entry);
     if (out.length >= 8) break;
   }
   return out;
@@ -244,14 +245,11 @@ function parseScenes(value: unknown): ScriptScene[] {
           const character = typeof line.character === "string" ? line.character.trim() : "";
           const spoken = typeof line.line === "string" ? line.line.trim() : "";
           if (!character || !spoken) continue;
-          dialogue.push({
-            character,
-            parenthetical:
-              typeof line.parenthetical === "string" && line.parenthetical.trim()
-                ? line.parenthetical.trim()
-                : undefined,
-            line: spoken,
-          });
+          const entry: ScriptDialogueLine = { character, line: spoken };
+          if (typeof line.parenthetical === "string" && line.parenthetical.trim()) {
+            entry.parenthetical = line.parenthetical.trim();
+          }
+          dialogue.push(entry);
         }
       }
       return {

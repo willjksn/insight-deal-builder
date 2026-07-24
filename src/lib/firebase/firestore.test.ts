@@ -21,4 +21,23 @@ describe("stripUndefined", () => {
       },
     });
   });
+
+  it("strips undefined keys inside deeply nested arrays (Firestore rejects undefined)", () => {
+    const cleaned = stripUndefined({
+      acts: [
+        {
+          scenes: [
+            {
+              heading: "INT. ROOM - DAY",
+              dialogue: [{ character: "ANA", line: "Go.", parenthetical: undefined }],
+            },
+          ],
+        },
+      ],
+    });
+    const line = cleaned.acts[0].scenes[0].dialogue[0];
+    // Key must be truly absent, not just undefined (toEqual would ignore undefined).
+    expect(Object.prototype.hasOwnProperty.call(line, "parenthetical")).toBe(false);
+    expect(line).toEqual({ character: "ANA", line: "Go." });
+  });
 });

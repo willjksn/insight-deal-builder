@@ -28,14 +28,15 @@ export function stripUndefined<T>(value: T): T {
   if (value === undefined) return value;
   if (value === null || typeof value !== "object") return value;
 
+  // Recurse arrays first so undefined keys inside array elements are stripped too.
+  if (Array.isArray(value)) {
+    return value.map((item) => stripUndefined(item)) as T;
+  }
+
   // Firestore Timestamp / FieldValue sentinels — do not recurse
   const proto = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) {
     return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((item) => stripUndefined(item)) as T;
   }
 
   const out: Record<string, unknown> = {};
