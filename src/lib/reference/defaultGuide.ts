@@ -485,9 +485,34 @@ Advanced framing: worm's-eye for drama; Dutch angle for tension; over-the-should
             ["Highlights", "70–90"],
           ],
         },
+        {
+          headers: ["Skin tone (clean/neutral look)", "S-Cinetone face IRE", "S-Log3 face IRE", "On-set note"],
+          rows: [
+            [
+              "Fair / light skin",
+              "60–70",
+              "55–62",
+              "Sits naturally high — guard cheeks/forehead from clipping; soften key or add negative fill",
+            ],
+            [
+              "Medium / tan / other skin tones",
+              "50–62",
+              "48–56",
+              "Classic clean middle; lock WB so skin doesn't read sallow or ruddy",
+            ],
+            [
+              "Deep / dark skin",
+              "42–55",
+              "40–50",
+              "Keep it lower and shape it — add edge/kick + eye catchlight instead of overexposing to 'brighten'",
+            ],
+          ],
+        },
       ],
       tips: [
         "Log warning: create darkness with ratios and background control — do not starve Log by underexposing everything",
+        "Don't force every skin tone to one IRE number — preserve natural tonal relationships. Meter a gray card, then place skin relative to it and shape with edge/eye light rather than raising global exposure",
+        "Mixed skin tones in one frame: expose to protect the lightest skin's highlights, then lift the darker skin with fill/bounce and a subtle kick — not by cranking overall exposure",
       ],
     },
     {
@@ -655,7 +680,7 @@ In video, color sets mood and guides the eye: match scenes for consistency, push
       category: "cameras",
       title: "Sony FX6 — best starting settings",
       summary: "Full-frame cinema cam — internal ND, dual base ISO, XLR audio.",
-      body: `The FX6 is your primary A-cam for documentary, interview, and cinematic work. Built-in ND lets you hold shutter and aperture outdoors. Match WB and profile with FX3/FX30 on multi-cam shoots.`,
+      body: `The FX6 is your primary A-cam for documentary, interview, and cinematic work. Built-in ND lets you hold shutter and aperture outdoors. Match WB and profile with the FX5/FX3/FX30 on multi-cam shoots.`,
       tables: [
         {
           headers: ["Use case", "Recommended setup", "Notes"],
@@ -686,7 +711,7 @@ In video, color sets mood and guides the eye: match scenes for consistency, push
               "Faster shutter needs more light",
             ],
             [
-              "Multi-cam with FX3/FX30",
+              "Multi-cam with FX5/FX3/FX30",
               "Same profile, same Kelvin WB, same shutter/FPS, similar exposure",
               "Skin test with gray card before rolling",
             ],
@@ -696,6 +721,54 @@ In video, color sets mood and guides the eye: match scenes for consistency, push
       tips: [
         "FX6 quick cheat: S-Cinetone + locked WB for repeatable interview/podcast days",
         "Use internal ND before closing aperture — keeps cinematic shutter at 1/50 on 24p",
+      ],
+    },
+    {
+      id: "sony-fx5",
+      category: "cameras",
+      title: "Sony FX5 — best starting settings",
+      summary: "Full-frame Cinema Line body — S-Cinetone/S-Log3, dual base ISO. Matches the FX family on multi-cam.",
+      body: `The FX5 slots into the Cinema Line as a full-frame body — treat it like the rest of the family. S-Cinetone for fast turnaround; S-Log3 / Cine EI when you have time to light, expose, and grade. Match WB, profile, shutter, and FPS with the FX6 / FX3 / FX30 on multi-cam shoots.`,
+      tables: [
+        {
+          headers: ["Use case", "Setup", "Notes"],
+          rows: [
+            [
+              "Interview / corporate",
+              "S-Cinetone, 4K 24p/30p, 1/50–1/60, f/2.8–f/4, WB custom to key, ND as needed",
+              "Soft key 30–45°; face 50–65 IRE; use XLR for lav/boom",
+            ],
+            [
+              "Cinematic / graded",
+              "Cine EI or S-Log3, 4K 24p, 1/48, base ISO 800 (12800 in dark rooms), monitor LUT",
+              "Light for ISO 800 when you can; protect shadows in Log",
+            ],
+            [
+              "Documentary / run-gun",
+              "S-Cinetone, 24/30p, WB preset/custom, Auto ISO only when needed",
+              "Zebras protect highlights; prioritize the moment",
+            ],
+            [
+              "Low light / night",
+              "S-Log3/Cine EI ISO 12800 or S-Cinetone with motivated light",
+              "Use ratio + background control, not global underexposure",
+            ],
+            [
+              "Slow motion",
+              "4K 60p/120p, shutter 1/120 or 1/240, add light",
+              "Faster shutter needs more light",
+            ],
+            [
+              "Multi-cam with FX6/FX3/FX30",
+              "Same profile, same Kelvin WB, same shutter/FPS, similar exposure",
+              "Gray-card + skin test before rolling",
+            ],
+          ],
+        },
+      ],
+      tips: [
+        "FX5 quick cheat: S-Cinetone + locked WB for repeatable interview/podcast days",
+        "Full-frame body — the APS-C crop factor applies to the FX30 only, not the FX5",
       ],
     },
     {
@@ -722,7 +795,7 @@ In video, color sets mood and guides the eye: match scenes for consistency, push
         {
           headers: ["Use case", "Setup", "Notes"],
           rows: [
-            ["B-cam to FX3/FX6", "Match profile, WB, shutter, FPS, LUT", "Same Kelvin; APS-C = tighter FOV at same focal length"],
+            ["B-cam to FX5/FX3/FX6", "Match profile, WB, shutter, FPS, LUT", "Same Kelvin; APS-C = tighter FOV at same focal length"],
             ["Gimbal / movement", "4K 24/60p, S-Cinetone or S-Log3, f/2.8–f/4", "Easier focus; hallways, kitchens"],
             ["Dark rooms", "Cine EI / S-Log3 base ISO 2500", "Add light for cleaner shadows vs FX3"],
           ],
@@ -748,7 +821,7 @@ In video, color sets mood and guides the eye: match scenes for consistency, push
     {
       id: "matching-cameras",
       category: "cameras",
-      title: "Matching FX6 + FX3 + FX30 + a7IV",
+      title: "Matching FX6 + FX5 + FX3 + FX30 + a7IV",
       tables: [
         {
           headers: ["Step", "Action", "Why"],
@@ -944,7 +1017,7 @@ In video, color sets mood and guides the eye: match scenes for consistency, push
         {
           headers: ["Field", "Value"],
           rows: [
-            ["Camera", "FX6 / FX3 / FX30 / a7IV"],
+            ["Camera", "FX6 / FX5 / FX3 / FX30 / a7IV"],
             ["Look", "Clean / Warm / Moody / Horror / Interview"],
             ["Profile", "S-Cinetone / S-Log3 / Cine EI"],
             ["Frame / Shutter", "24p 1/50 · 30p 1/60 · 60p 1/120"],
