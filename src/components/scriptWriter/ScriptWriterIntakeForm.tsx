@@ -246,7 +246,7 @@ export function ScriptWriterIntakeForm({
         </div>
       ) : null}
 
-      {onResearchTrendsChange ? (
+      {onResearchTrendsChange && brief.runtime !== "feature" ? (
         <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-4 py-3">
           <label className="flex cursor-pointer items-start gap-3">
             <input

@@ -270,13 +270,15 @@ function ScriptWriterPageContent() {
             onVideoChange={setPendingVideo}
             onUrlsChange={setPendingUrls}
           />
-          <ShotListOptions
-            storyboardMode={storyboardMode}
-            onStoryboardChange={setStoryboardMode}
-            detailedShotList={detailedShotList}
-            onDetailedChange={setDetailedShotList}
-            className="border-t border-slate-100 pt-4"
-          />
+          {brief.runtime !== "feature" ? (
+            <ShotListOptions
+              storyboardMode={storyboardMode}
+              onStoryboardChange={setStoryboardMode}
+              detailedShotList={detailedShotList}
+              onDetailedChange={setDetailedShotList}
+              className="border-t border-slate-100 pt-4"
+            />
+          ) : null}
           <div className="flex flex-col items-end gap-2">
             {uploadProgress ? (
               <p className="text-xs text-violet-700">{uploadProgress}</p>

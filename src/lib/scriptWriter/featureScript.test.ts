@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { assembleFeatureScript } from "@/lib/scriptWriter/featureScript";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  assembleFeatureScript,
+  expandFeatureAct,
+  generateFeatureOutline,
+} from "@/lib/scriptWriter/featureScript";
 import { DEFAULT_SCRIPT_BRIEF } from "@/lib/scriptWriter/brief";
 import { FeatureActDraft, FeatureOutline } from "@/lib/scriptWriter/types";
 
@@ -54,5 +58,33 @@ describe("assembleFeatureScript", () => {
     // normalized document has screenplay elements + fountain
     expect(doc.elements && doc.elements.length).toBeGreaterThan(0);
     expect(doc.fountain.trim().length).toBeGreaterThan(0);
+  });
+});
+
+describe("feature passes (mock mode)", () => {
+  const prev = process.env.SCOUT_USE_MOCK_AI;
+  beforeAll(() => {
+    process.env.SCOUT_USE_MOCK_AI = "true";
+  });
+  afterAll(() => {
+    if (prev === undefined) delete process.env.SCOUT_USE_MOCK_AI;
+    else process.env.SCOUT_USE_MOCK_AI = prev;
+  });
+
+  it("produces an outline then expands an act with continuity summary", async () => {
+    const out = await generateFeatureOutline(brief);
+    expect(out.acts.length).toBeGreaterThanOrEqual(3);
+    expect(out.logline.length).toBeGreaterThan(0);
+
+    const draft = await expandFeatureAct(brief, out, 0, []);
+    expect(draft.index).toBe(0);
+    expect(draft.scenes.length).toBeGreaterThan(0);
+    expect(draft.summary.length).toBeGreaterThan(0);
+    // dialogue entries must not carry an undefined parenthetical key
+    for (const scene of draft.scenes) {
+      for (const line of scene.dialogue) {
+        expect(Object.prototype.hasOwnProperty.call(line, "parenthetical")).toBe(false);
+      }
+    }
   });
 });

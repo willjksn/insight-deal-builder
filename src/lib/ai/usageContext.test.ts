@@ -29,4 +29,19 @@ describe("inferFeatureFromPath — revenue attribution", () => {
     expect(inferFeatureFromPath("/api/something-else")).toBe("api.other");
     expect(inferFeatureFromPath("/dashboard")).toBe("unknown");
   });
+
+  it("attributes script-writer endpoints, including feature multi-pass", () => {
+    expect(inferFeatureFromPath("/api/script-writer/sessions/s1/references")).toBe(
+      "script_writer.references"
+    );
+    expect(inferFeatureFromPath("/api/script-writer/sessions/s1/feature/outline")).toBe(
+      "script_writer.generate"
+    );
+    expect(inferFeatureFromPath("/api/script-writer/sessions/s1/feature/act")).toBe(
+      "script_writer.generate"
+    );
+    expect(inferFeatureFromPath("/api/script-writer/sessions/s1/feature/assemble")).toBe(
+      "script_writer.generate"
+    );
+  });
 });

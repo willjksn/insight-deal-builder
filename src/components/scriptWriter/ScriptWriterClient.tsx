@@ -539,7 +539,15 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         />
       ) : null}
 
-      {detailedShotList && user ? (
+      {isFeature && isInspiration ? (
+        <div className="mb-4 rounded-xl border border-amber-200/80 bg-amber-50/50 px-4 py-3 text-xs text-amber-800">
+          <span className="font-medium text-amber-900">Feature / long-form + inspiration:</span> the
+          multi-pass builder runs on text-only sessions. This inspiration session will write in a
+          single pass — for a staged multi-pass feature, start a new text session.
+        </div>
+      ) : null}
+
+      {detailedShotList && user && !isFeature ? (
         <ScriptShootingKitPanel
           sessionId={sessionId}
           shootingKit={session.shootingKit}
@@ -667,13 +675,15 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                 </Button>
               </div>
               <div className="mt-2 space-y-2">
-                <ShotListOptions
-                  storyboardMode={storyboardMode}
-                  onStoryboardChange={setStoryboardMode}
-                  detailedShotList={detailedShotList}
-                  onDetailedChange={setDetailedShotList}
-                  compact
-                />
+                {!isFeature ? (
+                  <ShotListOptions
+                    storyboardMode={storyboardMode}
+                    onStoryboardChange={setStoryboardMode}
+                    detailedShotList={detailedShotList}
+                    onDetailedChange={setDetailedShotList}
+                    compact
+                  />
+                ) : null}
                 {isFeature ? (
                   <p className="text-xs text-amber-700">
                     Feature / long-form — use the <strong>Feature build</strong> panel above to
@@ -705,7 +715,15 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
               </div>
             </div>
           ) : null}
-          {canRefine ? (
+          {canRefine && isFeature ? (
+            <div className="space-y-1 border-t border-slate-100 p-3">
+              <p className="text-xs text-slate-500">
+                Feature / long-form — refine by editing scenes directly, or use{" "}
+                <strong>Rebuild feature</strong> above for a fresh multi-pass draft.
+              </p>
+            </div>
+          ) : null}
+          {canRefine && !isFeature ? (
             <div className="space-y-2 border-t border-slate-100 p-3">
               <p className="text-xs text-slate-500">One optional refinement</p>
               <ShotListOptions
@@ -792,7 +810,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                 </Button>
               ) : null}
             </div>
-            {script && !adminReadOnly ? (
+            {script && !adminReadOnly && !isFeature ? (
               <div className="mt-3">
                 <ShotListOptions
                   storyboardMode={storyboardMode}
