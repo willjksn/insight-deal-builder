@@ -230,6 +230,32 @@ export interface ScriptWriterChatResponse {
   readyToWrite: boolean;
 }
 
+/**
+ * Comparable-works research: abstract craft patterns (structure, tone, visual
+ * language) drawn from similar films/videos — NOT plots or dialogue — used to
+ * ground and focus generation.
+ */
+export interface ScriptReferenceResearch {
+  query: string;
+  provider: "tavily";
+  searchedAt: string;
+  contentType?: ScriptContentType;
+  /** 2–4 comparable works by title, for orientation only. */
+  comparableTitles: string[];
+  summary: string;
+  /** Structural / act / sequence patterns. */
+  structure: string[];
+  /** Tone & character-dynamic patterns. */
+  tone: string[];
+  /** Cinematography / visual motifs. */
+  visualLanguage: string[];
+  /** Specific patterns to lean into for this piece. */
+  emulate: string[];
+  /** Clichés / traps to skip. */
+  avoid?: string[];
+  sourceTitles: string[];
+}
+
 /** Web trend research via Tavily, summarized by Gemini for script generation. */
 export interface ScriptTrendsResearch {
   query: string;
@@ -262,6 +288,7 @@ export interface ScriptWriterSession {
   inspirationUrls?: ScriptInspirationUrl[];
   inspirationAnalysis?: ScriptInspirationAnalysis | null;
   trendsResearch?: ScriptTrendsResearch | null;
+  referenceResearch?: ScriptReferenceResearch | null;
   refineUsed?: boolean;
   linkedProjectId?: string;
   linkedScoutProjectId?: string;

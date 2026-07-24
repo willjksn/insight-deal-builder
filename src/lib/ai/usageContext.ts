@@ -33,6 +33,7 @@ export function inferFeatureFromPath(pathname: string): string {
     [/\/api\/script-writer\/sessions\/[^/]+\/confirm-analysis$/, "script_writer.generate"],
     [/\/api\/script-writer\/sessions\/[^/]+\/refine$/, "script_writer.refine"],
     [/\/api\/script-writer\/sessions\/[^/]+\/trends$/, "script_writer.trends"],
+    [/\/api\/script-writer\/sessions\/[^/]+\/references$/, "script_writer.references"],
     [/\/api\/script-writer\/sessions$/, "script_writer.create"],
     [/\/api\/agreements\/suggest-scope$/, "agreements.scope"],
     [/\/api\/agreements\/pricing-research$/, "agreements.pricing"],

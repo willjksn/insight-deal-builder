@@ -32,6 +32,7 @@ import {
   scriptWriterGetSession,
   scriptWriterRefineScript,
   scriptWriterResearchTrends,
+  scriptWriterResearchReferences,
   scriptWriterSendMessage,
 } from "@/lib/scriptWriter/apiClient";
 import {
@@ -48,6 +49,7 @@ import { ScriptStoryboardPanel } from "@/components/scriptWriter/ScriptStoryboar
 import { ShotListOptions } from "@/components/scriptWriter/StoryboardModeToggle";
 import { canManageProjects, canManageUsers } from "@/lib/utils/permissions";
 import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPanel";
+import { ReferenceResearchPanel } from "@/components/scriptWriter/ReferenceResearchPanel";
 import { ScriptShootingKitPanel } from "@/components/scriptWriter/ScriptShootingKitPanel";
 import { SharedNotesPanel } from "@/components/sharedNotes/SharedNotesPanel";
 
@@ -75,6 +77,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const [refineInput, setRefineInput] = useState("");
   const [refining, setRefining] = useState(false);
   const [researchingTrends, setResearchingTrends] = useState(false);
+  const [researchingReferences, setResearchingReferences] = useState(false);
   const [projectId, setProjectId] = useState("");
   const [detailedShotList, setDetailedShotList] = useState(true);
   const [storyboardMode, setStoryboardMode] = useState(false);
@@ -235,6 +238,23 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
       setError(e instanceof Error ? e.message : "Trend research failed");
     } finally {
       setResearchingTrends(false);
+    }
+  };
+
+  const researchReferences = async () => {
+    if (!user || researchingReferences) return;
+    setResearchingReferences(true);
+    setError(null);
+    try {
+      const { session: updated } = await scriptWriterResearchReferences(
+        () => user.getIdToken(),
+        sessionId
+      );
+      setSession(updated as ScriptWriterSession);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Reference research failed");
+    } finally {
+      setResearchingReferences(false);
     }
   };
 
@@ -444,6 +464,12 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         trends={session.trendsResearch}
         loading={researchingTrends}
         onResearch={session.status !== "applied" ? () => void researchTrends() : undefined}
+      />
+
+      <ReferenceResearchPanel
+        references={session.referenceResearch}
+        loading={researchingReferences}
+        onResearch={session.status !== "applied" ? () => void researchReferences() : undefined}
       />
 
       {detailedShotList && user ? (

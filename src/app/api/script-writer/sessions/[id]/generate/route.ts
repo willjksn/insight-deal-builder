@@ -62,6 +62,7 @@ export async function POST(
       detailLevel,
       inspiration,
       trendsResearch: session.trendsResearch ?? null,
+      referenceResearch: session.referenceResearch ?? null,
       detailedShotList,
       storyboardMode,
       shootingKit,

@@ -34,9 +34,11 @@ import {
   ScriptWriterChatResponse,
   ScriptWriterMessage,
   ScriptTrendsResearch,
+  ScriptReferenceResearch,
   ScriptStoryboardFrame,
 } from "@/lib/scriptWriter/types";
 import { formatTrendsForPrompt } from "@/lib/scriptWriter/trendsResearch";
+import { formatReferencesForPrompt } from "@/lib/scriptWriter/referenceResearch";
 import { SCRIPT_VIDEO_MODE_LABELS } from "@/lib/scriptWriter/constants";
 import { normalizeScriptDocument } from "@/lib/screenplay/normalize";
 import { createScriptElement } from "@/lib/screenplay/elements";
@@ -379,6 +381,7 @@ export async function scriptWriterGenerate(
       confirmNotes?: string;
     };
     trendsResearch?: ScriptTrendsResearch | null;
+    referenceResearch?: ScriptReferenceResearch | null;
     detailedShotList?: boolean;
     storyboardMode?: boolean;
     shootingKit?: ProductionShootingKit | null;
@@ -403,6 +406,8 @@ export async function scriptWriterGenerate(
       ...contextLines,
       "",
       options?.trendsResearch ? formatTrendsForPrompt(options.trendsResearch) : "",
+      "",
+      options?.referenceResearch ? formatReferencesForPrompt(options.referenceResearch) : "",
       "",
       kitBlock,
       "",
@@ -429,6 +434,8 @@ export async function scriptWriterGenerate(
     formatBriefForPrompt(brief),
     "",
     options?.trendsResearch ? formatTrendsForPrompt(options.trendsResearch) : "",
+    "",
+    options?.referenceResearch ? formatReferencesForPrompt(options.referenceResearch) : "",
     "",
     kitBlock,
     "",
@@ -466,6 +473,7 @@ export async function scriptWriterRefineScript(
       urls?: ScriptInspirationUrl[];
     };
     trendsResearch?: ScriptTrendsResearch | null;
+    referenceResearch?: ScriptReferenceResearch | null;
     detailedShotList?: boolean;
     storyboardMode?: boolean;
     shootingKit?: ProductionShootingKit | null;
@@ -502,6 +510,7 @@ export async function scriptWriterRefineScript(
         )
       : "",
     options?.trendsResearch ? formatTrendsForPrompt(options.trendsResearch) : "",
+    options?.referenceResearch ? formatReferencesForPrompt(options.referenceResearch) : "",
     ...contextLines,
     "",
     kitBlock,

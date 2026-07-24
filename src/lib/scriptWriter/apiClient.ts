@@ -182,6 +182,17 @@ export async function scriptWriterResearchTrends(
   return parseJson<{ session: unknown; trendsResearch: unknown }>(res);
 }
 
+export async function scriptWriterResearchReferences(
+  getToken: () => Promise<string | null>,
+  sessionId: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/references`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ session: unknown; referenceResearch: unknown }>(res);
+}
+
 export async function scriptWriterApplyToProject(
   getToken: () => Promise<string | null>,
   sessionId: string,
