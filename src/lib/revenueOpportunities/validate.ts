@@ -28,7 +28,9 @@ export function validateCampaignCreate(body: unknown): RevenueCampaignCreateInpu
     objective: str(b.objective),
     status: status as RevenueCampaignCreateInput["status"],
     approvalMode,
-    opportunityCountRequested: Math.min(50, Math.max(1, num(b.opportunityCountRequested, 10))),
+    // Live research enriches at most 8 candidates per run (see runResearchPass),
+    // so cap the requested count at 8 — higher values were silently ignored.
+    opportunityCountRequested: Math.min(8, Math.max(1, num(b.opportunityCountRequested, 8))),
     minOpportunityScore: Math.min(100, Math.max(0, num(b.minOpportunityScore, 70))),
     minConfidenceScore: Math.min(100, Math.max(0, num(b.minConfidenceScore, 60))),
     dailyResearchLimit: b.dailyResearchLimit != null ? num(b.dailyResearchLimit, 5) : undefined,

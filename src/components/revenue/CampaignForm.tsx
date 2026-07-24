@@ -121,7 +121,8 @@ export function CampaignForm({
             label="Opportunities requested"
             type="number"
             min={1}
-            max={50}
+            max={8}
+            helperText="Live research enriches up to 8 per run."
             value={form.opportunityCountRequested}
             onChange={(e) => setField("opportunityCountRequested", Number(e.target.value))}
           />

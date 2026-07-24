@@ -9,7 +9,7 @@ export function emptyCampaignDraft(campaignType: "img_client" | "stormi_brand" =
     objective: "",
     status: "draft",
     approvalMode: "manual_review",
-    opportunityCountRequested: 10,
+    opportunityCountRequested: 8,
     minOpportunityScore: 70,
     minConfidenceScore: 60,
     dailyResearchLimit: 5,

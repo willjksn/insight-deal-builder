@@ -5,10 +5,11 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   touch?: boolean;
+  helperText?: string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, touch, id, ...props }, ref) => {
+  ({ className, label, error, touch, helperText, id, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, "-");
     return (
       <div className="w-full">
@@ -31,7 +32,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
           {...props}
         />
-        {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+        {error ? (
+          <p className="mt-1 text-sm text-red-600">{error}</p>
+        ) : helperText ? (
+          <p className="mt-1 text-xs text-slate-500">{helperText}</p>
+        ) : null}
       </div>
     );
   }

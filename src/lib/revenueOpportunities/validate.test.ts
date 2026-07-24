@@ -15,7 +15,7 @@ describe("validateCampaignCreate", () => {
     });
     expect(result.name).toBe("Orlando hotels");
     expect(result.campaignType).toBe("img_client");
-    expect(result.opportunityCountRequested).toBe(50);
+    expect(result.opportunityCountRequested).toBe(8);
     expect(result.minOpportunityScore).toBe(100);
     expect(result.approvalMode).toBe("manual_review");
   });
