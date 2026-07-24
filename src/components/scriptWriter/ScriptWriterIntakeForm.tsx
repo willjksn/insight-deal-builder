@@ -112,6 +112,29 @@ export function ScriptWriterIntakeForm({
         placeholder="A founder films a product launch in a warehouse studio, but the first take keeps getting interrupted…"
         rows={4}
       />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Textarea
+          label="Genre (optional)"
+          value={brief.genre ?? ""}
+          onChange={(e) => patch({ genre: e.target.value })}
+          placeholder="e.g. psychological thriller, coming-of-age dramedy"
+          rows={2}
+        />
+        <Textarea
+          label="Setting / world (optional)"
+          value={brief.setting ?? ""}
+          onChange={(e) => patch({ setting: e.target.value })}
+          placeholder="Place, era, environment — e.g. rainy 1970s Chicago diner, one night"
+          rows={2}
+        />
+      </div>
+      <Textarea
+        label="Theme / message (optional)"
+        value={brief.theme ?? ""}
+        onChange={(e) => patch({ theme: e.target.value })}
+        placeholder="What it's really about underneath — e.g. letting go of control"
+        rows={2}
+      />
       <Textarea
         label="Character notes (optional)"
         value={brief.characterNotes ?? ""}

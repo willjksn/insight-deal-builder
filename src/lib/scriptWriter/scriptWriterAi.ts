@@ -553,6 +553,9 @@ export function resolveSessionBrief(
     characterNotes: brief?.characterNotes,
     customMood: brief?.customMood,
     customRuntime: brief?.customRuntime,
+    setting: brief?.setting,
+    genre: brief?.genre,
+    theme: brief?.theme,
   };
 }
 

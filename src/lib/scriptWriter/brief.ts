@@ -69,6 +69,12 @@ export interface ScriptWriterBrief {
   concept: string;
   /** Optional casting or character notes */
   characterNotes?: string;
+  /** World, place, and time period (e.g. "rainy 1970s Chicago diner, one night"). */
+  setting?: string;
+  /** Genre framing (e.g. "psychological thriller", "coming-of-age dramedy"). */
+  genre?: string;
+  /** The underlying idea/message the piece is really about. */
+  theme?: string;
 }
 
 export const DEFAULT_SCRIPT_BRIEF: ScriptWriterBrief = {
@@ -80,6 +86,9 @@ export const DEFAULT_SCRIPT_BRIEF: ScriptWriterBrief = {
   genderMix: "any",
   concept: "",
   characterNotes: "",
+  setting: "",
+  genre: "",
+  theme: "",
 };
 
 export const SCRIPT_CONTENT_TYPE_LABELS: Record<ScriptContentType, string> = {
@@ -176,11 +185,23 @@ export function inferScriptDetailLevel(brief: ScriptWriterBrief): "standard" | "
 export function formatBriefForPrompt(brief: ScriptWriterBrief): string {
   const concept = brief.concept.trim();
   const characterNotes = brief.characterNotes?.trim();
+  const setting = brief.setting?.trim();
+  const genre = brief.genre?.trim();
+  const theme = brief.theme?.trim();
 
   const lines = [
     "=== PRIMARY CREATIVE DIRECTION (highest priority — obey over all dropdown defaults) ===",
     `Story idea: ${concept}`,
   ];
+  if (genre) {
+    lines.push(`Genre: ${genre}`);
+  }
+  if (setting) {
+    lines.push(`Setting / world: ${setting}`);
+  }
+  if (theme) {
+    lines.push(`Theme / message: ${theme}`);
+  }
   if (characterNotes) {
     lines.push(`Character & casting notes: ${characterNotes}`);
   }
