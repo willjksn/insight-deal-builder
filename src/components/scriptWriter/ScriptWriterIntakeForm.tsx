@@ -283,8 +283,8 @@ export function ScriptWriterIntakeForm({
                 Admin
               </span>
               <span className="mt-0.5 block text-xs text-slate-500">
-                Bold, highly sensual/seductive direction — very suggestive, up to just short of
-                explicit. Works on any script type. Adults only (18+), consensual, non-explicit.
+                Bold, highly sensual/seductive direction. Works on any script type. Adults only
+                (18+), consensual, non-explicit.
               </span>
             </span>
           </label>
