@@ -17,7 +17,6 @@ export function IdeaSparkPanel({ brief, onApply }: IdeaSparkPanelProps) {
   const [loading, setLoading] = useState(false);
   const [ideas, setIdeas] = useState<ScriptIdeaSuggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [usedTrends, setUsedTrends] = useState(false);
   const [appliedTitle, setAppliedTitle] = useState<string | null>(null);
 
   const fetchIdeas = async () => {
@@ -41,7 +40,6 @@ export function IdeaSparkPanel({ brief, onApply }: IdeaSparkPanelProps) {
         spicyMode: brief.spicyMode,
       });
       setIdeas(res.ideas);
-      setUsedTrends(res.usedTrends);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't generate ideas. Try again.");
     } finally {
@@ -85,11 +83,6 @@ export function IdeaSparkPanel({ brief, onApply }: IdeaSparkPanelProps) {
 
       {ideas.length ? (
         <div className="mt-3 space-y-2">
-          {usedTrends ? (
-            <p className="text-[11px] font-medium uppercase tracking-wide text-violet-500">
-              Informed by current trends
-            </p>
-          ) : null}
           <ul className="space-y-2">
             {ideas.map((idea, i) => {
               const applied = appliedTitle === idea.title;

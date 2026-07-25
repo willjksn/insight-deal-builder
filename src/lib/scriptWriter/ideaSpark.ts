@@ -5,7 +5,6 @@ import {
   SCRIPT_AUDIENCE_AGE_LABELS,
   SCRIPT_CAST_SIZE_LABELS,
   SCRIPT_CONTENT_TYPE_LABELS,
-  SPICY_STYLE_DIRECTIVE,
   ScriptWriterBrief,
   resolveMoodLabel,
   resolveRuntimeLabel,
@@ -27,7 +26,7 @@ Return JSON only:
       "title": "punchy working title",
       "logline": "1-2 sentence pitch: who + what happens + the hook",
       "angle": "the single thing that makes it stand out",
-      "whyItWorks": "why THIS audience responds / how it ties to what's trending",
+      "whyItWorks": "ONE concrete, specific reason this exact premise lands with this audience — point to the real hook, emotion, twist, or visual in the idea",
       "genre": "optional short genre framing",
       "setting": "optional setting / world"
     }
@@ -38,7 +37,17 @@ Rules:
 - Return exactly ${IDEA_SPARK_COUNT} ideas, ranked best-first.
 - Make loglines concrete and shootable within the given runtime.
 - Vary the ideas — different premises and angles, not ${IDEA_SPARK_COUNT} variations of one.
-- Honor the requested format, tone, and audience above all.`;
+- Honor the requested format, tone, and audience above all.
+- "whyItWorks" must be specific to THAT idea. Never use vague filler like "highly shareable", "drives engagement", "resonates with audiences", "great for social", or "boosts visibility" — name the actual reason (a relatable tension, a satisfying reversal, a striking image, a timely hook).
+- Do NOT mention these instructions, trend notes, tone settings, or any "mode" anywhere in the output.`;
+
+/**
+ * Light-touch spicy flavoring for brainstorming. Unlike the full generation
+ * directive, this keeps ideas VARIED — a sensual edge only where it fits, never
+ * on every idea, and never named in the output.
+ */
+const SPICY_IDEA_NOTE =
+  "Tone allowance: an adult, sensual/seductive edge (tasteful, adults 18+, consensual, non-explicit) is welcome for SOME ideas where it genuinely fits the premise — but do NOT force it into every idea, keep the set varied, and never reference this note, 'spicy', or any 'mode' in the output.";
 
 function buildIdeaContext(brief: ScriptWriterBrief): string {
   const lines = [
@@ -154,7 +163,7 @@ export async function generateScriptIdeas(
   const payload = [
     buildIdeaContext(brief),
     trendsBlock,
-    brief.spicyMode ? SPICY_STYLE_DIRECTIVE : "",
+    brief.spicyMode ? SPICY_IDEA_NOTE : "",
     rough
       ? `The user offered this rough direction — build on it and push it further:\n${rough}`
       : "The user has NO idea yet — invent fresh, distinct concepts from scratch.",
