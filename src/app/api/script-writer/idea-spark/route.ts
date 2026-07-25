@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   apiErrorStatus,
-  assertCanUseScriptWriter,
   requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { assertScriptWriterAppAccess } from "@/lib/projectAccess/server";
 import { ScriptWriterBrief } from "@/lib/scriptWriter/brief";
 import { resolveSessionBrief } from "@/lib/scriptWriter/scriptWriterAi";
 import { generateScriptIdeas } from "@/lib/scriptWriter/ideaSpark";
@@ -14,8 +14,14 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const { appUser } = await requireApprovedAuthUser(request);
-    assertCanUseScriptWriter(appUser);
+    const { uid, appUser } = await requireApprovedAuthUser(request);
+
+    const db = getAdminDb();
+    if (!db) throw new Error("Firebase Admin is not configured");
+
+    // Match the script-writer page/list gate: full production-tools OR
+    // project-scoped script access. Prevents a 401 for project-shared users.
+    await assertScriptWriterAppAccess(db, uid, appUser);
 
     const body = (await request.json().catch(() => ({}))) as {
       brief?: Partial<ScriptWriterBrief>;
@@ -30,7 +36,6 @@ export async function POST(request: NextRequest) {
       brief.spicyMode = false;
     }
 
-    const db = getAdminDb() ?? undefined;
     const { ideas, usedTrends } = await generateScriptIdeas(brief, { db });
 
     return NextResponse.json({ ideas, usedTrends });
