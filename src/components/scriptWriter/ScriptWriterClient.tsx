@@ -499,6 +499,11 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           <BriefChip label={resolveMoodLabel(session.brief)} />
           <BriefChip label={SCRIPT_CAST_SIZE_LABELS[session.brief.castSize]} />
           <BriefChip label={resolveRuntimeLabel(session.brief)} />
+          {session.brief.spicyMode ? (
+            <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-medium text-rose-800">
+              Spicy
+            </span>
+          ) : null}
         </div>
       ) : null}
 

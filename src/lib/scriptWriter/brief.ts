@@ -76,6 +76,12 @@ export interface ScriptWriterBrief {
   genre?: string;
   /** The underlying idea/message the piece is really about. */
   theme?: string;
+  /**
+   * Admin-only. When true, generation adopts a bold, highly sensual/"spicy"
+   * tone (very suggestive, up to just-short-of-explicit) across any format.
+   * Enforced adults-only (18+), consensual, non-pornographic.
+   */
+  spicyMode?: boolean;
 }
 
 export const DEFAULT_SCRIPT_BRIEF: ScriptWriterBrief = {
@@ -90,7 +96,21 @@ export const DEFAULT_SCRIPT_BRIEF: ScriptWriterBrief = {
   setting: "",
   genre: "",
   theme: "",
+  spicyMode: false,
 };
+
+/**
+ * Admin-only "Spicy" style directive. Injected into every generation path via
+ * formatBriefForPrompt. Very suggestive up to just-short-of-explicit, with hard
+ * adults-only / consensual / non-pornographic guardrails.
+ */
+export const SPICY_STYLE_DIRECTIVE = [
+  "=== SPICY MODE — SENSUAL, ADULTS ONLY (18+) — HIGH PRIORITY, applies to ALL formats ===",
+  "Write with a bold, highly sensual, seductive tone tuned to appeal to an adult male audience. Push to the edge of tasteful: very suggestive, sultry, and provocative — go ALL THE WAY UP TO JUST SHORT OF EXPLICIT, then stop there. Apply this to whatever format is requested (commercial, short film, music video, trailer, etc.) — not only ads.",
+  "Convey heat through cinematic craft, not graphic description: charged eye contact and sexual tension, slow deliberate movement, suggestive blocking and closeness, wardrobe and skin as texture, low-key / backlight / rim lighting, silhouette, breath, and pacing that builds desire and anticipation. Imply intimacy rather than depicting it.",
+  "HARD LIMITS (never violate): every character is unambiguously an adult (18+); everything is consensual; NO explicit or graphic sexual acts, NO pornographic detail, NO explicit nudity depicting sex or genitalia. The 'just short of explicit' line is the ceiling — seductive and cinematic, never pornographic. Use generic characters and settings; do not reference real brands, people, or trademarks.",
+  "For suggestedShots, favor sensual coverage: intimate close-ups (eyes, lips, hands, neck, jawline, silhouette), slow push-ins and reveals, shallow depth of field, rim/backlight, negative space, and lingering holds — always tasteful.",
+].join("\n");
 
 export const SCRIPT_CONTENT_TYPE_LABELS: Record<ScriptContentType, string> = {
   commercial: "Commercial / ad",
@@ -225,6 +245,9 @@ export function formatBriefForPrompt(brief: ScriptWriterBrief): string {
     `- Audience age (default): ${SCRIPT_AUDIENCE_AGE_LABELS[brief.audienceAge]}`,
     `- On-camera gender mix (default): ${SCRIPT_GENDER_MIX_LABELS[brief.genderMix]}`
   );
+  if (brief.spicyMode) {
+    lines.push("", SPICY_STYLE_DIRECTIVE);
+  }
   return lines.join("\n");
 }
 

@@ -20,6 +20,8 @@ interface ScriptWriterIntakeFormProps {
   onChange: (brief: ScriptWriterBrief) => void;
   researchTrends?: boolean;
   onResearchTrendsChange?: (value: boolean) => void;
+  /** Admin-only: show the "Spicy" (sensual/adult) tone toggle. */
+  allowSpicy?: boolean;
 }
 
 function selectOptions<T extends string>(labels: Record<T, string>) {
@@ -100,6 +102,7 @@ export function ScriptWriterIntakeForm({
   onChange,
   researchTrends,
   onResearchTrendsChange,
+  allowSpicy,
 }: ScriptWriterIntakeFormProps) {
   const patch = (partial: Partial<ScriptWriterBrief>) => onChange({ ...brief, ...partial });
 
@@ -259,6 +262,29 @@ export function ScriptWriterIntakeForm({
               <span className="font-medium text-slate-900">Research current trends</span>
               <span className="mt-0.5 block text-xs text-slate-500">
                 Uses the weekly trend cache when fresh (under 7 days), or live research on refresh.
+              </span>
+            </span>
+          </label>
+        </div>
+      ) : null}
+
+      {allowSpicy ? (
+        <div className="rounded-xl border border-rose-200/80 bg-rose-50/60 px-4 py-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={brief.spicyMode ?? false}
+              onChange={(e) => patch({ spicyMode: e.target.checked })}
+              className="mt-0.5 h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-400"
+            />
+            <span className="text-sm text-slate-700">
+              <span className="font-medium text-rose-900">Spicy tone</span>
+              <span className="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700">
+                Admin
+              </span>
+              <span className="mt-0.5 block text-xs text-slate-500">
+                Bold, highly sensual/seductive direction — very suggestive, up to just short of
+                explicit. Works on any script type. Adults only (18+), consensual, non-explicit.
               </span>
             </span>
           </label>

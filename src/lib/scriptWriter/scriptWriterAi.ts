@@ -565,6 +565,7 @@ export function resolveSessionBrief(
     setting: brief?.setting,
     genre: brief?.genre,
     theme: brief?.theme,
+    spicyMode: brief?.spicyMode ?? false,
   };
 }
 

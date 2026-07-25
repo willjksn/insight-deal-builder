@@ -33,7 +33,7 @@ import {
 import { uploadScriptWriterFile } from "@/lib/scriptWriter/storage";
 import { ScriptInspirationImage, ScriptInspirationVideo, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { scriptSessionStatusLabel, sessionsForProject } from "@/lib/scriptWriter/projectScripts";
-import { canUseProductionTools } from "@/lib/utils/permissions";
+import { canManageUsers, canUseProductionTools } from "@/lib/utils/permissions";
 
 function ScriptWriterPageContent() {
   const router = useRouter();
@@ -59,6 +59,7 @@ function ScriptWriterPageContent() {
 
   const hasInspiration =
     pendingImages.length > 0 || pendingVideo !== null || pendingUrls.length > 0;
+  const isAdmin = canManageUsers(appUser);
 
   useEffect(() => {
     const idea = searchParams.get("idea")?.trim();
@@ -261,6 +262,7 @@ function ScriptWriterPageContent() {
             onChange={setBrief}
             researchTrends={researchTrends}
             onResearchTrendsChange={setResearchTrends}
+            allowSpicy={isAdmin}
           />
           <InspirationUploadSection
             images={pendingImages}

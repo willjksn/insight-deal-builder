@@ -19,7 +19,7 @@ import {
 } from "@/lib/scriptWriter/scriptWriterAi";
 import { ScriptWriterMessage } from "@/lib/scriptWriter/types";
 import { serializeScriptSession } from "@/lib/scriptWriter/adminApply";
-import { canUseProductionTools } from "@/lib/utils/permissions";
+import { canManageUsers, canUseProductionTools } from "@/lib/utils/permissions";
 
 export const runtime = "nodejs";
 
@@ -83,6 +83,10 @@ export async function POST(request: NextRequest) {
 
     const workflowMode = body.workflowMode ?? "text";
     const brief = resolveSessionBrief(body.brief, body.initialIdea?.trim() ?? "");
+    // "Spicy" tone is admin-only; never honor it for non-admins even if requested.
+    if (brief.spicyMode && !canManageUsers(appUser)) {
+      brief.spicyMode = false;
+    }
     const hasConcept = Boolean(brief.concept.trim());
     if (!hasConcept && workflowMode !== "inspiration") {
       return NextResponse.json({ error: "Describe your concept first" }, { status: 400 });
