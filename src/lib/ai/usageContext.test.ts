@@ -43,5 +43,6 @@ describe("inferFeatureFromPath — revenue attribution", () => {
     expect(inferFeatureFromPath("/api/script-writer/sessions/s1/feature/assemble")).toBe(
       "script_writer.generate"
     );
+    expect(inferFeatureFromPath("/api/script-writer/idea-spark")).toBe("script_writer.ideas");
   });
 });

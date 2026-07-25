@@ -1,6 +1,7 @@
 import { ScriptWriterBrief } from "@/lib/scriptWriter/brief";
 import { ProductionShootingKit } from "@/lib/production/shootingKit";
 import {
+  ScriptIdeaSuggestion,
   ScriptInspirationImage,
   ScriptInspirationUrl,
   ScriptInspirationVideo,
@@ -300,6 +301,19 @@ export async function scriptWriterRestoreScriptVersion(
     body: JSON.stringify({ versionId }),
   });
   return parseJson<{ session: unknown }>(res);
+}
+
+/** Ask the AI for original, trend-aware concept ideas (no session required). */
+export async function scriptWriterSparkIdeas(
+  getToken: () => Promise<string | null>,
+  brief: Partial<ScriptWriterBrief>
+) {
+  const res = await fetch("/api/script-writer/idea-spark", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ brief }),
+  });
+  return parseJson<{ ideas: ScriptIdeaSuggestion[]; usedTrends: boolean }>(res);
 }
 
 export type PendingInspirationImage = {

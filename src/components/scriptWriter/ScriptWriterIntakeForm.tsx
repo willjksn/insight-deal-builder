@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
+import { IdeaSparkPanel } from "@/components/scriptWriter/IdeaSparkPanel";
 import { cn } from "@/lib/utils/cn";
 import {
   DEFAULT_SCRIPT_BRIEF,
@@ -114,6 +115,18 @@ export function ScriptWriterIntakeForm({
         onChange={(e) => patch({ concept: e.target.value })}
         placeholder="A founder films a product launch in a warehouse studio, but the first take keeps getting interrupted…"
         rows={4}
+      />
+      <IdeaSparkPanel
+        brief={brief}
+        onApply={(idea) =>
+          patch({
+            concept: idea.logline
+              ? `${idea.title}: ${idea.logline}${idea.angle ? ` — ${idea.angle}` : ""}`
+              : brief.concept,
+            genre: brief.genre?.trim() ? brief.genre : idea.genre ?? brief.genre,
+            setting: brief.setting?.trim() ? brief.setting : idea.setting ?? brief.setting,
+          })
+        }
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <Textarea

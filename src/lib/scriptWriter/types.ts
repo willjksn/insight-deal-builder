@@ -305,6 +305,25 @@ export interface ScriptReferenceResearch {
   sourceTitles: string[];
 }
 
+/**
+ * A single AI-suggested story concept for users who don't have an idea yet.
+ * Produced by the "idea spark" agent from the format brief + current trends.
+ */
+export interface ScriptIdeaSuggestion {
+  /** Punchy working title. */
+  title: string;
+  /** 1–2 sentence pitch: who + what happens + the hook. */
+  logline: string;
+  /** The single thing that makes it stand out. */
+  angle?: string;
+  /** Why the target audience will respond / trend tie-in. */
+  whyItWorks?: string;
+  /** Optional genre framing to prefill. */
+  genre?: string;
+  /** Optional setting/world to prefill. */
+  setting?: string;
+}
+
 /** Web trend research via Tavily, summarized by Gemini for script generation. */
 export interface ScriptTrendsResearch {
   query: string;
