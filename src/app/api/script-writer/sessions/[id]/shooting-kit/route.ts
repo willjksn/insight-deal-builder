@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   apiErrorStatus,
-  assertCanUseScriptWriter,
   requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
@@ -19,7 +18,6 @@ export async function PATCH(
 ) {
   try {
     const { uid, appUser } = await requireApprovedAuthUser(request);
-    assertCanUseScriptWriter(appUser);
     const { id } = await params;
 
     const body = (await request.json()) as { shootingKit?: Partial<ProductionShootingKit> };

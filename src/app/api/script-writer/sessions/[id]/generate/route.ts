@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   apiErrorStatus,
-  assertCanUseScriptWriter,
   requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
@@ -25,7 +24,8 @@ export async function POST(
 ) {
   try {
     const { uid, appUser } = await requireApprovedAuthUser(request);
-    assertCanUseScriptWriter(appUser);
+    // Access is enforced per-session by getScriptSessionForRequest below,
+    // which also grants project-scoped collaborators.
     const { id } = await params;
 
     const body = (await request.json().catch(() => ({}))) as {

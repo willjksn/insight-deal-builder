@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   apiErrorStatus,
-  assertCanUseScriptWriter,
   requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { getAdminDb } from "@/lib/firebase/admin";
@@ -23,7 +22,6 @@ export async function POST(
 ) {
   try {
     const { uid, appUser } = await requireApprovedAuthUser(request);
-    assertCanUseScriptWriter(appUser);
     const { id } = await params;
 
     const db = getAdminDb();
