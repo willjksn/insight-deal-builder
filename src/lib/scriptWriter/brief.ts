@@ -168,11 +168,11 @@ export const SCRIPT_AUDIENCE_AGE_LABELS: Record<ScriptAudienceAge, string> = {
 };
 
 export const SCRIPT_GENDER_MIX_LABELS: Record<ScriptGenderMix, string> = {
-  any: "Any / open casting",
-  mostly_women: "Mostly women on camera",
-  mostly_men: "Mostly men on camera",
-  mixed_ensemble: "Mixed ensemble",
-  na_voiceover: "N/A — voiceover or no cast",
+  any: "No preference",
+  mostly_women: "Lean female",
+  mostly_men: "Lean male",
+  mixed_ensemble: "Balanced mix",
+  na_voiceover: "No on-camera cast",
 };
 
 export function resolveMoodLabel(brief: Pick<ScriptWriterBrief, "mood" | "customMood">): string {

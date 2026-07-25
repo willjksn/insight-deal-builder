@@ -234,7 +234,7 @@ export function ScriptWriterIntakeForm({
           </div>
 
           <div>
-            <DefaultFieldLabel>On-camera gender mix</DefaultFieldLabel>
+            <DefaultFieldLabel>Cast gender balance</DefaultFieldLabel>
             <Select
               value={brief.genderMix}
               onChange={(e) =>
