@@ -5,6 +5,7 @@ import {
   ScriptInspirationImage,
   ScriptInspirationUrl,
   ScriptInspirationVideo,
+  ScriptStoryboardImage,
   ScriptVideoReferenceMode,
 } from "@/lib/scriptWriter/types";
 
@@ -227,6 +228,24 @@ export async function scriptWriterFeatureAssemble(
     headers: await authHeaders(getToken),
   });
   return parseJson<{ session: unknown }>(res);
+}
+
+/** Generate a photoreal storyboard still for one scene. */
+export async function scriptWriterGenerateStoryboardFrame(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  sceneNumber: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/storyboard/generate`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ sceneNumber }),
+  });
+  return parseJson<{
+    sceneNumber: string;
+    image: ScriptStoryboardImage;
+    session: unknown;
+  }>(res);
 }
 
 export async function scriptWriterApplyToProject(

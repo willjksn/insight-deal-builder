@@ -1,13 +1,19 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon, Loader2, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { formatShotTypeLabel } from "@/lib/production/shotLabels";
 import { deriveStoryboardFramesFromScript } from "@/lib/scriptWriter/scriptMappers";
+import { scriptWriterGenerateStoryboardFrame } from "@/lib/scriptWriter/apiClient";
+import { STORYBOARD_IMAGE_COST_USD } from "@/lib/scriptWriter/storyboardCost";
 import {
   ScriptDocument,
   ScriptInspirationImage,
   ScriptStoryboardFrame,
+  ScriptStoryboardImage,
+  ScriptWriterSession,
 } from "@/lib/scriptWriter/types";
 
 function frameTitle(frame: ScriptStoryboardFrame): string {
@@ -16,22 +22,105 @@ function frameTitle(frame: ScriptStoryboardFrame): string {
   return name ? `Scene ${frame.sceneNumber}, ${name}` : `Scene ${frame.sceneNumber}, ${typeLabel}`;
 }
 
+function formatCost(count: number): string {
+  return `~$${(count * STORYBOARD_IMAGE_COST_USD).toFixed(2)}`;
+}
+
+interface ScriptStoryboardPanelProps {
+  script: ScriptDocument;
+  inspirationImages?: ScriptInspirationImage[];
+  appliedProjectId?: string;
+  /** Session id — required to generate/persist frame images. */
+  sessionId?: string;
+  getToken?: () => Promise<string | null>;
+  storyboardImages?: Record<string, ScriptStoryboardImage>;
+  /** Called after the server persists a new/updated set of storyboard images. */
+  onSessionUpdated?: (session: ScriptWriterSession) => void;
+  readOnly?: boolean;
+  /** Admin-only: show the generate/regenerate controls (image credits). */
+  allowGenerate?: boolean;
+}
+
 export function ScriptStoryboardPanel({
   script,
   inspirationImages = [],
   appliedProjectId,
-}: {
-  script: ScriptDocument;
-  inspirationImages?: ScriptInspirationImage[];
-  appliedProjectId?: string;
-}) {
+  sessionId,
+  getToken,
+  storyboardImages,
+  onSessionUpdated,
+  readOnly,
+  allowGenerate,
+}: ScriptStoryboardPanelProps) {
   const frames = script.storyboardFrames?.length
     ? script.storyboardFrames
     : deriveStoryboardFramesFromScript(script);
 
+  const [busyScenes, setBusyScenes] = useState<Record<string, boolean>>({});
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const imageById = useMemo(
+    () => new Map(inspirationImages.map((img) => [img.id, img])),
+    [inspirationImages]
+  );
+  const generated = storyboardImages ?? {};
+  const canGenerate = Boolean(sessionId && getToken) && !readOnly && Boolean(allowGenerate);
+
+  const missingCount = useMemo(
+    () => frames.filter((f) => !generated[f.sceneNumber]?.url).length,
+    [frames, generated]
+  );
+
   if (!frames.length) return null;
 
-  const imageById = new Map(inspirationImages.map((img) => [img.id, img]));
+  const runOne = async (frame: ScriptStoryboardFrame): Promise<boolean> => {
+    if (!sessionId || !getToken) return false;
+    try {
+      const { session } = await scriptWriterGenerateStoryboardFrame(
+        getToken,
+        sessionId,
+        frame.sceneNumber
+      );
+      if (session && onSessionUpdated) onSessionUpdated(session as ScriptWriterSession);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate frame");
+      return false;
+    }
+  };
+
+  const generateOne = async (frame: ScriptStoryboardFrame) => {
+    if (!canGenerate) return;
+    setError(null);
+    setBusyScenes((s) => ({ ...s, [frame.sceneNumber]: true }));
+    await runOne(frame);
+    setBusyScenes((s) => ({ ...s, [frame.sceneNumber]: false }));
+  };
+
+  const generateAll = async () => {
+    if (!canGenerate) return;
+    const targets = frames.filter((f) => !generated[f.sceneNumber]?.url);
+    if (!targets.length) return;
+    const ok = window.confirm(
+      `Generate ${targets.length} storyboard frame${targets.length === 1 ? "" : "s"} for about ${formatCost(
+        targets.length
+      )}? This uses AI image credits.`
+    );
+    if (!ok) return;
+
+    setError(null);
+    setBatchProgress({ done: 0, total: targets.length });
+    for (let i = 0; i < targets.length; i++) {
+      const frame = targets[i];
+      setBusyScenes((s) => ({ ...s, [frame.sceneNumber]: true }));
+      const success = await runOne(frame);
+      setBusyScenes((s) => ({ ...s, [frame.sceneNumber]: false }));
+      setBatchProgress({ done: i + 1, total: targets.length });
+      if (!success) break; // Stop the batch on first failure so we don't burn credits.
+    }
+    setBatchProgress(null);
+  };
 
   return (
     <div className="border-b border-slate-100 px-4 py-4">
@@ -41,42 +130,87 @@ export function ScriptStoryboardPanel({
             Storyboard
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
-            One hero frame per scene — matched to inspiration refs when available.
+            One hero frame per scene. Generate photoreal AI stills or match inspiration refs.
           </p>
         </div>
-        {appliedProjectId ? (
-          <Link
-            href={`/projects/${appliedProjectId}/production`}
-            className="text-xs font-medium text-amber-800 hover:text-amber-900 hover:underline"
-          >
-            Open pre-production board →
-          </Link>
-        ) : null}
+        <div className="flex items-center gap-3">
+          {appliedProjectId ? (
+            <Link
+              href={`/projects/${appliedProjectId}/production`}
+              className="text-xs font-medium text-amber-800 hover:text-amber-900 hover:underline"
+            >
+              Open pre-production board →
+            </Link>
+          ) : null}
+          {canGenerate && missingCount > 0 ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void generateAll()}
+              disabled={Boolean(batchProgress)}
+            >
+              {batchProgress ? (
+                <>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  Generating {batchProgress.done}/{batchProgress.total}…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-1.5 h-4 w-4" />
+                  Generate all frames ({formatCost(frames.length)})
+                </>
+              )}
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      {error ? (
+        <p className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {error}
+        </p>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-2">
         {frames.map((frame) => {
+          const gen = generated[frame.sceneNumber];
           const img = frame.inspirationImageId
             ? imageById.get(frame.inspirationImageId)
             : undefined;
+          const displayUrl = gen?.url || img?.storageUrl;
+          const busy = busyScenes[frame.sceneNumber];
           return (
             <article
               key={`${frame.sceneNumber}-${frame.shotType}`}
               className="overflow-hidden rounded-xl border border-amber-200/60 bg-amber-50/30"
             >
               <div className="relative aspect-[4/3] bg-slate-100">
-                {img?.storageUrl ? (
+                {displayUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={img.storageUrl}
+                    src={displayUrl}
                     alt={frameTitle(frame)}
                     className="h-full w-full object-cover"
                   />
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center gap-1 text-slate-400">
                     <ImageIcon className="h-8 w-8 opacity-40" />
-                    <span className="text-[10px]">Reference image TBD</span>
+                    <span className="text-[10px]">
+                      {canGenerate ? "No frame yet" : "Reference image TBD"}
+                    </span>
                   </div>
                 )}
+                {busy ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 text-white">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : null}
+                {gen?.url ? (
+                  <span className="absolute left-1.5 top-1.5 rounded-full bg-violet-600/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
+                    AI frame
+                  </span>
+                ) : null}
               </div>
               <div className="p-2.5">
                 <h3 className="text-xs font-bold text-orange-800">{frameTitle(frame)}</h3>
@@ -87,14 +221,25 @@ export function ScriptStoryboardPanel({
                 {frame.audioCue ? (
                   <p className="mt-1 text-[10px] italic text-slate-500">{frame.audioCue}</p>
                 ) : null}
+                {canGenerate ? (
+                  <button
+                    type="button"
+                    onClick={() => void generateOne(frame)}
+                    disabled={busy || Boolean(batchProgress)}
+                    className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-violet-700 hover:text-violet-900 disabled:opacity-50"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    {gen?.url ? "Regenerate" : "Generate sketch"}
+                  </button>
+                ) : null}
               </div>
             </article>
           );
         })}
       </div>
       <p className="mt-3 text-[11px] text-slate-500">
-        After you apply this script to a project, use the shot list{" "}
-        <strong>Grid</strong> view to upload frames, swap references, and print a client PDF.
+        Frames are photoreal AI stills for inspiration. After you apply this script to a project,
+        use the shot list <strong>Grid</strong> view to swap references and print a client PDF.
       </p>
     </div>
   );

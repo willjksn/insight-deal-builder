@@ -25,8 +25,25 @@ export async function uploadProductionImageBuffer(params: {
 }): Promise<{ storagePath: string; storageUrl: string }> {
   const assetId = params.assetId ?? randomUUID();
   const path = productionAssetPath(params.projectId, params.folder, assetId, params.ext);
+  return uploadImageBufferToPath({
+    path,
+    buffer: params.buffer,
+    contentType: params.contentType,
+  });
+}
+
+/**
+ * Upload an image buffer to an explicit storage path and return a durable
+ * Firebase download URL (token metadata, same pattern as client getDownloadURL).
+ */
+export async function uploadImageBufferToPath(params: {
+  path: string;
+  buffer: Buffer;
+  contentType: string;
+}): Promise<{ storagePath: string; storageUrl: string }> {
   const token = randomUUID();
-  const file = getBucket().file(path);
+  const bucketRef = getBucket();
+  const file = bucketRef.file(params.path);
   await file.save(params.buffer, {
     contentType: params.contentType,
     metadata: {
@@ -36,7 +53,6 @@ export async function uploadProductionImageBuffer(params: {
       },
     },
   });
-  const bucket = getBucket().name;
-  const storageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
-  return { storagePath: path, storageUrl };
+  const storageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketRef.name}/o/${encodeURIComponent(params.path)}?alt=media&token=${token}`;
+  return { storagePath: params.path, storageUrl };
 }

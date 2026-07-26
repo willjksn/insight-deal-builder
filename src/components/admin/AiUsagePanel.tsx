@@ -92,6 +92,12 @@ export function AiUsagePanel() {
     return Object.entries(summary.byKind).sort((a, b) => b[1].estimatedUsd - a[1].estimatedUsd);
   }, [summary]);
 
+  // Total spend on generated images this month (Gemini/Vertex + OpenAI images).
+  const imageUsd = useMemo(() => {
+    const bk = summary?.byKind ?? {};
+    return (bk["gemini_image"]?.estimatedUsd ?? 0) + (bk["openai_image"]?.estimatedUsd ?? 0);
+  }, [summary]);
+
   return (
     <div className="mb-8">
       <div className="mb-4 flex items-center gap-2">
@@ -129,8 +135,13 @@ export function AiUsagePanel() {
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Images generated</p>
                 <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900">
                   {summary.imageCount.toLocaleString()}
+                  <span className="ml-2 text-sm font-medium text-violet-700">
+                    {formatUsd(imageUsd)}
+                  </span>
                 </p>
-                <p className="mt-1 text-xs text-slate-500">Storyboard frames & diagrams</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Storyboard frames &amp; diagrams · {formatUsd(imageUsd)} this month
+                </p>
               </CardBody>
             </Card>
             <Card>

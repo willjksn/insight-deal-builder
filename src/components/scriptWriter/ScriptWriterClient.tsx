@@ -836,6 +836,12 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
               script={script}
               inspirationImages={session.inspirationImages}
               appliedProjectId={session.appliedProjectId ?? session.linkedProjectId}
+              sessionId={sessionId}
+              getToken={() => user!.getIdToken()}
+              storyboardImages={session.storyboardImages}
+              onSessionUpdated={(updated) => setSession(updated)}
+              readOnly={adminReadOnly || session.status === "applied"}
+              allowGenerate={canManageUsers(appUser)}
             />
           ) : storyboardMode && !script ? (
             <div className="border-b border-slate-100 px-4 py-3">

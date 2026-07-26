@@ -138,6 +138,18 @@ export interface ScriptStoryboardFrame {
   inspirationImageId?: string;
 }
 
+/** An AI-generated storyboard still, persisted per scene on the session. */
+export interface ScriptStoryboardImage {
+  /** Durable Firebase download URL. */
+  url: string;
+  /** Storage path (for future cleanup). */
+  storagePath?: string;
+  /** The prompt used to generate the image. */
+  prompt?: string;
+  /** ISO timestamp of generation. */
+  createdAt: string;
+}
+
 export interface ScriptTimedBeat {
   startSec: number;
   endSec: number;
@@ -368,6 +380,8 @@ export interface ScriptWriterSession {
   detailedShotList?: boolean;
   /** When true, Gemini outputs scene storyboardFrames and applies reference images */
   storyboardMode?: boolean;
+  /** AI-generated storyboard stills, keyed by scene number. */
+  storyboardImages?: Record<string, ScriptStoryboardImage>;
   /** Pre-production shooting kit for this session (also loads from linked project board). */
   shootingKit?: ProductionShootingKit;
   sourceIdeaEngine?: boolean;
