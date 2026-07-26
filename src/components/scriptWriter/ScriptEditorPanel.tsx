@@ -181,7 +181,7 @@ export function ScriptEditorPanel({
           ))}
         </div>
 
-        {!readOnly && editing ? (
+        {!readOnly && viewMode === "edit" && editing ? (
           <EditActionButtons
             saving={saving}
             onSave={() => void save()}
@@ -265,7 +265,7 @@ export function ScriptEditorPanel({
             <p className="mt-1 break-words text-sm text-slate-600">{activeScript.logline}</p>
           </div>
 
-          {editing ? (
+          {viewMode === "edit" && editing ? (
             <div className="space-y-3">
               <Input
                 label="Title"
@@ -334,7 +334,7 @@ export function ScriptEditorPanel({
             />
           )}
 
-          {!readOnly && editing ? (
+          {!readOnly && viewMode === "edit" && editing ? (
             <EditActionButtons
               saving={saving}
               onSave={() => void save()}
