@@ -44,11 +44,28 @@ import { normalizeScriptDocument } from "@/lib/screenplay/normalize";
 import { createScriptElement } from "@/lib/screenplay/elements";
 
 /**
- * Output-token ceiling for single-pass script generation/refinement. Set to the
- * gemini-2.5-flash maximum so long (but non-feature) scripts don't get truncated
- * mid-JSON. Truly feature-length scripts should use the multi-pass builder.
+ * Output-token ceiling for single-pass script generation/refinement, scaled to
+ * the runtime. Short pieces get a sane cap so a runaway/repetition loop fails
+ * fast with a clear error instead of ballooning into a giant truncated blob;
+ * longer pieces get more headroom. Truly feature-length scripts use multi-pass.
  */
-const SCRIPT_GENERATE_MAX_TOKENS = 65536;
+function scriptGenerateMaxTokens(brief: ScriptWriterBrief): number {
+  if (brief.runtime === "feature") return 65536;
+  const level = inferScriptDetailLevel(brief);
+  if (level === "trailer") return 12288; // ~30–90s teasers/spots
+  if (level === "production") return 24576; // ~2–10 min
+  return 40960; // standard / longer one-offs
+}
+
+/** A truncated (MAX_TOKENS) or otherwise cut-off JSON response. */
+function isTruncationError(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    msg.includes("max_tokens") ||
+    msg.includes("unterminated") ||
+    msg.includes("cut off")
+  );
+}
 
 function toGeminiHistory(messages: ScriptWriterMessage[]) {
   return messages.map((m) => ({
@@ -428,12 +445,25 @@ export async function scriptWriterGenerate(
       .filter(Boolean)
       .join("\n");
 
-    const raw = await callGeminiJsonWithMedia(
-      scriptWriterInspirationGenerateSystem(detailLevel, detailedShotList, storyboardMode),
-      prompt,
-      media,
-      { temperature: 0.58, maxOutputTokens: SCRIPT_GENERATE_MAX_TOKENS }
+    const inspirationSystem = scriptWriterInspirationGenerateSystem(
+      detailLevel,
+      detailedShotList,
+      storyboardMode
     );
+    const maxOutputTokens = scriptGenerateMaxTokens(brief);
+    let raw: unknown;
+    try {
+      raw = await callGeminiJsonWithMedia(inspirationSystem, prompt, media, {
+        temperature: 0.58,
+        maxOutputTokens,
+      });
+    } catch (err) {
+      if (!isTruncationError(err)) throw err;
+      raw = await callGeminiJsonWithMedia(inspirationSystem, prompt, media, {
+        temperature: 0.3,
+        maxOutputTokens,
+      });
+    }
     return parseScriptDocument(raw);
   }
 
@@ -455,15 +485,29 @@ export async function scriptWriterGenerate(
     storyboardPromptRules(storyboardMode),
     "",
     "Write the complete, production-ready script now. Match the brief exactly.",
+    "Keep the length appropriate for the target runtime. Do NOT repeat lines, actions, shots, or descriptions — every element must be distinct.",
   ]
     .filter(Boolean)
     .join("\n");
 
-  const raw = await callGeminiJsonWithHistory(
-    `${SCRIPT_WRITER_GENERATE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`,
-    [{ role: "user", parts: [{ text: payload }] }],
-    { temperature: 0.58, maxOutputTokens: SCRIPT_GENERATE_MAX_TOKENS }
-  );
+  const system = `${SCRIPT_WRITER_GENERATE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`;
+  const history = [{ role: "user" as const, parts: [{ text: payload }] }];
+  const maxOutputTokens = scriptGenerateMaxTokens(brief);
+  let raw: unknown;
+  try {
+    raw = await callGeminiJsonWithHistory(system, history, {
+      temperature: 0.58,
+      maxOutputTokens,
+    });
+  } catch (err) {
+    // A truncated/looping response is often temperature-driven; retry once
+    // cooler to break the repetition before surfacing the error.
+    if (!isTruncationError(err)) throw err;
+    raw = await callGeminiJsonWithHistory(system, history, {
+      temperature: 0.3,
+      maxOutputTokens,
+    });
+  }
   return parseScriptDocument(raw);
 }
 
@@ -535,22 +579,24 @@ export async function scriptWriterRefineScript(
     .filter(Boolean)
     .join("\n");
 
-  const raw =
+  const refineSystem = `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`;
+  const maxOutputTokens = scriptGenerateMaxTokens(brief);
+  const runRefine = (temperature: number) =>
     media.length > 0
-      ? await callGeminiJsonWithMedia(
-          `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`,
-          payload,
-          media,
-          {
-            temperature: 0.55,
-            maxOutputTokens: SCRIPT_GENERATE_MAX_TOKENS,
-          }
-        )
-      : await callGeminiJsonWithHistory(
-          `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`,
+      ? callGeminiJsonWithMedia(refineSystem, payload, media, { temperature, maxOutputTokens })
+      : callGeminiJsonWithHistory(
+          refineSystem,
           [{ role: "user", parts: [{ text: payload }] }],
-          { temperature: 0.55, maxOutputTokens: SCRIPT_GENERATE_MAX_TOKENS }
+          { temperature, maxOutputTokens }
         );
+
+  let raw: unknown;
+  try {
+    raw = await runRefine(0.55);
+  } catch (err) {
+    if (!isTruncationError(err)) throw err;
+    raw = await runRefine(0.3);
+  }
 
   return parseScriptDocument(raw);
 }
