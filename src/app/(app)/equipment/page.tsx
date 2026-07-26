@@ -16,7 +16,6 @@ import { useMutations } from "@/hooks/useMutations";
 import { useAuth } from "@/contexts/AuthContext";
 import { canManageProjects } from "@/lib/utils/permissions";
 import { EquipmentCatalogItem } from "@/lib/types";
-import { EQUIPMENT_CATALOG_PRESETS } from "@/lib/constants/presets";
 import { Trash2 } from "lucide-react";
 
 const CATEGORIES = ["Camera", "Lens", "Lighting", "Audio", "Support", "Grip", "Monitor", "Other"];
@@ -85,14 +84,6 @@ export default function EquipmentCatalogPage() {
     refresh();
   };
 
-  const loadDefaults = async () => {
-    for (const preset of EQUIPMENT_CATALOG_PRESETS) {
-      if (data.some((d) => d.name === preset.name)) continue;
-      await create(preset);
-    }
-    refresh();
-  };
-
   return (
     <div>
       <PageHeader
@@ -101,9 +92,6 @@ export default function EquipmentCatalogPage() {
         action={
           canEdit && (
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={loadDefaults} disabled={saving}>
-                Load Starter Catalog
-              </Button>
               <Button onClick={openCreate}>Add Item</Button>
             </div>
           )
@@ -154,7 +142,7 @@ export default function EquipmentCatalogPage() {
       ) : data.length === 0 ? (
         <EmptyState
           title="No equipment in catalog"
-          description="Load the starter catalog or add your first item."
+          description="Add your first item to build your gear list."
           actionLabel={canEdit ? "Add Item" : undefined}
           onAction={canEdit ? openCreate : undefined}
         />

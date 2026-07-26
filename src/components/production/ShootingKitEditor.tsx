@@ -32,6 +32,11 @@ interface ShootingKitEditorProps {
   className?: string;
   /** Extra actions (import from agreement, load from board, etc.) */
   footerActions?: React.ReactNode;
+  /**
+   * Quick-add options per category, sourced from the user's equipment catalog.
+   * When present, each category shows selectable chips to add gear directly.
+   */
+  equipmentByCategory?: Partial<Record<ShootingKitCategory, string[]>>;
 }
 
 export function ShootingKitEditor({
@@ -41,15 +46,18 @@ export function ShootingKitEditor({
   compact = false,
   className,
   footerActions,
+  equipmentByCategory,
 }: ShootingKitEditorProps) {
   const updateKit = (next: ProductionShootingKit) => onChange(next, notes);
   const updateNotes = (nextNotes: string) => onChange(kit, nextNotes);
+  const hasEquipment = Boolean(equipmentByCategory);
 
   return (
     <div className={cn("space-y-3", className)}>
       <p className="text-xs text-slate-500">
-        Define your shoot-day kit here. Detailed shot lists assign camera, lens, support (dolly / gimbal /
-        sticks), lights, and props from this list only.
+        {hasEquipment
+          ? "Pick gear from your equipment catalog (or add custom). Detailed shot lists assign camera, lens, support (dolly / gimbal / sticks), lights, and props from this kit only."
+          : "Define your shoot-day kit here. Detailed shot lists assign camera, lens, support (dolly / gimbal / sticks), lights, and props from this list only."}
       </p>
 
       <div className={cn("space-y-3", compact && "space-y-2")}>
@@ -60,6 +68,8 @@ export function ShootingKitEditor({
             placeholder={SHOOTING_KIT_PLACEHOLDERS[cat]}
             items={kit[cat]}
             compact={compact}
+            options={equipmentByCategory?.[cat]}
+            hasEquipmentSource={hasEquipment}
             onChange={(items) => updateKit({ ...kit, [cat]: items })}
           />
         ))}
@@ -106,23 +116,32 @@ function KitCategorySection({
   placeholder,
   items,
   compact,
+  options,
+  hasEquipmentSource,
   onChange,
 }: {
   label: string;
   placeholder: string;
   items: string[];
   compact?: boolean;
+  /** Gear from the equipment catalog for this category, if available. */
+  options?: string[];
+  /** Whether an equipment catalog was provided at all (to tailor hints). */
+  hasEquipmentSource?: boolean;
   onChange: (items: string[]) => void;
 }) {
   const [draft, setDraft] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
   const [open, setOpen] = useState(!compact || items.length > 0);
 
   const add = () => {
     const next = draft.trim();
     if (!next) return;
-    onChange([...items, next]);
+    if (!items.includes(next)) onChange([...items, next]);
     setDraft("");
   };
+
+  const available = (options ?? []).filter((opt) => !items.includes(opt));
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white">
@@ -153,23 +172,62 @@ function KitCategorySection({
               ))}
             </ul>
           ) : null}
-          <div className="flex gap-2">
-            <Input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={placeholder}
-              className="text-sm"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  add();
-                }
-              }}
-            />
-            <Button type="button" size="sm" disabled={!draft.trim()} onClick={add} className="shrink-0 px-2.5">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
+
+          {hasEquipmentSource ? (
+            available.length > 0 ? (
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  From your equipment
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {available.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => onChange([...items, opt])}
+                      className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800 transition-colors hover:bg-sky-100"
+                    >
+                      <Plus className="h-3 w-3" />
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (options ?? []).length === 0 ? (
+              <p className="text-[11px] text-slate-400">
+                No {label.toLowerCase()} in your equipment catalog yet — add custom below or add gear on the
+                Equipment page.
+              </p>
+            ) : null
+          ) : null}
+
+          {hasEquipmentSource && !showCustom ? (
+            <button
+              type="button"
+              onClick={() => setShowCustom(true)}
+              className="text-xs font-medium text-slate-500 hover:text-slate-700"
+            >
+              + Add custom {label.toLowerCase()}
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <Input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={placeholder}
+                className="text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    add();
+                  }
+                }}
+              />
+              <Button type="button" size="sm" disabled={!draft.trim()} onClick={add} className="shrink-0 px-2.5">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       ) : null}
     </div>
