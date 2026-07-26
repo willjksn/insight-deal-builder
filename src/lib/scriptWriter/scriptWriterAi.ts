@@ -43,6 +43,13 @@ import { SCRIPT_VIDEO_MODE_LABELS } from "@/lib/scriptWriter/constants";
 import { normalizeScriptDocument } from "@/lib/screenplay/normalize";
 import { createScriptElement } from "@/lib/screenplay/elements";
 
+/**
+ * Output-token ceiling for single-pass script generation/refinement. Set to the
+ * gemini-2.5-flash maximum so long (but non-feature) scripts don't get truncated
+ * mid-JSON. Truly feature-length scripts should use the multi-pass builder.
+ */
+const SCRIPT_GENERATE_MAX_TOKENS = 65536;
+
 function toGeminiHistory(messages: ScriptWriterMessage[]) {
   return messages.map((m) => ({
     role: m.role === "assistant" ? ("model" as const) : ("user" as const),
@@ -425,7 +432,7 @@ export async function scriptWriterGenerate(
       scriptWriterInspirationGenerateSystem(detailLevel, detailedShotList, storyboardMode),
       prompt,
       media,
-      { temperature: 0.58 }
+      { temperature: 0.58, maxOutputTokens: SCRIPT_GENERATE_MAX_TOKENS }
     );
     return parseScriptDocument(raw);
   }
@@ -455,7 +462,7 @@ export async function scriptWriterGenerate(
   const raw = await callGeminiJsonWithHistory(
     `${SCRIPT_WRITER_GENERATE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`,
     [{ role: "user", parts: [{ text: payload }] }],
-    { temperature: 0.58 }
+    { temperature: 0.58, maxOutputTokens: SCRIPT_GENERATE_MAX_TOKENS }
   );
   return parseScriptDocument(raw);
 }
@@ -536,12 +543,13 @@ export async function scriptWriterRefineScript(
           media,
           {
             temperature: 0.55,
+            maxOutputTokens: SCRIPT_GENERATE_MAX_TOKENS,
           }
         )
       : await callGeminiJsonWithHistory(
           `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`,
           [{ role: "user", parts: [{ text: payload }] }],
-          { temperature: 0.55 }
+          { temperature: 0.55, maxOutputTokens: SCRIPT_GENERATE_MAX_TOKENS }
         );
 
   return parseScriptDocument(raw);

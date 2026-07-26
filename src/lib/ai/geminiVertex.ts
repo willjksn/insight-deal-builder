@@ -203,15 +203,25 @@ async function vertexGenerateOnce(
   }
 
   const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: {
+      content?: { parts?: { text?: string }[] };
+      finishReason?: string;
+    }[];
     usageMetadata?: {
       promptTokenCount?: number;
       candidatesTokenCount?: number;
     };
   };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0];
+  const text = candidate?.content?.parts?.[0]?.text;
   if (!text) {
     return { ok: false, status: 500, errText: "Empty response from Vertex AI Gemini" };
+  }
+  // Truncated output (hit the token cap) produces invalid/unterminated JSON.
+  if (candidate?.finishReason === "MAX_TOKENS") {
+    throw new Error(
+      "The AI response was too long and got cut off (MAX_TOKENS). Try a shorter runtime, or use the Feature / long-form runtime, which builds long scripts in multiple passes."
+    );
   }
   return {
     ok: true,

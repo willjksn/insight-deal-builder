@@ -97,15 +97,26 @@ async function callGeminiApiKeyGenerate(params: {
   }
 
   const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: {
+      content?: { parts?: { text?: string }[] };
+      finishReason?: string;
+    }[];
     usageMetadata?: {
       promptTokenCount?: number;
       candidatesTokenCount?: number;
       totalTokenCount?: number;
     };
   };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0];
+  const text = candidate?.content?.parts?.[0]?.text;
   if (!text) throw new Error("Empty response from Gemini");
+  // A truncated response (hit the output token cap) yields invalid JSON such as
+  // "Unterminated string". Surface a clear, actionable error instead.
+  if (candidate?.finishReason === "MAX_TOKENS") {
+    throw new Error(
+      "The AI response was too long and got cut off (MAX_TOKENS). Try a shorter runtime, or use the Feature / long-form runtime, which builds long scripts in multiple passes."
+    );
+  }
   logGeminiTextUsage({
     provider: "gemini_api",
     model,
@@ -405,7 +416,7 @@ export async function callGeminiJsonWithMedia(
   systemPrompt: string,
   userPrompt: string,
   media: GeminiMediaInput[],
-  options?: { model?: string; temperature?: number }
+  options?: { model?: string; temperature?: number; maxOutputTokens?: number }
 ): Promise<unknown> {
   const parts: GeminiPart[] = [{ text: userPrompt }];
   for (const item of media) {
@@ -424,6 +435,7 @@ export async function callGeminiJsonWithMedia(
     json: true,
     model: options?.model,
     temperature: options?.temperature,
+    maxOutputTokens: options?.maxOutputTokens,
   });
   return extractJson(text);
 }
