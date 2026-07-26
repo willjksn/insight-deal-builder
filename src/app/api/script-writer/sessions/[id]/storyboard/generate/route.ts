@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { apiErrorStatus, requireApprovedAuthUser } from "@/lib/api/routeAuth";
-import { canManageUsers } from "@/lib/utils/permissions";
+import { canGenerateStoryboardImages } from "@/lib/utils/permissions";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
@@ -18,10 +18,11 @@ export async function POST(
 ) {
   try {
     const { uid, appUser } = await requireApprovedAuthUser(request);
-    // Storyboard image generation is admin-only (spends AI image credits).
-    if (!canManageUsers(appUser)) {
+    // Storyboard image generation requires the explicit permission (or admin);
+    // it spends AI image credits.
+    if (!canGenerateStoryboardImages(appUser)) {
       return NextResponse.json(
-        { error: "Only admins can generate storyboard images" },
+        { error: "You don't have permission to generate storyboard images" },
         { status: 403 }
       );
     }

@@ -28,6 +28,8 @@ export interface UserPermissions {
   exportPayments: boolean;
   /** Script writer, stage planner, reference guide, production boards */
   useShotScout: boolean;
+  /** Generate AI storyboard images in the script writer (spends image credits) */
+  generateStoryboardImages: boolean;
   /** View Revenue & opportunities command center and pipeline */
   viewRevenueOpportunities: boolean;
   /** Create campaigns, approve opportunities, outreach, and convert to projects */

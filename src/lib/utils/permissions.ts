@@ -143,6 +143,17 @@ export function canUseProductionTools(user: AppUser | null | undefined): boolean
 /** @deprecated use canUseProductionTools */
 export const canUseShotScout = canUseProductionTools;
 
+/**
+ * Generate AI storyboard images in the script writer. Requires production-tool
+ * access plus either the explicit permission or user-management (admin).
+ */
+export function canGenerateStoryboardImages(user: AppUser | null | undefined): boolean {
+  return (
+    canUseProductionTools(user) &&
+    (hasPermission(user, "generateStoryboardImages") || canManageUsers(user))
+  );
+}
+
 export { isRevenueOpportunitiesEnabled as isRevenueOpportunitiesFeatureEnabled } from "@/lib/revenueOpportunities/featureFlag";
 
 export function canViewRevenueOpportunities(user: AppUser | null | undefined): boolean {

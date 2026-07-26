@@ -139,6 +139,14 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     insightOnly: true,
   },
   {
+    key: "generateStoryboardImages",
+    label: "Generate storyboard images",
+    description:
+      "Create AI storyboard stills in the script writer (spends image credits). Requires production tools",
+    group: "imgData",
+    insightOnly: true,
+  },
+  {
     key: "viewRevenueOpportunities",
     label: "View revenue & opportunities",
     description: "Open the revenue command center, pipeline, and read-only opportunity data",
@@ -180,6 +188,7 @@ export const EMPTY_PERMISSIONS: UserPermissions = {
   viewW9Docs: false,
   exportPayments: false,
   useShotScout: false,
+  generateStoryboardImages: false,
   viewRevenueOpportunities: false,
   manageRevenueOpportunities: false,
 };
@@ -204,6 +213,7 @@ export const FULL_IMG_PERMISSIONS: UserPermissions = {
   viewW9Docs: true,
   exportPayments: true,
   useShotScout: true,
+  generateStoryboardImages: true,
   viewRevenueOpportunities: true,
   manageRevenueOpportunities: true,
 };
@@ -231,6 +241,7 @@ export const PRODUCER_PERMISSIONS: UserPermissions = {
   viewAllOrgDeals: true,
   manageProjects: true,
   useShotScout: true,
+  generateStoryboardImages: true,
   viewRevenueOpportunities: true,
   manageRevenueOpportunities: true,
 };

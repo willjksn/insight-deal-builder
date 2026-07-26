@@ -51,7 +51,11 @@ import { ScriptEditorPanel } from "@/components/scriptWriter/ScriptEditorPanel";
 import { ScriptSuggestedShotsPanel } from "@/components/scriptWriter/ScriptSuggestedShotsPanel";
 import { ScriptStoryboardPanel } from "@/components/scriptWriter/ScriptStoryboardPanel";
 import { ShotListOptions } from "@/components/scriptWriter/StoryboardModeToggle";
-import { canManageProjects, canManageUsers } from "@/lib/utils/permissions";
+import {
+  canGenerateStoryboardImages,
+  canManageProjects,
+  canManageUsers,
+} from "@/lib/utils/permissions";
 import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPanel";
 import { ReferenceResearchPanel } from "@/components/scriptWriter/ReferenceResearchPanel";
 import { FeatureBuildPanel } from "@/components/scriptWriter/FeatureBuildPanel";
@@ -841,7 +845,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
               storyboardImages={session.storyboardImages}
               onSessionUpdated={(updated) => setSession(updated)}
               readOnly={adminReadOnly || session.status === "applied"}
-              allowGenerate={canManageUsers(appUser)}
+              allowGenerate={canGenerateStoryboardImages(appUser)}
             />
           ) : storyboardMode && !script ? (
             <div className="border-b border-slate-100 px-4 py-3">
