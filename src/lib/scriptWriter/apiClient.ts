@@ -230,6 +230,20 @@ export async function scriptWriterFeatureAssemble(
   return parseJson<{ session: unknown }>(res);
 }
 
+/** Update the session brief (e.g. change runtime) after creation. */
+export async function scriptWriterUpdateBrief(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  brief: Partial<ScriptWriterBrief>
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ brief }),
+  });
+  return parseJson<{ session: unknown }>(res);
+}
+
 /** Generate a photoreal storyboard still for one scene. */
 export async function scriptWriterGenerateStoryboardFrame(
   getToken: () => Promise<string | null>,

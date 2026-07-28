@@ -37,10 +37,13 @@ import {
   scriptWriterFeatureExpandAct,
   scriptWriterFeatureAssemble,
   scriptWriterSendMessage,
+  scriptWriterUpdateBrief,
 } from "@/lib/scriptWriter/apiClient";
 import {
   SCRIPT_CAST_SIZE_LABELS,
   SCRIPT_CONTENT_TYPE_LABELS,
+  SCRIPT_RUNTIME_LABELS,
+  ScriptRuntime,
   isFeatureRuntime,
   resolveMoodLabel,
   resolveRuntimeLabel,
@@ -95,6 +98,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [changingRuntime, setChangingRuntime] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
   const [applyMode, setApplyMode] = useState<"new" | "existing">("new");
@@ -192,6 +196,25 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const changeRuntime = async (runtime: ScriptRuntime) => {
+    if (!user || changingRuntime || adminReadOnly) return;
+    if (session?.brief?.runtime === runtime) return;
+    setChangingRuntime(true);
+    setError(null);
+    try {
+      const { session: updated } = await scriptWriterUpdateBrief(
+        () => user.getIdToken(),
+        sessionId,
+        { runtime }
+      );
+      setSession(updated as ScriptWriterSession);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not change runtime");
+    } finally {
+      setChangingRuntime(false);
     }
   };
 
@@ -502,7 +525,28 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           <BriefChip label={SCRIPT_CONTENT_TYPE_LABELS[session.brief.contentType]} />
           <BriefChip label={resolveMoodLabel(session.brief)} />
           <BriefChip label={SCRIPT_CAST_SIZE_LABELS[session.brief.castSize]} />
-          <BriefChip label={resolveRuntimeLabel(session.brief)} />
+          {!adminReadOnly && session.status !== "applied" ? (
+            <label className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-0.5 pl-2.5 pr-1 text-xs text-slate-600">
+              <span className="text-slate-400">Runtime</span>
+              <select
+                value={session.brief.runtime}
+                disabled={changingRuntime}
+                onChange={(e) => void changeRuntime(e.target.value as ScriptRuntime)}
+                className="rounded-full bg-transparent py-0.5 pr-1 text-xs font-medium text-slate-800 focus:outline-none disabled:opacity-50"
+                title="Change target runtime (Feature / long-form uses the multi-pass builder)"
+              >
+                {(Object.keys(SCRIPT_RUNTIME_LABELS) as ScriptRuntime[]).map((rt) => (
+                  <option key={rt} value={rt}>
+                    {rt === "custom" && session.brief?.runtime === "custom"
+                      ? resolveRuntimeLabel(session.brief)
+                      : SCRIPT_RUNTIME_LABELS[rt]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <BriefChip label={resolveRuntimeLabel(session.brief)} />
+          )}
           {session.brief.spicyMode ? (
             <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-medium text-rose-800">
               Spicy

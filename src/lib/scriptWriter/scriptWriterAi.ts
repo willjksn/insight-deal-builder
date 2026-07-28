@@ -49,12 +49,19 @@ import { createScriptElement } from "@/lib/screenplay/elements";
  * fast with a clear error instead of ballooning into a giant truncated blob;
  * longer pieces get more headroom. Truly feature-length scripts use multi-pass.
  */
-function scriptGenerateMaxTokens(brief: ScriptWriterBrief): number {
+function scriptGenerateMaxTokens(
+  brief: ScriptWriterBrief,
+  opts?: { detailedShotList?: boolean; storyboardMode?: boolean }
+): number {
   if (brief.runtime === "feature") return 65536;
   const level = inferScriptDetailLevel(brief);
-  if (level === "trailer") return 12288; // ~30–90s teasers/spots
-  if (level === "production") return 24576; // ~2–10 min
-  return 40960; // standard / longer one-offs
+  // Base budget by runtime tier.
+  let budget = level === "trailer" ? 16384 : level === "production" ? 28672 : 40960;
+  // Detailed coverage and storyboard frames each add a lot of per-scene JSON,
+  // so give meaningful headroom to avoid a truncated (MAX_TOKENS) response.
+  if (opts?.detailedShotList) budget += 8192;
+  if (opts?.storyboardMode) budget += 8192;
+  return Math.min(budget, 65536);
 }
 
 /** A truncated (MAX_TOKENS) or otherwise cut-off JSON response. */
@@ -450,7 +457,7 @@ export async function scriptWriterGenerate(
       detailedShotList,
       storyboardMode
     );
-    const maxOutputTokens = scriptGenerateMaxTokens(brief);
+    const maxOutputTokens = scriptGenerateMaxTokens(brief, { detailedShotList, storyboardMode });
     let raw: unknown;
     try {
       raw = await callGeminiJsonWithMedia(inspirationSystem, prompt, media, {
@@ -492,7 +499,7 @@ export async function scriptWriterGenerate(
 
   const system = `${SCRIPT_WRITER_GENERATE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`;
   const history = [{ role: "user" as const, parts: [{ text: payload }] }];
-  const maxOutputTokens = scriptGenerateMaxTokens(brief);
+  const maxOutputTokens = scriptGenerateMaxTokens(brief, { detailedShotList, storyboardMode });
   let raw: unknown;
   try {
     raw = await callGeminiJsonWithHistory(system, history, {
@@ -580,7 +587,7 @@ export async function scriptWriterRefineScript(
     .join("\n");
 
   const refineSystem = `${SCRIPT_WRITER_REFINE_SYSTEM}\n\n${shotListPromptRules(detailedShotList)}\n${storyboardPromptRules(storyboardMode)}`;
-  const maxOutputTokens = scriptGenerateMaxTokens(brief);
+  const maxOutputTokens = scriptGenerateMaxTokens(brief, { detailedShotList, storyboardMode });
   const runRefine = (temperature: number) =>
     media.length > 0
       ? callGeminiJsonWithMedia(refineSystem, payload, media, { temperature, maxOutputTokens })
