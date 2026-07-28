@@ -6,7 +6,7 @@ import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import { hasGlobalProjectAdmin } from "@/lib/projectAccess/server";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
 import { AppUser } from "@/lib/types";
-import { ScriptWriterSession } from "@/lib/scriptWriter/types";
+import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import {
   ScriptSeries,
   ScriptSeriesCharacter,
@@ -14,7 +14,11 @@ import {
   ScriptSeriesEntry,
   ScriptSeriesEntryKind,
   ScriptSeriesUpdateInput,
+  ScriptTrailerResolvedScene,
+  ScriptTrailerSceneRef,
+  ScriptTrailerSourceEntry,
   SCRIPT_SERIES_COLLECTION,
+  SCRIPT_SERIES_ENTRY_KIND_LABELS,
 } from "@/lib/scriptWriter/series/types";
 
 function requireDb(): Firestore {
@@ -214,6 +218,89 @@ export async function listSeriesEntries(seriesId: string): Promise<ScriptSeriesE
 export async function nextSeriesOrder(seriesId: string): Promise<number> {
   const entries = await listSeriesEntries(seriesId);
   return entries.reduce((max, e) => Math.max(max, e.order), 0) + 1;
+}
+
+interface SeriesEntryDoc {
+  sessionId: string;
+  title: string;
+  entryKind: ScriptSeriesEntryKind;
+  order: number;
+  script: ScriptDocument | null;
+}
+
+/** Load sibling entry docs (with their scripts) for a series. */
+async function loadSeriesEntryDocs(
+  seriesId: string,
+  excludeSessionId?: string
+): Promise<SeriesEntryDoc[]> {
+  const db = requireDb();
+  const snap = await db
+    .collection(SCRIPT_WRITER_SESSIONS_COLLECTION)
+    .where("seriesId", "==", seriesId)
+    .limit(100)
+    .get();
+  return snap.docs
+    .filter((d) => d.id !== excludeSessionId)
+    .map((d) => {
+      const data = d.data() as Partial<ScriptWriterSession>;
+      return {
+        sessionId: d.id,
+        title: data.title || "Untitled",
+        entryKind: (data.seriesEntryKind as ScriptSeriesEntryKind) || "episode",
+        order: typeof data.seriesOrder === "number" ? data.seriesOrder : 0,
+        script: (data.script as ScriptDocument | null) ?? null,
+      } satisfies SeriesEntryDoc;
+    })
+    .sort((a, b) => a.order - b.order);
+}
+
+/**
+ * Sibling entries that have a written script, with their scenes — offered as
+ * pickable source material when building a trailer/teaser.
+ */
+export async function listSeriesSourceEntries(
+  seriesId: string,
+  excludeSessionId: string
+): Promise<ScriptTrailerSourceEntry[]> {
+  const docs = await loadSeriesEntryDocs(seriesId, excludeSessionId);
+  return docs
+    .filter((d) => (d.script?.scenes?.length ?? 0) > 0)
+    .map((d) => ({
+      sessionId: d.sessionId,
+      title: d.title,
+      entryKind: d.entryKind,
+      order: d.order,
+      scenes: d.script!.scenes.map((s) => ({
+        sceneNumber: s.sceneNumber,
+        heading: s.heading,
+        action: s.action,
+      })),
+    }));
+}
+
+/** Resolve selected scene refs into full scenes (with dialogue) for the prompt. */
+export async function resolveTrailerSourceScenes(
+  seriesId: string,
+  refs: ScriptTrailerSceneRef[] | undefined,
+  excludeSessionId: string
+): Promise<ScriptTrailerResolvedScene[]> {
+  if (!refs?.length) return [];
+  const docs = await loadSeriesEntryDocs(seriesId, excludeSessionId);
+  const bySession = new Map(docs.map((d) => [d.sessionId, d]));
+  const out: ScriptTrailerResolvedScene[] = [];
+  for (const ref of refs) {
+    const d = bySession.get(ref.sessionId);
+    const scene = d?.script?.scenes.find((s) => s.sceneNumber === ref.sceneNumber);
+    if (!d || !scene) continue;
+    out.push({
+      entryLabel: `${SCRIPT_SERIES_ENTRY_KIND_LABELS[d.entryKind]} ${d.order}: ${d.title}`,
+      sceneNumber: scene.sceneNumber,
+      heading: scene.heading,
+      action: scene.action,
+      lines: (scene.dialogue ?? []).slice(0, 3).map((l) => `${l.character}: ${l.line}`),
+    });
+  }
+  return out;
 }
 
 /**

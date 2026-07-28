@@ -64,6 +64,7 @@ import { ReferenceResearchPanel } from "@/components/scriptWriter/ReferenceResea
 import { FeatureBuildPanel } from "@/components/scriptWriter/FeatureBuildPanel";
 import { ScriptShootingKitPanel } from "@/components/scriptWriter/ScriptShootingKitPanel";
 import { AddToSeriesButton } from "@/components/scriptWriter/AddToSeriesButton";
+import { TrailerSourcesPanel } from "@/components/scriptWriter/TrailerSourcesPanel";
 import { SharedNotesPanel } from "@/components/sharedNotes/SharedNotesPanel";
 
 interface ScriptWriterClientProps {
@@ -432,6 +433,10 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
   const awaitingAnalysisConfirm = session.status === "analysis_ready";
   const canRefine = Boolean(script && session.status === "script_ready" && !session.refineUsed);
   const isFeature = session.brief ? isFeatureRuntime(session.brief) : false;
+  const isSeriesTrailer = Boolean(
+    session.seriesId &&
+      (session.seriesEntryKind === "trailer" || session.seriesEntryKind === "teaser")
+  );
   const adminReadOnly = adminOpen && !!user && session.userId !== user.uid;
   const canDelete = Boolean(user && session.userId === user.uid && !adminReadOnly);
 
@@ -590,6 +595,15 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         loading={researchingReferences}
         onResearch={session.status !== "applied" ? () => void researchReferences() : undefined}
       />
+
+      {isSeriesTrailer && user ? (
+        <TrailerSourcesPanel
+          sessionId={sessionId}
+          getToken={() => user.getIdToken()}
+          onSaved={(updated) => setSession(updated)}
+          readOnly={adminReadOnly || session.status === "applied"}
+        />
+      ) : null}
 
       {isFeature && !isInspiration ? (
         <FeatureBuildPanel

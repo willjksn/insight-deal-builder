@@ -13,8 +13,14 @@ import { resolveScriptGenerationOptions } from "@/lib/scriptWriter/generationOpt
 import { resolveShootingKitForSession } from "@/lib/scriptWriter/resolveShootingKit";
 import { resolveSessionBrief, scriptWriterGenerate } from "@/lib/scriptWriter/scriptWriterAi";
 import { archiveScriptVersion } from "@/lib/scriptWriter/scriptVersions";
-import { loadSeriesContinuity } from "@/lib/scriptWriter/series/server";
-import { formatSeriesContextForPrompt } from "@/lib/scriptWriter/series/prompt";
+import {
+  loadSeriesContinuity,
+  resolveTrailerSourceScenes,
+} from "@/lib/scriptWriter/series/server";
+import {
+  formatSeriesContextForPrompt,
+  formatTrailerSourcesForPrompt,
+} from "@/lib/scriptWriter/series/prompt";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 import { prepareScriptDocumentForFirestore } from "@/lib/screenplay/serialize";
 
@@ -66,11 +72,22 @@ export async function POST(
     if (session.seriesId) {
       const continuity = await loadSeriesContinuity(session);
       if (continuity) {
+        const kind = session.seriesEntryKind ?? "episode";
         seriesContext = formatSeriesContextForPrompt(
           continuity.series,
-          session.seriesEntryKind ?? "episode",
+          kind,
           continuity.priorEntries
         );
+        // Trailers/teasers assemble from specific scenes picked in sibling entries.
+        if ((kind === "trailer" || kind === "teaser") && session.trailerSources?.length) {
+          const scenes = await resolveTrailerSourceScenes(
+            session.seriesId,
+            session.trailerSources,
+            session.id
+          );
+          const trailerBlock = formatTrailerSourcesForPrompt(scenes);
+          if (trailerBlock) seriesContext = `${seriesContext}\n\n${trailerBlock}`;
+        }
       }
     }
 

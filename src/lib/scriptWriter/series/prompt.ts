@@ -2,6 +2,7 @@ import {
   ScriptSeries,
   ScriptSeriesEntry,
   ScriptSeriesEntryKind,
+  ScriptTrailerResolvedScene,
   SCRIPT_SERIES_ENTRY_KIND_LABELS,
 } from "@/lib/scriptWriter/series/types";
 
@@ -63,5 +64,27 @@ export function formatSeriesContextForPrompt(
     }
   }
 
+  return lines.join("\n");
+}
+
+/**
+ * For trailer/teaser entries: the specific canon scenes (from sibling episodes)
+ * the editor picked to assemble the trailer from. The AI must build the piece
+ * out of THIS material — selecting, trimming, reordering, and intercutting —
+ * rather than inventing new plot.
+ */
+export function formatTrailerSourcesForPrompt(
+  scenes: ScriptTrailerResolvedScene[]
+): string {
+  if (!scenes.length) return "";
+  const lines: string[] = [
+    "=== TRAILER SOURCE MATERIAL (assemble the trailer from THESE canon scenes) ===",
+    "Build the trailer/teaser by selecting, trimming, reordering, and intercutting the most charged moments from the source scenes below. Stay faithful to what actually happens in them — do NOT invent new plot or characters. You may tease and withhold, but every beat must trace back to this material. Escalate toward a hook; do not reveal resolutions.",
+  ];
+  for (const s of scenes) {
+    lines.push("", `— ${s.entryLabel} · Scene ${s.sceneNumber}: ${s.heading}`);
+    if (s.action) lines.push(s.action);
+    for (const l of s.lines) lines.push(`  ${l}`);
+  }
   return lines.join("\n");
 }

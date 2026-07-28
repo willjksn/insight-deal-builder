@@ -14,6 +14,8 @@ import {
   ScriptSeriesEntry,
   ScriptSeriesEntryKind,
   ScriptSeriesUpdateInput,
+  ScriptTrailerSceneRef,
+  ScriptTrailerSourceEntry,
 } from "@/lib/scriptWriter/series/types";
 
 export const SCRIPT_WRITER_SESSIONS_COLLECTION = "scriptWriterSessions";
@@ -441,6 +443,33 @@ export async function scriptWriterDetachFromSeries(
   const res = await fetch(`/api/script-writer/sessions/${sessionId}/series`, {
     method: "DELETE",
     headers: await authHeaders(getToken),
+  });
+  return parseJson<{ session: unknown }>(res);
+}
+
+/** For a trailer/teaser: available sibling scenes + the current selection. */
+export async function scriptWriterGetTrailerSources(
+  getToken: () => Promise<string | null>,
+  sessionId: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/trailer-sources`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ entries: ScriptTrailerSourceEntry[]; selected: ScriptTrailerSceneRef[] }>(
+    res
+  );
+}
+
+/** Save the selected source scenes for a trailer/teaser. */
+export async function scriptWriterSaveTrailerSources(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  sources: ScriptTrailerSceneRef[]
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/trailer-sources`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ sources }),
   });
   return parseJson<{ session: unknown }>(res);
 }

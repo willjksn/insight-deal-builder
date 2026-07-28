@@ -61,6 +61,30 @@ export interface ScriptSeriesEntry {
   status?: string;
 }
 
+/** A reference to one scene in a sibling entry, selected as trailer material. */
+export interface ScriptTrailerSceneRef {
+  sessionId: string;
+  sceneNumber: string;
+}
+
+/** A sibling entry with its scenes, offered as pickable trailer material. */
+export interface ScriptTrailerSourceEntry {
+  sessionId: string;
+  title: string;
+  entryKind: ScriptSeriesEntryKind;
+  order: number;
+  scenes: { sceneNumber: string; heading: string; action: string }[];
+}
+
+/** A fully resolved source scene (with dialogue) used to build the trailer prompt. */
+export interface ScriptTrailerResolvedScene {
+  entryLabel: string;
+  sceneNumber: string;
+  heading: string;
+  action: string;
+  lines: string[];
+}
+
 export interface ScriptSeriesCreateInput {
   title: string;
   premise?: string;

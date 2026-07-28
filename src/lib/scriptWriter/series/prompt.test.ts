@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatSeriesContextForPrompt } from "@/lib/scriptWriter/series/prompt";
-import { ScriptSeries, ScriptSeriesEntry } from "@/lib/scriptWriter/series/types";
+import {
+  formatSeriesContextForPrompt,
+  formatTrailerSourcesForPrompt,
+} from "@/lib/scriptWriter/series/prompt";
+import {
+  ScriptSeries,
+  ScriptSeriesEntry,
+  ScriptTrailerResolvedScene,
+} from "@/lib/scriptWriter/series/types";
 
 const baseSeries: ScriptSeries = {
   id: "s1",
@@ -44,5 +51,29 @@ describe("formatSeriesContextForPrompt", () => {
     const out = formatSeriesContextForPrompt(baseSeries, "trailer", []);
     expect(out).toContain("TRAILER");
     expect(out).not.toContain("STORY SO FAR");
+  });
+});
+
+describe("formatTrailerSourcesForPrompt", () => {
+  it("returns empty string with no scenes", () => {
+    expect(formatTrailerSourcesForPrompt([])).toBe("");
+  });
+
+  it("lists source scenes with their entry label, action, and lines", () => {
+    const scenes: ScriptTrailerResolvedScene[] = [
+      {
+        entryLabel: "Episode 1: The First Look",
+        sceneNumber: "3",
+        heading: "INT. STUDIO — NIGHT",
+        action: "Elara freezes as the webcam light blinks on by itself.",
+        lines: ["ELARA: Who's there?"],
+      },
+    ];
+    const out = formatTrailerSourcesForPrompt(scenes);
+    expect(out).toContain("TRAILER SOURCE MATERIAL");
+    expect(out).toContain("Episode 1: The First Look · Scene 3: INT. STUDIO — NIGHT");
+    expect(out).toContain("webcam light blinks on by itself");
+    expect(out).toContain("ELARA: Who's there?");
+    expect(out).toContain("do NOT invent new plot");
   });
 });
