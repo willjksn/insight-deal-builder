@@ -19,7 +19,8 @@ export type RevenueAgentName =
   | "formal_opportunities"
   | "brand_opportunity"
   | "pursuit"
-  | "follow_up";
+  | "follow_up"
+  | "creator_match";
 
 export interface RevenueAgentRun {
   id: string;

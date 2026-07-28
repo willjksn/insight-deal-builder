@@ -16,6 +16,7 @@ import { formalOpportunitiesAgent } from "@/lib/revenueOpportunities/agents/form
 import { brandOpportunityAgent } from "@/lib/revenueOpportunities/agents/brandOpportunity";
 import { pursuitAgent } from "@/lib/revenueOpportunities/agents/pursuit";
 import { followUpAgent } from "@/lib/revenueOpportunities/agents/followUp";
+import { creatorMatchAgent } from "@/lib/creators/creatorMatchAgent";
 
 let initialized = false;
 
@@ -39,6 +40,7 @@ export function initRevenueAgents(): void {
   registerAgent(brandOpportunityAgent);
   registerAgent(pursuitAgent);
   registerAgent(followUpAgent);
+  registerAgent(creatorMatchAgent);
   initialized = true;
 }
 
@@ -60,5 +62,6 @@ export {
   brandOpportunityAgent,
   pursuitAgent,
   followUpAgent,
+  creatorMatchAgent,
 };
 export * from "@/lib/revenueOpportunities/agents/registry";

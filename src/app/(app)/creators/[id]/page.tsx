@@ -24,6 +24,7 @@ import {
   getCreator,
   getCreatorDocumentViewUrl,
   removeCreatorDocument,
+  saveDevelopmentPlan,
   setCreatorApplicationStatus,
   updateCreator,
 } from "@/lib/creators/apiClient";
@@ -43,6 +44,7 @@ import {
   type CreatorStatus,
   type CreatorUpdateInput,
 } from "@/lib/creators/types";
+import type { CreatorDevelopmentPlan } from "@/lib/creators/opsTypes";
 import { CreatorPlatformsPanel } from "@/components/creators/CreatorPlatformsPanel";
 import { CreatorRatesPanel } from "@/components/creators/CreatorRatesPanel";
 import { CreatorAvailabilityPanel } from "@/components/creators/CreatorAvailabilityPanel";
@@ -50,6 +52,7 @@ import { CreatorReadinessPanel } from "@/components/creators/CreatorReadinessPan
 import { CreatorOnboardingPanel } from "@/components/creators/CreatorOnboardingPanel";
 import { CreatorDocumentsPanel } from "@/components/creators/CreatorDocumentsPanel";
 import { CreatorApplicationPanel } from "@/components/creators/CreatorApplicationPanel";
+import { CreatorDevelopmentPanel } from "@/components/creators/CreatorDevelopmentPanel";
 
 const RELATIONSHIP_OPTIONS = (
   Object.keys(CREATOR_RELATIONSHIP_LABELS) as CreatorRelationshipType[]
@@ -461,6 +464,33 @@ export default function CreatorDetailPage() {
           canEdit={canManage}
           saving={saving}
           onSave={(onboarding: CreatorOnboardingTask[]) => patch({ onboarding })}
+        />
+
+        <CreatorDevelopmentPanel
+          key={`dev-${creator.updatedAt}-${creator.developmentPlan?.updatedAt ?? "none"}`}
+          plan={creator.developmentPlan}
+          canEdit={canManage}
+          saving={saving}
+          onSeed={async () => {
+            if (!id) return;
+            setSaving(true);
+            try {
+              await saveDevelopmentPlan(getToken, id, { action: "seed" });
+              await reload();
+            } finally {
+              setSaving(false);
+            }
+          }}
+          onSave={async (plan: CreatorDevelopmentPlan) => {
+            if (!id) return;
+            setSaving(true);
+            try {
+              await saveDevelopmentPlan(getToken, id, { plan });
+              await reload();
+            } finally {
+              setSaving(false);
+            }
+          }}
         />
 
         <CreatorDocumentsPanel

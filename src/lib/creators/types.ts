@@ -1,3 +1,5 @@
+import type { CreatorDevelopmentPlan } from "@/lib/creators/opsTypes";
+
 /**
  * Creator / talent management (Business workspace).
  *
@@ -306,6 +308,8 @@ export interface Creator {
   documents?: CreatorDocument[];
   readiness?: CreatorReadiness;
   onboarding?: CreatorOnboardingTask[];
+  /** Incubator / development plan (Phase 7). */
+  developmentPlan?: CreatorDevelopmentPlan;
 
   // ── Links (dedup — point to existing records, never duplicate people) ──
   crewMemberId?: string;

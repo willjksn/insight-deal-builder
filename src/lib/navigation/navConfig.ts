@@ -20,6 +20,8 @@ import {
   TrendingUp,
   LayoutGrid,
   Star,
+  Target,
+  Briefcase,
 } from "lucide-react";
 import { AppUser } from "@/lib/types";
 import { Workspace } from "@/lib/workspace/types";
@@ -110,9 +112,27 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/clients", label: "Clients", icon: Users, canAccess: canManageClients },
       { href: "/creators", label: "Creators", icon: Star, canAccess: canManageCreators },
       {
+        href: "/creators/network",
+        label: "Creator network",
+        icon: Users,
+        canAccess: canManageCreators,
+      },
+      {
         href: "/creators/applications",
         label: "Applications",
         icon: FileText,
+        canAccess: canManageCreators,
+      },
+      {
+        href: "/creators/shortlists",
+        label: "Shortlists",
+        icon: Target,
+        canAccess: canManageCreators,
+      },
+      {
+        href: "/creators/campaigns",
+        label: "Creator campaigns",
+        icon: Briefcase,
         canAccess: canManageCreators,
       },
     ],

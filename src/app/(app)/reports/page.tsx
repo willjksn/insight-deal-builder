@@ -4,14 +4,15 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { InfoCallout, PageSection } from "@/components/ui/PageSection";
 import { useAuth } from "@/contexts/AuthContext";
-import { canAccessReports } from "@/lib/utils/permissions";
+import { canAccessReports, canManageCreators } from "@/lib/utils/permissions";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 import { AdminPartnerAgreements } from "@/components/admin/AdminPartnerAgreements";
-import { BarChart3, Download, Users } from "lucide-react";
+import { BarChart3, Download, Users, Star } from "lucide-react";
 
 export default function ReportsPage() {
   const { appUser } = useAuth();
   const allowed = canAccessReports(appUser);
+  const creatorsAllowed = canManageCreators(appUser);
 
   if (!allowed) {
     return (
@@ -31,7 +32,7 @@ export default function ReportsPage() {
         subtitle="Cash flow, partner payouts, and CSV exports for accounting"
       />
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-2">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link
           href="/reports/payments"
           className="group rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-md ring-1 ring-slate-100 transition-all hover:border-sky-300 hover:ring-sky-200"
@@ -62,6 +63,24 @@ export default function ReportsPage() {
             </div>
           </div>
         </Link>
+        {creatorsAllowed ? (
+          <Link
+            href="/creators/reports"
+            className="group rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-md ring-1 ring-slate-100 transition-all hover:border-amber-300 hover:ring-amber-200"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white">
+                <Star className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900 group-hover:text-amber-900">
+                  Creator network
+                </p>
+                <p className="text-sm text-slate-600">Roster, campaigns, and margin rollups</p>
+              </div>
+            </div>
+          </Link>
+        ) : null}
       </div>
 
       <InfoCallout variant="sky">

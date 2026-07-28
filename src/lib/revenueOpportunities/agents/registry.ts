@@ -41,6 +41,8 @@ function agentPhase(name: RevenueAgentName): number {
     case "pursuit":
     case "follow_up":
       return 4;
+    case "creator_match":
+      return 8;
     case "outreach_draft":
       return 5;
     case "email_receptionist":
@@ -66,6 +68,7 @@ function agentStatus(name: RevenueAgentName): RevenueAgentCatalogEntry["status"]
     case "verification":
     case "pursuit":
     case "follow_up":
+    case "creator_match":
       return aiUsesMock() ? "stub" : "live";
     case "img_research":
     case "stormi_research":

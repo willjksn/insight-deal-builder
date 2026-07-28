@@ -7,6 +7,23 @@ import type {
   CreatorRelationshipType,
   CreatorUpdateInput,
 } from "@/lib/creators/types";
+import type {
+  CreatorBrief,
+  CreatorCampaign,
+  CreatorCampaignCreateInput,
+  CreatorCampaignUpdateInput,
+  CreatorDeliverable,
+  CreatorDevelopmentPlan,
+  CreatorMatchResult,
+  CreatorNetworkFilters,
+  CreatorNetworkSummary,
+  CreatorProductionDay,
+  CreatorProductionDayCreateInput,
+  CreatorSavedSearch,
+  CreatorShortlist,
+  CreatorShortlistCreateInput,
+  CreatorShortlistEntryStatus,
+} from "@/lib/creators/opsTypes";
 
 type GetToken = () => Promise<string | null>;
 
@@ -143,3 +160,235 @@ export async function getCreatorDocumentViewUrl(
   });
   return parseJson<{ url: string; expiresInMs: number }>(res);
 }
+
+// ── Phase 3–8 ops ──────────────────────────────────────────────────────────
+
+export async function getCreatorNetworkSummary(getToken: GetToken) {
+  const res = await fetch("/api/creators/network?summary=1", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ summary: CreatorNetworkSummary }>(res);
+}
+
+export async function searchCreatorNetwork(getToken: GetToken, filters: CreatorNetworkFilters) {
+  const params = new URLSearchParams();
+  if (filters.q) params.set("q", filters.q);
+  if (filters.location) params.set("location", filters.location);
+  if (filters.availableOnly) params.set("availableOnly", "1");
+  if (filters.applicantsOnly) params.set("applicantsOnly", "1");
+  if (filters.relationshipTypes?.length)
+    params.set("relationshipTypes", filters.relationshipTypes.join(","));
+  if (filters.statuses?.length) params.set("statuses", filters.statuses.join(","));
+  if (filters.readinessStatuses?.length)
+    params.set("readinessStatuses", filters.readinessStatuses.join(","));
+  if (filters.niches?.length) params.set("niches", filters.niches.join(","));
+  if (filters.platforms?.length) params.set("platforms", filters.platforms.join(","));
+  if (filters.tags?.length) params.set("tags", filters.tags.join(","));
+  const res = await fetch(`/api/creators/network?${params}`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ creators: Creator[] }>(res);
+}
+
+export async function listSavedCreatorSearches(getToken: GetToken) {
+  const res = await fetch("/api/creators/saved-searches", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ searches: CreatorSavedSearch[] }>(res);
+}
+
+export async function createSavedCreatorSearch(
+  getToken: GetToken,
+  name: string,
+  filters: CreatorNetworkFilters
+) {
+  const res = await fetch("/api/creators/saved-searches", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ name, filters }),
+  });
+  return parseJson<{ search: CreatorSavedSearch }>(res);
+}
+
+export async function deleteSavedCreatorSearch(getToken: GetToken, id: string) {
+  const res = await fetch(`/api/creators/saved-searches?id=${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  await parseJson<{ ok: boolean }>(res);
+}
+
+export async function matchCreators(
+  getToken: GetToken,
+  body: {
+    requiredNiche?: string;
+    requiredPlatforms?: string[];
+    locationPreference?: string;
+    audienceNotes?: string;
+    limit?: number;
+    useAgent?: boolean;
+  }
+) {
+  const res = await fetch("/api/creators/match", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ matches: CreatorMatchResult[] }>(res);
+}
+
+export async function listShortlists(getToken: GetToken) {
+  const res = await fetch("/api/creators/shortlists", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ shortlists: CreatorShortlist[] }>(res);
+}
+
+export async function createShortlist(getToken: GetToken, body: CreatorShortlistCreateInput) {
+  const res = await fetch("/api/creators/shortlists", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ shortlist: CreatorShortlist }>(res);
+}
+
+export async function getShortlist(getToken: GetToken, id: string) {
+  const res = await fetch(`/api/creators/shortlists/${id}`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ shortlist: CreatorShortlist }>(res);
+}
+
+export async function patchShortlist(
+  getToken: GetToken,
+  id: string,
+  body: Record<string, unknown>
+) {
+  const res = await fetch(`/api/creators/shortlists/${id}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ shortlist: CreatorShortlist }>(res);
+}
+
+export async function deleteShortlist(getToken: GetToken, id: string) {
+  const res = await fetch(`/api/creators/shortlists/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  await parseJson<{ ok: boolean }>(res);
+}
+
+export async function listCreatorCampaigns(getToken: GetToken) {
+  const res = await fetch("/api/creators/campaigns", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ campaigns: CreatorCampaign[] }>(res);
+}
+
+export async function createCreatorCampaign(getToken: GetToken, body: CreatorCampaignCreateInput) {
+  const res = await fetch("/api/creators/campaigns", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ campaign: CreatorCampaign }>(res);
+}
+
+export async function getCreatorCampaign(getToken: GetToken, id: string) {
+  const res = await fetch(`/api/creators/campaigns/${id}`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ campaign: CreatorCampaign }>(res);
+}
+
+export async function patchCreatorCampaign(
+  getToken: GetToken,
+  id: string,
+  body: CreatorCampaignUpdateInput & {
+    action?: string;
+    brief?: Omit<CreatorBrief, "id" | "updatedAt"> & { id?: string };
+    deliverable?: Omit<CreatorDeliverable, "id"> & { id?: string };
+    projectId?: string;
+  }
+) {
+  const res = await fetch(`/api/creators/campaigns/${id}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ campaign: CreatorCampaign }>(res);
+}
+
+export async function deleteCreatorCampaign(getToken: GetToken, id: string) {
+  const res = await fetch(`/api/creators/campaigns/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  await parseJson<{ ok: boolean }>(res);
+}
+
+export async function listProductionDays(getToken: GetToken) {
+  const res = await fetch("/api/creators/production-days", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ days: CreatorProductionDay[] }>(res);
+}
+
+export async function createProductionDay(
+  getToken: GetToken,
+  body: CreatorProductionDayCreateInput
+) {
+  const res = await fetch("/api/creators/production-days", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ day: CreatorProductionDay }>(res);
+}
+
+export async function saveDevelopmentPlan(
+  getToken: GetToken,
+  creatorId: string,
+  body: { action?: string; plan?: CreatorDevelopmentPlan; areas?: string[] }
+) {
+  const res = await fetch(`/api/creators/${creatorId}/development-plan`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ plan: CreatorDevelopmentPlan }>(res);
+}
+
+export async function getCreatorReports(getToken: GetToken) {
+  const res = await fetch("/api/creators/reports", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    report: {
+      network: CreatorNetworkSummary;
+      campaignsByStatus: Record<string, number>;
+      campaignCount: number;
+      shortlistCount: number;
+      economics: {
+        revenue: number;
+        compensation: number;
+        costs: number;
+        estimatedMargin: number;
+      };
+      campaigns: {
+        id: string;
+        name: string;
+        brandName?: string;
+        status: string;
+        creatorCount: number;
+        deliverableCount: number;
+        estimatedMargin?: number;
+      }[];
+    };
+  }>(res);
+}
+
+export type { CreatorShortlistEntryStatus };

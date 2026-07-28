@@ -11,6 +11,7 @@ import {
   Handshake,
   Briefcase,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -24,20 +25,26 @@ import type { RevenueDashboardSummary } from "@/lib/revenueOpportunities/types/o
 import {
   canCreateQuotes,
   canAccessRevenueOpportunities,
+  canManageCreators,
   isRevenueOpportunitiesFeatureEnabled,
 } from "@/lib/utils/permissions";
 import { formatCurrency } from "@/lib/utils/format";
 import { StatCard, QuickAction, SectionHeader, EmptyPanel } from "./widgets";
 import { WORKSPACE_TAGLINES } from "@/lib/workspace/types";
+import { getCreatorNetworkSummary } from "@/lib/creators/apiClient";
+import type { CreatorNetworkSummary } from "@/lib/creators/opsTypes";
 
 export function BusinessDashboard() {
   const { user, appUser } = useAuth();
   const { data: agreements, loading: aLoading } = useAgreements();
   const revenueEnabled =
     isRevenueOpportunitiesFeatureEnabled() && canAccessRevenueOpportunities(appUser);
+  const creatorsEnabled = canManageCreators(appUser);
 
   const [summary, setSummary] = useState<RevenueDashboardSummary | null>(null);
+  const [creatorSummary, setCreatorSummary] = useState<CreatorNetworkSummary | null>(null);
   const [revenueLoading, setRevenueLoading] = useState(revenueEnabled);
+  const [creatorsLoading, setCreatorsLoading] = useState(creatorsEnabled);
 
   useEffect(() => {
     if (!user || !revenueEnabled) {
@@ -51,7 +58,19 @@ export function BusinessDashboard() {
       .finally(() => setRevenueLoading(false));
   }, [user, revenueEnabled]);
 
-  const loading = aLoading || revenueLoading;
+  useEffect(() => {
+    if (!user || !creatorsEnabled) {
+      setCreatorsLoading(false);
+      return;
+    }
+    setCreatorsLoading(true);
+    getCreatorNetworkSummary(() => user.getIdToken())
+      .then((res) => setCreatorSummary(res.summary))
+      .catch(() => setCreatorSummary(null))
+      .finally(() => setCreatorsLoading(false));
+  }, [user, creatorsEnabled]);
+
+  const loading = aLoading || revenueLoading || creatorsLoading;
 
   const draftDeals = agreements.filter((a) => a.status === "draft").length;
   const readyToSign = agreements.filter((a) => a.status === "ready_for_signature").length;
@@ -139,9 +158,49 @@ export function BusinessDashboard() {
                   <QuickAction href="/revenue/inbox" icon={Inbox} label="Inbox" description="Replies & follow-ups" accent="indigo" />
                 </>
               ) : null}
+              {creatorsEnabled ? (
+                <>
+                  <QuickAction href="/creators/network" icon={Sparkles} label="Creator network" description="Roster & readiness" accent="violet" />
+                  <QuickAction href="/creators/applications" icon={Users} label="Applications" description="Review applicants" accent="sky" />
+                </>
+              ) : null}
               <QuickAction href="/agreements/new" icon={FileText} label="New agreement" description="Draft a deal" accent="emerald" />
             </div>
           </section>
+
+          {creatorsEnabled && creatorSummary ? (
+            <section className="mb-8">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Creator network
+              </h2>
+              <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatCard
+                  label="Active creators"
+                  value={creatorSummary.totalActive}
+                  href="/creators"
+                  accent="sky"
+                />
+                <StatCard
+                  label="Campaign ready"
+                  value={creatorSummary.campaignReady}
+                  href="/creators/network"
+                  accent="emerald"
+                />
+                <StatCard
+                  label="Needs development"
+                  value={creatorSummary.needsDevelopment}
+                  href="/creators/network"
+                  accent="amber"
+                />
+                <StatCard
+                  label="Open applications"
+                  value={creatorSummary.openApplications}
+                  href="/creators/applications"
+                  accent="violet"
+                />
+              </div>
+            </section>
+          ) : null}
 
           <div className="grid gap-6 lg:grid-cols-2">
             {revenueEnabled && summary ? (
