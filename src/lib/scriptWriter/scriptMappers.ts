@@ -301,6 +301,22 @@ function audioFromScene(script: ScriptDocument, sceneNumber: string): string | u
 }
 
 /** Build scene frames from script when AI omitted storyboardFrames. */
+/**
+ * Stable per-frame identity for storyboard images. A scene can have several
+ * frames (WS / MS / INSERT …), so we cannot key generated images by scene
+ * number alone — the index guarantees each frame gets its own image slot.
+ */
+export function storyboardFrameKey(frame: ScriptStoryboardFrame, index: number): string {
+  const scene = (frame.sceneNumber ?? "").toString().trim() || "x";
+  const shot = (frame.shotType ?? "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "shot";
+  return `${index}:${scene}:${shot}`;
+}
+
 export function deriveStoryboardFramesFromScript(script: ScriptDocument): ScriptStoryboardFrame[] {
   return script.scenes.map((scene) => {
     const hero = heroShotForScene(scene.sceneNumber, script.suggestedShots);

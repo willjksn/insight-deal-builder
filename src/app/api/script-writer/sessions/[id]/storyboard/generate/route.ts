@@ -6,7 +6,10 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
 import { getScriptSessionForRequest } from "@/lib/projectAccess/requestAccess";
-import { deriveStoryboardFramesFromScript } from "@/lib/scriptWriter/scriptMappers";
+import {
+  deriveStoryboardFramesFromScript,
+  storyboardFrameKey,
+} from "@/lib/scriptWriter/scriptMappers";
 import { generateStoryboardFrameImage } from "@/lib/scriptWriter/storyboardImage";
 
 export const runtime = "nodejs";
@@ -28,10 +31,15 @@ export async function POST(
     }
     const { id } = await params;
 
-    const body = (await request.json().catch(() => ({}))) as { sceneNumber?: string };
-    const sceneNumber = body.sceneNumber?.toString().trim();
-    if (!sceneNumber) {
-      return NextResponse.json({ error: "sceneNumber is required" }, { status: 400 });
+    const body = (await request.json().catch(() => ({}))) as {
+      frameKey?: string;
+      /** @deprecated legacy callers may still send sceneNumber */
+      sceneNumber?: string;
+    };
+    const frameKey = body.frameKey?.toString().trim();
+    const legacyScene = body.sceneNumber?.toString().trim();
+    if (!frameKey && !legacyScene) {
+      return NextResponse.json({ error: "frameKey is required" }, { status: 400 });
     }
 
     const db = getAdminDb();
@@ -51,13 +59,21 @@ export async function POST(
     const frames = script.storyboardFrames?.length
       ? script.storyboardFrames
       : deriveStoryboardFramesFromScript(script);
-    const frame = frames.find((f) => f.sceneNumber?.toString().trim() === sceneNumber);
-    if (!frame) {
+
+    // Resolve the specific frame by its stable per-frame key (scene can have
+    // multiple frames). Fall back to first-frame-in-scene for legacy callers.
+    let resolvedKey = frameKey;
+    const frameIndex = frameKey
+      ? frames.findIndex((f, i) => storyboardFrameKey(f, i) === frameKey)
+      : frames.findIndex((f) => f.sceneNumber?.toString().trim() === legacyScene);
+    if (frameIndex < 0) {
       return NextResponse.json(
-        { error: `No storyboard frame for scene ${sceneNumber}` },
+        { error: `No storyboard frame for ${frameKey ?? `scene ${legacyScene}`}` },
         { status: 404 }
       );
     }
+    const frame = frames[frameIndex];
+    if (!resolvedKey) resolvedKey = storyboardFrameKey(frame, frameIndex);
 
     const image = await generateStoryboardFrameImage({
       sessionId: id,
@@ -68,7 +84,7 @@ export async function POST(
 
     // Merge into the persisted map. Client generates sequentially and re-reads
     // the returned session, so a full-map write avoids clobbering prior frames.
-    const nextImages = { ...(session.storyboardImages ?? {}), [sceneNumber]: image };
+    const nextImages = { ...(session.storyboardImages ?? {}), [resolvedKey]: image };
     await db
       .collection(SCRIPT_WRITER_SESSIONS_COLLECTION)
       .doc(id)
@@ -80,7 +96,7 @@ export async function POST(
       );
 
     const updated = await getScriptSessionForRequest(request, id, uid, appUser);
-    return NextResponse.json({ sceneNumber, image, session: updated });
+    return NextResponse.json({ frameKey: resolvedKey, image, session: updated });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to generate storyboard frame";
     return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });

@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 import { ScriptShotListCard } from "@/components/scriptWriter/ScriptShotListCard";
 
 export function ScriptProductionPackView({ script }: { script: ScriptDocument }) {
   const pack = script.productionPack;
+  const [shotsExpanded, setShotsExpanded] = useState(false);
   if (!pack) return null;
 
   return (
@@ -196,10 +198,25 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
 
       {script.suggestedShots.length ? (
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shot list</h4>
-          <div className="mt-2 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Shot list
+            </h4>
+            <button
+              type="button"
+              onClick={() => setShotsExpanded((v) => !v)}
+              className="text-[11px] font-medium text-sky-700 hover:text-sky-900"
+            >
+              {shotsExpanded ? "Collapse all" : "Expand all"}
+            </button>
+          </div>
+          <div className="mt-2 space-y-2">
             {script.suggestedShots.map((shot) => (
-              <ScriptShotListCard key={`${shot.sceneNumber}-${shot.shotNumber}`} shot={shot} />
+              <ScriptShotListCard
+                key={`${shot.sceneNumber}-${shot.shotNumber}-${shotsExpanded ? "o" : "c"}`}
+                shot={shot}
+                defaultOpen={shotsExpanded}
+              />
             ))}
           </div>
         </div>

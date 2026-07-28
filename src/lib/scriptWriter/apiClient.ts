@@ -244,19 +244,19 @@ export async function scriptWriterUpdateBrief(
   return parseJson<{ session: unknown }>(res);
 }
 
-/** Generate a photoreal storyboard still for one scene. */
+/** Generate a photoreal storyboard still for one specific frame. */
 export async function scriptWriterGenerateStoryboardFrame(
   getToken: () => Promise<string | null>,
   sessionId: string,
-  sceneNumber: string
+  frameKey: string
 ) {
   const res = await fetch(`/api/script-writer/sessions/${sessionId}/storyboard/generate`, {
     method: "POST",
     headers: await authHeaders(getToken),
-    body: JSON.stringify({ sceneNumber }),
+    body: JSON.stringify({ frameKey }),
   });
   return parseJson<{
-    sceneNumber: string;
+    frameKey: string;
     image: ScriptStoryboardImage;
     session: unknown;
   }>(res);

@@ -5,7 +5,10 @@ import Link from "next/link";
 import { ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatShotTypeLabel } from "@/lib/production/shotLabels";
-import { deriveStoryboardFramesFromScript } from "@/lib/scriptWriter/scriptMappers";
+import {
+  deriveStoryboardFramesFromScript,
+  storyboardFrameKey,
+} from "@/lib/scriptWriter/scriptMappers";
 import { scriptWriterGenerateStoryboardFrame } from "@/lib/scriptWriter/apiClient";
 import { STORYBOARD_IMAGE_COST_USD } from "@/lib/scriptWriter/storyboardCost";
 import {
@@ -56,7 +59,14 @@ export function ScriptStoryboardPanel({
     ? script.storyboardFrames
     : deriveStoryboardFramesFromScript(script);
 
-  const [busyScenes, setBusyScenes] = useState<Record<string, boolean>>({});
+  // Each frame gets a stable key (scene can have several frames), so generated
+  // images map 1:1 to a specific frame instead of collapsing per scene.
+  const keyedFrames = useMemo(
+    () => frames.map((frame, i) => ({ frame, key: storyboardFrameKey(frame, i) })),
+    [frames]
+  );
+
+  const [busyKeys, setBusyKeys] = useState<Record<string, boolean>>({});
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,20 +78,16 @@ export function ScriptStoryboardPanel({
   const canGenerate = Boolean(sessionId && getToken) && !readOnly && Boolean(allowGenerate);
 
   const missingCount = useMemo(
-    () => frames.filter((f) => !generated[f.sceneNumber]?.url).length,
-    [frames, generated]
+    () => keyedFrames.filter((kf) => !generated[kf.key]?.url).length,
+    [keyedFrames, generated]
   );
 
   if (!frames.length) return null;
 
-  const runOne = async (frame: ScriptStoryboardFrame): Promise<boolean> => {
+  const runOne = async (frameKey: string): Promise<boolean> => {
     if (!sessionId || !getToken) return false;
     try {
-      const { session } = await scriptWriterGenerateStoryboardFrame(
-        getToken,
-        sessionId,
-        frame.sceneNumber
-      );
+      const { session } = await scriptWriterGenerateStoryboardFrame(getToken, sessionId, frameKey);
       if (session && onSessionUpdated) onSessionUpdated(session as ScriptWriterSession);
       return true;
     } catch (err) {
@@ -90,17 +96,17 @@ export function ScriptStoryboardPanel({
     }
   };
 
-  const generateOne = async (frame: ScriptStoryboardFrame) => {
+  const generateOne = async (frameKey: string) => {
     if (!canGenerate) return;
     setError(null);
-    setBusyScenes((s) => ({ ...s, [frame.sceneNumber]: true }));
-    await runOne(frame);
-    setBusyScenes((s) => ({ ...s, [frame.sceneNumber]: false }));
+    setBusyKeys((s) => ({ ...s, [frameKey]: true }));
+    await runOne(frameKey);
+    setBusyKeys((s) => ({ ...s, [frameKey]: false }));
   };
 
   const generateAll = async () => {
     if (!canGenerate) return;
-    const targets = frames.filter((f) => !generated[f.sceneNumber]?.url);
+    const targets = keyedFrames.filter((kf) => !generated[kf.key]?.url);
     if (!targets.length) return;
     const ok = window.confirm(
       `Generate ${targets.length} storyboard frame${targets.length === 1 ? "" : "s"} for about ${formatCost(
@@ -112,10 +118,10 @@ export function ScriptStoryboardPanel({
     setError(null);
     setBatchProgress({ done: 0, total: targets.length });
     for (let i = 0; i < targets.length; i++) {
-      const frame = targets[i];
-      setBusyScenes((s) => ({ ...s, [frame.sceneNumber]: true }));
-      const success = await runOne(frame);
-      setBusyScenes((s) => ({ ...s, [frame.sceneNumber]: false }));
+      const { key } = targets[i];
+      setBusyKeys((s) => ({ ...s, [key]: true }));
+      const success = await runOne(key);
+      setBusyKeys((s) => ({ ...s, [key]: false }));
       setBatchProgress({ done: i + 1, total: targets.length });
       if (!success) break; // Stop the batch on first failure so we don't burn credits.
     }
@@ -130,7 +136,7 @@ export function ScriptStoryboardPanel({
             Storyboard
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
-            One hero frame per scene. Generate photoreal AI stills or match inspiration refs.
+            One frame per shot. Generate photoreal AI stills or match inspiration refs.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -173,16 +179,16 @@ export function ScriptStoryboardPanel({
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {frames.map((frame) => {
-          const gen = generated[frame.sceneNumber];
+        {keyedFrames.map(({ frame, key }) => {
+          const gen = generated[key];
           const img = frame.inspirationImageId
             ? imageById.get(frame.inspirationImageId)
             : undefined;
           const displayUrl = gen?.url || img?.storageUrl;
-          const busy = busyScenes[frame.sceneNumber];
+          const busy = busyKeys[key];
           return (
             <article
-              key={`${frame.sceneNumber}-${frame.shotType}`}
+              key={key}
               className="overflow-hidden rounded-xl border border-amber-200/60 bg-amber-50/30"
             >
               <div className="relative aspect-[4/3] bg-slate-100">
@@ -224,7 +230,7 @@ export function ScriptStoryboardPanel({
                 {canGenerate ? (
                   <button
                     type="button"
-                    onClick={() => void generateOne(frame)}
+                    onClick={() => void generateOne(key)}
                     disabled={busy || Boolean(batchProgress)}
                     className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-violet-700 hover:text-violet-900 disabled:opacity-50"
                   >
