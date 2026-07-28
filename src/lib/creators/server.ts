@@ -7,15 +7,39 @@ import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelp
 import { REVENUE_BUSINESS_PROFILES_COLLECTION } from "@/lib/revenueOpportunities/collections";
 import { CreatorError } from "@/lib/creators/errors";
 import {
+  deleteCreatorDocumentFile,
+  getCreatorDocumentSignedUrl,
+  uploadCreatorDocumentFile,
+} from "@/lib/creators/storage";
+import {
   CREATORS_COLLECTION,
+  SENSITIVE_CREATOR_DOCUMENT_KINDS,
+  buildDefaultOnboarding,
+  isApprovedApplication,
   type Creator,
+  type CreatorApplicationStatus,
   type CreatorChangeEntry,
   type CreatorCreateInput,
+  type CreatorDocument,
+  type CreatorDocumentKind,
+  type CreatorRelationshipType,
   type CreatorUpdateInput,
 } from "@/lib/creators/types";
 import { AppUser } from "@/lib/types";
+import { canViewSensitiveCreatorDocs } from "@/lib/utils/permissions";
 
 const MAX_CHANGE_HISTORY = 100;
+
+/** Structured sub-records are diffed/edited as wholes, not scalar-logged. */
+const STRUCTURED_FIELDS = new Set([
+  "platforms",
+  "rates",
+  "availability",
+  "documents",
+  "readiness",
+  "onboarding",
+  "changeHistory",
+]);
 
 function requireDb(): Firestore {
   const db = getAdminDb();
@@ -34,7 +58,7 @@ function displayValue(value: unknown): string | undefined {
   if (value == null) return undefined;
   if (Array.isArray(value)) return value.length ? value.join(", ") : undefined;
   if (typeof value === "boolean") return value ? "yes" : "no";
-  if (typeof value === "object") return undefined; // sub-records diffed in later phases
+  if (typeof value === "object") return undefined;
   const s = String(value).trim();
   return s || undefined;
 }
@@ -49,6 +73,7 @@ export function diffCreatorChanges(
   const entries: CreatorChangeEntry[] = [];
   for (const [key, value] of Object.entries(next)) {
     if (value === undefined) continue;
+    if (STRUCTURED_FIELDS.has(key)) continue;
     const prevStr = displayValue((previous as unknown as Record<string, unknown>)[key]);
     const nextStr = displayValue(value);
     if (prevStr === nextStr) continue;
@@ -65,7 +90,29 @@ export function diffCreatorChanges(
   return entries;
 }
 
-export async function listCreators(appUser: AppUser): Promise<Creator[]> {
+/** Strip sensitive document URLs/paths for users without W-9/ID view rights. */
+export function redactCreatorForViewer(creator: Creator, appUser: AppUser): Creator {
+  if (canViewSensitiveCreatorDocs(appUser)) return creator;
+  const docs = creator.documents;
+  if (!docs?.length) return creator;
+  return {
+    ...creator,
+    documents: docs.map((d) => {
+      if (!d.sensitive && !SENSITIVE_CREATOR_DOCUMENT_KINDS.includes(d.kind)) return d;
+      return {
+        ...d,
+        url: "",
+        storagePath: undefined,
+        label: d.label ?? d.kind,
+      };
+    }),
+  };
+}
+
+export async function listCreators(
+  appUser: AppUser,
+  opts?: { relationshipType?: CreatorRelationshipType; applicantsOnly?: boolean }
+): Promise<Creator[]> {
   const db = requireDb();
   const organizationCompany = tenantCompany(appUser);
   const docs = await getOrderedQueryDocs(
@@ -73,12 +120,21 @@ export async function listCreators(appUser: AppUser): Promise<Creator[]> {
       let q: FirebaseFirestore.Query = db
         .collection(CREATORS_COLLECTION)
         .where("organizationCompany", "==", organizationCompany);
+      if (opts?.relationshipType) {
+        q = q.where("relationshipType", "==", opts.relationshipType);
+      }
       if (ordered) q = q.orderBy("updatedAt", "desc");
       return q;
     },
     "updatedAt"
   );
-  return docs.map((d) => serializeDoc<Creator>(d.id, d.data()));
+  let creators = docs.map((d) => serializeDoc<Creator>(d.id, d.data()));
+  if (opts?.applicantsOnly && !opts.relationshipType) {
+    creators = creators.filter(
+      (c) => c.relationshipType === "applicant" || !!c.applicationStatus
+    );
+  }
+  return creators.map((c) => redactCreatorForViewer(c, appUser));
 }
 
 export async function getCreator(appUser: AppUser, id: string): Promise<Creator> {
@@ -89,7 +145,22 @@ export async function getCreator(appUser: AppUser, id: string): Promise<Creator>
   if (data.organizationCompany !== tenantCompany(appUser)) {
     throw new CreatorError("NOT_FOUND", "Creator not found");
   }
-  return serializeDoc<Creator>(snap.id, data);
+  return redactCreatorForViewer(serializeDoc<Creator>(snap.id, data), appUser);
+}
+
+async function loadCreatorRaw(
+  appUser: AppUser,
+  id: string
+): Promise<{ ref: FirebaseFirestore.DocumentReference; current: Creator }> {
+  const db = requireDb();
+  const ref = db.collection(CREATORS_COLLECTION).doc(id);
+  const existing = await ref.get();
+  if (!existing.exists) throw new CreatorError("NOT_FOUND", "Creator not found");
+  const current = serializeDoc<Creator>(existing.id, existing.data()!);
+  if (current.organizationCompany !== tenantCompany(appUser)) {
+    throw new CreatorError("NOT_FOUND", "Creator not found");
+  }
+  return { ref, current };
 }
 
 export async function createCreator(
@@ -103,6 +174,9 @@ export async function createCreator(
     throw new CreatorError("VALIDATION_FAILED", "Creator name is required");
   }
 
+  const nowIso = new Date().toISOString();
+  const isApplicant = input.relationshipType === "applicant";
+
   const payload = stripUndefined({
     organizationCompany,
     ownerUserId: appUser.id,
@@ -114,8 +188,10 @@ export async function createCreator(
     website: input.website?.trim() || undefined,
     portfolioUrl: input.portfolioUrl?.trim() || undefined,
     relationshipType: input.relationshipType ?? "network",
-    status: input.status ?? "active",
+    status: input.status ?? (isApplicant ? "inactive" : "active"),
     readinessStatus: input.readinessStatus ?? "not_reviewed",
+    applicationStatus: isApplicant ? "submitted" : undefined,
+    applicationSubmittedAt: isApplicant ? nowIso : undefined,
     primaryNiche: input.primaryNiche?.trim() || undefined,
     secondaryNiches: input.secondaryNiches,
     tags: input.tags,
@@ -133,7 +209,7 @@ export async function createCreator(
 
   const ref = await db.collection(CREATORS_COLLECTION).add(payload);
   const snap = await ref.get();
-  return serializeDoc<Creator>(ref.id, snap.data()!);
+  return redactCreatorForViewer(serializeDoc<Creator>(ref.id, snap.data()!), appUser);
 }
 
 export async function updateCreator(
@@ -141,14 +217,7 @@ export async function updateCreator(
   id: string,
   input: CreatorUpdateInput
 ): Promise<Creator> {
-  const db = requireDb();
-  const ref = db.collection(CREATORS_COLLECTION).doc(id);
-  const existing = await ref.get();
-  if (!existing.exists) throw new CreatorError("NOT_FOUND", "Creator not found");
-  const current = serializeDoc<Creator>(existing.id, existing.data()!);
-  if (current.organizationCompany !== tenantCompany(appUser)) {
-    throw new CreatorError("NOT_FOUND", "Creator not found");
-  }
+  const { ref, current } = await loadCreatorRaw(appUser, id);
 
   const nowIso = new Date().toISOString();
   const newEntries = diffCreatorChanges(
@@ -157,26 +226,245 @@ export async function updateCreator(
     { userId: appUser.id, displayName: appUser.displayName },
     nowIso
   );
-  const changeHistory = [...newEntries, ...(current.changeHistory ?? [])].slice(0, MAX_CHANGE_HISTORY);
+  const changeHistory = [...newEntries, ...(current.changeHistory ?? [])].slice(
+    0,
+    MAX_CHANGE_HISTORY
+  );
+
+  for (const key of STRUCTURED_FIELDS) {
+    if (key === "changeHistory") continue;
+    if ((input as Record<string, unknown>)[key] !== undefined) {
+      changeHistory.unshift({
+        id: randomUUID(),
+        field: key,
+        previousValue: undefined,
+        newValue: "updated",
+        changedByUserId: appUser.id,
+        changedByDisplayName: appUser.displayName,
+        changedAt: nowIso,
+      });
+    }
+  }
 
   const update = stripUndefined({
     ...input,
-    changeHistory,
+    changeHistory: changeHistory.slice(0, MAX_CHANGE_HISTORY),
     updatedAt: FieldValue.serverTimestamp(),
   });
 
   await ref.update(update);
   const snap = await ref.get();
-  return serializeDoc<Creator>(snap.id, snap.data()!);
+  return redactCreatorForViewer(serializeDoc<Creator>(snap.id, snap.data()!), appUser);
+}
+
+/**
+ * Transition an applicant through the application pipeline.
+ * Approvals promote them into the roster, seed onboarding, and set dates.
+ */
+export async function setCreatorApplicationStatus(
+  appUser: AppUser,
+  id: string,
+  applicationStatus: CreatorApplicationStatus,
+  opts?: {
+    reviewNotes?: string;
+    promoteTo?: CreatorRelationshipType;
+  }
+): Promise<Creator> {
+  const { ref, current } = await loadCreatorRaw(appUser, id);
+  const nowIso = new Date().toISOString();
+  const approved = isApprovedApplication(applicationStatus);
+
+  const patch: CreatorUpdateInput = {
+    applicationStatus,
+    applicationReviewNotes: opts?.reviewNotes?.trim() || current.applicationReviewNotes,
+  };
+
+  if (approved) {
+    patch.relationshipType =
+      opts?.promoteTo && opts.promoteTo !== "applicant" ? opts.promoteTo : "network";
+    patch.status = "active";
+    patch.dateApproved = nowIso;
+    if (!current.onboarding?.length) {
+      patch.onboarding = buildDefaultOnboarding();
+    }
+    if (applicationStatus === "approved_with_development") {
+      patch.readinessStatus = "needs_development";
+    } else if (current.readinessStatus === "not_reviewed") {
+      patch.readinessStatus = "nearly_ready";
+    }
+  }
+
+  if (
+    applicationStatus === "rejected" ||
+    applicationStatus === "withdrawn" ||
+    applicationStatus === "archived"
+  ) {
+    patch.status = "inactive";
+  }
+
+  const newEntries = diffCreatorChanges(
+    current,
+    patch,
+    { userId: appUser.id, displayName: appUser.displayName },
+    nowIso
+  );
+  const changeHistory = [...newEntries, ...(current.changeHistory ?? [])].slice(
+    0,
+    MAX_CHANGE_HISTORY
+  );
+
+  await ref.update(
+    stripUndefined({
+      ...patch,
+      changeHistory,
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+  );
+  const snap = await ref.get();
+  return redactCreatorForViewer(serializeDoc<Creator>(snap.id, snap.data()!), appUser);
+}
+
+export async function addCreatorDocument(
+  appUser: AppUser,
+  id: string,
+  input: {
+    kind: CreatorDocumentKind;
+    label?: string;
+    url?: string;
+    fileDataUrl?: string;
+    fileName?: string;
+  }
+): Promise<Creator> {
+  const { ref, current } = await loadCreatorRaw(appUser, id);
+  const sensitive = SENSITIVE_CREATOR_DOCUMENT_KINDS.includes(input.kind);
+
+  if (sensitive && !canViewSensitiveCreatorDocs(appUser)) {
+    throw new CreatorError(
+      "NOT_AUTHORIZED",
+      "Not authorized to upload sensitive creator documents"
+    );
+  }
+
+  let url = input.url?.trim() || "";
+  let storagePath: string | undefined;
+
+  if (input.fileDataUrl) {
+    const uploaded = await uploadCreatorDocumentFile(
+      id,
+      input.kind,
+      input.fileDataUrl,
+      input.fileName
+    );
+    storagePath = uploaded.storagePath;
+    url = url || `storage://${storagePath}`;
+  }
+
+  if (!url && !storagePath) {
+    throw new CreatorError("VALIDATION_FAILED", "Document URL or file is required");
+  }
+
+  const nowIso = new Date().toISOString();
+  const doc: CreatorDocument = stripUndefined({
+    id: randomUUID(),
+    kind: input.kind,
+    label: input.label?.trim() || undefined,
+    url,
+    storagePath,
+    sensitive: sensitive || undefined,
+    uploadedAt: nowIso,
+  }) as CreatorDocument;
+
+  const documents = [...(current.documents ?? []), doc];
+  await ref.update({
+    documents,
+    changeHistory: [
+      {
+        id: randomUUID(),
+        field: "documents",
+        newValue: `added ${input.kind}`,
+        changedByUserId: appUser.id,
+        changedByDisplayName: appUser.displayName,
+        changedAt: nowIso,
+      },
+      ...(current.changeHistory ?? []),
+    ].slice(0, MAX_CHANGE_HISTORY),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  const snap = await ref.get();
+  return redactCreatorForViewer(serializeDoc<Creator>(snap.id, snap.data()!), appUser);
+}
+
+export async function removeCreatorDocument(
+  appUser: AppUser,
+  id: string,
+  documentId: string
+): Promise<Creator> {
+  const { ref, current } = await loadCreatorRaw(appUser, id);
+  const doc = (current.documents ?? []).find((d) => d.id === documentId);
+  if (!doc) throw new CreatorError("NOT_FOUND", "Document not found");
+
+  if (doc.sensitive || SENSITIVE_CREATOR_DOCUMENT_KINDS.includes(doc.kind)) {
+    if (!canViewSensitiveCreatorDocs(appUser)) {
+      throw new CreatorError("NOT_AUTHORIZED", "Not authorized to remove sensitive documents");
+    }
+  }
+
+  if (doc.storagePath) {
+    await deleteCreatorDocumentFile(doc.storagePath);
+  }
+
+  const nowIso = new Date().toISOString();
+  const documents = (current.documents ?? []).filter((d) => d.id !== documentId);
+  await ref.update({
+    documents,
+    changeHistory: [
+      {
+        id: randomUUID(),
+        field: "documents",
+        newValue: `removed ${doc.kind}`,
+        changedByUserId: appUser.id,
+        changedByDisplayName: appUser.displayName,
+        changedAt: nowIso,
+      },
+      ...(current.changeHistory ?? []),
+    ].slice(0, MAX_CHANGE_HISTORY),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  const snap = await ref.get();
+  return redactCreatorForViewer(serializeDoc<Creator>(snap.id, snap.data()!), appUser);
+}
+
+/** Issue a short-lived signed URL for a stored creator document. */
+export async function getCreatorDocumentViewUrl(
+  appUser: AppUser,
+  id: string,
+  documentId: string
+): Promise<{ url: string; expiresInMs: number }> {
+  const { current } = await loadCreatorRaw(appUser, id);
+  const doc = (current.documents ?? []).find((d) => d.id === documentId);
+  if (!doc) throw new CreatorError("NOT_FOUND", "Document not found");
+
+  if (doc.sensitive || SENSITIVE_CREATOR_DOCUMENT_KINDS.includes(doc.kind)) {
+    if (!canViewSensitiveCreatorDocs(appUser)) {
+      throw new CreatorError("NOT_AUTHORIZED", "Not authorized to view sensitive documents");
+    }
+  }
+
+  if (doc.storagePath) {
+    const ttl = 60 * 60 * 1000;
+    const url = await getCreatorDocumentSignedUrl(doc.storagePath, ttl);
+    return { url, expiresInMs: ttl };
+  }
+  if (doc.url && !doc.url.startsWith("storage://")) {
+    return { url: doc.url, expiresInMs: 0 };
+  }
+  throw new CreatorError("NOT_FOUND", "Document file not available");
 }
 
 export async function deleteCreator(appUser: AppUser, id: string): Promise<void> {
-  const db = requireDb();
-  const ref = db.collection(CREATORS_COLLECTION).doc(id);
-  const existing = await ref.get();
-  if (!existing.exists) throw new CreatorError("NOT_FOUND", "Creator not found");
-  if (existing.data()!.organizationCompany !== tenantCompany(appUser)) {
-    throw new CreatorError("NOT_FOUND", "Creator not found");
+  const { ref, current } = await loadCreatorRaw(appUser, id);
+  for (const doc of current.documents ?? []) {
+    if (doc.storagePath) await deleteCreatorDocumentFile(doc.storagePath);
   }
   await ref.delete();
 }
@@ -184,7 +472,6 @@ export async function deleteCreator(appUser: AppUser, id: string): Promise<void>
 /**
  * Idempotently ensure a flagship "Stormi" creator record exists for this tenant,
  * cross-linked to the existing Stormi business profile (never duplicating it).
- * Safe to call repeatedly — returns the existing record if already present.
  */
 export async function ensureStormiCreator(
   appUser: AppUser
@@ -192,7 +479,6 @@ export async function ensureStormiCreator(
   const db = requireDb();
   const organizationCompany = tenantCompany(appUser);
 
-  // Already imported? Prefer an existing flagship, else a name match.
   const existing = await db
     .collection(CREATORS_COLLECTION)
     .where("organizationCompany", "==", organizationCompany)
@@ -205,10 +491,12 @@ export async function ensureStormiCreator(
     );
   });
   if (match) {
-    return { creator: serializeDoc<Creator>(match.id, match.data()), created: false };
+    return {
+      creator: redactCreatorForViewer(serializeDoc<Creator>(match.id, match.data()), appUser),
+      created: false,
+    };
   }
 
-  // Link to the existing Stormi business profile if one exists.
   let businessProfileId: string | undefined;
   try {
     const profiles = await db
@@ -219,7 +507,7 @@ export async function ensureStormiCreator(
       .get();
     businessProfileId = profiles.docs[0]?.id;
   } catch {
-    // Best-effort link; ignore lookup issues.
+    // Best-effort link
   }
 
   const creator = await createCreator(appUser, {

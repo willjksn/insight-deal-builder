@@ -184,6 +184,11 @@ export function canManageCreators(user: AppUser | null | undefined): boolean {
   );
 }
 
+/** View a creator's sensitive documents (W-9 / ID) — reuses the doc-review gates. */
+export function canViewSensitiveCreatorDocs(user: AppUser | null | undefined): boolean {
+  return canViewW9Docs(user) || canViewIdentityDocs(user);
+}
+
 /** Record cash received from clients or paid to payees on signed agreements */
 export function canRecordPayments(user: AppUser | null | undefined): boolean {
   return canExportPayments(user);

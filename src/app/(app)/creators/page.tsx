@@ -75,7 +75,8 @@ export default function CreatorsPage() {
   const reload = useCallback(async () => {
     if (!user) return;
     const list = await listCreators(getToken);
-    setCreators(list);
+    // Applicants live on the Applications page until approved.
+    setCreators(list.filter((c) => c.relationshipType !== "applicant"));
   }, [user, getToken]);
 
   useEffect(() => {
@@ -150,6 +151,11 @@ export default function CreatorsPage() {
                   {importing ? "Importing…" : "Import Stormi"}
                 </Button>
               )}
+              <Link href="/creators/applications">
+                <Button size="touch" variant="outline">
+                  Applications
+                </Button>
+              </Link>
               <Button
                 size="touch"
                 onClick={() => {

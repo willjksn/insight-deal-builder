@@ -84,6 +84,21 @@ export type CreatorApplicationStatus =
   | "withdrawn"
   | "archived";
 
+export const CREATOR_APPLICATION_STATUS_LABELS: Record<CreatorApplicationStatus, string> = {
+  started: "Started",
+  submitted: "Submitted",
+  needs_information: "Needs information",
+  under_review: "Under review",
+  interview_requested: "Interview requested",
+  interview_scheduled: "Interview scheduled",
+  approved: "Approved",
+  approved_with_development: "Approved (with development)",
+  waitlisted: "Waitlisted",
+  rejected: "Rejected",
+  withdrawn: "Withdrawn",
+  archived: "Archived",
+};
+
 export type CreatorPlatformType =
   | "instagram"
   | "tiktok"
@@ -126,6 +141,20 @@ export interface CreatorPlatform {
   lastUpdated?: string;
 }
 
+/** Common rate-card kinds (free-form `kind` still allowed). */
+export const CREATOR_RATE_KIND_OPTIONS: { value: string; label: string }[] = [
+  { value: "sponsored_post", label: "Sponsored post" },
+  { value: "reel_tiktok", label: "Reel / TikTok" },
+  { value: "story", label: "Story" },
+  { value: "ugc", label: "UGC / usage content" },
+  { value: "youtube", label: "YouTube integration" },
+  { value: "day_rate", label: "Day rate" },
+  { value: "appearance", label: "Appearance / event" },
+  { value: "usage_rights", label: "Usage rights" },
+  { value: "exclusivity", label: "Exclusivity" },
+  { value: "other", label: "Other" },
+];
+
 /** A single compensation figure (rate card is a list of these). */
 export interface CreatorRate {
   id: string;
@@ -145,15 +174,66 @@ export interface CreatorAvailability {
   notes?: string;
 }
 
-/** A stored document/media asset (permissions applied in later phases). */
+export type CreatorDocumentKind =
+  | "media_kit"
+  | "rate_card"
+  | "portfolio"
+  | "headshot"
+  | "sample_content"
+  | "w9"
+  | "id_verification"
+  | "release"
+  | "contract"
+  | "other";
+
+export const CREATOR_DOCUMENT_KIND_LABELS: Record<CreatorDocumentKind, string> = {
+  media_kit: "Media kit",
+  rate_card: "Rate card",
+  portfolio: "Portfolio",
+  headshot: "Headshot",
+  sample_content: "Sample content",
+  w9: "W-9 (tax)",
+  id_verification: "ID verification",
+  release: "Release / consent",
+  contract: "Contract",
+  other: "Other",
+};
+
+/** Document kinds that hold PII / tax data — gated behind sensitive-doc permissions. */
+export const SENSITIVE_CREATOR_DOCUMENT_KINDS: CreatorDocumentKind[] = [
+  "w9",
+  "id_verification",
+];
+
+/** A stored document/media asset. Sensitive kinds are permission-gated in the UI. */
 export interface CreatorDocument {
   id: string;
-  kind: string; // media_kit | rate_card | portfolio | headshot | w9 | release | other
+  kind: CreatorDocumentKind;
   label?: string;
   url: string;
   storagePath?: string;
   sensitive?: boolean;
   uploadedAt: string;
+}
+
+/** Explainable readiness components behind the overall readinessStatus. */
+export interface CreatorReadiness {
+  mediaKitReady?: boolean;
+  ratesDefined?: boolean;
+  brandSafe?: boolean;
+  availabilitySet?: boolean;
+  sampleContentReady?: boolean;
+  agreementReady?: boolean;
+  notes?: string;
+}
+
+/** A single onboarding checklist item. */
+export interface CreatorOnboardingTask {
+  id: string;
+  label: string;
+  done: boolean;
+  doneAt?: string;
+  notes?: string;
 }
 
 /** Audited manual change entry (review-before-write history). */
@@ -196,6 +276,8 @@ export interface Creator {
   status: CreatorStatus;
   readinessStatus: CreatorReadinessStatus;
   applicationStatus?: CreatorApplicationStatus;
+  applicationSubmittedAt?: string;
+  applicationReviewNotes?: string;
   dateJoined?: string;
   dateApproved?: string;
   internalOwnerUserId?: string;
@@ -217,11 +299,13 @@ export interface Creator {
   brandSafetyNotes?: string;
   willNotPromote?: string[];
 
-  // ── Structured sub-records (filled out in later phases) ──
+  // ── Structured sub-records ──
   platforms?: CreatorPlatform[];
   rates?: CreatorRate[];
   availability?: CreatorAvailability;
   documents?: CreatorDocument[];
+  readiness?: CreatorReadiness;
+  onboarding?: CreatorOnboardingTask[];
 
   // ── Links (dedup — point to existing records, never duplicate people) ──
   crewMemberId?: string;
@@ -266,6 +350,58 @@ export type CreatorUpdateInput = Partial<
     "id" | "organizationCompany" | "ownerUserId" | "changeHistory" | "createdAt" | "updatedAt"
   >
 >;
+
+/** Default onboarding checklist seeded when a creator is approved/onboarded. */
+export const DEFAULT_ONBOARDING_TASK_LABELS: string[] = [
+  "Signed creator agreement",
+  "W-9 / tax details on file",
+  "ID verification complete",
+  "Media kit / rate card uploaded",
+  "Brand-safety review complete",
+  "Payment details collected",
+  "Content & usage rights reviewed",
+  "Added to relevant campaigns",
+];
+
+/** Seed a fresh onboarding checklist (ids are stable slug keys). */
+export function buildDefaultOnboarding(): CreatorOnboardingTask[] {
+  return DEFAULT_ONBOARDING_TASK_LABELS.map((label) => ({
+    id: label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, ""),
+    label,
+    done: false,
+  }));
+}
+
+/** Application stages still in the open pipeline (not terminal). */
+export const OPEN_APPLICATION_STATUSES: CreatorApplicationStatus[] = [
+  "started",
+  "submitted",
+  "needs_information",
+  "under_review",
+  "interview_requested",
+  "interview_scheduled",
+];
+
+export function isOpenApplication(status?: CreatorApplicationStatus): boolean {
+  return !!status && OPEN_APPLICATION_STATUSES.includes(status);
+}
+
+export function isApprovedApplication(status?: CreatorApplicationStatus): boolean {
+  return status === "approved" || status === "approved_with_development";
+}
+
+/** Readiness component field labels (for the readiness editor UI). */
+export const CREATOR_READINESS_COMPONENT_LABELS: Record<keyof Omit<CreatorReadiness, "notes">, string> = {
+  mediaKitReady: "Media kit ready",
+  ratesDefined: "Rates defined",
+  brandSafe: "Brand-safety reviewed",
+  availabilitySet: "Availability set",
+  sampleContentReady: "Sample content ready",
+  agreementReady: "Agreement-ready",
+};
 
 /** String-array fields — used by the editor + change diffing. */
 export const CREATOR_LIST_FIELDS: (keyof Creator)[] = [

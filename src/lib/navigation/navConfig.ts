@@ -109,6 +109,12 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/companies", label: "Companies", icon: Building2, canAccess: canManageCompanies },
       { href: "/clients", label: "Clients", icon: Users, canAccess: canManageClients },
       { href: "/creators", label: "Creators", icon: Star, canAccess: canManageCreators },
+      {
+        href: "/creators/applications",
+        label: "Applications",
+        icon: FileText,
+        canAccess: canManageCreators,
+      },
     ],
   },
 

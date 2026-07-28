@@ -84,7 +84,16 @@ function validateCreate(body: unknown): CreatorCreateInput {
 export async function GET(request: NextRequest) {
   try {
     const { appUser } = await requireCreatorManager(request);
-    const creators = await listCreators(appUser);
+    const { searchParams } = new URL(request.url);
+    const relationshipType = searchParams.get("relationshipType") as CreatorRelationshipType | null;
+    const applicantsOnly = searchParams.get("applicants") === "1";
+    const creators = await listCreators(appUser, {
+      relationshipType:
+        relationshipType && RELATIONSHIP_TYPES.includes(relationshipType)
+          ? relationshipType
+          : undefined,
+      applicantsOnly,
+    });
     return NextResponse.json({ creators });
   } catch (err) {
     return creatorApiError(err);
