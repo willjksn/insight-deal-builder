@@ -1,10 +1,13 @@
 import type { AgentDefinition, AgentRunResult } from "@/lib/revenueOpportunities/agents/instruction";
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
+import type { BusinessProfile } from "@/lib/revenueOpportunities/types/businessProfile";
 import type { ResearchAgentOutput } from "@/lib/revenueOpportunities/agents/imgResearch";
 import { runStormiResearchPass } from "@/lib/revenueOpportunities/research/runResearchPass";
 
 export interface StormiResearchInput {
   campaign: RevenueCampaign;
+  /** Optional linked business profile that steers identity + targeting. */
+  profile?: BusinessProfile | null;
 }
 
 const AGENT_NAME = "stormi_research";
@@ -34,7 +37,7 @@ export const stormiResearchAgent: AgentDefinition<StormiResearchInput, ResearchA
     fallback: ["Fail loudly — never invent dummy brands"],
   },
   async execute(input: StormiResearchInput): Promise<AgentRunResult<ResearchAgentOutput>> {
-    const pass = await runStormiResearchPass(input.campaign);
+    const pass = await runStormiResearchPass(input.campaign, input.profile);
     const topScore = pass.prospects[0]?.scoring.totalScore ?? 0;
     return {
       agentName: AGENT_NAME,

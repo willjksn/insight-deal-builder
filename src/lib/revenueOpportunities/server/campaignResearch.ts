@@ -5,7 +5,9 @@ import { newActivity } from "@/lib/revenueOpportunities/defaults";
 import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";
 import { prospectToOpportunityInput } from "@/lib/revenueOpportunities/research/prospectToOpportunity";
 import { runRevenueAgent } from "@/lib/revenueOpportunities/server/agentRunner";
+import { getBusinessProfile } from "@/lib/revenueOpportunities/server/businessProfiles";
 import { getCampaign } from "@/lib/revenueOpportunities/server/campaigns";
+import type { BusinessProfile } from "@/lib/revenueOpportunities/types/businessProfile";
 import {
   countCampaignRunsSince,
   createCampaignRun,
@@ -86,6 +88,17 @@ export async function runCampaignResearch(
   const agentName: RevenueAgentName =
     campaign.campaignType === "stormi_brand" ? "stormi_research" : "img_research";
 
+  // Load the linked business profile (if any) to steer identity + targeting.
+  // Best-effort: a missing/inaccessible profile never blocks the run.
+  let profile: BusinessProfile | null = null;
+  if (campaign.profileId) {
+    try {
+      profile = await getBusinessProfile(appUser, campaign.profileId);
+    } catch {
+      profile = null;
+    }
+  }
+
   let campaignRun = await createCampaignRun(appUser, campaign, {
     usedLiveSearch: false,
     usedLiveAi: false,
@@ -95,7 +108,7 @@ export async function runCampaignResearch(
     const { run: agentRun, result } = await runRevenueAgent(
       appUser,
       agentName,
-      { campaign },
+      { campaign, profile },
       {
         campaignId,
         inputSummary: `Research: ${campaign.name}`,
@@ -161,6 +174,13 @@ export async function runCampaignResearch(
         errorParts.push("No verified prospects from deep research");
       } else {
         errorParts.push("No prospects met score/confidence thresholds");
+        // Surface how close the best candidate came so thresholds are tunable.
+        const top = pass.prospects[0];
+        if (top) {
+          errorParts.push(
+            `best: score ${top.scoring.totalScore} / confidence ${top.scoring.confidenceScore} (need ${campaign.minOpportunityScore}/${campaign.minConfidenceScore})`
+          );
+        }
       }
       if (skippedDupes) errorParts.push(`${skippedDupes} duplicates skipped`);
       if (skippedScore) errorParts.push(`${skippedScore} below thresholds`);

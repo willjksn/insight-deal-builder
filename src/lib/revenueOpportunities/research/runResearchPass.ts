@@ -1,6 +1,7 @@
 import { summarizeWebResearch } from "@/lib/search/researchSummarize";
 import { tavilySearch } from "@/lib/search/tavilyClient";
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
+import type { BusinessProfile } from "@/lib/revenueOpportunities/types/businessProfile";
 import {
   buildCampaignContextLines,
   buildImgResearchQueryPlan,
@@ -28,14 +29,17 @@ export interface ResearchPassResult {
 
 async function runDeepResearchPass(
   campaign: RevenueCampaign,
-  kind: "img" | "stormi"
+  kind: "img" | "stormi",
+  profile?: BusinessProfile | null
 ): Promise<ResearchPassResult> {
   if (!revenueResearchLive()) {
     throw new Error(liveResearchRequirementsMessage());
   }
 
   const queries =
-    kind === "stormi" ? buildStormiResearchQueryPlan(campaign) : buildImgResearchQueryPlan(campaign);
+    kind === "stormi"
+      ? buildStormiResearchQueryPlan(campaign, profile)
+      : buildImgResearchQueryPlan(campaign, profile);
 
   const searches = await Promise.all(
     queries.map((query) =>
@@ -57,7 +61,7 @@ async function runDeepResearchPass(
   const discoverRaw = await summarizeWebResearch<unknown>(
     discoverSystem,
     merged,
-    buildCampaignContextLines(campaign)
+    buildCampaignContextLines(campaign, profile)
   );
   const candidates = parseDiscoverCandidates(discoverRaw).filter(
     (c) => !isExcludedName(c.name, campaign)
@@ -80,7 +84,7 @@ async function runDeepResearchPass(
 
   for (const candidate of shortlist) {
     try {
-      const enriched = await enrichProspect(candidate, campaign, kind);
+      const enriched = await enrichProspect(candidate, campaign, kind, profile);
       if (enriched && !isExcludedName(enriched.subject.name, campaign)) {
         prospects.push(enriched);
       }
@@ -101,16 +105,25 @@ async function runDeepResearchPass(
   };
 }
 
-export async function runImgResearchPass(campaign: RevenueCampaign): Promise<ResearchPassResult> {
-  return runDeepResearchPass(campaign, "img");
+export async function runImgResearchPass(
+  campaign: RevenueCampaign,
+  profile?: BusinessProfile | null
+): Promise<ResearchPassResult> {
+  return runDeepResearchPass(campaign, "img", profile);
 }
 
-export async function runStormiResearchPass(campaign: RevenueCampaign): Promise<ResearchPassResult> {
-  return runDeepResearchPass(campaign, "stormi");
+export async function runStormiResearchPass(
+  campaign: RevenueCampaign,
+  profile?: BusinessProfile | null
+): Promise<ResearchPassResult> {
+  return runDeepResearchPass(campaign, "stormi", profile);
 }
 
-export async function runCampaignResearchPass(campaign: RevenueCampaign): Promise<ResearchPassResult> {
+export async function runCampaignResearchPass(
+  campaign: RevenueCampaign,
+  profile?: BusinessProfile | null
+): Promise<ResearchPassResult> {
   return campaign.campaignType === "stormi_brand"
-    ? runStormiResearchPass(campaign)
-    : runImgResearchPass(campaign);
+    ? runStormiResearchPass(campaign, profile)
+    : runImgResearchPass(campaign, profile);
 }

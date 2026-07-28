@@ -1,7 +1,23 @@
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
+import type { BusinessProfile } from "@/lib/revenueOpportunities/types/businessProfile";
+
+/** Extra search terms drawn from a linked profile's targeting fields. */
+export function profileQueryTerms(profile: BusinessProfile): string[] {
+  const f = profile.fields ?? {};
+  return [
+    ...(f.keywords ?? []),
+    ...(f.idealCustomers ?? []),
+    ...(f.idealBrands ?? []),
+  ]
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
 
 /** Multi-angle Tavily queries for IMG local-business discovery. */
-export function buildImgResearchQueryPlan(campaign: RevenueCampaign): string[] {
+export function buildImgResearchQueryPlan(
+  campaign: RevenueCampaign,
+  profile?: BusinessProfile | null
+): string[] {
   const img = campaign.img;
   const year = new Date().getFullYear();
   const location = [img?.city, img?.state].filter(Boolean).join(", ") || "Orlando, FL";
@@ -23,11 +39,19 @@ export function buildImgResearchQueryPlan(campaign: RevenueCampaign): string[] {
     queries.push(`${focus} ${location} ${campaign.additionalInstructions.trim().slice(0, 120)}`);
   }
 
+  if (profile) {
+    const terms = profileQueryTerms(profile).slice(0, 4);
+    if (terms.length) queries.push(`${focus} ${location} ${terms.join(" ")}`);
+  }
+
   return queries.map((q) => q.replace(/\s+/g, " ").trim()).filter(Boolean);
 }
 
 /** Multi-angle Tavily queries for Stormi brand partnerships. */
-export function buildStormiResearchQueryPlan(campaign: RevenueCampaign): string[] {
+export function buildStormiResearchQueryPlan(
+  campaign: RevenueCampaign,
+  profile?: BusinessProfile | null
+): string[] {
   const stormi = campaign.stormi;
   const year = new Date().getFullYear();
   const category = stormi?.brandCategory?.trim() || "beauty lifestyle brands";
@@ -46,7 +70,50 @@ export function buildStormiResearchQueryPlan(campaign: RevenueCampaign): string[
     queries.push(`${category} ${geo} ${campaign.additionalInstructions.trim().slice(0, 120)}`);
   }
 
+  if (profile) {
+    const terms = profileQueryTerms(profile).slice(0, 4);
+    if (terms.length) queries.push(`${category} ${geo} ${terms.join(" ")}`);
+  }
+
   return queries.map((q) => q.replace(/\s+/g, " ").trim()).filter(Boolean);
+}
+
+/**
+ * Authoritative identity + targeting context from a linked business profile.
+ * Layered on top of the built-in persona so the profile steers discovery,
+ * qualification, and scoring emphasis.
+ */
+export function buildProfileContextLines(profile: BusinessProfile): string[] {
+  const f = profile.fields ?? {};
+  const lines: string[] = [
+    "",
+    "=== LINKED BUSINESS PROFILE (authoritative identity + targeting — prioritize this) ===",
+    `Profile: ${profile.name} (${profile.profileType})`,
+  ];
+  const push = (label: string, val?: string) => {
+    if (val && val.trim()) lines.push(`${label}: ${val.trim()}`);
+  };
+  const pushList = (label: string, arr?: string[]) => {
+    const v = (arr ?? []).map((s) => s.trim()).filter(Boolean);
+    if (v.length) lines.push(`${label}: ${v.join("; ")}`);
+  };
+
+  push("Who we are", f.description);
+  pushList("Services / offerings", f.services);
+  pushList("Signature offers", f.offers);
+  pushList("Ideal customers", f.idealCustomers);
+  pushList("Ideal brands", f.idealBrands);
+  pushList("Target industries", f.industries);
+  pushList("Geography", f.geography);
+  push("Creator niche", f.creatorNiche);
+  push("Content style", f.contentStyle);
+  pushList("Search keywords (prefer)", f.keywords);
+  pushList("Negative keywords (avoid)", f.negativeKeywords);
+  pushList("Disqualifiers (skip)", f.disqualifiers);
+  pushList("Disallowed industries", f.disallowedIndustries);
+  pushList("Brand-safety restrictions", f.brandSafetyRestrictions);
+  if (f.minimumProjectValue != null) push("Minimum project value", `$${f.minimumProjectValue}`);
+  return lines;
 }
 
 /** @deprecated use buildImgResearchQueryPlan */
@@ -59,7 +126,10 @@ export function buildStormiResearchQuery(campaign: RevenueCampaign): string {
   return buildStormiResearchQueryPlan(campaign)[0] ?? "";
 }
 
-export function buildCampaignContextLines(campaign: RevenueCampaign): string[] {
+export function buildCampaignContextLines(
+  campaign: RevenueCampaign,
+  profile?: BusinessProfile | null
+): string[] {
   const lines = [
     `Campaign: ${campaign.name}`,
     `Type: ${campaign.campaignType}`,
@@ -108,15 +178,20 @@ export function buildCampaignContextLines(campaign: RevenueCampaign): string[] {
     );
   }
 
+  if (profile) {
+    lines.push(...buildProfileContextLines(profile));
+  }
+
   return lines.filter(Boolean);
 }
 
 export function buildEnrichContextLines(
   campaign: RevenueCampaign,
-  candidate: { name: string; website?: string; city?: string; state?: string; industry?: string; whyInteresting?: string }
+  candidate: { name: string; website?: string; city?: string; state?: string; industry?: string; whyInteresting?: string },
+  profile?: BusinessProfile | null
 ): string[] {
   return [
-    ...buildCampaignContextLines(campaign),
+    ...buildCampaignContextLines(campaign, profile),
     "",
     "=== CANDIDATE TO QUALIFY (deep research) ===",
     `Name: ${candidate.name}`,

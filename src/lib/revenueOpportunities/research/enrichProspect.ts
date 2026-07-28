@@ -1,6 +1,7 @@
 import { summarizeWebResearch } from "@/lib/search/researchSummarize";
 import { tavilySearch } from "@/lib/search/tavilyClient";
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
+import type { BusinessProfile } from "@/lib/revenueOpportunities/types/businessProfile";
 import { buildEnrichContextLines } from "@/lib/revenueOpportunities/research/buildQuery";
 import { mergeTavilySearches } from "@/lib/revenueOpportunities/research/mergeSearches";
 import {
@@ -34,7 +35,8 @@ function enrichQueries(candidate: DiscoverCandidate, campaign: RevenueCampaign):
 export async function enrichProspect(
   candidate: DiscoverCandidate,
   campaign: RevenueCampaign,
-  kind: "img" | "stormi"
+  kind: "img" | "stormi",
+  profile?: BusinessProfile | null
 ): Promise<ParsedResearchProspect | null> {
   const queries = enrichQueries(candidate, campaign).slice(0, 3);
   const searches = await Promise.all(
@@ -53,7 +55,7 @@ export async function enrichProspect(
   const raw = await summarizeWebResearch<unknown>(
     system,
     merged,
-    buildEnrichContextLines(campaign, candidate)
+    buildEnrichContextLines(campaign, candidate, profile)
   );
   const prospects = parseResearchProspects(raw, kind);
   const best = prospects[0];

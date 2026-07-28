@@ -1,10 +1,13 @@
 import type { AgentDefinition, AgentRunResult } from "@/lib/revenueOpportunities/agents/instruction";
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
+import type { BusinessProfile } from "@/lib/revenueOpportunities/types/businessProfile";
 import type { ParsedResearchProspect } from "@/lib/revenueOpportunities/research/parseResearch";
 import { runImgResearchPass } from "@/lib/revenueOpportunities/research/runResearchPass";
 
 export interface ImgResearchInput {
   campaign: RevenueCampaign;
+  /** Optional linked business profile that steers identity + targeting. */
+  profile?: BusinessProfile | null;
 }
 
 export interface ResearchAgentOutput {
@@ -43,7 +46,7 @@ export const imgResearchAgent: AgentDefinition<ImgResearchInput, ResearchAgentOu
     fallback: ["Fail loudly — never invent dummy businesses"],
   },
   async execute(input: ImgResearchInput): Promise<AgentRunResult<ResearchAgentOutput>> {
-    const pass = await runImgResearchPass(input.campaign);
+    const pass = await runImgResearchPass(input.campaign, input.profile);
     const topScore = pass.prospects[0]?.scoring.totalScore ?? 0;
     return {
       agentName: AGENT_NAME,
