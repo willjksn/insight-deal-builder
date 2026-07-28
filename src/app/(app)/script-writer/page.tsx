@@ -23,9 +23,15 @@ import {
   scriptWriterAnalyzeInspiration,
   scriptWriterCreateSession,
   scriptWriterDeleteSession,
+  scriptWriterGetSeries,
   scriptWriterListSessions,
   scriptWriterResearchTrends,
 } from "@/lib/scriptWriter/apiClient";
+import {
+  ScriptSeries,
+  ScriptSeriesEntryKind,
+  SCRIPT_SERIES_ENTRY_KIND_LABELS,
+} from "@/lib/scriptWriter/series/types";
 import {
   isBriefComplete,
   ScriptWriterBrief,
@@ -56,6 +62,9 @@ function ScriptWriterPageContent() {
   const [storyboardMode, setStoryboardMode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ScriptWriterSession | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [seriesId, setSeriesId] = useState<string>();
+  const [seriesEntryKind, setSeriesEntryKind] = useState<ScriptSeriesEntryKind>("episode");
+  const [series, setSeries] = useState<ScriptSeries | null>(null);
 
   const hasInspiration =
     pendingImages.length > 0 || pendingVideo !== null || pendingUrls.length > 0;
@@ -70,7 +79,33 @@ function ScriptWriterPageContent() {
     if (t) setTitle(t);
     const projectId = searchParams.get("projectId") ?? undefined;
     if (projectId) setLinkedProjectId(projectId);
+    const sid = searchParams.get("seriesId") ?? undefined;
+    if (sid) setSeriesId(sid);
+    const kind = searchParams.get("entryKind");
+    if (kind === "episode" || kind === "teaser" || kind === "trailer") {
+      setSeriesEntryKind(kind);
+    }
   }, [searchParams]);
+
+  // When adding an entry to a series, load the bible and pre-fill empty fields.
+  useEffect(() => {
+    if (!user || !seriesId) return;
+    scriptWriterGetSeries(() => user.getIdToken(), seriesId)
+      .then((res) => {
+        setSeries(res.series);
+        setBrief((b) => ({
+          ...b,
+          genre: b.genre?.trim() ? b.genre : res.series.genre ?? b.genre,
+          setting: b.setting?.trim() ? b.setting : res.series.world ?? b.setting,
+          theme: b.theme?.trim()
+            ? b.theme
+            : res.series.theme ?? res.series.premise ?? b.theme,
+        }));
+      })
+      .catch(() => {
+        /* non-fatal: server still enforces + prefills on create */
+      });
+  }, [user, seriesId]);
 
   useEffect(() => {
     if (!user) return;
@@ -121,6 +156,8 @@ function ScriptWriterPageContent() {
         workflowMode: hasInspiration ? "inspiration" : "text",
         detailedShotList,
         storyboardMode,
+        seriesId,
+        seriesEntryKind: seriesId ? seriesEntryKind : undefined,
       });
 
       if (hasInspiration) {
@@ -247,7 +284,29 @@ function ScriptWriterPageContent() {
       <PageHeader
         title="Script writer"
         subtitle="Start with a basic idea — get a full script, then push it to your board, shot list, and call sheets."
+        actionLabel="Series"
+        actionHref="/script-writer/series"
       />
+
+      {series ? (
+        <div className="mb-6 flex items-start justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-violet-900">
+              Adding to series: {series.title}
+            </p>
+            <p className="mt-0.5 text-xs text-violet-700">
+              New {SCRIPT_SERIES_ENTRY_KIND_LABELS[seriesEntryKind].toLowerCase()} · inherits the
+              world, recurring cast, and motifs from the bible.
+            </p>
+          </div>
+          <Link
+            href={`/script-writer/series/${seriesId}`}
+            className="shrink-0 text-xs font-medium text-violet-700 hover:text-violet-900"
+          >
+            Edit bible
+          </Link>
+        </div>
+      ) : null}
 
       {error && (
         <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">

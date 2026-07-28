@@ -13,6 +13,8 @@ import { resolveScriptGenerationOptions } from "@/lib/scriptWriter/generationOpt
 import { resolveShootingKitForSession } from "@/lib/scriptWriter/resolveShootingKit";
 import { resolveSessionBrief, scriptWriterGenerate } from "@/lib/scriptWriter/scriptWriterAi";
 import { archiveScriptVersion } from "@/lib/scriptWriter/scriptVersions";
+import { loadSeriesContinuity } from "@/lib/scriptWriter/series/server";
+import { formatSeriesContextForPrompt } from "@/lib/scriptWriter/series/prompt";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 import { prepareScriptDocumentForFirestore } from "@/lib/screenplay/serialize";
 
@@ -59,6 +61,19 @@ export async function POST(
 
     const shootingKit = await resolveShootingKitForSession(db, session);
 
+    // Series continuity: inject shared canon + "story so far" from prior entries.
+    let seriesContext: string | null = null;
+    if (session.seriesId) {
+      const continuity = await loadSeriesContinuity(session);
+      if (continuity) {
+        seriesContext = formatSeriesContextForPrompt(
+          continuity.series,
+          session.seriesEntryKind ?? "episode",
+          continuity.priorEntries
+        );
+      }
+    }
+
     const script = await scriptWriterGenerate(brief, session.messages, {
       detailLevel,
       inspiration,
@@ -67,11 +82,18 @@ export async function POST(
       detailedShotList,
       storyboardMode,
       shootingKit,
+      seriesContext,
     });
 
     if (session.script) {
       await archiveScriptVersion(db, id, session.script as ScriptDocument, "generate", "Before regenerate");
     }
+
+    // For series entries, capture a one-line recap so later entries carry the
+    // story forward (uses the logline / premise — no extra AI call).
+    const seriesRecap = session.seriesId
+      ? (script.logline || script.productionPack?.premise || "").trim() || undefined
+      : undefined;
 
     await db.collection(SCRIPT_WRITER_SESSIONS_COLLECTION).doc(id).update(
       stripUndefined({
@@ -81,6 +103,7 @@ export async function POST(
         refineUsed: false,
         detailedShotList,
         storyboardMode,
+        seriesRecap,
         updatedAt: FieldValue.serverTimestamp(),
       })
     );

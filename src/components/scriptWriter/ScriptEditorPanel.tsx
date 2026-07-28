@@ -13,6 +13,7 @@ import {
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 import { ScriptVersionRecord, scriptVersionLabel } from "@/lib/scriptWriter/scriptVersionLabels";
 import { ScriptProductionPackView } from "@/components/scriptWriter/ScriptProductionPackView";
+import { CollapsibleSection } from "@/components/scriptWriter/CollapsibleSection";
 import { ScreenplayEditor } from "@/components/screenplay/ScreenplayEditor";
 import {
   ScreenplayPreview,
@@ -315,24 +316,26 @@ export function ScriptEditorPanel({
             onShowPageOneNumberChange={previewState.setShowPageOneNumber}
           />
 
-          {viewMode === "edit" && editing ? (
-            <ScreenplayEditor
-              elements={elements}
-              onChange={(nextElements) => {
-                setDraft(applyElementsToScript(draft, nextElements));
-              }}
-            />
-          ) : (
-            <ScreenplayPreview
-              script={{
-                ...activeScript,
-                showPageOneNumber: previewState.showPageOneNumber,
-              }}
-              showNotes={previewState.showNotes}
-              showPageOneNumber={previewState.showPageOneNumber}
-              zoom={previewState.zoom}
-            />
-          )}
+          <CollapsibleSection title="Screenplay" defaultOpen>
+            {viewMode === "edit" && editing ? (
+              <ScreenplayEditor
+                elements={elements}
+                onChange={(nextElements) => {
+                  setDraft(applyElementsToScript(draft, nextElements));
+                }}
+              />
+            ) : (
+              <ScreenplayPreview
+                script={{
+                  ...activeScript,
+                  showPageOneNumber: previewState.showPageOneNumber,
+                }}
+                showNotes={previewState.showNotes}
+                showPageOneNumber={previewState.showPageOneNumber}
+                zoom={previewState.zoom}
+              />
+            )}
+          </CollapsibleSection>
 
           {!readOnly && viewMode === "edit" && editing ? (
             <EditActionButtons

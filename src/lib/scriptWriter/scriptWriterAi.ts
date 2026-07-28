@@ -416,11 +416,14 @@ export async function scriptWriterGenerate(
     detailedShotList?: boolean;
     storyboardMode?: boolean;
     shootingKit?: ProductionShootingKit | null;
+    /** Series canon + "story so far" block for continuity across entries. */
+    seriesContext?: string | null;
   }
 ): Promise<ScriptDocument> {
   const detailedShotList = options?.detailedShotList !== false;
   const storyboardMode = options?.storyboardMode ?? false;
   const kitBlock = detailedShotList ? formatShootingKitForPrompt(options?.shootingKit) : "";
+  const seriesBlock = options?.seriesContext?.trim() || "";
 
   if (aiUsesMock()) {
     return mockScript(brief, detailedShotList, storyboardMode);
@@ -433,6 +436,8 @@ export async function scriptWriterGenerate(
     const { media, contextLines } = await buildInspirationMediaBundle({ images, video, urls });
     const prompt = [
       inspirationContext(brief, analysis, images, video, confirmNotes, urls),
+      "",
+      seriesBlock,
       "",
       ...contextLines,
       "",
@@ -476,6 +481,8 @@ export async function scriptWriterGenerate(
 
   const payload = [
     formatBriefForPrompt(brief),
+    "",
+    seriesBlock,
     "",
     options?.trendsResearch ? formatTrendsForPrompt(options.trendsResearch) : "",
     "",

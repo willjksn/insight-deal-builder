@@ -2,6 +2,7 @@ import { Timestamp } from "firebase/firestore";
 import { ScriptWriterBrief, ScriptContentType } from "@/lib/scriptWriter/brief";
 import { ScriptElement } from "@/lib/screenplay/types";
 import { ProductionShootingKit } from "@/lib/production/shootingKit";
+import { ScriptSeriesEntryKind } from "@/lib/scriptWriter/series/types";
 
 export type ScriptWriterSessionStatus =
   | "interviewing"
@@ -387,6 +388,14 @@ export interface ScriptWriterSession {
   sourceIdeaEngine?: boolean;
   sourceIdeaSessionId?: string;
   sourceIdeaId?: string;
+  /** When set, this session is an entry in a series (shared canon + continuity). */
+  seriesId?: string;
+  /** Entry kind within the series (episode / teaser / trailer). */
+  seriesEntryKind?: ScriptSeriesEntryKind;
+  /** 1-based ordering of this entry within its series. */
+  seriesOrder?: number;
+  /** One-line "story so far" recap captured after the script is written. */
+  seriesRecap?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

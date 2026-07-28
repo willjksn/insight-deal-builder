@@ -8,6 +8,13 @@ import {
   ScriptStoryboardImage,
   ScriptVideoReferenceMode,
 } from "@/lib/scriptWriter/types";
+import {
+  ScriptSeries,
+  ScriptSeriesCreateInput,
+  ScriptSeriesEntry,
+  ScriptSeriesEntryKind,
+  ScriptSeriesUpdateInput,
+} from "@/lib/scriptWriter/series/types";
 
 export const SCRIPT_WRITER_SESSIONS_COLLECTION = "scriptWriterSessions";
 
@@ -36,6 +43,8 @@ export async function scriptWriterCreateSession(
     workflowMode?: "text" | "inspiration";
     detailedShotList?: boolean;
     storyboardMode?: boolean;
+    seriesId?: string;
+    seriesEntryKind?: ScriptSeriesEntryKind;
   }
 ) {
   const res = await fetch("/api/script-writer/sessions", {
@@ -347,6 +356,93 @@ export async function scriptWriterSparkIdeas(
     body: JSON.stringify({ brief }),
   });
   return parseJson<{ ideas: ScriptIdeaSuggestion[]; usedTrends: boolean }>(res);
+}
+
+// ---------------------------------------------------------------------------
+// Series (shared canon / continuity across multiple scripts)
+// ---------------------------------------------------------------------------
+
+export async function scriptWriterListSeries(getToken: () => Promise<string | null>) {
+  const res = await fetch("/api/script-writer/series", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ series: ScriptSeries[] }>(res);
+}
+
+export async function scriptWriterCreateSeries(
+  getToken: () => Promise<string | null>,
+  body: ScriptSeriesCreateInput
+) {
+  const res = await fetch("/api/script-writer/series", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ ok: true; series: ScriptSeries }>(res);
+}
+
+export async function scriptWriterGetSeries(
+  getToken: () => Promise<string | null>,
+  seriesId: string
+) {
+  const res = await fetch(`/api/script-writer/series/${seriesId}`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ series: ScriptSeries; entries: ScriptSeriesEntry[] }>(res);
+}
+
+export async function scriptWriterUpdateSeries(
+  getToken: () => Promise<string | null>,
+  seriesId: string,
+  body: ScriptSeriesUpdateInput
+) {
+  const res = await fetch(`/api/script-writer/series/${seriesId}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ ok: true; series: ScriptSeries }>(res);
+}
+
+export async function scriptWriterDeleteSeries(
+  getToken: () => Promise<string | null>,
+  seriesId: string
+) {
+  const res = await fetch(`/api/script-writer/series/${seriesId}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: true }>(res);
+}
+
+/** Attach an existing session to a series (existing or newly created). */
+export async function scriptWriterAttachToSeries(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  body: {
+    seriesId?: string;
+    newSeriesTitle?: string;
+    entryKind?: ScriptSeriesEntryKind;
+  }
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/series`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ session: unknown; seriesId: string }>(res);
+}
+
+/** Detach a session from its series (keeps it as a standalone script). */
+export async function scriptWriterDetachFromSeries(
+  getToken: () => Promise<string | null>,
+  sessionId: string
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/series`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ session: unknown }>(res);
 }
 
 export type PendingInspirationImage = {

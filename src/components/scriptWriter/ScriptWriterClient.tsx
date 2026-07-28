@@ -63,6 +63,7 @@ import { TrendsResearchPanel } from "@/components/scriptWriter/TrendsResearchPan
 import { ReferenceResearchPanel } from "@/components/scriptWriter/ReferenceResearchPanel";
 import { FeatureBuildPanel } from "@/components/scriptWriter/FeatureBuildPanel";
 import { ScriptShootingKitPanel } from "@/components/scriptWriter/ScriptShootingKitPanel";
+import { AddToSeriesButton } from "@/components/scriptWriter/AddToSeriesButton";
 import { SharedNotesPanel } from "@/components/sharedNotes/SharedNotesPanel";
 
 interface ScriptWriterClientProps {
@@ -465,6 +466,15 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
         }
         action={
           <div className="flex flex-wrap gap-2">
+            {!adminReadOnly && user ? (
+              <AddToSeriesButton
+                sessionId={sessionId}
+                getToken={() => user.getIdToken()}
+                seriesId={session.seriesId}
+                seriesEntryKind={session.seriesEntryKind}
+                onChanged={(updated) => setSession(updated)}
+              />
+            ) : null}
             {canDelete ? (
               <Button
                 type="button"

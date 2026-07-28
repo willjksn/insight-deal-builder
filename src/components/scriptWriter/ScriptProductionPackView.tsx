@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 import { ScriptShotListCard } from "@/components/scriptWriter/ScriptShotListCard";
+import { CollapsibleSection } from "@/components/scriptWriter/CollapsibleSection";
 
 export function ScriptProductionPackView({ script }: { script: ScriptDocument }) {
   const pack = script.productionPack;
@@ -12,24 +13,19 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
   return (
     <div className="space-y-4 border-t border-slate-100 pt-4">
       {pack.premise ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Premise</h4>
-          <p className="mt-1 break-words text-sm text-slate-700">{pack.premise}</p>
-        </div>
+        <CollapsibleSection title="Premise" defaultOpen>
+          <p className="break-words text-sm text-slate-700">{pack.premise}</p>
+        </CollapsibleSection>
       ) : null}
       {pack.tone ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tone</h4>
-          <p className="mt-1 text-sm text-slate-700">{pack.tone}</p>
-        </div>
+        <CollapsibleSection title="Tone" defaultOpen>
+          <p className="text-sm text-slate-700">{pack.tone}</p>
+        </CollapsibleSection>
       ) : null}
 
       {pack.timedBeats?.length ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Timed beats
-          </h4>
-          <ul className="mt-2 space-y-2">
+        <CollapsibleSection title="Timed beats">
+          <ul className="space-y-2">
             {pack.timedBeats.map((beat, i) => (
               <li key={i} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
                 <span className="font-semibold text-violet-800">
@@ -48,15 +44,12 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
               </li>
             ))}
           </ul>
-        </div>
+        </CollapsibleSection>
       ) : null}
 
       {pack.editTimeline?.length ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Edit timeline
-          </h4>
-          <div className="mt-2 overflow-x-auto">
+        <CollapsibleSection title="Edit timeline">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[320px] text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500">
@@ -76,13 +69,12 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
               </tbody>
             </table>
           </div>
-        </div>
+        </CollapsibleSection>
       ) : null}
 
       {pack.lensPlan?.length ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lens plan</h4>
-          <div className="mt-2 overflow-x-auto">
+        <CollapsibleSection title="Lens plan">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[280px] text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500">
@@ -100,15 +92,12 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
               </tbody>
             </table>
           </div>
-        </div>
+        </CollapsibleSection>
       ) : null}
 
       {pack.dollyMoves?.length ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Dolly &amp; blocking plan
-          </h4>
-          <div className="mt-2 overflow-x-auto">
+        <CollapsibleSection title="Dolly & blocking plan">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500">
@@ -132,22 +121,20 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
               </tbody>
             </table>
           </div>
-        </div>
+        </CollapsibleSection>
       ) : null}
 
       {pack.blockingMap?.trim() ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Blocking map</h4>
-          <pre className="mt-2 overflow-x-auto rounded-lg bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-700 whitespace-pre-wrap">
+        <CollapsibleSection title="Blocking map">
+          <pre className="overflow-x-auto rounded-lg bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-700 whitespace-pre-wrap">
             {pack.blockingMap.trim()}
           </pre>
-        </div>
+        </CollapsibleSection>
       ) : null}
 
       {pack.cameraSetup?.length ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Camera setup</h4>
-          <div className="mt-2 overflow-x-auto">
+        <CollapsibleSection title="Camera setup">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[320px] text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500">
@@ -167,41 +154,38 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
               </tbody>
             </table>
           </div>
-        </div>
+        </CollapsibleSection>
       ) : null}
 
       {pack.editPlan?.length ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Edit plan</h4>
-          <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-sm text-slate-700">
+        <CollapsibleSection title="Edit plan">
+          <ol className="list-decimal space-y-1.5 pl-4 text-sm text-slate-700">
             {pack.editPlan.map((step, i) => (
               <li key={i}>
-                <span className="font-medium text-violet-800">{String(step.step)}.</span> {step.action}
+                <span className="font-medium text-violet-800">{String(step.step)}.</span>{" "}
+                {step.action}
               </li>
             ))}
           </ol>
-        </div>
+        </CollapsibleSection>
       ) : null}
 
       {pack.cinematicLook ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Look</h4>
-          <ul className="mt-1 space-y-1 text-sm text-slate-700">
+        <CollapsibleSection title="Look" defaultOpen>
+          <ul className="space-y-1 text-sm text-slate-700">
             {pack.cinematicLook.lighting ? <li>Lighting: {pack.cinematicLook.lighting}</li> : null}
             {pack.cinematicLook.color ? <li>Color: {pack.cinematicLook.color}</li> : null}
             {pack.cinematicLook.cameraStyle ? (
               <li>Camera: {pack.cinematicLook.cameraStyle}</li>
             ) : null}
           </ul>
-        </div>
+        </CollapsibleSection>
       ) : null}
 
       {script.suggestedShots.length ? (
-        <div>
-          <div className="flex items-center justify-between gap-2">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Shot list
-            </h4>
+        <CollapsibleSection
+          title="Shot list"
+          action={
             <button
               type="button"
               onClick={() => setShotsExpanded((v) => !v)}
@@ -209,8 +193,9 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
             >
               {shotsExpanded ? "Collapse all" : "Expand all"}
             </button>
-          </div>
-          <div className="mt-2 space-y-2">
+          }
+        >
+          <div className="space-y-2">
             {script.suggestedShots.map((shot) => (
               <ScriptShotListCard
                 key={`${shot.sceneNumber}-${shot.shotNumber}-${shotsExpanded ? "o" : "c"}`}
@@ -219,32 +204,29 @@ export function ScriptProductionPackView({ script }: { script: ScriptDocument })
               />
             ))}
           </div>
-        </div>
+        </CollapsibleSection>
       ) : null}
 
       {pack.soundDesign?.length ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sound</h4>
-          <ul className="mt-1 list-disc pl-4 text-sm text-slate-700">
+        <CollapsibleSection title="Sound">
+          <ul className="list-disc pl-4 text-sm text-slate-700">
             {pack.soundDesign.map((s, i) => (
               <li key={i}>{s}</li>
             ))}
           </ul>
-        </div>
+        </CollapsibleSection>
       ) : null}
 
       {pack.props?.length ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Props</h4>
-          <p className="mt-1 text-sm text-slate-700">{pack.props.join(" · ")}</p>
-        </div>
+        <CollapsibleSection title="Props" defaultOpen>
+          <p className="text-sm text-slate-700">{pack.props.join(" · ")}</p>
+        </CollapsibleSection>
       ) : null}
 
       {pack.cameraGearNotes ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Camera</h4>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{pack.cameraGearNotes}</p>
-        </div>
+        <CollapsibleSection title="Camera">
+          <p className="whitespace-pre-wrap text-sm text-slate-700">{pack.cameraGearNotes}</p>
+        </CollapsibleSection>
       ) : null}
     </div>
   );
