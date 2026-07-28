@@ -34,6 +34,8 @@ export interface UserPermissions {
   viewRevenueOpportunities: boolean;
   /** Create campaigns, approve opportunities, outreach, and convert to projects */
   manageRevenueOpportunities: boolean;
+  /** Add and edit creator/talent roster, applications, and readiness */
+  manageCreators: boolean;
 }
 
 export interface UserProfile {

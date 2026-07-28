@@ -89,6 +89,13 @@ export function assertCanManageRevenueOpportunities(appUser: AppUser): void {
   }
 }
 
+export function assertCanManageCreators(appUser: AppUser): void {
+  if (!isInsightOrgUser(appUser)) throw new Error("Not authorized");
+  if (!hasPermission(appUser, "manageCreators") && !hasPermission(appUser, "manageUsers")) {
+    throw new Error("Not authorized to manage creators");
+  }
+}
+
 export function assertApprovedUser(appUser: AppUser): void {
   if (!isUserApproved(appUser)) {
     throw new Error("Not authorized");

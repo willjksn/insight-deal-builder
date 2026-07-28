@@ -160,6 +160,13 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     group: "imgData",
     insightOnly: true,
   },
+  {
+    key: "manageCreators",
+    label: "Manage creators",
+    description: "Add and edit the creator/talent roster, applications, and readiness",
+    group: "imgData",
+    insightOnly: true,
+  },
 ];
 
 export const PERMISSION_GROUPS = [
@@ -191,6 +198,7 @@ export const EMPTY_PERMISSIONS: UserPermissions = {
   generateStoryboardImages: false,
   viewRevenueOpportunities: false,
   manageRevenueOpportunities: false,
+  manageCreators: false,
 };
 
 export const FULL_IMG_PERMISSIONS: UserPermissions = {
@@ -216,6 +224,7 @@ export const FULL_IMG_PERMISSIONS: UserPermissions = {
   generateStoryboardImages: true,
   viewRevenueOpportunities: true,
   manageRevenueOpportunities: true,
+  manageCreators: true,
 };
 
 /** Production partner — own quotes only, no IMG client/company/crew access */
@@ -244,6 +253,7 @@ export const PRODUCER_PERMISSIONS: UserPermissions = {
   generateStoryboardImages: true,
   viewRevenueOpportunities: true,
   manageRevenueOpportunities: true,
+  manageCreators: true,
 };
 
 /** @deprecated alias — use PRODUCER_PERMISSIONS */

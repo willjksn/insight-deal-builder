@@ -15,6 +15,8 @@ export interface ProductionPerson {
   photoUrl?: string;
   storagePath?: string;
   crewMemberId?: string;
+  /** Links this cast/crew slot to a canonical creator roster record. */
+  creatorId?: string;
   notes?: string;
   callTime?: string;
   sortOrder: number;

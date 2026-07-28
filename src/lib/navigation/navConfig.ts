@@ -19,6 +19,7 @@ import {
   Lightbulb,
   TrendingUp,
   LayoutGrid,
+  Star,
 } from "lucide-react";
 import { AppUser } from "@/lib/types";
 import { Workspace } from "@/lib/workspace/types";
@@ -30,6 +31,7 @@ import {
   canManageProjects,
   canManageTemplates,
   canManageUsers,
+  canManageCreators,
   canAccessReports,
   canUseProductionTools,
   canAccessRevenueOpportunities,
@@ -106,6 +108,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/companies", label: "Companies", icon: Building2, canAccess: canManageCompanies },
       { href: "/clients", label: "Clients", icon: Users, canAccess: canManageClients },
+      { href: "/creators", label: "Creators", icon: Star, canAccess: canManageCreators },
     ],
   },
 

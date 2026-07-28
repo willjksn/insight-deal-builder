@@ -176,6 +176,14 @@ export function canAccessRevenueOpportunities(user: AppUser | null | undefined):
   return canViewRevenueOpportunities(user);
 }
 
+/** Add and edit the creator/talent roster, applications, and readiness */
+export function canManageCreators(user: AppUser | null | undefined): boolean {
+  return (
+    isInsightOrgUser(user) &&
+    (hasPermission(user, "manageCreators") || canManageUsers(user))
+  );
+}
+
 /** Record cash received from clients or paid to payees on signed agreements */
 export function canRecordPayments(user: AppUser | null | undefined): boolean {
   return canExportPayments(user);
@@ -202,6 +210,7 @@ export function canReadInsightData(user: AppUser | null | undefined): boolean {
     canManageCompanies(user) ||
     canManageCrew(user) ||
     canManageProjects(user) ||
+    canManageCreators(user) ||
     canCreateQuotes(user) ||
     canEditQuotes(user)
   );
