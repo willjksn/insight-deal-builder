@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ImageIcon, Loader2, Sparkles } from "lucide-react";
+import { ChevronDown, ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatShotTypeLabel } from "@/lib/production/shotLabels";
 import {
@@ -69,6 +69,7 @@ export function ScriptStoryboardPanel({
   const [busyKeys, setBusyKeys] = useState<Record<string, boolean>>({});
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   const imageById = useMemo(
     () => new Map(inspirationImages.map((img) => [img.id, img])),
@@ -131,14 +132,31 @@ export function ScriptStoryboardPanel({
   return (
     <div className="border-b border-slate-100 px-4 py-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Storyboard
-          </p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            One frame per shot. Generate photoreal AI stills or match inspiration refs.
-          </p>
-        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          className="flex min-w-0 items-start gap-2 text-left"
+        >
+          <ChevronDown
+            className={`mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition-transform ${
+              collapsed ? "-rotate-90" : ""
+            }`}
+          />
+          <span className="min-w-0">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Storyboard
+              <span className="ml-1.5 font-medium normal-case tracking-normal text-slate-400">
+                ({keyedFrames.length} frame{keyedFrames.length === 1 ? "" : "s"})
+              </span>
+            </span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              {collapsed
+                ? "Tap to show frames."
+                : "One frame per shot. Generate photoreal AI stills or match inspiration refs."}
+            </span>
+          </span>
+        </button>
         <div className="flex items-center gap-3">
           {appliedProjectId ? (
             <Link
@@ -178,6 +196,7 @@ export function ScriptStoryboardPanel({
         </p>
       ) : null}
 
+      {collapsed ? null : (
       <div className="grid gap-3 sm:grid-cols-2">
         {keyedFrames.map(({ frame, key }) => {
           const gen = generated[key];
@@ -243,10 +262,13 @@ export function ScriptStoryboardPanel({
           );
         })}
       </div>
-      <p className="mt-3 text-[11px] text-slate-500">
-        Frames are photoreal AI stills for inspiration. After you apply this script to a project,
-        use the shot list <strong>Grid</strong> view to swap references and print a client PDF.
-      </p>
+      )}
+      {collapsed ? null : (
+        <p className="mt-3 text-[11px] text-slate-500">
+          Frames are photoreal AI stills for inspiration. After you apply this script to a project,
+          use the shot list <strong>Grid</strong> view to swap references and print a client PDF.
+        </p>
+      )}
     </div>
   );
 }
