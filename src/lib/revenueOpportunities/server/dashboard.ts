@@ -32,14 +32,23 @@ export async function buildDashboardSummary(appUser: AppUser): Promise<RevenueDa
   ]);
 
   const byStage: Record<string, number> = {};
+  const byOpportunityType: Record<string, number> = {};
   let estimatedPipelineValue = 0;
   let revenueWon = 0;
   let approved = 0;
   let rejected = 0;
+  let newImgOpportunities = 0;
+  let newCreatorOpportunities = 0;
 
   for (const opp of opportunities) {
     const stage = opp.workflow.pipelineStage;
     byStage[stage] = (byStage[stage] ?? 0) + 1;
+    byOpportunityType[opp.opportunityType] = (byOpportunityType[opp.opportunityType] ?? 0) + 1;
+
+    if (stage === "new") {
+      if (opp.opportunityType === "stormi_brand") newCreatorOpportunities += 1;
+      else newImgOpportunities += 1;
+    }
 
     if (opp.workflow.approvalStatus === "approved") approved += 1;
     if (opp.workflow.approvalStatus === "rejected") rejected += 1;
@@ -79,6 +88,8 @@ export async function buildDashboardSummary(appUser: AppUser): Promise<RevenueDa
 
   return {
     newOpportunities: byStage.new ?? 0,
+    newImgOpportunities,
+    newCreatorOpportunities,
     awaitingReview: (byStage.review_required ?? 0) + (byStage.researched ?? 0),
     approved: byStage.approved ?? 0,
     outreachReady: byStage.ready_for_outreach ?? 0,
@@ -93,6 +104,7 @@ export async function buildDashboardSummary(appUser: AppUser): Promise<RevenueDa
     estimatedPipelineValue: Math.round(estimatedPipelineValue),
     revenueWon: Math.round(revenueWon),
     byStage,
+    byOpportunityType,
     recentActivity,
     totalOpportunities: opportunities.length,
     approvalApproved: approved,

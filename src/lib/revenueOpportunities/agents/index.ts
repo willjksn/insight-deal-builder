@@ -5,6 +5,7 @@ import { imgResearchAgent } from "@/lib/revenueOpportunities/agents/imgResearch"
 import { stormiResearchAgent } from "@/lib/revenueOpportunities/agents/stormiResearch";
 import { campaignConceptAgent } from "@/lib/revenueOpportunities/agents/campaignConcept";
 import { outreachDraftAgent } from "@/lib/revenueOpportunities/agents/outreachDraft";
+import { aiWriterAgent } from "@/lib/revenueOpportunities/agents/aiWriter";
 import { emailReceptionistAgent } from "@/lib/revenueOpportunities/agents/emailReceptionist";
 import { discoveryPrepAgent } from "@/lib/revenueOpportunities/agents/discoveryPrep";
 import { discoveryDebriefAgent } from "@/lib/revenueOpportunities/agents/discoveryDebrief";
@@ -29,6 +30,7 @@ export function initRevenueAgents(): void {
   registerAgent(stormiResearchAgent);
   registerAgent(campaignConceptAgent);
   registerAgent(outreachDraftAgent);
+  registerAgent(aiWriterAgent);
   registerAgent(emailReceptionistAgent);
   registerAgent(discoveryPrepAgent);
   registerAgent(discoveryDebriefAgent);
@@ -51,6 +53,7 @@ export {
   stormiResearchAgent,
   campaignConceptAgent,
   outreachDraftAgent,
+  aiWriterAgent,
   emailReceptionistAgent,
   discoveryPrepAgent,
   discoveryDebriefAgent,

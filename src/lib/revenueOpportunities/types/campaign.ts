@@ -21,6 +21,14 @@ export interface ImgCampaignFields {
   excludedBusinessTypes?: string[];
 }
 
+/**
+ * Who this creator-brand mission is for.
+ * - stormi_flagship: Stormi-led brand deals (classic track)
+ * - network: IMG creator network (multi-creator / UGC / represented)
+ * - specific: named creators on the roster (linkedCreatorIds)
+ */
+export type CreatorCampaignScope = "stormi_flagship" | "network" | "specific";
+
 export interface StormiCampaignFields {
   brandCategory?: string;
   productType?: string;
@@ -34,6 +42,12 @@ export interface StormiCampaignFields {
   usageRightsPreference?: string;
   witmeConversionObjective?: boolean;
   desiredCampaignTheme?: string;
+  /** Creator-side scope — Stormi only, full network, or specific roster IDs. */
+  creatorScope?: CreatorCampaignScope;
+  /** When creatorScope is "specific", roster creator IDs to pitch. */
+  linkedCreatorIds?: string[];
+  /** Optional shortlist built from Creator Match. */
+  shortlistId?: string;
 }
 
 export interface RevenueCampaign {

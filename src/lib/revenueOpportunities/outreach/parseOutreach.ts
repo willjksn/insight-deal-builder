@@ -1,5 +1,5 @@
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
-import type { OutreachDraftItem } from "@/lib/revenueOpportunities/types/outreach";
+import type { AiWriterRequest, OutreachDraftItem } from "@/lib/revenueOpportunities/types/outreach";
 
 const VALID_CHANNELS = new Set(["email", "linkedin_dm", "instagram_dm"]);
 
@@ -65,6 +65,36 @@ Insight Media Group`,
     {
       channel: "instagram_dm",
       body: `Love what ${name} is building in ${city}! We're a cinematic production team — would be fun to collaborate on premium reels for your feed. Mind if I send a quick idea?`,
+    },
+  ];
+}
+
+export function mockAiWriterDraft(
+  request: AiWriterRequest,
+  opportunity?: RevenueOpportunity | null
+): OutreachDraftItem[] {
+  const brief = request.brief.trim();
+  const name = request.toName?.trim();
+  const subjectName = opportunity?.subject.name;
+  const greeting = name ? `Hi ${name},` : "Hi,";
+  const subject =
+    request.subjectHint?.trim() ||
+    (subjectName ? `Quick note about ${subjectName}` : "Following up from Insight Media Group");
+
+  return [
+    {
+      channel: "email",
+      subject,
+      ...(name ? { recipientName: name } : {}),
+      ...(request.toEmail?.trim() ? { recipientEmail: request.toEmail.trim() } : {}),
+      body: `${greeting}
+
+${brief}
+
+Happy to jump on a short call if helpful — just reply with a time that works.
+
+Best,
+Insight Media Group`,
     },
   ];
 }

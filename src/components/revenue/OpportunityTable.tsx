@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
-import { pipelineStageLabel, scorePriorityLabel } from "@/lib/revenueOpportunities/labels";
+import {
+  campaignTypeLabel,
+  pipelineStageLabel,
+  scorePriorityLabel,
+} from "@/lib/revenueOpportunities/labels";
 import { Badge } from "@/components/ui/Badge";
 import { DataTable, DataRow } from "@/components/ui/DataTable";
 import { formatCurrency } from "@/lib/utils/format";
@@ -50,7 +54,7 @@ export function OpportunityTable({
                   {[o.subject.city, o.subject.state].filter(Boolean).join(", ") || o.subject.industry}
                 </p>
               </div>,
-              o.opportunityType === "stormi_brand" ? "Stormi brand" : "IMG client",
+              campaignTypeLabel(o.opportunityType),
               <div key="score">
                 <span className="font-semibold">{score || "—"}</span>
                 {score > 0 && (

@@ -44,6 +44,7 @@ function agentPhase(name: RevenueAgentName): number {
     case "creator_match":
       return 8;
     case "outreach_draft":
+    case "ai_writer":
       return 5;
     case "email_receptionist":
       return 6;
@@ -61,6 +62,7 @@ function agentStatus(name: RevenueAgentName): RevenueAgentCatalogEntry["status"]
     case "quality_review":
     case "revision":
     case "outreach_draft":
+    case "ai_writer":
     case "email_receptionist":
     case "discovery_prep":
     case "discovery_debrief":

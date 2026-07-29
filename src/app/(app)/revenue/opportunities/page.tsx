@@ -24,6 +24,8 @@ export default function RevenueOpportunitiesPage() {
   const [error, setError] = useState<string | null>(null);
   const [approvalFilter, setApprovalFilter] = useState(searchParams.get("approval") ?? "");
   const [campaignFilter, setCampaignFilter] = useState(searchParams.get("campaignId") ?? "");
+  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") ?? "");
+  const stageFilter = searchParams.get("filter") ?? "";
   const [search, setSearch] = useState("");
   const canManage = canManageRevenueOpportunities(appUser);
 
@@ -48,8 +50,10 @@ export default function RevenueOpportunitiesPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return opportunities;
     return opportunities.filter((o) => {
+      if (typeFilter && o.opportunityType !== typeFilter) return false;
+      if (stageFilter && o.workflow?.pipelineStage !== stageFilter) return false;
+      if (!q) return true;
       const haystack = [
         o.subject.name,
         o.subject.industry,
@@ -66,7 +70,7 @@ export default function RevenueOpportunitiesPage() {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [opportunities, search]);
+  }, [opportunities, search, typeFilter, stageFilter]);
 
   return (
     <>
@@ -88,7 +92,7 @@ export default function RevenueOpportunitiesPage() {
           ) : undefined
         }
       />
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="w-full">
           <label htmlFor="opportunity-search" className="mb-1.5 block text-sm font-medium text-slate-700">
             Search
@@ -114,6 +118,16 @@ export default function RevenueOpportunitiesPage() {
           ]}
         />
         <Select
+          label="Type"
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          options={[
+            { value: "", label: "All types" },
+            { value: "img_client", label: "IMG client" },
+            { value: "stormi_brand", label: "Creator brand" },
+          ]}
+        />
+        <Select
           label="Approval"
           value={approvalFilter}
           onChange={(e) => setApprovalFilter(e.target.value)}
@@ -131,7 +145,7 @@ export default function RevenueOpportunitiesPage() {
         <OpportunityTable
           opportunities={filtered}
           emptyMessage={
-            search.trim() || campaignFilter || approvalFilter
+            search.trim() || campaignFilter || approvalFilter || typeFilter || stageFilter
               ? "No opportunities match these filters."
               : "No opportunities yet."
           }

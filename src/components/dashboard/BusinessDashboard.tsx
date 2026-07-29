@@ -104,6 +104,20 @@ export function BusinessDashboard() {
                 <StatCard label="Follow-ups due" value={summary.followUpsDue} href="/revenue/pipeline" accent="rose" />
                 <StatCard label="Proposals pending" value={summary.proposalsPending} href="/revenue/proposals" accent="violet" />
               </div>
+              <div className="mb-6 grid grid-cols-2 gap-3">
+                <StatCard
+                  label="New — IMG client"
+                  value={summary.newImgOpportunities}
+                  href="/revenue/opportunities?filter=new&type=img_client"
+                  accent="slate"
+                />
+                <StatCard
+                  label="New — Creator brand"
+                  value={summary.newCreatorOpportunities}
+                  href="/revenue/opportunities?filter=new&type=stormi_brand"
+                  accent="violet"
+                />
+              </div>
 
               <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <StatCard label="Pipeline value" value={formatCurrency(summary.estimatedPipelineValue)} href="/revenue/pipeline" accent="slate" />

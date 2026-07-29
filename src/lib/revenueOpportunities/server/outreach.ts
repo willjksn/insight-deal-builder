@@ -8,9 +8,18 @@ import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import type {
   OutreachDraftItem,
   RevenueOutreachActivity,
+  RevenueOutreachSource,
   RevenueOutreachStatus,
 } from "@/lib/revenueOpportunities/types/outreach";
 import { AppUser } from "@/lib/types";
+
+export type CreateOutreachMeta = {
+  opportunityId?: string;
+  opportunitySubjectName?: string;
+  campaignId?: string;
+  source?: RevenueOutreachSource;
+  userBrief?: string;
+};
 
 function requireDb(): Firestore {
   const db = getAdminDb();
@@ -60,7 +69,7 @@ export async function getOutreachActivity(appUser: AppUser, id: string): Promise
 
 export async function createOutreachActivitiesFromDrafts(
   appUser: AppUser,
-  opportunity: { id: string; subject: { name: string }; campaignId?: string },
+  meta: CreateOutreachMeta,
   drafts: OutreachDraftItem[],
   agentRunId?: string
 ): Promise<RevenueOutreachActivity[]> {
@@ -72,9 +81,11 @@ export async function createOutreachActivitiesFromDrafts(
       stripUndefined({
         organizationCompany: tenantCompany(appUser),
         ownerUserId: appUser.id,
-        opportunityId: opportunity.id,
-        opportunitySubjectName: opportunity.subject.name,
-        campaignId: opportunity.campaignId,
+        opportunityId: meta.opportunityId,
+        opportunitySubjectName: meta.opportunitySubjectName,
+        campaignId: meta.campaignId,
+        source: meta.source ?? (meta.opportunityId ? "opportunity" : "ai_writer"),
+        userBrief: meta.userBrief,
         channel: draft.channel,
         status: "pending_review",
         subject: draft.subject,

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { DataTable, DataRow } from "@/components/ui/DataTable";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -140,6 +141,13 @@ export default function CreatorsPage() {
 
   return (
     <div>
+      <Link
+        href="/dashboard"
+        className="mb-4 inline-flex items-center text-sm text-sky-700 hover:underline"
+      >
+        <ArrowLeft className="mr-1 h-4 w-4" />
+        Dashboard
+      </Link>
       <PageHeader
         title="Creators"
         subtitle="Your creator and talent roster — flagship, network, represented, and UGC"

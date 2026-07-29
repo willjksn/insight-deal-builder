@@ -233,6 +233,9 @@ export interface RevenueOpportunity {
   campaignName?: string;
   opportunityType: RevenueOpportunityType;
   clientId?: string;
+  /** Roster creators this brand opportunity is being matched/pitched to. */
+  linkedCreatorIds?: string[];
+  shortlistId?: string;
   subject: OpportunitySubject;
   contact?: OpportunityContact;
   research?: OpportunityResearch;
@@ -272,6 +275,9 @@ export type RevenueOpportunityUpdateInput = Partial<
 
 export interface RevenueDashboardSummary {
   newOpportunities: number;
+  /** Breakdown so the Business dashboard can show IMG vs creator-brand feeds. */
+  newImgOpportunities: number;
+  newCreatorOpportunities: number;
   awaitingReview: number;
   approved: number;
   outreachReady: number;
@@ -284,6 +290,7 @@ export interface RevenueDashboardSummary {
   estimatedPipelineValue: number;
   revenueWon: number;
   byStage: Record<string, number>;
+  byOpportunityType: Record<string, number>;
   recentActivity: OpportunityActivityEntry[];
   /** Analytics rates (0–100), null when denominator is zero */
   totalOpportunities: number;

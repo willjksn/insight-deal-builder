@@ -130,24 +130,47 @@ export default function CreatorApplicationsPage() {
     <div>
       <PageHeader
         title="Creator applications"
-        subtitle="Internal intake for creator network applicants — review, interview, approve"
+        subtitle="External applicants enter here — review, interview, approve, then invite to ShootSpine"
         action={
           canManage ? (
             <Button size="touch" onClick={() => setShowForm((v) => !v)}>
-              New application
+              Add manually
             </Button>
           ) : undefined
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-        <Link href="/creators" className="font-semibold text-sky-700 hover:text-sky-900">
-          ← Creator roster
-        </Link>
-        <span className="text-slate-300">|</span>
-        <span className="text-slate-500">
-          Public / invite application link comes next — intake is internal-only for now.
-        </span>
+      <div className="mb-4 space-y-2 text-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/creators" className="font-semibold text-sky-700 hover:text-sky-900">
+            ← Creator roster
+          </Link>
+          <span className="text-slate-300">|</span>
+          <Link
+            href="/apply/creators"
+            target="_blank"
+            className="font-semibold text-sky-700 hover:text-sky-900"
+          >
+            Public apply form ↗
+          </Link>
+        </div>
+        <p className="rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-2 text-slate-600">
+          Add this on{" "}
+          <a
+            href="https://insightmediagroupllc.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-sky-700 hover:underline"
+          >
+            insightmediagroupllc.com
+          </a>
+          :{" "}
+          <code className="rounded bg-white px-1.5 py-0.5 text-xs text-sky-900">
+            /apply/creators
+          </code>{" "}
+          (your ShootSpine domain + that path). Creators apply with no account; after you approve,
+          invite them to ShootSpine.
+        </p>
       </div>
 
       {error && (
@@ -183,7 +206,10 @@ export default function CreatorApplicationsPage() {
       {showForm && canManage && (
         <Card className="mb-6">
           <CardHeader>
-            <h2 className="text-lg font-semibold">New internal application</h2>
+            <h2 className="text-lg font-semibold">Add applicant manually</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Use when someone applied offline (DM, email, event). Public applicants use /apply/creators.
+            </p>
           </CardHeader>
           <CardBody>
             <form onSubmit={handleCreate} className="grid gap-4 md:grid-cols-2">

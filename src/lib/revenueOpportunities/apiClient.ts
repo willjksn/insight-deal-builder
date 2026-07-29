@@ -515,6 +515,28 @@ export async function revenueRunOutreachDraft(getToken: () => Promise<string | n
   }>(res);
 }
 
+export async function revenueRunAiWriter(
+  getToken: () => Promise<string | null>,
+  body: {
+    brief: string;
+    toEmail?: string;
+    toName?: string;
+    subjectHint?: string;
+    tone?: "professional" | "warm" | "concise";
+    opportunityId?: string;
+  }
+) {
+  const res = await fetch("/api/revenue/outreach/ai-writer", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    agentRun: RevenueAgentRun;
+    activities: RevenueOutreachActivity[];
+  }>(res);
+}
+
 export async function revenueApproveOutreach(
   getToken: () => Promise<string | null>,
   id: string,

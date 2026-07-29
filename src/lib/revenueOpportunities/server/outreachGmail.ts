@@ -38,7 +38,6 @@ export async function createGmailDraftFromOutreach(
     body: activity.body,
   });
 
-  const opportunity = await getOpportunity(appUser, activity.opportunityId);
   await upsertEmailThreadFromGmail(appUser, {
     gmailThreadId: draft.threadId ?? `outreach-${activity.id}`,
     subject: activity.subject ?? "Outreach draft",
@@ -67,20 +66,26 @@ export async function createGmailDraftFromOutreach(
     });
   }
 
-  await updateOpportunity(appUser, activity.opportunityId, {
-    workflow: {
-      ...opportunity.workflow,
-      pipelineStage: "contacted",
-      nextAction: mode === "mock" ? "Mock Gmail draft created — connect Gmail to send for real" : "Review Gmail draft before sending",
-    },
-    activityLog: [
-      ...opportunity.activityLog,
-      newActivity(appUser, "outreach_gmail_draft", `Created Gmail draft for ${activity.channel}`, {
-        outreachId: activity.id,
-        draftId: draft.draftId,
-      }),
-    ],
-  });
+  if (activity.opportunityId) {
+    const opportunity = await getOpportunity(appUser, activity.opportunityId);
+    await updateOpportunity(appUser, activity.opportunityId, {
+      workflow: {
+        ...opportunity.workflow,
+        pipelineStage: "contacted",
+        nextAction:
+          mode === "mock"
+            ? "Mock Gmail draft created — connect Gmail to send for real"
+            : "Review Gmail draft before sending",
+      },
+      activityLog: [
+        ...opportunity.activityLog,
+        newActivity(appUser, "outreach_gmail_draft", `Created Gmail draft for ${activity.channel}`, {
+          outreachId: activity.id,
+          draftId: draft.draftId,
+        }),
+      ],
+    });
+  }
 
   const updated = await getOutreachActivity(appUser, outreachId);
   return { activity: updated, draftId: draft.draftId, threadId: draft.threadId };

@@ -9,6 +9,7 @@ export type RevenueAgentName =
   | "stormi_research"
   | "campaign_concept"
   | "outreach_draft"
+  | "ai_writer"
   | "email_receptionist"
   | "discovery_prep"
   | "discovery_debrief"

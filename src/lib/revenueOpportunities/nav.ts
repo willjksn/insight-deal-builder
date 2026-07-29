@@ -41,7 +41,7 @@ export const REVENUE_NAV_ITEMS: RevenueNavItem[] = [
     href: "/revenue/campaigns",
     label: "Campaigns",
     icon: Megaphone,
-    description: "IMG client and Stormi brand prospecting campaigns",
+    description: "IMG client and creator-brand (Stormi & network) prospecting",
   },
   {
     href: "/revenue/opportunities",
@@ -53,7 +53,7 @@ export const REVENUE_NAV_ITEMS: RevenueNavItem[] = [
     href: "/revenue/outreach",
     label: "Outreach",
     icon: Mail,
-    description: "Prepared emails, DMs, and follow-ups",
+    description: "AI Writer + approve drafts before Gmail",
   },
   {
     href: "/revenue/inbox",

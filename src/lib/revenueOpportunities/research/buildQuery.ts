@@ -168,7 +168,16 @@ export function buildCampaignContextLines(
   }
 
   if (campaign.stormi) {
+    const scope = campaign.stormi.creatorScope ?? "network";
+    const scopeLine =
+      scope === "stormi_flagship"
+        ? "Creator scope: Stormi flagship (single-creator brand deals)"
+        : scope === "specific"
+          ? `Creator scope: specific roster creators (${(campaign.stormi.linkedCreatorIds ?? []).length} linked)`
+          : "Creator scope: IMG creator network (multi-creator / UGC / represented)";
     lines.push(
+      `Track: Creator brand partnerships (Stormi & network — not IMG production BD)`,
+      scopeLine,
       `Brand category: ${campaign.stormi.brandCategory ?? "—"}`,
       `Partnership type: ${campaign.stormi.desiredPartnershipType ?? "—"}`,
       `Geography: ${campaign.stormi.geographicPreference ?? "—"}`,
@@ -215,7 +224,7 @@ export function buildConceptContextLines(
     industry ? `Industry: ${industry}` : "",
     campaignName ? `Campaign: ${campaignName}` : "",
     "Insight Media Group produces cinematic video/photo for businesses.",
-    "Stormi is a creator partner for lifestyle/beauty brand collaborations.",
+    "Creator brand track covers Stormi (flagship) and the IMG creator network for brand partnerships.",
   ].filter(Boolean);
 }
 

@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { RevenueCampaignCreateInput } from "@/lib/revenueOpportunities/types/campaign";
 import { emptyCampaignDraft } from "@/lib/revenueOpportunities/defaults";
-import { IMG_INDUSTRY_OPTIONS, STORMI_CATEGORY_OPTIONS } from "@/lib/revenueOpportunities/labels";
+import {
+  CAMPAIGN_TYPE_OPTIONS,
+  CREATOR_SCOPE_OPTIONS,
+  IMG_INDUSTRY_OPTIONS,
+  STORMI_CATEGORY_OPTIONS,
+} from "@/lib/revenueOpportunities/labels";
+import type { CreatorCampaignScope } from "@/lib/revenueOpportunities/types/campaign";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
@@ -61,10 +67,7 @@ export function CampaignForm({
               setForm(emptyCampaignDraft(campaignType));
               setField("name", form.name);
             }}
-            options={[
-              { value: "img_client", label: "IMG client prospecting" },
-              { value: "stormi_brand", label: "Stormi brand prospecting" },
-            ]}
+            options={CAMPAIGN_TYPE_OPTIONS}
           />
           <Input
             label="Campaign name"
@@ -140,8 +143,14 @@ export function CampaignForm({
       <Card>
         <CardBody className="grid gap-4 md:grid-cols-2">
           <h3 className="md:col-span-2 font-semibold text-slate-900">
-            {isImg ? "IMG targeting" : "Stormi targeting"}
+            {isImg ? "IMG client targeting" : "Creator brand targeting"}
           </h3>
+          {!isImg ? (
+            <p className="md:col-span-2 text-sm text-slate-500">
+              Finds brand partnership opportunities for Stormi and/or the IMG creator network.
+              Results land in the same Revenue pipeline as IMG client deals.
+            </p>
+          ) : null}
           {isImg ? (
             <>
               <Select
@@ -175,6 +184,17 @@ export function CampaignForm({
           ) : (
             <>
               <Select
+                label="Creator scope"
+                value={form.stormi?.creatorScope ?? "network"}
+                onChange={(e) =>
+                  setField("stormi", {
+                    ...form.stormi,
+                    creatorScope: e.target.value as CreatorCampaignScope,
+                  })
+                }
+                options={CREATOR_SCOPE_OPTIONS}
+              />
+              <Select
                 label="Brand category"
                 value={form.stormi?.brandCategory ?? ""}
                 onChange={(e) => setField("stormi", { ...form.stormi, brandCategory: e.target.value })}
@@ -194,6 +214,24 @@ export function CampaignForm({
                   setField("stormi", { ...form.stormi, desiredPartnershipType: e.target.value })
                 }
               />
+              {(form.stormi?.creatorScope ?? "network") === "specific" ? (
+                <div className="md:col-span-2">
+                  <Input
+                    label="Linked creator IDs (comma-separated)"
+                    value={(form.stormi?.linkedCreatorIds ?? []).join(", ")}
+                    onChange={(e) =>
+                      setField("stormi", {
+                        ...form.stormi,
+                        linkedCreatorIds: e.target.value
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean),
+                      })
+                    }
+                    helperText="Paste creator roster IDs from /creators. Shortlist picker comes next."
+                  />
+                </div>
+              ) : null}
             </>
           )}
         </CardBody>

@@ -15,6 +15,8 @@ export function prospectToOpportunityInput(
     campaignId: campaign.id,
     campaignName: campaign.name,
     opportunityType: campaign.campaignType,
+    linkedCreatorIds: campaign.stormi?.linkedCreatorIds,
+    shortlistId: campaign.stormi?.shortlistId,
     subject: prospect.subject,
     contact: prospect.contact,
     research: prospect.research,

@@ -16,7 +16,10 @@ export function emptyCampaignDraft(campaignType: "img_client" | "stormi_brand" =
     weeklyResearchLimit: 25,
     active: true,
     img: campaignType === "img_client" ? { city: "Orlando", state: "FL", radiusMiles: 35 } : undefined,
-    stormi: campaignType === "stormi_brand" ? { brandCategory: "Beauty" } : undefined,
+    stormi:
+      campaignType === "stormi_brand"
+        ? { brandCategory: "Beauty", creatorScope: "network" }
+        : undefined,
   };
 }
 

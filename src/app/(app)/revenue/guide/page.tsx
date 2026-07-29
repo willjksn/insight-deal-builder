@@ -93,9 +93,9 @@ export default function RevenueHowToGuidePage() {
                 <h2 className="text-lg font-semibold text-slate-900">What this is for</h2>
                 <p>
                   Revenue & opportunities is Insight Media Group’s prospecting and sales workspace. It helps you
-                  find businesses (IMG client campaigns) or brands (Stormi campaigns), score and review them, send
-                  human-approved outreach, run discovery, draft proposals, and convert wins into ShootSpine
-                  projects / agreements.
+                  find businesses (IMG client campaigns) or brands (creator-brand campaigns for Stormi and the
+                  network), score and review them, send human-approved outreach, run discovery, draft proposals, and
+                  convert wins into ShootSpine projects / agreements.
                 </p>
                 <p>
                   AI assists with research, quality checks, drafts, and call prep — but approvals and sending stay
@@ -172,7 +172,8 @@ export default function RevenueHowToGuidePage() {
                     need production / brand content.
                   </li>
                   <li>
-                    <strong>Stormi brand prospecting</strong> — brands / categories for Stormi partnerships.
+                    <strong>Creator brand prospecting</strong> — brands for Stormi and/or the IMG creator network
+                    (same pipeline as IMG client deals).
                   </li>
                 </ul>
               </li>
@@ -297,15 +298,19 @@ export default function RevenueHowToGuidePage() {
           <Step id="step-4" number={4} title="Prepare and send outreach">
             <ol className="list-decimal space-y-2 pl-5">
               <li>
-                On an approved opportunity, open the outreach panel and generate an outreach draft (email / DM
-                variants as available). Prefer the contact email you verified in step 3.
-              </li>
-              <li>
-                Edit the draft in{" "}
+                For any email (not just a pipeline lead), open{" "}
                 <Link href="/revenue/outreach" className="font-medium text-sky-700 hover:underline">
                   Outreach
-                </Link>{" "}
-                or on the opportunity page until the tone matches IMG / Stormi.
+                </Link>
+                , use <strong>AI Writer</strong>, describe what you want said, then craft → edit → approve → Create
+                Gmail draft.
+              </li>
+              <li>
+                On an approved opportunity, open the outreach panel and generate personalized outreach drafts (email /
+                DM variants). Prefer the contact email you verified in step 3.
+              </li>
+              <li>
+                Edit drafts in Outreach or on the opportunity page until the tone matches IMG / Stormi.
               </li>
               <li>
                 <strong>Approve</strong> the draft when it’s ready. Reject and regenerate if it’s off-brand.
@@ -495,7 +500,7 @@ export default function RevenueHowToGuidePage() {
                       "Opportunities",
                       "All researched leads; search + campaign/approval filters; open one to approve and advance.",
                     ],
-                    ["Outreach", "Draft queue — edit, approve, push Gmail drafts."],
+                    ["Outreach", "AI Writer + draft queue — edit, approve, push Gmail drafts."],
                     [
                       "Inbox",
                       "Auto-sync on open; link threads to opportunities; classify replies (stage writeback when linked).",

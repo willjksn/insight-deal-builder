@@ -27,24 +27,35 @@ export function OutreachTable({
   }
 
   const headers = showOpportunity
-    ? ["Opportunity", "Channel", "Subject / preview", "Status", "Updated"]
+    ? ["Source", "Channel", "Subject / preview", "Status", "Updated"]
     : ["Channel", "Subject / preview", "Status", "Updated"];
 
   return (
     <DataTable headers={headers}>
       {activities.map((a) => {
         const preview = a.subject ?? a.body.slice(0, 80) + (a.body.length > 80 ? "…" : "");
+        const sourceLabel =
+          a.source === "ai_writer"
+            ? a.opportunitySubjectName && a.opportunitySubjectName !== "AI Writer"
+              ? `AI Writer · ${a.opportunitySubjectName}`
+              : "AI Writer"
+            : a.opportunitySubjectName ?? "Opportunity";
+        const href = a.opportunityId ? `/revenue/opportunities/${a.opportunityId}` : undefined;
         const cells = [
           ...(showOpportunity
             ? [
-                <div key="opp">
-                  <Link
-                    href={`/revenue/opportunities/${a.opportunityId}`}
-                    className="font-medium text-sky-700 hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {a.opportunitySubjectName ?? "View opportunity"}
-                  </Link>
+                <div key="src">
+                  {href ? (
+                    <Link
+                      href={href}
+                      className="font-medium text-sky-700 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {sourceLabel}
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-slate-800">{sourceLabel}</span>
+                  )}
                 </div>,
               ]
             : []),
@@ -58,7 +69,7 @@ export function OutreachTable({
           new Date(a.updatedAt).toLocaleDateString(),
         ];
 
-        return <DataRow key={a.id} href={`/revenue/opportunities/${a.opportunityId}`} cells={cells} />;
+        return <DataRow key={a.id} href={href} cells={cells} />;
       })}
     </DataTable>
   );

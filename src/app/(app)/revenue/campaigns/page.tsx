@@ -6,6 +6,7 @@ import { ArrowLeft, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { revenueListCampaigns } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
+import { campaignTypeLabel } from "@/lib/revenueOpportunities/labels";
 import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -37,7 +38,7 @@ export default function RevenueCampaignsPage() {
       </Link>
       <PageHeader
         title="Campaigns"
-        subtitle="IMG client and Stormi brand prospecting campaigns."
+        subtitle="IMG client and creator-brand (Stormi & network) prospecting — same pipeline."
         action={
           canManage ? (
             <Link href="/revenue/campaigns/new">
@@ -80,7 +81,7 @@ export default function RevenueCampaignsPage() {
               href={`/revenue/campaigns/${c.id}`}
               cells={[
                 c.name,
-                c.campaignType === "stormi_brand" ? "Stormi brand" : "IMG client",
+                campaignTypeLabel(c.campaignType),
                 <Badge key="status" variant={c.status === "active" ? "success" : "default"}>
                   {c.status}
                 </Badge>,

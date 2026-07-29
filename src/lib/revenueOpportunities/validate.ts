@@ -22,9 +22,26 @@ export function validateCampaignCreate(body: unknown): RevenueCampaignCreateInpu
   const status = typeof b.status === "string" ? b.status : "draft";
   const approvalMode = b.approvalMode === "auto_prepare" ? "auto_prepare" : "manual_review";
 
+  const stormiRaw =
+    campaignType === "stormi_brand" && b.stormi && typeof b.stormi === "object"
+      ? (b.stormi as Record<string, unknown>)
+      : undefined;
+  const creatorScope =
+    stormiRaw?.creatorScope === "stormi_flagship" ||
+    stormiRaw?.creatorScope === "network" ||
+    stormiRaw?.creatorScope === "specific"
+      ? stormiRaw.creatorScope
+      : "network";
+  const linkedCreatorIds = Array.isArray(stormiRaw?.linkedCreatorIds)
+    ? stormiRaw.linkedCreatorIds.filter(
+        (x): x is string => typeof x === "string" && x.trim().length > 0
+      )
+    : undefined;
+
   return {
     campaignType,
     name,
+    profileId: str(b.profileId),
     objective: str(b.objective),
     status: status as RevenueCampaignCreateInput["status"],
     approvalMode,
@@ -45,10 +62,15 @@ export function validateCampaignCreate(body: unknown): RevenueCampaignCreateInpu
     schedule: str(b.schedule),
     active: b.active !== false,
     img: campaignType === "img_client" && b.img && typeof b.img === "object" ? (b.img as RevenueCampaignCreateInput["img"]) : undefined,
-    stormi:
-      campaignType === "stormi_brand" && b.stormi && typeof b.stormi === "object"
-        ? (b.stormi as RevenueCampaignCreateInput["stormi"])
-        : undefined,
+    stormi: stormiRaw
+      ? {
+          ...(stormiRaw as RevenueCampaignCreateInput["stormi"]),
+          creatorScope,
+          linkedCreatorIds,
+          shortlistId:
+            typeof stormiRaw.shortlistId === "string" ? stormiRaw.shortlistId.trim() || undefined : undefined,
+        }
+      : undefined,
   };
 }
 

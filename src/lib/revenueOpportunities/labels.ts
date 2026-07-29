@@ -1,4 +1,44 @@
-import type { RevenuePipelineStage, RevenueRejectionReason } from "@/lib/revenueOpportunities/types";
+import type {
+  RevenueCampaignType,
+  RevenueOpportunityType,
+  RevenuePipelineStage,
+  RevenueRejectionReason,
+} from "@/lib/revenueOpportunities/types";
+import type { CreatorCampaignScope } from "@/lib/revenueOpportunities/types/campaign";
+
+/** Human labels for revenue tracks (IMG production BD vs creator-brand BD). */
+export const CAMPAIGN_TYPE_LABELS: Record<RevenueCampaignType, string> = {
+  img_client: "IMG client",
+  stormi_brand: "Creator brand",
+};
+
+export const CAMPAIGN_TYPE_OPTIONS: { value: RevenueCampaignType; label: string }[] = [
+  { value: "img_client", label: "IMG client prospecting" },
+  {
+    value: "stormi_brand",
+    label: "Creator brand prospecting (Stormi & network)",
+  },
+];
+
+export const CREATOR_SCOPE_LABELS: Record<CreatorCampaignScope, string> = {
+  stormi_flagship: "Stormi (flagship)",
+  network: "IMG creator network",
+  specific: "Specific creators",
+};
+
+export const CREATOR_SCOPE_OPTIONS: { value: CreatorCampaignScope; label: string }[] = [
+  { value: "stormi_flagship", label: "Stormi (flagship)" },
+  { value: "network", label: "IMG creator network" },
+  { value: "specific", label: "Specific creators on roster" },
+];
+
+export function campaignTypeLabel(type: RevenueCampaignType | RevenueOpportunityType): string {
+  return CAMPAIGN_TYPE_LABELS[type] ?? type;
+}
+
+export function isCreatorBrandType(type: RevenueCampaignType | RevenueOpportunityType): boolean {
+  return type === "stormi_brand";
+}
 
 export const PIPELINE_STAGE_LABELS: Record<RevenuePipelineStage, string> = {
   new: "New",
