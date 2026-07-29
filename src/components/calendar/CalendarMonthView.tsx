@@ -24,11 +24,18 @@ import {
 } from "@/lib/calendar/types";
 import { filterCalendarEvents } from "@/lib/calendar/buildEvents";
 
-const FILTERS: { id: CalendarFilter; label: string }[] = [
+const STAFF_FILTERS: { id: CalendarFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "shoot", label: "Shoots" },
+  { id: "campaign", label: "Campaigns" },
   { id: "delivery", label: "Deliveries" },
   { id: "payment", label: "Payments" },
+];
+
+const PORTAL_FILTERS: { id: CalendarFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "shoot", label: "Shoots" },
+  { id: "campaign", label: "Campaigns" },
 ];
 
 export function CalendarMonthView({
@@ -38,6 +45,7 @@ export function CalendarMonthView({
   onMonthChange,
   onFilterChange,
   loading,
+  portalMode = false,
 }: {
   month: Date;
   events: CalendarEvent[];
@@ -45,7 +53,10 @@ export function CalendarMonthView({
   onMonthChange: (next: Date) => void;
   onFilterChange: (filter: CalendarFilter) => void;
   loading?: boolean;
+  /** Network creators — hide staff payment/delivery filters. */
+  portalMode?: boolean;
 }) {
+  const filters = portalMode ? PORTAL_FILTERS : STAFF_FILTERS;
   const filtered = filterCalendarEvents(events, filter);
   const monthStart = startOfMonth(month);
   const monthEnd = endOfMonth(month);
@@ -95,7 +106,7 @@ export function CalendarMonthView({
         </div>
 
         <div className="flex flex-wrap gap-1">
-          {FILTERS.map((item) => (
+          {filters.map((item) => (
             <button
               key={item.id}
               type="button"

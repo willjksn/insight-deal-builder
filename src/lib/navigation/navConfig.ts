@@ -85,6 +85,7 @@ export const CREATOR_PORTAL_NAV_GROUPS: NavGroup[] = [
     scope: "shared",
     items: [
       { href: "/creator-portal", label: "Home", icon: LayoutDashboard, exact: true },
+      { href: "/calendar", label: "Calendar", icon: CalendarDays },
       { href: "/creator-portal/profile", label: "My profile", icon: UserCircle },
       { href: "/creator-portal/campaigns", label: "My campaigns", icon: Briefcase },
       { href: "/creator-portal/onboarding", label: "Onboarding", icon: Target },

@@ -2,6 +2,8 @@ import { Agreement, Project } from "@/lib/types";
 import { ProductionBoard } from "@/lib/production/types";
 import { agreementOutstanding } from "@/lib/analytics/paymentTracking";
 import { CalendarEvent, CalendarEventKind, CalendarFilter } from "@/lib/calendar/types";
+import type { CreatorProductionDay } from "@/lib/creators/opsTypes";
+import type { CreatorPortalCampaignView } from "@/lib/creators/portalServer";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -21,6 +23,7 @@ function shootEvent(params: {
   href: string;
   projectId?: string;
   agreementId?: string;
+  campaignId?: string;
   kind?: CalendarEventKind;
 }): CalendarEvent {
   return {
@@ -32,6 +35,7 @@ function shootEvent(params: {
     href: params.href,
     projectId: params.projectId,
     agreementId: params.agreementId,
+    campaignId: params.campaignId,
   };
 }
 
@@ -259,6 +263,9 @@ export function filterCalendarEvents(
   if (filter === "delivery") {
     return events.filter((e) => e.kind === "delivery");
   }
+  if (filter === "campaign") {
+    return events.filter((e) => e.kind === "campaign");
+  }
   return events.filter((e) => e.kind === "payment");
 }
 
@@ -268,4 +275,143 @@ export function eventsInRange(
   endDate: string
 ): CalendarEvent[] {
   return events.filter((e) => e.date >= startDate && e.date <= endDate);
+}
+
+/** Minimal campaign shape for calendar date extraction. */
+export type CreatorCalendarCampaignSource = {
+  id: string;
+  name: string;
+  brandName?: string;
+  briefs?: {
+    id: string;
+    productionDate?: string;
+    postingDate?: string;
+    creatorName?: string;
+  }[];
+  deliverables?: {
+    id: string;
+    type?: string;
+    dueDate?: string;
+    postingDate?: string;
+    creatorName?: string;
+  }[];
+};
+
+export type CreatorOpsCalendarOptions = {
+  productionDayHref?: string;
+  campaignHref?: string;
+};
+
+/** Creator-ops calendar events (production days + campaign brief/deliverable dates). */
+export function buildCreatorOpsCalendarEvents(
+  campaigns: CreatorCalendarCampaignSource[],
+  productionDays: CreatorProductionDay[],
+  opts: CreatorOpsCalendarOptions = {}
+): CalendarEvent[] {
+  const productionDayHref = opts.productionDayHref ?? "/creators/production-days";
+  const campaignHref = opts.campaignHref ?? "/creators/campaigns";
+  const byId = new Map<string, CalendarEvent>();
+
+  for (const day of productionDays) {
+    if (!isValidCalendarDate(day.date)) continue;
+    const creatorCount = day.creatorIds?.length ?? 0;
+    const who =
+      creatorCount > 0
+        ? ` · ${creatorCount} creator${creatorCount === 1 ? "" : "s"}`
+        : "";
+    byId.set(
+      `creator-production-day-${day.id}`,
+      shootEvent({
+        id: `creator-production-day-${day.id}`,
+        date: day.date,
+        title: day.name,
+        subtitle: day.location
+          ? `Creator production day · ${day.location}${who}`
+          : `Creator production day${who}`,
+        href: productionDayHref,
+        kind: "production_day",
+      })
+    );
+  }
+
+  for (const campaign of campaigns) {
+    const brand = campaign.brandName ? ` · ${campaign.brandName}` : "";
+    for (const brief of campaign.briefs ?? []) {
+      const who = brief.creatorName ? ` · ${brief.creatorName}` : "";
+      if (isValidCalendarDate(brief.productionDate)) {
+        byId.set(
+          `creator-brief-prod-${campaign.id}-${brief.id}`,
+          shootEvent({
+            id: `creator-brief-prod-${campaign.id}-${brief.id}`,
+            date: brief.productionDate,
+            title: campaign.name,
+            subtitle: `Creator shoot / production${brand}${who}`,
+            href: campaignHref,
+            campaignId: campaign.id,
+            kind: "shoot",
+          })
+        );
+      }
+      if (isValidCalendarDate(brief.postingDate)) {
+        byId.set(
+          `creator-brief-post-${campaign.id}-${brief.id}`,
+          shootEvent({
+            id: `creator-brief-post-${campaign.id}-${brief.id}`,
+            date: brief.postingDate,
+            title: campaign.name,
+            subtitle: `Creator posting${brand}${who}`,
+            href: campaignHref,
+            campaignId: campaign.id,
+            kind: "campaign",
+          })
+        );
+      }
+    }
+    for (const d of campaign.deliverables ?? []) {
+      const who = d.creatorName ? ` · ${d.creatorName}` : "";
+      if (isValidCalendarDate(d.dueDate)) {
+        byId.set(
+          `creator-del-due-${campaign.id}-${d.id}`,
+          shootEvent({
+            id: `creator-del-due-${campaign.id}-${d.id}`,
+            date: d.dueDate,
+            title: campaign.name,
+            subtitle: `${d.type || "Deliverable"} due${brand}${who}`,
+            href: campaignHref,
+            campaignId: campaign.id,
+            kind: "campaign",
+          })
+        );
+      }
+      if (isValidCalendarDate(d.postingDate)) {
+        byId.set(
+          `creator-del-post-${campaign.id}-${d.id}`,
+          shootEvent({
+            id: `creator-del-post-${campaign.id}-${d.id}`,
+            date: d.postingDate,
+            title: campaign.name,
+            subtitle: `${d.type || "Deliverable"} posting${brand}${who}`,
+            href: campaignHref,
+            campaignId: campaign.id,
+            kind: "campaign",
+          })
+        );
+      }
+    }
+  }
+
+  return Array.from(byId.values()).sort((a, b) =>
+    a.date === b.date ? a.title.localeCompare(b.title) : a.date.localeCompare(b.date)
+  );
+}
+
+/** Calendar events for a linked creator portal account — only their assigned work. */
+export function buildCreatorPortalCalendarEvents(
+  campaigns: CreatorPortalCampaignView[],
+  productionDays: CreatorProductionDay[]
+): CalendarEvent[] {
+  return buildCreatorOpsCalendarEvents(campaigns, productionDays, {
+    productionDayHref: "/creator-portal/campaigns",
+    campaignHref: "/creator-portal/campaigns",
+  });
 }

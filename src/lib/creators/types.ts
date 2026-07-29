@@ -294,6 +294,8 @@ export interface Creator {
   tags?: string[];
   notes?: string;
   lastReviewedAt?: string;
+  /** Staff-marked favorite — surfaces near the top of the roster (below Stormi). */
+  favorited?: boolean;
 
   // ── Niche & positioning ──
   primaryNiche?: string;
@@ -401,6 +403,12 @@ export function isOpenApplication(status?: CreatorApplicationStatus): boolean {
 
 export function isApprovedApplication(status?: CreatorApplicationStatus): boolean {
   return status === "approved" || status === "approved_with_development";
+}
+
+/** Flagship Stormi record — always pinned above other roster rows. */
+export function isStormiCreator(creator: Pick<Creator, "professionalName" | "relationshipType">): boolean {
+  if (creator.relationshipType === "flagship") return true;
+  return creator.professionalName.trim().toLowerCase() === "stormi";
 }
 
 /** Readiness component field labels (for the readiness editor UI). */

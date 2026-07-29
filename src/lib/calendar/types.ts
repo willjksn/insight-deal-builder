@@ -1,4 +1,10 @@
-export type CalendarEventKind = "shoot" | "production_day" | "delivery" | "payment" | "rental";
+export type CalendarEventKind =
+  | "shoot"
+  | "production_day"
+  | "delivery"
+  | "payment"
+  | "rental"
+  | "campaign";
 
 export type CalendarEvent = {
   id: string;
@@ -10,9 +16,10 @@ export type CalendarEvent = {
   href: string;
   projectId?: string;
   agreementId?: string;
+  campaignId?: string;
 };
 
-export type CalendarFilter = "all" | "shoot" | "delivery" | "payment";
+export type CalendarFilter = "all" | "shoot" | "delivery" | "payment" | "campaign";
 
 export const CALENDAR_KIND_LABELS: Record<CalendarEventKind, string> = {
   shoot: "Shoot",
@@ -20,6 +27,7 @@ export const CALENDAR_KIND_LABELS: Record<CalendarEventKind, string> = {
   delivery: "Delivery",
   payment: "Payment",
   rental: "Rental",
+  campaign: "Campaign",
 };
 
 export const CALENDAR_KIND_COLORS: Record<CalendarEventKind, string> = {
@@ -28,4 +36,5 @@ export const CALENDAR_KIND_COLORS: Record<CalendarEventKind, string> = {
   delivery: "bg-emerald-500",
   payment: "bg-amber-500",
   rental: "bg-orange-500",
+  campaign: "bg-fuchsia-500",
 };

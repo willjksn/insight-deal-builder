@@ -238,6 +238,7 @@ export function validateCreatorUpdate(body: unknown): CreatorUpdateInput {
     if (LIST_FIELDS.has(key)) update[key] = asStringArray(o[key]);
   }
   if ("remoteAvailable" in o) update.remoteAvailable = Boolean(o.remoteAvailable);
+  if ("favorited" in o) update.favorited = Boolean(o.favorited);
 
   if ("relationshipType" in o) {
     if (!RELATIONSHIP_TYPES.includes(o.relationshipType as CreatorRelationshipType)) {

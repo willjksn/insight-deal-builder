@@ -12,9 +12,12 @@ import {
 } from "@/components/calendar/CalendarMonthView";
 import { CalendarEvent, CalendarFilter } from "@/lib/calendar/types";
 import { eventsInRange } from "@/lib/calendar/buildEvents";
+import { isCreatorPortalUser, canManageUsers } from "@/lib/utils/permissions";
 
 export default function CalendarPage() {
-  const { user } = useAuth();
+  const { user, appUser } = useAuth();
+  const portalOnly = isCreatorPortalUser(appUser);
+  const adminCalendar = canManageUsers(appUser);
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [filter, setFilter] = useState<CalendarFilter>("all");
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -65,7 +68,13 @@ export default function CalendarPage() {
     <div>
       <PageHeader
         title="Calendar"
-        subtitle="Shoot days, deliveries, and payments pulled from your projects and agreements — no extra scheduling required."
+        subtitle={
+          portalOnly
+            ? "Your shoots, production days, and campaign dates — only work assigned to you."
+            : adminCalendar
+              ? "Projects, agreements, creator campaigns, and creator production days across the org."
+              : "Shoot days, deliveries, and payments pulled from your projects and agreements — no extra scheduling required."
+        }
       />
 
       {error ? (
@@ -86,6 +95,7 @@ export default function CalendarPage() {
               onMonthChange={setMonth}
               onFilterChange={setFilter}
               loading={loading}
+              portalMode={portalOnly}
             />
           </div>
 
@@ -97,6 +107,7 @@ export default function CalendarPage() {
               onMonthChange={setMonth}
               onFilterChange={setFilter}
               loading={loading}
+              portalMode={portalOnly}
             />
             <div>
               <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800">

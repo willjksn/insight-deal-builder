@@ -96,6 +96,7 @@ describe("getVisibleNavGroups", () => {
     const hrefs = itemHrefs(creatorUser, "business");
     expect(labels).toEqual(["Creator portal"]);
     expect(hrefs).toContain("/creator-portal");
+    expect(hrefs).toContain("/calendar");
     expect(hrefs).toContain("/creator-portal/profile");
     expect(hrefs).not.toContain("/revenue");
     expect(hrefs).not.toContain("/creators");

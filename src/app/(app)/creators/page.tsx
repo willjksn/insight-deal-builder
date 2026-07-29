@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Star } from "lucide-react";
 import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { DataTable, DataRow } from "@/components/ui/DataTable";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -14,15 +14,18 @@ import { Select } from "@/components/ui/Select";
 import { ListSearchField } from "@/components/ui/ListSearchField";
 import { useAuth } from "@/contexts/AuthContext";
 import { canManageCreators } from "@/lib/utils/permissions";
+import { cn } from "@/lib/utils/cn";
 import {
   createCreator,
   importStormiCreator,
   listCreators,
+  updateCreator,
 } from "@/lib/creators/apiClient";
 import {
   CREATOR_READINESS_LABELS,
   CREATOR_RELATIONSHIP_LABELS,
   CREATOR_STATUS_LABELS,
+  isStormiCreator,
   type Creator,
   type CreatorReadinessStatus,
   type CreatorRelationshipType,
@@ -47,6 +50,18 @@ function statusVariant(status: CreatorStatus) {
   return "default" as const;
 }
 
+function sortRoster(list: Creator[]): Creator[] {
+  return [...list].sort((a, b) => {
+    const aStormi = isStormiCreator(a) ? 0 : 1;
+    const bStormi = isStormiCreator(b) ? 0 : 1;
+    if (aStormi !== bStormi) return aStormi - bStormi;
+    const aFav = a.favorited ? 0 : 1;
+    const bFav = b.favorited ? 0 : 1;
+    if (aFav !== bFav) return aFav - bFav;
+    return a.professionalName.localeCompare(b.professionalName);
+  });
+}
+
 const emptyForm = {
   professionalName: "",
   relationshipType: "network" as CreatorRelationshipType,
@@ -67,6 +82,7 @@ export default function CreatorsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [favoriteBusyId, setFavoriteBusyId] = useState<string | null>(null);
 
   const getToken = useCallback(() => {
     if (!user) throw new Error("Not signed in");
@@ -77,7 +93,7 @@ export default function CreatorsPage() {
     if (!user) return;
     const list = await listCreators(getToken);
     // Applicants live on the Applications page until approved.
-    setCreators(list.filter((c) => c.relationshipType !== "applicant"));
+    setCreators(sortRoster(list.filter((c) => c.relationshipType !== "applicant")));
   }, [user, getToken]);
 
   useEffect(() => {
@@ -124,20 +140,43 @@ export default function CreatorsPage() {
     }
   };
 
-  const filtered = creators.filter((c) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      c.professionalName.toLowerCase().includes(q) ||
-      (c.primaryNiche ?? "").toLowerCase().includes(q) ||
-      (c.email ?? "").toLowerCase().includes(q) ||
-      (c.tags ?? []).some((t) => t.toLowerCase().includes(q))
+  const toggleFavorite = async (creator: Creator) => {
+    if (!canManage) return;
+    setFavoriteBusyId(creator.id);
+    setError(null);
+    const next = !creator.favorited;
+    setCreators((prev) =>
+      sortRoster(prev.map((c) => (c.id === creator.id ? { ...c, favorited: next } : c)))
     );
-  });
+    try {
+      await updateCreator(getToken, creator.id, { favorited: next });
+    } catch (e) {
+      setCreators((prev) =>
+        sortRoster(
+          prev.map((c) => (c.id === creator.id ? { ...c, favorited: creator.favorited } : c))
+        )
+      );
+      setError(e instanceof Error ? e.message : "Failed to update favorite");
+    } finally {
+      setFavoriteBusyId(null);
+    }
+  };
 
-  const hasStormi = creators.some(
-    (c) => c.relationshipType === "flagship" || c.professionalName.trim().toLowerCase() === "stormi"
-  );
+  const filtered = useMemo(() => {
+    const list = creators.filter((c) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        c.professionalName.toLowerCase().includes(q) ||
+        (c.primaryNiche ?? "").toLowerCase().includes(q) ||
+        (c.email ?? "").toLowerCase().includes(q) ||
+        (c.tags ?? []).some((t) => t.toLowerCase().includes(q))
+      );
+    });
+    return sortRoster(list);
+  }, [creators, search]);
+
+  const hasStormi = creators.some((c) => isStormiCreator(c));
 
   return (
     <div>
@@ -258,32 +297,76 @@ export default function CreatorsPage() {
           }
         />
       ) : (
-        <DataTable headers={["Creator", "Relationship", "Readiness", "Status", ""]}>
-          {filtered.map((c) => (
-            <DataRow
-              key={c.id}
-              cells={[
-                <div key="name" className="min-w-0">
-                  <div className="font-semibold text-slate-900">{c.professionalName}</div>
-                  {c.primaryNiche && (
-                    <div className="truncate text-xs text-slate-500">{c.primaryNiche}</div>
-                  )}
-                </div>,
-                <Badge key="rel" variant="default">
-                  {CREATOR_RELATIONSHIP_LABELS[c.relationshipType]}
-                </Badge>,
-                <Badge key="ready" variant={readinessVariant(c.readinessStatus)}>
-                  {CREATOR_READINESS_LABELS[c.readinessStatus]}
-                </Badge>,
-                <Badge key="status" variant={statusVariant(c.status)}>
-                  {CREATOR_STATUS_LABELS[c.status]}
-                </Badge>,
-                <Link key="open" href={`/creators/${c.id}`} className="text-sm font-semibold text-sky-700 hover:text-sky-900">
-                  Open
-                </Link>,
-              ]}
-            />
-          ))}
+        <DataTable headers={["", "Creator", "Relationship", "Readiness", "Status", ""]}>
+          {filtered.map((c) => {
+            const stormi = isStormiCreator(c);
+            return (
+              <DataRow
+                key={c.id}
+                href={`/creators/${c.id}`}
+                actionCellIndex={0}
+                cells={[
+                  canManage ? (
+                    <button
+                      key="fav"
+                      type="button"
+                      title={c.favorited ? "Remove favorite" : "Add favorite"}
+                      disabled={favoriteBusyId === c.id}
+                      className="rounded-lg p-1.5 text-slate-400 transition hover:bg-amber-50 hover:text-amber-500 disabled:opacity-50"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void toggleFavorite(c);
+                      }}
+                    >
+                      <Star
+                        className={cn(
+                          "h-4 w-4",
+                          c.favorited && "fill-amber-400 text-amber-500"
+                        )}
+                      />
+                    </button>
+                  ) : (
+                    <span key="fav" />
+                  ),
+                  <div key="name" className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-slate-900">{c.professionalName}</span>
+                      {stormi && (
+                        <Badge variant="info" className="normal-case tracking-normal">
+                          Pinned
+                        </Badge>
+                      )}
+                      {c.favorited && !stormi && (
+                        <Badge variant="warning" className="normal-case tracking-normal">
+                          Favorite
+                        </Badge>
+                      )}
+                    </div>
+                    {c.primaryNiche && (
+                      <div className="truncate text-xs text-slate-500">{c.primaryNiche}</div>
+                    )}
+                  </div>,
+                  <Badge key="rel" variant="default">
+                    {CREATOR_RELATIONSHIP_LABELS[c.relationshipType]}
+                  </Badge>,
+                  <Badge key="ready" variant={readinessVariant(c.readinessStatus)}>
+                    {CREATOR_READINESS_LABELS[c.readinessStatus]}
+                  </Badge>,
+                  <Badge key="status" variant={statusVariant(c.status)}>
+                    {CREATOR_STATUS_LABELS[c.status]}
+                  </Badge>,
+                  <Link
+                    key="open"
+                    href={`/creators/${c.id}`}
+                    className="text-sm font-semibold text-sky-700 hover:text-sky-900"
+                  >
+                    Open
+                  </Link>,
+                ]}
+              />
+            );
+          })}
         </DataTable>
       )}
     </div>

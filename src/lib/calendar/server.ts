@@ -1,13 +1,24 @@
 import { Firestore } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { emailAccessKey, companyAccessKey } from "@/lib/agreement/access";
-import { mergeCalendarEvents } from "@/lib/calendar/buildEvents";
+import {
+  buildCreatorOpsCalendarEvents,
+  buildCreatorPortalCalendarEvents,
+  mergeCalendarEvents,
+} from "@/lib/calendar/buildEvents";
 import { CalendarEvent } from "@/lib/calendar/types";
+import {
+  listPortalCampaignsForCreator,
+  listPortalProductionDaysForCreator,
+} from "@/lib/creators/portalServer";
+import { listCreatorCampaigns, listProductionDays } from "@/lib/creators/opsServer";
 import { PRODUCTION_BOARDS_COLLECTION } from "@/lib/firebase/productionFirestore";
 import { getProjectIdsForMember, hasGlobalProjectAdmin } from "@/lib/projectAccess/server";
 import {
+  canManageUsers,
   canSeeAllAgreements,
   canViewAllOrgDeals,
+  isCreatorPortalUser,
 } from "@/lib/utils/permissions";
 import { Agreement, AppUser, Project } from "@/lib/types";
 import { ProductionBoard } from "@/lib/production/types";
@@ -101,6 +112,15 @@ export async function loadCalendarEventsForUser(params: {
   const db = getAdminDb();
   if (!db) throw new Error("Firebase Admin is not configured");
 
+  // Network creators only see shoots / production days / campaign dates assigned to them.
+  if (isCreatorPortalUser(params.appUser)) {
+    const [campaigns, productionDays] = await Promise.all([
+      listPortalCampaignsForCreator(params.appUser),
+      listPortalProductionDaysForCreator(params.appUser),
+    ]);
+    return buildCreatorPortalCalendarEvents(campaigns, productionDays);
+  }
+
   const projects = await listAccessibleProjects(db, params.uid, params.appUser);
   const projectIds = projects.map((p) => p.id);
   const [boards, agreements] = await Promise.all([
@@ -108,5 +128,31 @@ export async function loadCalendarEventsForUser(params: {
     listAccessibleAgreements(db, params.appUser, params.email),
   ]);
 
-  return mergeCalendarEvents(projects, boards, agreements);
+  const base = mergeCalendarEvents(projects, boards, agreements);
+
+  // Admins see creator-ops dates too (all creator campaigns + production days).
+  // Other staff keep the existing projects/agreements calendar only.
+  if (!canManageUsers(params.appUser)) {
+    return base;
+  }
+
+  try {
+    const [campaigns, productionDays] = await Promise.all([
+      listCreatorCampaigns(params.appUser),
+      listProductionDays(params.appUser),
+    ]);
+    const creatorOps = buildCreatorOpsCalendarEvents(campaigns, productionDays, {
+      productionDayHref: "/creators/production-days",
+      campaignHref: "/creators/campaigns",
+    });
+    const byId = new Map<string, CalendarEvent>();
+    for (const event of base) byId.set(event.id, event);
+    for (const event of creatorOps) byId.set(event.id, event);
+    return Array.from(byId.values()).sort((a, b) =>
+      a.date === b.date ? a.title.localeCompare(b.title) : a.date.localeCompare(b.date)
+    );
+  } catch (err) {
+    console.error("[calendar] failed to load creator-ops events for admin", err);
+    return base;
+  }
 }
