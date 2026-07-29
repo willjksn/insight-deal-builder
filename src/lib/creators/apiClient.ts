@@ -358,6 +358,24 @@ export async function createProductionDay(
   return parseJson<{ day: CreatorProductionDay }>(res);
 }
 
+export async function updateProductionDay(
+  getToken: GetToken,
+  id: string,
+  body: Partial<
+    Pick<
+      CreatorProductionDay,
+      "name" | "date" | "location" | "theme" | "capacity" | "creatorIds" | "notes" | "status"
+    >
+  >
+) {
+  const res = await fetch("/api/creators/production-days", {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ id, ...body }),
+  });
+  return parseJson<{ day: CreatorProductionDay }>(res);
+}
+
 export async function saveDevelopmentPlan(
   getToken: GetToken,
   creatorId: string,
