@@ -89,6 +89,37 @@ export async function revenueDeleteCampaign(getToken: () => Promise<string | nul
   }>(res);
 }
 
+/** Existing creator-ops campaign linked to this revenue campaign, if any. */
+export async function revenueGetCreatorHandoff(
+  getToken: () => Promise<string | null>,
+  campaignId: string
+) {
+  const res = await fetch(`/api/revenue/campaigns/${campaignId}/creator-handoff`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ creatorCampaign: { id: string; name: string; status: string } | null }>(res);
+}
+
+/** Create (or return) a creator-ops campaign from a revenue BD campaign. */
+export async function revenueCreateCreatorHandoff(
+  getToken: () => Promise<string | null>,
+  campaignId: string
+) {
+  const res = await fetch(`/api/revenue/campaigns/${campaignId}/creator-handoff`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    creatorCampaign: {
+      id: string;
+      name: string;
+      status: string;
+      assignments?: { creatorId: string; creatorName: string }[];
+    };
+    created: boolean;
+  }>(res);
+}
+
 // ---- Business profiles (spec Part 10-11) ---------------------------------
 
 export async function revenueListProfiles(getToken: () => Promise<string | null>) {

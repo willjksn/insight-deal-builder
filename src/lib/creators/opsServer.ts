@@ -6,6 +6,9 @@ import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import { CreatorError } from "@/lib/creators/errors";
 import { getCreator, listCreators } from "@/lib/creators/server";
+import { isStormiCreator } from "@/lib/creators/types";
+import { getCampaign as getRevenueCampaign } from "@/lib/revenueOpportunities/server/campaigns";
+import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
 import {
   buildCreatorNetworkSummary,
   filterCreators,
@@ -493,6 +496,129 @@ export async function removeCampaignAssignment(
   return updateCreatorCampaign(appUser, campaignId, {
     assignments: before.filter((a) => a.id !== assignmentId),
   });
+}
+
+/** Find an existing creator-ops campaign linked to a revenue campaign (if any). */
+export async function findCreatorCampaignByRevenueId(
+  appUser: AppUser,
+  revenueCampaignId: string
+): Promise<CreatorCampaign | null> {
+  const db = requireDb();
+  const organizationCompany = tenantCompany(appUser);
+  const snap = await db
+    .collection(CREATOR_CAMPAIGNS_COLLECTION)
+    .where("organizationCompany", "==", organizationCompany)
+    .where("revenueCampaignId", "==", revenueCampaignId)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  return serializeDoc<CreatorCampaign>(snap.docs[0].id, snap.docs[0].data());
+}
+
+const HANDOFF_SHORTLIST_STATUSES = new Set([
+  "suggested",
+  "shortlisted",
+  "availability_requested",
+  "hold",
+  "confirmed",
+]);
+
+async function resolveHandoffAssignments(
+  appUser: AppUser,
+  revenue: RevenueCampaign
+): Promise<CreatorCampaignAssignment[]> {
+  const creatorIds = new Set<string>();
+  const stormi = revenue.stormi;
+  const scope = stormi?.creatorScope;
+
+  for (const id of stormi?.linkedCreatorIds ?? []) {
+    if (typeof id === "string" && id.trim()) creatorIds.add(id.trim());
+  }
+
+  if (
+    scope === "stormi_flagship" ||
+    (revenue.campaignType === "stormi_brand" && !scope && creatorIds.size === 0)
+  ) {
+    const roster = await listCreators(appUser);
+    const stormiCreator = roster.find((c) => isStormiCreator(c));
+    if (stormiCreator) creatorIds.add(stormiCreator.id);
+  }
+
+  if (stormi?.shortlistId) {
+    try {
+      const shortlist = await getShortlist(appUser, stormi.shortlistId);
+      for (const entry of shortlist.entries ?? []) {
+        if (HANDOFF_SHORTLIST_STATUSES.has(entry.status) && entry.creatorId) {
+          creatorIds.add(entry.creatorId);
+        }
+      }
+    } catch {
+      // Shortlist may have been deleted — still create the campaign.
+    }
+  }
+
+  const assignments: CreatorCampaignAssignment[] = [];
+  for (const creatorId of creatorIds) {
+    try {
+      const creator = await getCreator(appUser, creatorId);
+      assignments.push(
+        stripUndefined({
+          id: randomUUID(),
+          creatorId: creator.id,
+          creatorName: creator.professionalName,
+          status: "assigned",
+        }) as CreatorCampaignAssignment
+      );
+    } catch {
+      // Skip missing / unauthorized creator ids.
+    }
+  }
+  return assignments;
+}
+
+/**
+ * Create (or return existing) creator-ops campaign from a revenue BD campaign.
+ * Prefills assignments from linkedCreatorIds, shortlist entries, and Stormi when scoped.
+ */
+export async function handoffRevenueCampaignToCreatorOps(
+  appUser: AppUser,
+  revenueCampaignId: string
+): Promise<{ creatorCampaign: CreatorCampaign; created: boolean }> {
+  const revenue = await getRevenueCampaign(appUser, revenueCampaignId);
+  const existing = await findCreatorCampaignByRevenueId(appUser, revenue.id);
+  if (existing) {
+    return { creatorCampaign: existing, created: false };
+  }
+
+  const assignments = await resolveHandoffAssignments(appUser, revenue);
+  const brandName =
+    revenue.stormi?.brandCategory?.trim() ||
+    revenue.img?.industry?.trim() ||
+    undefined;
+  const objective =
+    revenue.objective?.trim() ||
+    revenue.stormi?.desiredPartnershipType?.trim() ||
+    revenue.img?.serviceToPromote?.trim() ||
+    undefined;
+
+  const created = await createCreatorCampaign(appUser, {
+    name: revenue.name,
+    brandName,
+    objective,
+    status: "draft",
+    revenueCampaignId: revenue.id,
+    shortlistId: revenue.stormi?.shortlistId,
+    notes: `Handed off from revenue campaign ${revenue.id} (${revenue.campaignType}).`,
+  });
+
+  if (assignments.length === 0) {
+    return { creatorCampaign: created, created: true };
+  }
+
+  const withAssignments = await updateCreatorCampaign(appUser, created.id, {
+    assignments,
+  });
+  return { creatorCampaign: withAssignments, created: true };
 }
 
 // ── Production days ────────────────────────────────────────────────────────

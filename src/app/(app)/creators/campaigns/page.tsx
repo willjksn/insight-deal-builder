@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
@@ -35,6 +36,8 @@ const STATUS_OPTIONS = (Object.keys(CREATOR_CAMPAIGN_STATUS_LABELS) as CreatorCa
 
 export default function CreatorCampaignsPage() {
   const { user, appUser } = useAuth();
+  const searchParams = useSearchParams();
+  const openId = searchParams.get("open");
   const canManage = canManageCreators(appUser);
   const [campaigns, setCampaigns] = useState<CreatorCampaign[]>([]);
   const [roster, setRoster] = useState<Creator[]>([]);
@@ -82,7 +85,7 @@ export default function CreatorCampaignsPage() {
       .finally(() => setLoading(false));
   }, [user, canManage, reload, getToken]);
 
-  const open = async (id: string) => {
+  const open = useCallback(async (id: string) => {
     setError(null);
     const res = await getCreatorCampaign(getToken, id);
     setActive(res.campaign);
@@ -97,7 +100,15 @@ export default function CreatorCampaignsPage() {
     setBriefCreatorId(firstAssigned);
     setDelCreatorId(firstAssigned);
     setBriefRole(res.campaign.assignments?.[0]?.role ?? "");
-  };
+  }, [getToken]);
+
+  useEffect(() => {
+    if (!openId || !user || !canManage || loading) return;
+    if (active?.id === openId) return;
+    void open(openId).catch((e) =>
+      setError(e instanceof Error ? e.message : "Failed to open campaign")
+    );
+  }, [openId, user, canManage, loading, active?.id, open]);
 
   const assignableRoster = useMemo(() => {
     const assigned = new Set((active?.assignments ?? []).map((a) => a.creatorId));

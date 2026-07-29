@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Briefcase, Search, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   revenueDeleteCampaign,
   revenueDeleteCampaignRun,
   revenueGetCampaign,
+  revenueGetCreatorHandoff,
+  revenueCreateCreatorHandoff,
   revenueGetStatus,
   revenueListCampaignRuns,
   revenueRunCampaignResearch,
@@ -18,7 +20,10 @@ import {
 import type { RevenueCampaign } from "@/lib/revenueOpportunities/types/campaign";
 import type { RevenueCampaignRun } from "@/lib/revenueOpportunities/types/campaignRun";
 import type { RevenueFeatureStatus } from "@/lib/revenueOpportunities/types";
-import { canManageRevenueOpportunities } from "@/lib/utils/permissions";
+import {
+  canManageCreators,
+  canManageRevenueOpportunities,
+} from "@/lib/utils/permissions";
 import { formatDateTime } from "@/lib/utils/format";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -59,7 +64,15 @@ export default function CampaignDetailPage() {
   const [researchMessage, setResearchMessage] = useState<string | null>(null);
   const [featureStatus, setFeatureStatus] = useState<RevenueFeatureStatus | null>(null);
   const [profiles, setProfiles] = useState<CampaignProfileOption[]>([]);
+  const [linkedCreatorCampaign, setLinkedCreatorCampaign] = useState<{
+    id: string;
+    name: string;
+    status: string;
+  } | null>(null);
+  const [handoffBusy, setHandoffBusy] = useState(false);
+  const [handoffMessage, setHandoffMessage] = useState<string | null>(null);
   const canManage = canManageRevenueOpportunities(appUser);
+  const canHandoff = canManage && canManageCreators(appUser);
   const researchLive = featureStatus?.integrations.research === "live";
 
   useEffect(() => {
@@ -69,8 +82,11 @@ export default function CampaignDetailPage() {
       revenueListCampaignRuns(() => user.getIdToken(), id),
       revenueGetStatus(() => user.getIdToken()).catch(() => null),
       revenueListProfiles(() => user.getIdToken()).catch(() => null),
+      canManageCreators(appUser)
+        ? revenueGetCreatorHandoff(() => user.getIdToken(), id).catch(() => null)
+        : Promise.resolve(null),
     ])
-      .then(([c, r, statusRes, profilesRes]) => {
+      .then(([c, r, statusRes, profilesRes, handoffRes]) => {
         setCampaign(c.campaign);
         setRuns(r.runs);
         if (statusRes?.status) setFeatureStatus(statusRes.status);
@@ -83,10 +99,13 @@ export default function CampaignDetailPage() {
             }))
           );
         }
+        if (handoffRes?.creatorCampaign) {
+          setLinkedCreatorCampaign(handoffRes.creatorCampaign);
+        }
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
-  }, [user, id]);
+  }, [user, id, appUser]);
 
   if (loading) return <LoadingSpinner />;
   if (!campaign) {
@@ -107,6 +126,48 @@ export default function CampaignDetailPage() {
         action={
           canManage ? (
             <div className="flex flex-wrap gap-2">
+              {canHandoff ? (
+                linkedCreatorCampaign ? (
+                  <Link href={`/creators/campaigns?open=${linkedCreatorCampaign.id}`}>
+                    <Button size="touch" variant="outline">
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      Open creator campaign
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button
+                    size="touch"
+                    variant="outline"
+                    disabled={busy || researching || deleting || handoffBusy}
+                    onClick={async () => {
+                      if (!user) return;
+                      setHandoffBusy(true);
+                      setError(null);
+                      setHandoffMessage(null);
+                      try {
+                        const res = await revenueCreateCreatorHandoff(
+                          () => user.getIdToken(),
+                          id
+                        );
+                        setLinkedCreatorCampaign(res.creatorCampaign);
+                        const assigned = res.creatorCampaign.assignments?.length ?? 0;
+                        setHandoffMessage(
+                          res.created
+                            ? `Creator campaign created${assigned ? ` with ${assigned} assignee${assigned === 1 ? "" : "s"}` : ""}.`
+                            : "Creator campaign already linked."
+                        );
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Handoff failed");
+                      } finally {
+                        setHandoffBusy(false);
+                      }
+                    }}
+                  >
+                    <Briefcase className="mr-2 h-4 w-4" />
+                    {handoffBusy ? "Creating…" : "Create creator campaign"}
+                  </Button>
+                )
+              ) : null}
               <Button
                 size="touch"
                 variant="outline"
@@ -180,6 +241,37 @@ export default function CampaignDetailPage() {
       ) : null}
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
       {researchMessage && <p className="mb-4 text-sm text-emerald-700">{researchMessage}</p>}
+      {handoffMessage && (
+        <p className="mb-4 text-sm text-emerald-700">
+          {handoffMessage}{" "}
+          {linkedCreatorCampaign ? (
+            <Link
+              href={`/creators/campaigns?open=${linkedCreatorCampaign.id}`}
+              className="font-semibold underline"
+            >
+              Open creator campaign
+            </Link>
+          ) : null}
+        </p>
+      )}
+      {linkedCreatorCampaign && !handoffMessage ? (
+        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+          Linked creator campaign: <strong>{linkedCreatorCampaign.name}</strong> (
+          {linkedCreatorCampaign.status}).{" "}
+          <Link
+            href={`/creators/campaigns?open=${linkedCreatorCampaign.id}`}
+            className="font-semibold underline"
+          >
+            Manage assignments &amp; briefs
+          </Link>
+        </div>
+      ) : null}
+      {canHandoff && !linkedCreatorCampaign ? (
+        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          Ready for ops? Create a creator campaign to assign roster talent, briefs, and portal
+          visibility. Prefills from linked creators / shortlist / Stormi scope when set.
+        </div>
+      ) : null}
 
       {canManage ? (
         <CampaignForm
