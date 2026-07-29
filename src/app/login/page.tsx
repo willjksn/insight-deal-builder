@@ -41,6 +41,11 @@ function LoginForm() {
       }
       if (mode === "signUp") {
         await signUp(email, password, displayName);
+        // Creator invites approve via claim — stay signed in and return to the invite.
+        if (nextPath.startsWith("/creator-invite/")) {
+          router.push(nextPath);
+          return;
+        }
         await signOut();
         setMessage(
           "Account created. Check your email — we'll notify you when an admin approves your access."

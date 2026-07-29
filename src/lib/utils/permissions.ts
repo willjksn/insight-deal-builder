@@ -184,6 +184,24 @@ export function canManageCreators(user: AppUser | null | undefined): boolean {
   );
 }
 
+/** Network creator self-service portal (may also be true for staff who manage creators). */
+export function canAccessCreatorPortal(user: AppUser | null | undefined): boolean {
+  return (
+    isInsightOrgUser(user) &&
+    (hasPermission(user, "accessCreatorPortal") || canManageCreators(user))
+  );
+}
+
+/**
+ * True when this login should see the creator portal shell only
+ * (not IMG staff business/production tools).
+ */
+export function isCreatorPortalUser(user: AppUser | null | undefined): boolean {
+  if (!user || !isInsightOrgUser(user)) return false;
+  if (canManageCreators(user) || canManageUsers(user)) return false;
+  return hasPermission(user, "accessCreatorPortal") && Boolean(user.creatorId);
+}
+
 /** View a creator's sensitive documents (W-9 / ID) — reuses the doc-review gates. */
 export function canViewSensitiveCreatorDocs(user: AppUser | null | undefined): boolean {
   return canViewW9Docs(user) || canViewIdentityDocs(user);

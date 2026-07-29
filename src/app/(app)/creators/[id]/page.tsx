@@ -25,6 +25,7 @@ import {
   getCreatorDocumentViewUrl,
   removeCreatorDocument,
   saveDevelopmentPlan,
+  sendCreatorPortalInvite,
   setCreatorApplicationStatus,
   updateCreator,
 } from "@/lib/creators/apiClient";
@@ -52,6 +53,7 @@ import { CreatorReadinessPanel } from "@/components/creators/CreatorReadinessPan
 import { CreatorOnboardingPanel } from "@/components/creators/CreatorOnboardingPanel";
 import { CreatorDocumentsPanel } from "@/components/creators/CreatorDocumentsPanel";
 import { CreatorApplicationPanel } from "@/components/creators/CreatorApplicationPanel";
+import { CreatorPortalInviteCard } from "@/components/creators/CreatorPortalInviteCard";
 import { CreatorDevelopmentPanel } from "@/components/creators/CreatorDevelopmentPanel";
 
 const RELATIONSHIP_OPTIONS = (
@@ -261,6 +263,16 @@ export default function CreatorDetailPage() {
               setSaving(false);
             }
           }}
+        />
+
+        <CreatorPortalInviteCard
+          creator={creator}
+          canEdit={canManage}
+          onSendInvite={async () => {
+            if (!id) throw new Error("Missing creator id");
+            return sendCreatorPortalInvite(getToken, id);
+          }}
+          onCreatorRefresh={(patch) => setCreator((prev) => (prev ? { ...prev, ...patch } : prev))}
         />
 
         <form onSubmit={handleSaveIdentity} className="space-y-6">

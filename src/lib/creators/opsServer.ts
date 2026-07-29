@@ -5,7 +5,7 @@ import { stripUndefined } from "@/lib/firebase/firestore";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import { CreatorError } from "@/lib/creators/errors";
-import { listCreators } from "@/lib/creators/server";
+import { getCreator, listCreators } from "@/lib/creators/server";
 import {
   buildCreatorNetworkSummary,
   filterCreators,
@@ -20,6 +20,7 @@ import {
   CREATOR_SHORTLISTS_COLLECTION,
   type CreatorBrief,
   type CreatorCampaign,
+  type CreatorCampaignAssignment,
   type CreatorCampaignCreateInput,
   type CreatorCampaignUpdateInput,
   type CreatorDeliverable,
@@ -409,6 +410,88 @@ export async function linkCampaignToProject(
   return updateCreatorCampaign(appUser, campaignId, {
     projectId,
     status: "in_production",
+  });
+}
+
+export type CampaignAssignmentInput = {
+  creatorId: string;
+  role?: string;
+  compensation?: number;
+  compensationNotes?: string;
+  status?: string;
+};
+
+/** Assign a roster creator so they can see this campaign in the portal. */
+export async function addCampaignAssignment(
+  appUser: AppUser,
+  campaignId: string,
+  input: CampaignAssignmentInput
+): Promise<CreatorCampaign> {
+  const creatorId = input.creatorId?.trim();
+  if (!creatorId) throw new CreatorError("VALIDATION_FAILED", "Creator is required");
+
+  const campaign = await getCreatorCampaign(appUser, campaignId);
+  if ((campaign.assignments ?? []).some((a) => a.creatorId === creatorId)) {
+    throw new CreatorError("VALIDATION_FAILED", "Creator is already assigned to this campaign");
+  }
+
+  const creator = await getCreator(appUser, creatorId);
+  const assignment: CreatorCampaignAssignment = stripUndefined({
+    id: randomUUID(),
+    creatorId: creator.id,
+    creatorName: creator.professionalName,
+    role: input.role?.trim() || undefined,
+    compensation: typeof input.compensation === "number" ? input.compensation : undefined,
+    compensationNotes: input.compensationNotes?.trim() || undefined,
+    status: input.status?.trim() || "assigned",
+  }) as CreatorCampaignAssignment;
+
+  return updateCreatorCampaign(appUser, campaignId, {
+    assignments: [...(campaign.assignments ?? []), assignment],
+  });
+}
+
+export async function updateCampaignAssignment(
+  appUser: AppUser,
+  campaignId: string,
+  assignmentId: string,
+  patch: Omit<CampaignAssignmentInput, "creatorId"> & { creatorId?: never }
+): Promise<CreatorCampaign> {
+  const campaign = await getCreatorCampaign(appUser, campaignId);
+  const existing = (campaign.assignments ?? []).find((a) => a.id === assignmentId);
+  if (!existing) throw new CreatorError("NOT_FOUND", "Assignment not found");
+
+  const next: CreatorCampaignAssignment = stripUndefined({
+    ...existing,
+    role: patch.role !== undefined ? patch.role.trim() || undefined : existing.role,
+    compensation:
+      patch.compensation !== undefined ? patch.compensation : existing.compensation,
+    compensationNotes:
+      patch.compensationNotes !== undefined
+        ? patch.compensationNotes.trim() || undefined
+        : existing.compensationNotes,
+    status: patch.status !== undefined ? patch.status.trim() || undefined : existing.status,
+  }) as CreatorCampaignAssignment;
+
+  return updateCreatorCampaign(appUser, campaignId, {
+    assignments: (campaign.assignments ?? []).map((a) =>
+      a.id === assignmentId ? next : a
+    ),
+  });
+}
+
+export async function removeCampaignAssignment(
+  appUser: AppUser,
+  campaignId: string,
+  assignmentId: string
+): Promise<CreatorCampaign> {
+  const campaign = await getCreatorCampaign(appUser, campaignId);
+  const before = campaign.assignments ?? [];
+  if (!before.some((a) => a.id === assignmentId)) {
+    throw new CreatorError("NOT_FOUND", "Assignment not found");
+  }
+  return updateCreatorCampaign(appUser, campaignId, {
+    assignments: before.filter((a) => a.id !== assignmentId),
   });
 }
 

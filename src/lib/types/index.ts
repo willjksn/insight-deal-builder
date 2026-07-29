@@ -36,6 +36,8 @@ export interface UserPermissions {
   manageRevenueOpportunities: boolean;
   /** Add and edit creator/talent roster, applications, and readiness */
   manageCreators: boolean;
+  /** Network creator self-service portal (own profile, campaigns, onboarding) */
+  accessCreatorPortal: boolean;
 }
 
 export interface UserProfile {
@@ -46,6 +48,8 @@ export interface UserProfile {
   role: UserRole;
   company?: string;
   permissions?: UserPermissions;
+  /** Linked creator roster record when this user is an IMG network creator */
+  creatorId?: string;
   /** Web push (FCM) device tokens */
   fcmTokens?: string[];
   /** Email alerts for agreement events (default true) */

@@ -9,11 +9,13 @@ import { APP_NAME } from "@/lib/brand";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { getMobileNav, isNavItemActive } from "@/lib/navigation/navConfig";
+import { isCreatorPortalUser } from "@/lib/utils/permissions";
 
 export function MobileNav() {
   const pathname = usePathname();
   const { appUser } = useAuth();
   const { workspace } = useWorkspace();
+  const portalOnly = isCreatorPortalUser(appUser);
 
   const { primary, more } = getMobileNav(workspace, appUser);
 
@@ -28,7 +30,9 @@ export function MobileNav() {
                 <h1 className="truncate text-base font-bold text-slate-900">{APP_NAME}</h1>
               </div>
             </div>
-            <WorkspaceSwitcher variant="mobile" className="w-[188px] shrink-0" />
+            {!portalOnly ? (
+              <WorkspaceSwitcher variant="mobile" className="w-[188px] shrink-0" />
+            ) : null}
           </div>
           {more.length > 0 ? (
             <nav className="mt-2 flex gap-1 overflow-x-auto pb-1 scrollbar-none">

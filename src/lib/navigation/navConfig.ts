@@ -37,6 +37,8 @@ import {
   canAccessReports,
   canUseProductionTools,
   canAccessRevenueOpportunities,
+  canAccessCreatorPortal,
+  isCreatorPortalUser,
   isRevenueOpportunitiesFeatureEnabled,
 } from "@/lib/utils/permissions";
 import { isContentIdeasNavEnabled } from "@/lib/contentIdeas/navFlag";
@@ -76,6 +78,21 @@ const revenueAccess = (user: AppUser | null) =>
  * Recordings, Contacts, Follow-Ups, Deliverables, Client Approvals) are added in
  * their respective later phases.
  */
+/** Nav shown only to network creators (linked portal accounts). */
+export const CREATOR_PORTAL_NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Creator portal",
+    scope: "shared",
+    items: [
+      { href: "/creator-portal", label: "Home", icon: LayoutDashboard, exact: true },
+      { href: "/creator-portal/profile", label: "My profile", icon: UserCircle },
+      { href: "/creator-portal/campaigns", label: "My campaigns", icon: Briefcase },
+      { href: "/creator-portal/onboarding", label: "Onboarding", icon: Target },
+      { href: "/settings", label: "Settings", icon: Settings, exact: true },
+    ],
+  },
+];
+
 export const NAV_GROUPS: NavGroup[] = [
   // ---- Shared across both workspaces --------------------------------------
   {
@@ -84,6 +101,18 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
+      {
+        href: "/creator-portal",
+        label: "Creator portal",
+        icon: Star,
+        // Staff with a linked creator profile; pure network creators use CREATOR_PORTAL_NAV_GROUPS.
+        canAccess: (user) =>
+          Boolean(
+            user?.creatorId &&
+              canAccessCreatorPortal(user) &&
+              !isCreatorPortalUser(user)
+          ),
+      },
     ],
   },
 
@@ -196,6 +225,9 @@ export function getVisibleNavGroups(
   workspace: Workspace,
   user: AppUser | null
 ): NavGroup[] {
+  if (isCreatorPortalUser(user)) {
+    return CREATOR_PORTAL_NAV_GROUPS;
+  }
   return NAV_GROUPS.filter((group) => isGroupInWorkspace(group, workspace))
     .map((group) => ({
       ...group,
@@ -222,6 +254,14 @@ export function getMobileNav(
   user: AppUser | null
 ): { primary: NavItem[]; more: NavItem[] } {
   const groups = getVisibleNavGroups(workspace, user);
+
+  if (isCreatorPortalUser(user)) {
+    const items = groups.flatMap((g) => g.items);
+    const primary = items.slice(0, 4);
+    const primaryHrefs = new Set(primary.map((i) => i.href));
+    return { primary, more: items.filter((i) => !primaryHrefs.has(i.href)) };
+  }
+
   const overview = groups.find((g) => g.label === "Overview")?.items ?? [];
   const system = groups.find((g) => g.label === "System")?.items ?? [];
   const settings = system.find((i) => i.href === "/settings");

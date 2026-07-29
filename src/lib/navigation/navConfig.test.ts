@@ -82,6 +82,24 @@ describe("getVisibleNavGroups", () => {
   it("drops empty groups (Content development is flagged off by default)", () => {
     expect(groupLabels(imgAdmin, "production")).not.toContain("Content development");
   });
+
+  it("limits network creators to the creator portal nav only", () => {
+    const creatorUser = {
+      id: "c1",
+      email: "creator@example.com",
+      role: "member",
+      company: "Insight Media Group LLC",
+      creatorId: "creator-1",
+      permissions: { accessCreatorPortal: true },
+    } as AppUser;
+    const labels = groupLabels(creatorUser, "business");
+    const hrefs = itemHrefs(creatorUser, "business");
+    expect(labels).toEqual(["Creator portal"]);
+    expect(hrefs).toContain("/creator-portal");
+    expect(hrefs).toContain("/creator-portal/profile");
+    expect(hrefs).not.toContain("/revenue");
+    expect(hrefs).not.toContain("/creators");
+  });
 });
 
 describe("isNavItemActive", () => {

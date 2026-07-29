@@ -14,6 +14,7 @@ import {
   canCreateQuotes,
   canManageProjects,
   canUseProductionTools,
+  isCreatorPortalUser,
 } from "@/lib/utils/permissions";
 import {
   NavItem,
@@ -56,9 +57,11 @@ export function Sidebar() {
           <p className="text-[11px] text-slate-400 leading-snug">{APP_SHORT_TAGLINE}</p>
         </div>
 
-        <div className="px-4 pt-4">
-          <WorkspaceSwitcher variant="sidebar" />
-        </div>
+        {!isCreatorPortalUser(appUser) ? (
+          <div className="px-4 pt-4">
+            <WorkspaceSwitcher variant="sidebar" />
+          </div>
+        ) : null}
 
         <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
           {visibleGroups.map((group) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -17,6 +17,7 @@ import {
   createCreatorCampaign,
   getCreatorCampaign,
   listCreatorCampaigns,
+  listCreators,
   patchCreatorCampaign,
 } from "@/lib/creators/apiClient";
 import {
@@ -26,6 +27,7 @@ import {
   type CreatorCampaignStatus,
   type CreatorDeliverableStatus,
 } from "@/lib/creators/opsTypes";
+import type { Creator } from "@/lib/creators/types";
 
 const STATUS_OPTIONS = (Object.keys(CREATOR_CAMPAIGN_STATUS_LABELS) as CreatorCampaignStatus[]).map(
   (value) => ({ value, label: CREATOR_CAMPAIGN_STATUS_LABELS[value] })
@@ -35,6 +37,7 @@ export default function CreatorCampaignsPage() {
   const { user, appUser } = useAuth();
   const canManage = canManageCreators(appUser);
   const [campaigns, setCampaigns] = useState<CreatorCampaign[]>([]);
+  const [roster, setRoster] = useState<Creator[]>([]);
   const [active, setActive] = useState<CreatorCampaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
@@ -48,10 +51,16 @@ export default function CreatorCampaignsPage() {
   const [comp, setComp] = useState<number | undefined>(undefined);
   const [costs, setCosts] = useState<number | undefined>(undefined);
 
-  // Brief / deliverable quick add
-  const [briefCreator, setBriefCreator] = useState("");
+  // Assignment form
+  const [assignCreatorId, setAssignCreatorId] = useState("");
+  const [assignRole, setAssignRole] = useState("");
+  const [assignComp, setAssignComp] = useState<number | undefined>(undefined);
+
+  // Brief / deliverable quick add (tied to assigned creators)
+  const [briefCreatorId, setBriefCreatorId] = useState("");
   const [briefRole, setBriefRole] = useState("");
   const [delType, setDelType] = useState("Instagram Reel");
+  const [delCreatorId, setDelCreatorId] = useState("");
   const [projectId, setProjectId] = useState("");
 
   const getToken = useCallback(() => {
@@ -67,19 +76,46 @@ export default function CreatorCampaignsPage() {
 
   useEffect(() => {
     if (!user || !canManage) return;
-    reload()
+    Promise.all([reload(), listCreators(getToken)])
+      .then(([, creators]) => setRoster(creators))
       .catch((e) => setError(e instanceof Error ? e.message : "Failed"))
       .finally(() => setLoading(false));
-  }, [user, canManage, reload]);
+  }, [user, canManage, reload, getToken]);
 
   const open = async (id: string) => {
+    setError(null);
     const res = await getCreatorCampaign(getToken, id);
     setActive(res.campaign);
     setRevenue(res.campaign.economics?.clientRevenue);
     setComp(res.campaign.economics?.creatorCompensationTotal);
     setCosts(res.campaign.economics?.directCosts);
     setProjectId(res.campaign.projectId ?? "");
+    setAssignCreatorId("");
+    setAssignRole("");
+    setAssignComp(undefined);
+    const firstAssigned = res.campaign.assignments?.[0]?.creatorId ?? "";
+    setBriefCreatorId(firstAssigned);
+    setDelCreatorId(firstAssigned);
+    setBriefRole(res.campaign.assignments?.[0]?.role ?? "");
   };
+
+  const assignableRoster = useMemo(() => {
+    const assigned = new Set((active?.assignments ?? []).map((a) => a.creatorId));
+    return roster
+      .filter((c) => c.relationshipType !== "applicant")
+      .filter((c) => !assigned.has(c.id))
+      .slice()
+      .sort((a, b) => a.professionalName.localeCompare(b.professionalName));
+  }, [roster, active?.assignments]);
+
+  const assignmentOptions = useMemo(
+    () =>
+      (active?.assignments ?? []).map((a) => ({
+        value: a.creatorId,
+        label: a.creatorName + (a.role ? ` (${a.role})` : ""),
+      })),
+    [active?.assignments]
+  );
 
   if (!canManage) return <div className="p-6 text-sm">Not authorized.</div>;
 
@@ -128,6 +164,7 @@ export default function CreatorCampaignsPage() {
               disabled={busy || !name.trim()}
               onClick={async () => {
                 setBusy(true);
+                setError(null);
                 try {
                   const res = await createCreatorCampaign(getToken, {
                     name: name.trim(),
@@ -138,7 +175,9 @@ export default function CreatorCampaignsPage() {
                   setBrand("");
                   setObjective("");
                   await reload();
-                  setActive(res.campaign);
+                  await open(res.campaign.id);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Create failed");
                 } finally {
                   setBusy(false);
                 }
@@ -162,6 +201,9 @@ export default function CreatorCampaignsPage() {
                       {c.name}
                       <div className="text-xs text-slate-500">
                         {CREATOR_CAMPAIGN_STATUS_LABELS[c.status]}
+                        {(c.assignments?.length ?? 0) > 0
+                          ? ` · ${c.assignments!.length} assigned`
+                          : ""}
                       </div>
                     </button>
                   </li>
@@ -172,7 +214,10 @@ export default function CreatorCampaignsPage() {
         </Card>
 
         {!active ? (
-          <EmptyState title="Select a campaign" description="Create one to manage briefs and economics." />
+          <EmptyState
+            title="Select a campaign"
+            description="Create one, then assign roster creators so they can see it in the portal."
+          />
         ) : (
           <div className="space-y-4">
             <Card>
@@ -236,9 +281,7 @@ export default function CreatorCampaignsPage() {
                 {active.economics?.estimatedMargin != null && (
                   <p className="text-sm">
                     Estimated IMG margin:{" "}
-                    <strong>
-                      ${active.economics.estimatedMargin.toLocaleString()}
-                    </strong>
+                    <strong>${active.economics.estimatedMargin.toLocaleString()}</strong>
                   </p>
                 )}
 
@@ -246,8 +289,7 @@ export default function CreatorCampaignsPage() {
                   <Textarea
                     label="Usage / rights summary"
                     value={active.rights?.usageSummary ?? ""}
-                    onChange={async (e) => {
-                      /* local only until save */
+                    onChange={(e) => {
                       setActive({
                         ...active,
                         rights: { ...active.rights, usageSummary: e.target.value },
@@ -307,6 +349,149 @@ export default function CreatorCampaignsPage() {
 
             <Card>
               <CardHeader>
+                <h2 className="font-semibold">Assigned creators</h2>
+                <p className="text-xs font-normal text-slate-500">
+                  Assigned creators see this campaign in their ShootSpine portal.
+                </p>
+              </CardHeader>
+              <CardBody className="space-y-3">
+                {(active.assignments ?? []).length === 0 ? (
+                  <p className="text-sm text-slate-600">
+                    No creators assigned yet. Pick someone from the roster below.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {(active.assignments ?? []).map((a) => (
+                      <li
+                        key={a.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                      >
+                        <div>
+                          <Link
+                            href={`/creators/${a.creatorId}`}
+                            className="font-semibold text-sky-800 hover:underline"
+                          >
+                            {a.creatorName}
+                          </Link>
+                          <div className="text-xs text-slate-500">
+                            {a.role || "Role TBD"}
+                            {typeof a.compensation === "number"
+                              ? ` · $${a.compensation.toLocaleString()}`
+                              : ""}
+                            {a.status ? ` · ${a.status}` : ""}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            setError(null);
+                            try {
+                              const res = await patchCreatorCampaign(getToken, active.id, {
+                                action: "removeAssignment",
+                                assignmentId: a.id,
+                              });
+                              setActive(res.campaign);
+                              await reload();
+                              if (briefCreatorId === a.creatorId) {
+                                setBriefCreatorId(res.campaign.assignments?.[0]?.creatorId ?? "");
+                              }
+                              if (delCreatorId === a.creatorId) {
+                                setDelCreatorId(res.campaign.assignments?.[0]?.creatorId ?? "");
+                              }
+                            } catch (e) {
+                              setError(e instanceof Error ? e.message : "Remove failed");
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div className="grid gap-2 border-t border-slate-100 pt-3 md:grid-cols-2">
+                  <Select
+                    label="Add from roster"
+                    value={assignCreatorId}
+                    options={[
+                      { value: "", label: "Select creator…" },
+                      ...assignableRoster.map((c) => ({
+                        value: c.id,
+                        label: `${c.professionalName}${c.primaryNiche ? ` · ${c.primaryNiche}` : ""}`,
+                      })),
+                    ]}
+                    onChange={(e) => setAssignCreatorId(e.target.value)}
+                    touch
+                  />
+                  <Input
+                    label="Role"
+                    value={assignRole}
+                    onChange={(e) => setAssignRole(e.target.value)}
+                    placeholder="e.g. Lead talent"
+                    touch
+                  />
+                  <NumberInput
+                    label="Compensation (optional)"
+                    value={assignComp}
+                    onChange={setAssignComp}
+                    touch
+                  />
+                  <div className="flex items-end">
+                    <Button
+                      size="touch"
+                      className="w-full"
+                      disabled={busy || !assignCreatorId}
+                      onClick={async () => {
+                        setBusy(true);
+                        setError(null);
+                        try {
+                          const res = await patchCreatorCampaign(getToken, active.id, {
+                            action: "addAssignment",
+                            assignment: {
+                              creatorId: assignCreatorId,
+                              role: assignRole.trim() || undefined,
+                              compensation: assignComp,
+                            },
+                          });
+                          setActive(res.campaign);
+                          await reload();
+                          if (!briefCreatorId) setBriefCreatorId(assignCreatorId);
+                          if (!delCreatorId) setDelCreatorId(assignCreatorId);
+                          setAssignCreatorId("");
+                          setAssignRole("");
+                          setAssignComp(undefined);
+                        } catch (e) {
+                          setError(e instanceof Error ? e.message : "Assign failed");
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Assign creator
+                    </Button>
+                  </div>
+                </div>
+                {assignableRoster.length === 0 && (
+                  <p className="text-xs text-slate-500">
+                    Everyone on the roster is already assigned, or add creators under{" "}
+                    <Link href="/creators" className="underline">
+                      Creators
+                    </Link>
+                    .
+                  </p>
+                )}
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <h2 className="font-semibold">Creator briefs</h2>
               </CardHeader>
               <CardBody className="space-y-3">
@@ -319,39 +504,62 @@ export default function CreatorCampaignsPage() {
                     <Badge>{b.status ?? "draft"}</Badge>
                   </div>
                 ))}
-                <div className="grid gap-2 md:grid-cols-2">
-                  <Input
-                    label="Creator name"
-                    value={briefCreator}
-                    onChange={(e) => setBriefCreator(e.target.value)}
-                  />
-                  <Input
-                    label="Role"
-                    value={briefRole}
-                    onChange={(e) => setBriefRole(e.target.value)}
-                  />
-                </div>
-                <Button
-                  size="sm"
-                  disabled={!briefCreator.trim()}
-                  onClick={async () => {
-                    const res = await patchCreatorCampaign(getToken, active.id, {
-                      action: "upsertBrief",
-                      brief: {
-                        creatorId: "manual",
-                        creatorName: briefCreator.trim(),
-                        creatorRole: briefRole.trim() || undefined,
-                        campaignObjective: active.objective,
-                        status: "draft",
-                      },
-                    });
-                    setActive(res.campaign);
-                    setBriefCreator("");
-                    setBriefRole("");
-                  }}
-                >
-                  Add brief
-                </Button>
+                {assignmentOptions.length === 0 ? (
+                  <p className="text-sm text-slate-600">
+                    Assign a creator first, then add their brief.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <Select
+                        label="Assigned creator"
+                        value={briefCreatorId}
+                        options={[
+                          { value: "", label: "Select…" },
+                          ...assignmentOptions,
+                        ]}
+                        onChange={(e) => {
+                          setBriefCreatorId(e.target.value);
+                          const a = (active.assignments ?? []).find(
+                            (x) => x.creatorId === e.target.value
+                          );
+                          if (a?.role) setBriefRole(a.role);
+                        }}
+                        touch
+                      />
+                      <Input
+                        label="Role"
+                        value={briefRole}
+                        onChange={(e) => setBriefRole(e.target.value)}
+                        touch
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={!briefCreatorId}
+                      onClick={async () => {
+                        const a = (active.assignments ?? []).find(
+                          (x) => x.creatorId === briefCreatorId
+                        );
+                        if (!a) return;
+                        const res = await patchCreatorCampaign(getToken, active.id, {
+                          action: "upsertBrief",
+                          brief: {
+                            creatorId: a.creatorId,
+                            creatorName: a.creatorName,
+                            creatorRole: briefRole.trim() || a.role || undefined,
+                            campaignObjective: active.objective,
+                            status: "draft",
+                          },
+                        });
+                        setActive(res.campaign);
+                        setBriefRole("");
+                      }}
+                    >
+                      Add brief
+                    </Button>
+                  </>
+                )}
               </CardBody>
             </Card>
 
@@ -395,31 +603,53 @@ export default function CreatorCampaignsPage() {
                     />
                   </div>
                 ))}
-                <div className="flex flex-wrap gap-2">
-                  <Input
-                    label="Deliverable type"
-                    value={delType}
-                    onChange={(e) => setDelType(e.target.value)}
-                  />
-                  <Button
-                    size="sm"
-                    className="self-end"
-                    onClick={async () => {
-                      const res = await patchCreatorCampaign(getToken, active.id, {
-                        action: "upsertDeliverable",
-                        deliverable: {
-                          creatorId: "manual",
-                          creatorName: briefCreator.trim() || "TBD",
-                          type: delType,
-                          status: "planned",
-                        },
-                      });
-                      setActive(res.campaign);
-                    }}
-                  >
-                    Add deliverable
-                  </Button>
-                </div>
+                {assignmentOptions.length === 0 ? (
+                  <p className="text-sm text-slate-600">
+                    Assign a creator first, then add deliverables.
+                  </p>
+                ) : (
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <Select
+                      label="Assigned creator"
+                      value={delCreatorId}
+                      options={[
+                        { value: "", label: "Select…" },
+                        ...assignmentOptions,
+                      ]}
+                      onChange={(e) => setDelCreatorId(e.target.value)}
+                      touch
+                    />
+                    <Input
+                      label="Deliverable type"
+                      value={delType}
+                      onChange={(e) => setDelType(e.target.value)}
+                      touch
+                    />
+                    <Button
+                      size="sm"
+                      className="md:col-span-2"
+                      disabled={!delCreatorId || !delType.trim()}
+                      onClick={async () => {
+                        const a = (active.assignments ?? []).find(
+                          (x) => x.creatorId === delCreatorId
+                        );
+                        if (!a) return;
+                        const res = await patchCreatorCampaign(getToken, active.id, {
+                          action: "upsertDeliverable",
+                          deliverable: {
+                            creatorId: a.creatorId,
+                            creatorName: a.creatorName,
+                            type: delType.trim(),
+                            status: "planned",
+                          },
+                        });
+                        setActive(res.campaign);
+                      }}
+                    >
+                      Add deliverable
+                    </Button>
+                  </div>
+                )}
               </CardBody>
             </Card>
           </div>

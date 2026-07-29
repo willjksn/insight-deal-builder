@@ -283,6 +283,12 @@ export interface Creator {
   dateJoined?: string;
   dateApproved?: string;
   internalOwnerUserId?: string;
+  /** ShootSpine user id when this creator has portal access */
+  linkedUserId?: string;
+  /** SHA-256 of one-time invite token (cleared after claim) */
+  inviteTokenHash?: string;
+  inviteExpiresAt?: string;
+  inviteSentAt?: string;
   source?: string;
   referralSource?: string;
   tags?: string[];

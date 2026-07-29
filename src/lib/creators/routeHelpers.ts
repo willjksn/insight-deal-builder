@@ -4,7 +4,8 @@ import {
   assertCanManageCreators,
   requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
-import { isCreatorError } from "@/lib/creators/errors";
+import { CreatorError, isCreatorError } from "@/lib/creators/errors";
+import { canAccessCreatorPortal } from "@/lib/utils/permissions";
 
 export const runtime = "nodejs";
 
@@ -23,5 +24,14 @@ export function creatorApiError(err: unknown): NextResponse {
 export async function requireCreatorManager(request: NextRequest) {
   const auth = await requireApprovedAuthUser(request);
   assertCanManageCreators(auth.appUser);
+  return auth;
+}
+
+/** Approved user with creator portal access (network creator or staff). */
+export async function requireCreatorPortalAccess(request: NextRequest) {
+  const auth = await requireApprovedAuthUser(request);
+  if (!canAccessCreatorPortal(auth.appUser)) {
+    throw new CreatorError("NOT_AUTHORIZED", "Not authorized for the creator portal");
+  }
   return auth;
 }

@@ -312,6 +312,15 @@ export async function patchCreatorCampaign(
     brief?: Omit<CreatorBrief, "id" | "updatedAt"> & { id?: string };
     deliverable?: Omit<CreatorDeliverable, "id"> & { id?: string };
     projectId?: string;
+    assignment?: {
+      id?: string;
+      creatorId?: string;
+      role?: string;
+      compensation?: number;
+      compensationNotes?: string;
+      status?: string;
+    };
+    assignmentId?: string;
   }
 ) {
   const res = await fetch(`/api/creators/campaigns/${id}`, {
@@ -392,3 +401,96 @@ export async function getCreatorReports(getToken: GetToken) {
 }
 
 export type { CreatorShortlistEntryStatus };
+
+// ── Creator portal (network creators) ──────────────────────────────────────
+
+export async function sendCreatorPortalInvite(
+  getToken: GetToken,
+  creatorId: string
+): Promise<{ inviteUrl: string; expiresAt: string; emailSent: boolean }> {
+  const res = await fetch(`/api/creators/${creatorId}/invite`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson(res);
+}
+
+export async function fetchCreatorInvitePreview(token: string): Promise<{
+  professionalName: string;
+  email: string;
+  expired: boolean;
+  alreadyLinked: boolean;
+}> {
+  const res = await fetch(`/api/creator-invite/${encodeURIComponent(token)}`);
+  const data = await parseJson<{ invite: {
+    professionalName: string;
+    email: string;
+    expired: boolean;
+    alreadyLinked: boolean;
+  } }>(res);
+  return data.invite;
+}
+
+export async function claimCreatorInvite(
+  getToken: GetToken,
+  token: string
+): Promise<Creator> {
+  const res = await fetch(`/api/creator-invite/${encodeURIComponent(token)}`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  const data = await parseJson<{ creator: Creator }>(res);
+  return data.creator;
+}
+
+export async function getCreatorPortalMe(getToken: GetToken): Promise<Creator> {
+  const res = await fetch("/api/creator-portal/me", {
+    headers: await authHeaders(getToken),
+  });
+  const data = await parseJson<{ creator: Creator }>(res);
+  return data.creator;
+}
+
+export async function updateCreatorPortalMe(
+  getToken: GetToken,
+  body: {
+    professionalName?: string;
+    phone?: string;
+    location?: string;
+    website?: string;
+    portfolioUrl?: string;
+    primaryNiche?: string;
+    audienceDescription?: string;
+    onboarding?: Creator["onboarding"];
+  }
+): Promise<Creator> {
+  const res = await fetch("/api/creator-portal/me", {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  const data = await parseJson<{ creator: Creator }>(res);
+  return data.creator;
+}
+
+export async function listCreatorPortalCampaigns(getToken: GetToken): Promise<{
+  campaigns: {
+    id: string;
+    name: string;
+    brandName?: string;
+    objective?: string;
+    status: string;
+    role?: string;
+    compensation?: number;
+    compensationNotes?: string;
+    briefs: CreatorBrief[];
+    deliverables: CreatorDeliverable[];
+    updatedAt: string;
+  }[];
+  productionDays: CreatorProductionDay[];
+}> {
+  const res = await fetch("/api/creator-portal/campaigns", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson(res);
+}

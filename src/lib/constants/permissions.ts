@@ -167,6 +167,13 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     group: "imgData",
     insightOnly: true,
   },
+  {
+    key: "accessCreatorPortal",
+    label: "Creator portal",
+    description: "Self-service creator home — own profile, campaigns, and onboarding",
+    group: "imgData",
+    insightOnly: true,
+  },
 ];
 
 export const PERMISSION_GROUPS = [
@@ -199,6 +206,7 @@ export const EMPTY_PERMISSIONS: UserPermissions = {
   viewRevenueOpportunities: false,
   manageRevenueOpportunities: false,
   manageCreators: false,
+  accessCreatorPortal: false,
 };
 
 export const FULL_IMG_PERMISSIONS: UserPermissions = {
@@ -225,6 +233,7 @@ export const FULL_IMG_PERMISSIONS: UserPermissions = {
   viewRevenueOpportunities: true,
   manageRevenueOpportunities: true,
   manageCreators: true,
+  accessCreatorPortal: true,
 };
 
 /** Production partner — own quotes only, no IMG client/company/crew access */
@@ -254,6 +263,13 @@ export const PRODUCER_PERMISSIONS: UserPermissions = {
   viewRevenueOpportunities: true,
   manageRevenueOpportunities: true,
   manageCreators: true,
+  accessCreatorPortal: true,
+};
+
+/** Network creator — self-service portal only (no staff roster / revenue tools) */
+export const CREATOR_PORTAL_PERMISSIONS: UserPermissions = {
+  ...EMPTY_PERMISSIONS,
+  accessCreatorPortal: true,
 };
 
 /** @deprecated alias — use PRODUCER_PERMISSIONS */
@@ -279,6 +295,7 @@ export const PERMISSION_PRESETS = [
   { id: "producer", label: "Producer (IMG)", permissions: PRODUCER_PERMISSIONS },
   { id: "accounting", label: "Accounting (IMG)", permissions: ACCOUNTING_PERMISSIONS },
   { id: "compliance", label: "Compliance / manager (IMG)", permissions: COMPLIANCE_PERMISSIONS },
+  { id: "creator", label: "Creator portal (network)", permissions: CREATOR_PORTAL_PERMISSIONS },
   { id: "partner", label: "Partner org", permissions: PARTNER_PERMISSIONS },
   { id: "viewer", label: "View & sign only", permissions: { ...EMPTY_PERMISSIONS, signQuotes: true, downloadPdf: true } },
   { id: "none", label: "Clear all", permissions: EMPTY_PERMISSIONS },

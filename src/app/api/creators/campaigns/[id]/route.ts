@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  addCampaignAssignment,
   deleteCreatorCampaign,
   getCreatorCampaign,
   linkCampaignToProject,
+  removeCampaignAssignment,
+  updateCampaignAssignment,
   updateCreatorCampaign,
   upsertCampaignBrief,
   upsertCampaignDeliverable,
+  type CampaignAssignmentInput,
 } from "@/lib/creators/opsServer";
 import { creatorApiError, requireCreatorManager } from "@/lib/creators/routeHelpers";
 import { CreatorError } from "@/lib/creators/errors";
@@ -37,6 +41,8 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
       brief?: Omit<CreatorBrief, "id" | "updatedAt"> & { id?: string };
       deliverable?: Omit<CreatorDeliverable, "id"> & { id?: string };
       projectId?: string;
+      assignment?: CampaignAssignmentInput & { id?: string };
+      assignmentId?: string;
     };
 
     if (body.action === "upsertBrief" && body.brief) {
@@ -51,18 +57,36 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
       const campaign = await linkCampaignToProject(appUser, id, body.projectId);
       return NextResponse.json({ campaign });
     }
+    if (body.action === "addAssignment" && body.assignment?.creatorId) {
+      const campaign = await addCampaignAssignment(appUser, id, body.assignment);
+      return NextResponse.json({ campaign });
+    }
+    if (body.action === "updateAssignment" && body.assignment?.id) {
+      const { id: assignmentId, creatorId: _cid, ...patch } = body.assignment;
+      void _cid;
+      const campaign = await updateCampaignAssignment(appUser, id, assignmentId, patch);
+      return NextResponse.json({ campaign });
+    }
+    if (body.action === "removeAssignment" && body.assignmentId) {
+      const campaign = await removeCampaignAssignment(appUser, id, body.assignmentId);
+      return NextResponse.json({ campaign });
+    }
 
     const {
       action: _a,
       brief: _b,
       deliverable: _d,
       projectId: _p,
+      assignment: _as,
+      assignmentId: _aid,
       ...rest
     } = body;
     void _a;
     void _b;
     void _d;
     void _p;
+    void _as;
+    void _aid;
     if (!Object.keys(rest).length) {
       throw new CreatorError("VALIDATION_FAILED", "No update fields provided");
     }
