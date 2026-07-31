@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -81,6 +81,13 @@ export default function CreatorPortalOnboardingPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
+        <Link
+          href="/creator-portal"
+          className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-sky-700 hover:text-sky-900"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to portal
+        </Link>
         <h1 className="text-2xl font-bold text-slate-900">Onboarding</h1>
         <p className="mt-1 text-sm text-slate-600">
           Track what IMG needs from you to go live on campaigns.
