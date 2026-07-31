@@ -69,7 +69,7 @@ export default function CreatorCampaignsPage() {
   const [assignWarnText, setAssignWarnText] = useState("");
   const [payTarget, setPayTarget] = useState<{
     assignment: CreatorCampaignAssignment;
-    mode: "stripe" | "manual";
+    mode: "stripe" | "manual" | "clear";
   } | null>(null);
 
   // Brief / deliverable quick add (tied to assigned creators)
@@ -445,6 +445,10 @@ export default function CreatorCampaignsPage() {
                         typeof a.compensation === "number" && a.compensation > 0;
                       const canPayStripe = !alreadyPaid && hasComp && connectReady;
                       const canMarkPaid = !alreadyPaid && hasComp;
+                      const canClearPaid =
+                        alreadyPaid &&
+                        a.paidVia === "manual" &&
+                        !a.stripeTransferId;
                       return (
                       <li
                         key={a.id}
@@ -517,6 +521,17 @@ export default function CreatorCampaignsPage() {
                               onClick={() => setPayTarget({ assignment: a, mode: "manual" })}
                             >
                               Mark paid
+                            </Button>
+                          ) : null}
+                          {canClearPaid ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              onClick={() => setPayTarget({ assignment: a, mode: "clear" })}
+                            >
+                              Clear paid
                             </Button>
                           ) : null}
                           <Button
@@ -789,18 +804,28 @@ export default function CreatorCampaignsPage() {
       <ConfirmDialog
         open={Boolean(payTarget)}
         title={
-          payTarget?.mode === "manual"
-            ? "Mark assignment paid?"
-            : "Pay creator via Stripe?"
+          payTarget?.mode === "clear"
+            ? "Clear paid record?"
+            : payTarget?.mode === "manual"
+              ? "Mark assignment paid?"
+              : "Pay creator via Stripe?"
         }
         description={
           payTarget
-            ? payTarget.mode === "manual"
-              ? `Record $${(payTarget.assignment.compensation ?? 0).toLocaleString()} as paid to ${payTarget.assignment.creatorName} outside Stripe (PayPal, ACH, Venmo, check, etc.). No money will move from ShootSpine.`
-              : `Transfer $${(payTarget.assignment.compensation ?? 0).toLocaleString()} USD to ${payTarget.assignment.creatorName} through their Stripe Connect Express account. This uses your platform Stripe balance.`
+            ? payTarget.mode === "clear"
+              ? `Remove the paid mark for ${payTarget.assignment.creatorName}. This does not reverse any money already sent outside ShootSpine.`
+              : payTarget.mode === "manual"
+                ? `Record $${(payTarget.assignment.compensation ?? 0).toLocaleString()} as paid to ${payTarget.assignment.creatorName} outside Stripe (PayPal, ACH, Venmo, check, etc.). No money will move from ShootSpine.`
+                : `Transfer $${(payTarget.assignment.compensation ?? 0).toLocaleString()} USD to ${payTarget.assignment.creatorName} through their Stripe Connect Express account. This uses your platform Stripe balance.`
             : ""
         }
-        confirmLabel={payTarget?.mode === "manual" ? "Mark paid" : "Pay via Stripe"}
+        confirmLabel={
+          payTarget?.mode === "clear"
+            ? "Clear paid"
+            : payTarget?.mode === "manual"
+              ? "Mark paid"
+              : "Pay via Stripe"
+        }
         cancelLabel="Cancel"
         loading={busy}
         onCancel={() => setPayTarget(null)}
@@ -810,11 +835,14 @@ export default function CreatorCampaignsPage() {
             setBusy(true);
             setError(null);
             try {
-              const res = await patchCreatorCampaign(getToken, active.id, {
-                action:
-                  payTarget.mode === "manual"
+              const action =
+                payTarget.mode === "clear"
+                  ? "clearAssignmentPaid"
+                  : payTarget.mode === "manual"
                     ? "markAssignmentPaid"
-                    : "payAssignmentStripe",
+                    : "payAssignmentStripe";
+              const res = await patchCreatorCampaign(getToken, active.id, {
+                action,
                 assignmentId: payTarget.assignment.id,
               });
               setActive(res.campaign);
@@ -824,9 +852,11 @@ export default function CreatorCampaignsPage() {
               setError(
                 e instanceof Error
                   ? e.message
-                  : payTarget.mode === "manual"
-                    ? "Could not mark paid"
-                    : "Stripe payout failed"
+                  : payTarget.mode === "clear"
+                    ? "Could not clear paid"
+                    : payTarget.mode === "manual"
+                      ? "Could not mark paid"
+                      : "Stripe payout failed"
               );
             } finally {
               setBusy(false);

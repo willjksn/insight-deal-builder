@@ -505,6 +505,7 @@ export async function listCreatorPortalCampaigns(getToken: GetToken): Promise<{
     paidAt?: string;
     paidAmount?: number;
     paidVia?: "stripe" | "manual";
+    payoutError?: string;
     briefs: CreatorBrief[];
     deliverables: CreatorDeliverable[];
     updatedAt: string;

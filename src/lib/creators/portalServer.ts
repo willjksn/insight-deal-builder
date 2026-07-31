@@ -63,6 +63,7 @@ export type CreatorPortalCampaignView = {
   paidAt?: string;
   paidAmount?: number;
   paidVia?: "stripe" | "manual";
+  payoutError?: string;
   briefs: CreatorCampaign["briefs"];
   deliverables: CreatorCampaign["deliverables"];
   updatedAt: string;
@@ -212,6 +213,7 @@ export async function listPortalCampaignsForCreator(
       paidAt: assignment.paidAt,
       paidAmount: assignment.paidAmount,
       paidVia: assignment.paidVia,
+      payoutError: assignment.payoutError,
       briefs: (c.briefs ?? []).filter((b) => b.creatorId === creator.id),
       deliverables: (c.deliverables ?? []).filter((d) => d.creatorId === creator.id),
       updatedAt: c.updatedAt,

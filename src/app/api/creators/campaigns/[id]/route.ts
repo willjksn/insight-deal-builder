@@ -4,6 +4,7 @@ import {
   deleteCreatorCampaign,
   getCreatorCampaign,
   linkCampaignToProject,
+  clearCreatorCampaignAssignmentPaid,
   markCreatorCampaignAssignmentPaid,
   removeCampaignAssignment,
   updateCampaignAssignment,
@@ -89,6 +90,14 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
         id,
         body.assignmentId,
         { amount: typeof body.amount === "number" ? body.amount : undefined }
+      );
+      return NextResponse.json({ campaign });
+    }
+    if (body.action === "clearAssignmentPaid" && body.assignmentId) {
+      const campaign = await clearCreatorCampaignAssignmentPaid(
+        appUser,
+        id,
+        body.assignmentId
       );
       return NextResponse.json({ campaign });
     }

@@ -528,18 +528,72 @@ export async function markCreatorCampaignAssignmentPaid(
   }
 
   const paidAt = new Date().toISOString();
+  const assignments = (campaign.assignments ?? []).map((a) => {
+    if (a.id !== assignmentId) return a;
+    const { payoutError: _err, ...base } = a;
+    void _err;
+    return {
+      ...base,
+      paidAt,
+      paidAmount: amount,
+      paidVia: "manual" as const,
+      paidByUserId: appUser.id,
+      paidByDisplayName: appUser.displayName || appUser.email || undefined,
+      status: "paid",
+    };
+  });
+
+  return updateCreatorCampaign(appUser, campaignId, { assignments });
+}
+
+/**
+ * Undo a manual paid mark (mistake correction).
+ * Stripe-paid assignments must be reversed in Stripe (transfer.reversed webhook).
+ */
+export async function clearCreatorCampaignAssignmentPaid(
+  appUser: AppUser,
+  campaignId: string,
+  assignmentId: string
+): Promise<CreatorCampaign> {
+  const campaign = await getCreatorCampaign(appUser, campaignId);
+  const existing = (campaign.assignments ?? []).find((a) => a.id === assignmentId);
+  if (!existing) throw new CreatorError("NOT_FOUND", "Assignment not found");
+
+  if (!existing.paidAt && !existing.stripeTransferId) {
+    throw new CreatorError("VALIDATION_FAILED", "This assignment is not marked paid");
+  }
+
+  if (existing.stripeTransferId || existing.paidVia === "stripe") {
+    throw new CreatorError(
+      "VALIDATION_FAILED",
+      "This was paid via Stripe. Reverse the transfer in Stripe to clear paid status."
+    );
+  }
+
+  const {
+    paidAt: _paidAt,
+    paidAmount: _paidAmount,
+    paidVia: _paidVia,
+    paidByUserId: _paidByUserId,
+    paidByDisplayName: _paidByDisplayName,
+    stripeTransferId: _stripeTransferId,
+    ...rest
+  } = existing;
+  void _paidAt;
+  void _paidAmount;
+  void _paidVia;
+  void _paidByUserId;
+  void _paidByDisplayName;
+  void _stripeTransferId;
+
+  const cleared: CreatorCampaignAssignment = {
+    ...rest,
+    payoutError: "Paid record cleared by staff",
+    status: existing.status === "paid" ? "assigned" : existing.status,
+  };
+
   const assignments = (campaign.assignments ?? []).map((a) =>
-    a.id === assignmentId
-      ? {
-          ...a,
-          paidAt,
-          paidAmount: amount,
-          paidVia: "manual" as const,
-          paidByUserId: appUser.id,
-          paidByDisplayName: appUser.displayName || appUser.email || undefined,
-          status: "paid",
-        }
-      : a
+    a.id === assignmentId ? cleared : a
   );
 
   return updateCreatorCampaign(appUser, campaignId, { assignments });
