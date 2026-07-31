@@ -143,6 +143,12 @@ export interface CreatorCampaignAssignment {
   shortlistEntryId?: string;
   briefId?: string;
   status?: string;
+  /** Stripe Connect transfer payout record */
+  paidAt?: string;
+  paidAmount?: number;
+  stripeTransferId?: string;
+  paidByUserId?: string;
+  paidByDisplayName?: string;
 }
 
 export interface CreatorCampaignEconomics {

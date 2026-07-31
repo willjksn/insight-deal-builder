@@ -321,6 +321,7 @@ export async function patchCreatorCampaign(
       status?: string;
     };
     assignmentId?: string;
+    amount?: number;
   }
 ) {
   const res = await fetch(`/api/creators/campaigns/${id}`, {
@@ -624,7 +625,51 @@ export async function getCreatorPortalPayment(getToken: GetToken) {
   return parseJson<{
     paymentDetails: Creator["paymentDetails"] | null;
     complete: boolean;
+    stripeConnectReady: boolean;
   }>(res);
+}
+
+export async function getCreatorPortalStripeConnect(getToken: GetToken) {
+  const res = await fetch("/api/creator-portal/stripe-connect", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    configured: boolean;
+    accountId: string | null;
+    status: Creator["stripeConnect"] | null;
+    ready: boolean;
+  }>(res);
+}
+
+export async function startCreatorPortalStripeConnect(getToken: GetToken) {
+  const res = await fetch("/api/creator-portal/stripe-connect", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ action: "onboard" }),
+  });
+  return parseJson<{ url: string; accountId: string }>(res);
+}
+
+export async function openCreatorPortalStripeDashboard(getToken: GetToken) {
+  const res = await fetch("/api/creator-portal/stripe-connect", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ action: "dashboard" }),
+  });
+  return parseJson<{ url: string; accountId: string }>(res);
+}
+
+export async function syncCreatorStripeConnect(
+  getToken: GetToken,
+  creatorId: string
+): Promise<Creator> {
+  const res = await fetch(`/api/creators/${creatorId}/stripe-connect`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ action: "sync" }),
+  });
+  const data = await parseJson<{ creator: Creator }>(res);
+  return data.creator;
 }
 
 export async function saveCreatorPortalPayment(

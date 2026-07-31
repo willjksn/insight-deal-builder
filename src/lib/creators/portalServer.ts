@@ -18,7 +18,7 @@ import {
   CREATOR_ID_ONBOARDING_TASK_ID,
   CREATOR_PAYMENT_ONBOARDING_TASK_ID,
   buildDefaultOnboarding,
-  isPaymentDetailsComplete,
+  isCreatorPaymentOnboardingComplete,
   sanitizeCreatorOnboarding,
   isApprovedApplication,
   type Creator,
@@ -60,6 +60,8 @@ export type CreatorPortalCampaignView = {
   role?: string;
   compensation?: number;
   compensationNotes?: string;
+  paidAt?: string;
+  paidAmount?: number;
   briefs: CreatorCampaign["briefs"];
   deliverables: CreatorCampaign["deliverables"];
   updatedAt: string;
@@ -111,7 +113,7 @@ export async function updateOwnCreatorProfile(
       creator.networkAgreement?.status === "signed" &&
       creator.networkAgreement.version === CREATOR_NETWORK_AGREEMENT_VERSION;
     const idApproved = creator.identityVerification?.status === "approved";
-    const paymentOk = isPaymentDetailsComplete(creator.paymentDetails);
+    const paymentOk = isCreatorPaymentOnboardingComplete(creator);
     onboarding = sanitizeCreatorOnboarding(onboarding).map((t) => {
       if (t.id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID) {
         if (agreementSigned) {
@@ -137,11 +139,17 @@ export async function updateOwnCreatorProfile(
       }
       if (t.id === CREATOR_PAYMENT_ONBOARDING_TASK_ID) {
         if (paymentOk) {
+          const connectReady = Boolean(
+            creator.stripeConnectAccountId && creator.stripeConnect?.payoutsEnabled
+          );
           return {
             ...t,
             done: true,
-            doneAt: creator.paymentDetails?.updatedAt ?? t.doneAt,
-            notes: t.notes || "Saved in ShootSpine",
+            doneAt:
+              creator.stripeConnect?.updatedAt ??
+              creator.paymentDetails?.updatedAt ??
+              t.doneAt,
+            notes: t.notes || (connectReady ? "Stripe Connect ready" : "Saved in ShootSpine"),
           };
         }
         return { ...t, done: false, doneAt: undefined };
@@ -200,6 +208,8 @@ export async function listPortalCampaignsForCreator(
       role: assignment.role,
       compensation: assignment.compensation,
       compensationNotes: assignment.compensationNotes,
+      paidAt: assignment.paidAt,
+      paidAmount: assignment.paidAmount,
       briefs: (c.briefs ?? []).filter((b) => b.creatorId === creator.id),
       deliverables: (c.deliverables ?? []).filter((d) => d.creatorId === creator.id),
       updatedAt: c.updatedAt,

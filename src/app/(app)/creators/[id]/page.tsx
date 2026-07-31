@@ -32,6 +32,7 @@ import {
   reviewCreatorIdentityVerification,
   viewCreatorIdentityDocument,
   saveCreatorPaymentDetails,
+  syncCreatorStripeConnect,
 } from "@/lib/creators/apiClient";
 import {
   CREATOR_READINESS_LABELS,
@@ -58,6 +59,7 @@ import { CreatorOnboardingPanel } from "@/components/creators/CreatorOnboardingP
 import { CreatorNetworkAgreementPanel } from "@/components/creators/CreatorNetworkAgreementPanel";
 import { CreatorIdentityVerificationPanel } from "@/components/creators/CreatorIdentityVerificationPanel";
 import { CreatorPaymentDetailsPanel } from "@/components/creators/CreatorPaymentDetailsPanel";
+import { CreatorStripeConnectPanel } from "@/components/creators/CreatorStripeConnectPanel";
 import { CreatorChangeHistoryPanel } from "@/components/creators/CreatorChangeHistoryPanel";
 import { CreatorDocumentsPanel } from "@/components/creators/CreatorDocumentsPanel";
 import type { CreatorPaymentDetails } from "@/lib/creators/types";
@@ -550,6 +552,18 @@ export default function CreatorDetailPage() {
             } finally {
               setSaving(false);
             }
+          }}
+        />
+
+        <CreatorStripeConnectPanel
+          key={`connect-${creator.updatedAt}`}
+          stripeConnectAccountId={creator.stripeConnectAccountId}
+          stripeConnect={creator.stripeConnect}
+          canManage={canManage}
+          onSync={async () => {
+            if (!id) return;
+            const updated = await syncCreatorStripeConnect(getToken, id);
+            hydrate(updated);
           }}
         />
 

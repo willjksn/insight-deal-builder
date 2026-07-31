@@ -2,7 +2,8 @@ export type CreatorErrorCode =
   | "NOT_AUTHORIZED"
   | "NOT_FOUND"
   | "VALIDATION_FAILED"
-  | "NOT_CONFIGURED";
+  | "NOT_CONFIGURED"
+  | "INTERNAL";
 
 export class CreatorError extends Error {
   readonly code: CreatorErrorCode;
@@ -32,6 +33,8 @@ export function creatorErrorHttpStatus(code: CreatorErrorCode): number {
       return 400;
     case "NOT_CONFIGURED":
       return 503;
+    case "INTERNAL":
+      return 500;
     default:
       return 500;
   }

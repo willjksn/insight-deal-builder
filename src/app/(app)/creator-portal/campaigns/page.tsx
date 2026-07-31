@@ -104,6 +104,14 @@ export default function CreatorPortalCampaignsPage() {
                   {typeof c.compensation === "number" && (
                     <span>Compensation: ${c.compensation.toLocaleString()}</span>
                   )}
+                  {c.paidAt ? (
+                    <span>
+                      Paid
+                      {typeof c.paidAmount === "number"
+                        ? ` $${c.paidAmount.toLocaleString()}`
+                        : ""}
+                    </span>
+                  ) : null}
                   {c.compensationNotes && <span>{c.compensationNotes}</span>}
                 </div>
                 {c.briefs.length > 0 && (

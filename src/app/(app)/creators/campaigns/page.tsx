@@ -30,10 +30,12 @@ import {
   CREATOR_CAMPAIGN_STATUS_LABELS,
   CREATOR_DELIVERABLE_STATUS_LABELS,
   type CreatorCampaign,
+  type CreatorCampaignAssignment,
   type CreatorCampaignStatus,
   type CreatorDeliverableStatus,
 } from "@/lib/creators/opsTypes";
-import type { Creator } from "@/lib/creators/types";
+import { isStripeConnectReady, type Creator } from "@/lib/creators/types";
+import { formatDate } from "@/lib/utils/format";
 
 const STATUS_OPTIONS = (Object.keys(CREATOR_CAMPAIGN_STATUS_LABELS) as CreatorCampaignStatus[]).map(
   (value) => ({ value, label: CREATOR_CAMPAIGN_STATUS_LABELS[value] })
@@ -65,6 +67,7 @@ export default function CreatorCampaignsPage() {
   const [assignComp, setAssignComp] = useState<number | undefined>(undefined);
   const [assignWarnOpen, setAssignWarnOpen] = useState(false);
   const [assignWarnText, setAssignWarnText] = useState("");
+  const [payTarget, setPayTarget] = useState<CreatorCampaignAssignment | null>(null);
 
   // Brief / deliverable quick add (tied to assigned creators)
   const [briefCreatorId, setBriefCreatorId] = useState("");
@@ -431,10 +434,15 @@ export default function CreatorCampaignsPage() {
                 ) : (
                   <ul className="space-y-2">
                     {(active.assignments ?? []).map((a) => {
-                      const gaps = (() => {
-                        const c = rosterById.get(a.creatorId);
-                        return c ? getCreatorCampaignAssignGaps(c) : [];
-                      })();
+                      const creator = rosterById.get(a.creatorId);
+                      const gaps = creator ? getCreatorCampaignAssignGaps(creator) : [];
+                      const connectReady = isStripeConnectReady(creator);
+                      const alreadyPaid = Boolean(a.paidAt || a.stripeTransferId);
+                      const canPayStripe =
+                        !alreadyPaid &&
+                        typeof a.compensation === "number" &&
+                        a.compensation > 0 &&
+                        connectReady;
                       return (
                       <li
                         key={a.id}
@@ -448,7 +456,9 @@ export default function CreatorCampaignsPage() {
                             >
                               {a.creatorName}
                             </Link>
-                            {gaps.length > 0 ? (
+                            {alreadyPaid ? (
+                              <Badge variant="success">Paid</Badge>
+                            ) : gaps.length > 0 ? (
                               <Badge variant="warning">Onboarding incomplete</Badge>
                             ) : null}
                           </div>
@@ -458,41 +468,67 @@ export default function CreatorCampaignsPage() {
                               ? ` · $${a.compensation.toLocaleString()}`
                               : ""}
                             {a.status ? ` · ${a.status}` : ""}
-                            {gaps.length
+                            {alreadyPaid && a.paidAt
+                              ? ` · Paid ${formatDate(a.paidAt)}${
+                                  typeof a.paidAmount === "number"
+                                    ? ` · $${a.paidAmount.toLocaleString()}`
+                                    : ""
+                                }`
+                              : ""}
+                            {!alreadyPaid && gaps.length
                               ? ` · ${gaps.map((g) => g.label).join("; ")}`
+                              : ""}
+                            {!alreadyPaid &&
+                            typeof a.compensation === "number" &&
+                            a.compensation > 0 &&
+                            !connectReady
+                              ? " · Stripe Connect not ready"
                               : ""}
                           </div>
                         </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={async () => {
-                            setBusy(true);
-                            setError(null);
-                            try {
-                              const res = await patchCreatorCampaign(getToken, active.id, {
-                                action: "removeAssignment",
-                                assignmentId: a.id,
-                              });
-                              setActive(res.campaign);
-                              await reload();
-                              if (briefCreatorId === a.creatorId) {
-                                setBriefCreatorId(res.campaign.assignments?.[0]?.creatorId ?? "");
+                        <div className="flex flex-wrap items-center gap-1">
+                          {canPayStripe ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => setPayTarget(a)}
+                            >
+                              Pay via Stripe
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy || alreadyPaid}
+                            onClick={async () => {
+                              setBusy(true);
+                              setError(null);
+                              try {
+                                const res = await patchCreatorCampaign(getToken, active.id, {
+                                  action: "removeAssignment",
+                                  assignmentId: a.id,
+                                });
+                                setActive(res.campaign);
+                                await reload();
+                                if (briefCreatorId === a.creatorId) {
+                                  setBriefCreatorId(res.campaign.assignments?.[0]?.creatorId ?? "");
+                                }
+                                if (delCreatorId === a.creatorId) {
+                                  setDelCreatorId(res.campaign.assignments?.[0]?.creatorId ?? "");
+                                }
+                              } catch (e) {
+                                setError(e instanceof Error ? e.message : "Remove failed");
+                              } finally {
+                                setBusy(false);
                               }
-                              if (delCreatorId === a.creatorId) {
-                                setDelCreatorId(res.campaign.assignments?.[0]?.creatorId ?? "");
-                              }
-                            } catch (e) {
-                              setError(e instanceof Error ? e.message : "Remove failed");
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          Remove
-                        </Button>
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </div>
                       </li>
                     );
                     })}
@@ -727,6 +763,40 @@ export default function CreatorCampaignsPage() {
         loading={busy}
         onCancel={() => setAssignWarnOpen(false)}
         onConfirm={() => void runAssign()}
+      />
+
+      <ConfirmDialog
+        open={Boolean(payTarget)}
+        title="Pay creator via Stripe?"
+        description={
+          payTarget
+            ? `Transfer $${(payTarget.compensation ?? 0).toLocaleString()} USD to ${payTarget.creatorName} through their Stripe Connect Express account. This uses your platform Stripe balance.`
+            : ""
+        }
+        confirmLabel="Pay via Stripe"
+        cancelLabel="Cancel"
+        loading={busy}
+        onCancel={() => setPayTarget(null)}
+        onConfirm={() => {
+          void (async () => {
+            if (!active || !payTarget) return;
+            setBusy(true);
+            setError(null);
+            try {
+              const res = await patchCreatorCampaign(getToken, active.id, {
+                action: "payAssignmentStripe",
+                assignmentId: payTarget.id,
+              });
+              setActive(res.campaign);
+              setPayTarget(null);
+              await reload();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Stripe payout failed");
+            } finally {
+              setBusy(false);
+            }
+          })();
+        }}
       />
     </div>
   );

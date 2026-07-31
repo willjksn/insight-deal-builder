@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { getCreatorPortalMe, listCreatorPortalCampaigns } from "@/lib/creators/apiClient";
-import { isPaymentDetailsComplete, type Creator } from "@/lib/creators/types";
+import { isCreatorPaymentOnboardingComplete, type Creator } from "@/lib/creators/types";
 import { PRODUCER_LEGAL_NAME } from "@/lib/constants/legalTerms";
 
 export function CreatorPortalHome() {
@@ -71,7 +71,7 @@ export function CreatorPortalHome() {
     creator.networkAgreement?.status === "signed" &&
     Boolean(creator.networkAgreement.version);
   const idStatus = creator.identityVerification?.status ?? "none";
-  const paymentOk = isPaymentDetailsComplete(creator.paymentDetails);
+  const paymentOk = isCreatorPaymentOnboardingComplete(creator);
 
   return (
     <div className="space-y-6">
@@ -142,8 +142,8 @@ export function CreatorPortalHome() {
             </CardHeader>
             <CardBody className="text-sm text-slate-600">
               {paymentOk
-                ? "Payee details on file."
-                : "Add how IMG should pay you as a contractor."}
+                ? "Payout setup complete."
+                : "Connect Stripe or add how IMG should pay you."}
             </CardBody>
           </Card>
         </Link>

@@ -85,6 +85,8 @@ const FIELD_LABELS: Record<string, string> = {
   networkAgreement: "Network agreement",
   identityVerification: "ID verification",
   paymentDetails: "Payment details",
+  stripeConnectAccountId: "Stripe Connect account",
+  stripeConnect: "Stripe Connect status",
 };
 
 /** Human label for a change-history field key. */

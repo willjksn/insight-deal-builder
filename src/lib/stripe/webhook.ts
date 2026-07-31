@@ -4,6 +4,7 @@ import { Agreement } from "@/lib/types";
 import { getStripeWebhookSecret } from "@/lib/stripe/config";
 import { getStripe } from "@/lib/stripe/server";
 import { applyStripePaymentToAgreement, persistStripePayment } from "@/lib/stripe/applyPayment";
+import { handleStripeConnectAccountUpdated } from "@/lib/stripe/creatorConnect";
 import { installmentPayableAmount } from "@/lib/stripe/eligibility";
 
 const WEBHOOK_EVENTS_COLLECTION = "stripeWebhookEvents";
@@ -85,7 +86,12 @@ export async function handleCheckoutSessionCompleted(
 export async function processStripeWebhookEvent(
   db: Firestore,
   event: Stripe.Event
-): Promise<{ handled: boolean; applied?: boolean; agreementId?: string }> {
+): Promise<{
+  handled: boolean;
+  applied?: boolean;
+  agreementId?: string;
+  creatorId?: string;
+}> {
   const isNew = await markEventProcessed(db, event.id);
   if (!isNew) {
     return { handled: true, applied: false };
@@ -95,6 +101,12 @@ export async function processStripeWebhookEvent(
     const session = event.data.object as Stripe.Checkout.Session;
     const result = await handleCheckoutSessionCompleted(db, session);
     return { handled: true, ...result };
+  }
+
+  if (event.type === "account.updated") {
+    const account = event.data.object as Stripe.Account;
+    const result = await handleStripeConnectAccountUpdated(account);
+    return { handled: true, applied: result.updated, creatorId: result.creatorId };
   }
 
   return { handled: false };

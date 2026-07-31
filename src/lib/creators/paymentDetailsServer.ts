@@ -9,7 +9,9 @@ import {
   CREATOR_PAYMENT_METHOD_LABELS,
   CREATOR_PAYMENT_ONBOARDING_TASK_ID,
   buildDefaultOnboarding,
+  isCreatorPaymentOnboardingComplete,
   isPaymentDetailsComplete,
+  isStripeConnectReady,
   sanitizeCreatorOnboarding,
   type Creator,
   type CreatorOnboardingTask,
@@ -103,11 +105,13 @@ export function parsePaymentDetailsInput(raw: unknown): CreatorPaymentDetails {
 export async function getPaymentDetailsForPortal(appUser: AppUser): Promise<{
   paymentDetails: CreatorPaymentDetails | null;
   complete: boolean;
+  stripeConnectReady: boolean;
 }> {
   const creator = await getLinkedCreatorForUser(appUser);
   return {
     paymentDetails: creator.paymentDetails ?? null,
-    complete: isPaymentDetailsComplete(creator.paymentDetails),
+    complete: isCreatorPaymentOnboardingComplete(creator),
+    stripeConnectReady: isStripeConnectReady(creator),
   };
 }
 

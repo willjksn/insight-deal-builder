@@ -309,6 +309,26 @@ export interface CreatorPaymentDetails {
   updatedByUserId?: string;
 }
 
+/** Stripe Connect Express status cached on the creator. */
+export interface CreatorStripeConnectStatus {
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  detailsSubmitted?: boolean;
+  disabledReason?: string;
+  updatedAt?: string;
+}
+
+/** True when Stripe Connect Express can receive transfers. */
+export function isStripeConnectReady(creator?: {
+  stripeConnectAccountId?: string;
+  stripeConnect?: CreatorStripeConnectStatus;
+}): boolean {
+  if (!creator?.stripeConnectAccountId) return false;
+  return Boolean(
+    creator.stripeConnect?.detailsSubmitted && creator.stripeConnect?.payoutsEnabled
+  );
+}
+
 /** Client-safe completeness check for payment onboarding. */
 export function isPaymentDetailsComplete(
   details: CreatorPaymentDetails | undefined
@@ -324,6 +344,15 @@ export function isPaymentDetailsComplete(
     );
   }
   return true;
+}
+
+/** Payment onboarding satisfied via Connect or manual payee details. */
+export function isCreatorPaymentOnboardingComplete(creator: {
+  paymentDetails?: CreatorPaymentDetails;
+  stripeConnectAccountId?: string;
+  stripeConnect?: CreatorStripeConnectStatus;
+}): boolean {
+  return isStripeConnectReady(creator) || isPaymentDetailsComplete(creator.paymentDetails);
 }
 
 /** Audited manual change entry (review-before-write history). */
@@ -412,6 +441,10 @@ export interface Creator {
   identityVerification?: CreatorIdentityVerification;
   /** Contractor payee / payout details. */
   paymentDetails?: CreatorPaymentDetails;
+  /** Stripe Connect Express account id (acct_…). */
+  stripeConnectAccountId?: string;
+  /** Cached Connect readiness from Stripe account.updated / retrieve. */
+  stripeConnect?: CreatorStripeConnectStatus;
 
   // ── Links (dedup — point to existing records, never duplicate people) ──
   crewMemberId?: string;

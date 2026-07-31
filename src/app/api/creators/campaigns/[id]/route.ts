@@ -11,6 +11,7 @@ import {
   upsertCampaignDeliverable,
   type CampaignAssignmentInput,
 } from "@/lib/creators/opsServer";
+import { payCreatorCampaignAssignmentViaStripe } from "@/lib/stripe/creatorPayout";
 import { creatorApiError, requireCreatorManager } from "@/lib/creators/routeHelpers";
 import { CreatorError } from "@/lib/creators/errors";
 import type {
@@ -43,6 +44,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
       projectId?: string;
       assignment?: CampaignAssignmentInput & { id?: string };
       assignmentId?: string;
+      amount?: number;
     };
 
     if (body.action === "upsertBrief" && body.brief) {
@@ -69,6 +71,15 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
     }
     if (body.action === "removeAssignment" && body.assignmentId) {
       const campaign = await removeCampaignAssignment(appUser, id, body.assignmentId);
+      return NextResponse.json({ campaign });
+    }
+    if (body.action === "payAssignmentStripe" && body.assignmentId) {
+      const campaign = await payCreatorCampaignAssignmentViaStripe(
+        appUser,
+        id,
+        body.assignmentId,
+        { amount: typeof body.amount === "number" ? body.amount : undefined }
+      );
       return NextResponse.json({ campaign });
     }
 
