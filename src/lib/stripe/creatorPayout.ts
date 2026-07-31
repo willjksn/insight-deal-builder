@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { CreatorError } from "@/lib/creators/errors";
+import { sendCreatorPaidEmail } from "@/lib/creators/creatorPayoutEmail";
 import { getCreator } from "@/lib/creators/server";
 import {
   getCreatorCampaign,
@@ -113,7 +114,17 @@ export async function payCreatorCampaignAssignmentViaStripe(
       };
     });
 
-    return updateCreatorCampaign(appUser, campaignId, { assignments });
+    const updated = await updateCreatorCampaign(appUser, campaignId, { assignments });
+    if (creator.email?.trim()) {
+      await sendCreatorPaidEmail({
+        to: creator.email,
+        professionalName: creator.professionalName,
+        campaignName: campaign.name,
+        amount,
+        paidVia: "stripe",
+      });
+    }
+    return updated;
   } catch (err) {
     if (err instanceof CreatorError) throw err;
     const setup = getStripeConnectSetupRequiredMessage(err);

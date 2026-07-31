@@ -33,6 +33,7 @@ import {
   viewCreatorIdentityDocument,
   saveCreatorPaymentDetails,
   syncCreatorStripeConnect,
+  remindCreatorStripeConnect,
 } from "@/lib/creators/apiClient";
 import {
   CREATOR_READINESS_LABELS,
@@ -564,6 +565,10 @@ export default function CreatorDetailPage() {
             if (!id) return;
             const updated = await syncCreatorStripeConnect(getToken, id);
             hydrate(updated);
+          }}
+          onRemind={async () => {
+            if (!id) return;
+            await remindCreatorStripeConnect(getToken, id);
           }}
         />
 

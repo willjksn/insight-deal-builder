@@ -5,6 +5,7 @@ import { stripUndefined } from "@/lib/firebase/firestore";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import { CreatorError } from "@/lib/creators/errors";
+import { sendCreatorPaidEmail } from "@/lib/creators/creatorPayoutEmail";
 import { getCreator, listCreators } from "@/lib/creators/server";
 import { isStormiCreator } from "@/lib/creators/types";
 import { getCampaign as getRevenueCampaign } from "@/lib/revenueOpportunities/server/campaigns";
@@ -543,7 +544,22 @@ export async function markCreatorCampaignAssignmentPaid(
     };
   });
 
-  return updateCreatorCampaign(appUser, campaignId, { assignments });
+  const updated = await updateCreatorCampaign(appUser, campaignId, { assignments });
+  try {
+    const creator = await getCreator(appUser, existing.creatorId);
+    if (creator.email?.trim()) {
+      await sendCreatorPaidEmail({
+        to: creator.email,
+        professionalName: creator.professionalName,
+        campaignName: campaign.name,
+        amount,
+        paidVia: "manual",
+      });
+    }
+  } catch (err) {
+    console.error("[creators] paid email after manual mark failed", err);
+  }
+  return updated;
 }
 
 /**

@@ -15,6 +15,7 @@ type Props = {
   stripeConnect?: CreatorStripeConnectStatus;
   canManage: boolean;
   onSync: () => Promise<void>;
+  onRemind?: () => Promise<void>;
 };
 
 export function CreatorStripeConnectPanel({
@@ -22,9 +23,12 @@ export function CreatorStripeConnectPanel({
   stripeConnect,
   canManage,
   onSync,
+  onRemind,
 }: Props) {
   const [syncing, setSyncing] = useState(false);
+  const [reminding, setReminding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [remindOk, setRemindOk] = useState<string | null>(null);
   const ready = isStripeConnectReady({ stripeConnectAccountId, stripeConnect });
 
   return (
@@ -74,28 +78,64 @@ export function CreatorStripeConnectPanel({
           <p className="text-slate-500">Creator has not started Stripe Connect yet.</p>
         )}
 
-        {canManage && stripeConnectAccountId ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={syncing}
-            onClick={() => {
-              void (async () => {
-                setSyncing(true);
-                setError(null);
-                try {
-                  await onSync();
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : "Sync failed");
-                } finally {
-                  setSyncing(false);
-                }
-              })();
-            }}
-          >
-            {syncing ? "Syncing…" : "Refresh from Stripe"}
-          </Button>
+        {remindOk ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900">
+            {remindOk}
+          </div>
+        ) : null}
+
+        {canManage ? (
+          <div className="flex flex-wrap gap-2">
+            {stripeConnectAccountId ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={syncing || reminding}
+                onClick={() => {
+                  void (async () => {
+                    setSyncing(true);
+                    setError(null);
+                    setRemindOk(null);
+                    try {
+                      await onSync();
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Sync failed");
+                    } finally {
+                      setSyncing(false);
+                    }
+                  })();
+                }}
+              >
+                {syncing ? "Syncing…" : "Refresh from Stripe"}
+              </Button>
+            ) : null}
+            {!ready && onRemind ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={syncing || reminding}
+                onClick={() => {
+                  void (async () => {
+                    setReminding(true);
+                    setError(null);
+                    setRemindOk(null);
+                    try {
+                      await onRemind();
+                      setRemindOk("Reminder email sent.");
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Could not send reminder");
+                    } finally {
+                      setReminding(false);
+                    }
+                  })();
+                }}
+              >
+                {reminding ? "Sending…" : "Email Connect reminder"}
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </CardBody>
     </Card>

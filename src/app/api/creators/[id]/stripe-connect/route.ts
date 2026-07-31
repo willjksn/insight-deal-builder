@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { remindCreatorStripeConnect } from "@/lib/creators/creatorPayoutEmail";
 import { syncCreatorStripeConnectAccount } from "@/lib/stripe/creatorConnect";
 import { creatorApiError, requireCreatorManager } from "@/lib/creators/routeHelpers";
 import { redactCreatorForViewer } from "@/lib/creators/server";
@@ -14,6 +15,14 @@ export async function POST(request: NextRequest, context: Ctx) {
     const { id } = await context.params;
     const body = (await request.json().catch(() => ({}))) as { action?: string };
     const action = body.action || "sync";
+
+    if (action === "remind") {
+      const { sent, creator } = await remindCreatorStripeConnect(id);
+      return NextResponse.json({
+        sent,
+        creator: redactCreatorForViewer(creator, appUser),
+      });
+    }
 
     if (action !== "sync") {
       throw new CreatorError("VALIDATION_FAILED", "Unsupported Connect action");

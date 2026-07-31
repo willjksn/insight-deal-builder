@@ -676,6 +676,18 @@ export async function syncCreatorStripeConnect(
   return data.creator;
 }
 
+export async function remindCreatorStripeConnect(
+  getToken: GetToken,
+  creatorId: string
+): Promise<{ sent: boolean; creator: Creator }> {
+  const res = await fetch(`/api/creators/${creatorId}/stripe-connect`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ action: "remind" }),
+  });
+  return parseJson(res);
+}
+
 export async function saveCreatorPortalPayment(
   getToken: GetToken,
   body: NonNullable<Creator["paymentDetails"]>
