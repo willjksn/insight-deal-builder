@@ -134,7 +134,11 @@ export function CreatorOnboardingPanel({
                   </button>
                   {locked ? (
                     <p className="mt-1.5 pl-8 text-xs text-slate-500">
-                      {portalMode && isAgreement ? (
+                      {task.done && isAgreement ? (
+                        "Completed via e-signature."
+                      ) : task.done && isId ? (
+                        "Verified by IMG staff."
+                      ) : portalMode && isAgreement ? (
                         <>
                           Completes automatically when you{" "}
                           <Link
