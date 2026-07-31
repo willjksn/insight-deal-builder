@@ -253,6 +253,28 @@ export interface CreatorNetworkAgreement {
   userAgent?: string;
 }
 
+/** Creator-uploaded government ID awaiting staff review. */
+export type CreatorIdentityVerificationStatus =
+  | "none"
+  | "pending"
+  | "approved"
+  | "rejected";
+
+export interface CreatorIdentityVerification {
+  status: CreatorIdentityVerificationStatus;
+  frontDocumentId?: string;
+  backDocumentId?: string;
+  submittedAt?: string;
+  submittedByUserId?: string;
+  reviewedAt?: string;
+  reviewedByUserId?: string;
+  reviewedByDisplayName?: string;
+  rejectionReason?: string;
+}
+
+/** Stable onboarding task id for ID verification (matches buildDefaultOnboarding slug). */
+export const CREATOR_ID_ONBOARDING_TASK_ID = "id_verification_complete";
+
 /** Audited manual change entry (review-before-write history). */
 export interface CreatorChangeEntry {
   id: string;
@@ -335,6 +357,8 @@ export interface Creator {
   developmentPlan?: CreatorDevelopmentPlan;
   /** Master Creator Network independent-contractor agreement (e-sign record). */
   networkAgreement?: CreatorNetworkAgreement;
+  /** Government ID upload + staff verification status. */
+  identityVerification?: CreatorIdentityVerification;
 
   // ── Links (dedup — point to existing records, never duplicate people) ──
   crewMemberId?: string;

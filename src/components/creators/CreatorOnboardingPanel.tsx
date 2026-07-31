@@ -9,10 +9,16 @@ import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils/cn";
 import { CREATOR_AGREEMENT_ONBOARDING_TASK_ID } from "@/lib/creators/networkAgreementContent";
 import {
+  CREATOR_ID_ONBOARDING_TASK_ID,
   buildDefaultOnboarding,
   sanitizeCreatorOnboarding,
   type CreatorOnboardingTask,
 } from "@/lib/creators/types";
+
+const LOCKED_TASK_IDS = new Set([
+  CREATOR_AGREEMENT_ONBOARDING_TASK_ID,
+  CREATOR_ID_ONBOARDING_TASK_ID,
+]);
 
 type Props = {
   onboarding?: CreatorOnboardingTask[];
@@ -47,7 +53,7 @@ export function CreatorOnboardingPanel({
   };
 
   const toggle = (id: string) => {
-    if (id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID) return;
+    if (LOCKED_TASK_IDS.has(id)) return;
     setItems((prev) =>
       prev.map((t) =>
         t.id === id
@@ -91,7 +97,9 @@ export function CreatorOnboardingPanel({
         ) : (
           <ul className="space-y-2">
             {items.map((task) => {
-              const locked = task.id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID;
+              const locked = LOCKED_TASK_IDS.has(task.id);
+              const isAgreement = task.id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID;
+              const isId = task.id === CREATOR_ID_ONBOARDING_TASK_ID;
               return (
                 <li
                   key={task.id}
@@ -126,7 +134,7 @@ export function CreatorOnboardingPanel({
                   </button>
                   {locked ? (
                     <p className="mt-1.5 pl-8 text-xs text-slate-500">
-                      {portalMode ? (
+                      {portalMode && isAgreement ? (
                         <>
                           Completes automatically when you{" "}
                           <Link
@@ -137,8 +145,21 @@ export function CreatorOnboardingPanel({
                           </Link>
                           .
                         </>
-                      ) : (
+                      ) : portalMode && isId ? (
+                        <>
+                          Completes when IMG approves your{" "}
+                          <Link
+                            href="/creator-portal/identity"
+                            className="font-medium text-sky-700 hover:text-sky-900"
+                          >
+                            ID upload
+                          </Link>
+                          .
+                        </>
+                      ) : isAgreement ? (
                         "Completes when the creator e-signs the network contractor agreement in the portal (not toggleable here)."
+                      ) : (
+                        "Completes when staff approve the creator’s ID upload (not toggleable here)."
                       )}
                     </p>
                   ) : null}

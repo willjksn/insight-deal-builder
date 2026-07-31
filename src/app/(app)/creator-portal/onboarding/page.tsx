@@ -9,9 +9,15 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { getCreatorPortalMe, updateCreatorPortalMe } from "@/lib/creators/apiClient";
 import { CREATOR_AGREEMENT_ONBOARDING_TASK_ID } from "@/lib/creators/networkAgreementContent";
 import {
+  CREATOR_ID_ONBOARDING_TASK_ID,
   sanitizeCreatorOnboarding,
   type CreatorOnboardingTask,
 } from "@/lib/creators/types";
+
+const LOCKED_TASK_IDS = new Set([
+  CREATOR_AGREEMENT_ONBOARDING_TASK_ID,
+  CREATOR_ID_ONBOARDING_TASK_ID,
+]);
 
 export default function CreatorPortalOnboardingPage() {
   const { user } = useAuth();
@@ -45,7 +51,7 @@ export default function CreatorPortalOnboardingPage() {
   }, [user, getToken]);
 
   const toggle = async (id: string) => {
-    if (id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID) return;
+    if (LOCKED_TASK_IDS.has(id)) return;
     const next = tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
     setTasks(next);
     setSaving(true);
@@ -98,7 +104,9 @@ export default function CreatorPortalOnboardingPage() {
             </p>
           ) : (
             tasks.map((task) => {
-              const locked = task.id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID;
+              const locked = LOCKED_TASK_IDS.has(task.id);
+              const isAgreement = task.id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID;
+              const isId = task.id === CREATOR_ID_ONBOARDING_TASK_ID;
               return (
                 <div
                   key={task.id}
@@ -128,9 +136,11 @@ export default function CreatorPortalOnboardingPage() {
                   </label>
                   {locked ? (
                     <p className="mt-1.5 pl-7 text-xs text-slate-500">
-                      {task.done ? (
+                      {task.done && isAgreement ? (
                         "Completed via e-signature."
-                      ) : (
+                      ) : task.done && isId ? (
+                        "Verified by IMG staff."
+                      ) : isAgreement ? (
                         <>
                           Sign in{" "}
                           <Link
@@ -140,6 +150,17 @@ export default function CreatorPortalOnboardingPage() {
                             Agreement
                           </Link>{" "}
                           to complete this step.
+                        </>
+                      ) : (
+                        <>
+                          Upload ID in{" "}
+                          <Link
+                            href="/creator-portal/identity"
+                            className="font-medium text-sky-700 hover:text-sky-900"
+                          >
+                            ID verification
+                          </Link>{" "}
+                          for IMG to review.
                         </>
                       )}
                     </p>

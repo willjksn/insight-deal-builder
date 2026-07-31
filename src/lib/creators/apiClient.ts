@@ -554,3 +554,65 @@ export async function voidCreatorNetworkAgreement(
   const data = await parseJson<{ creator: Creator }>(res);
   return data.creator;
 }
+
+export async function getCreatorPortalIdentity(getToken: GetToken) {
+  const res = await fetch("/api/creator-portal/identity", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    verification: NonNullable<Creator["identityVerification"]>;
+    canUpload: boolean;
+    hasFront: boolean;
+    hasBack: boolean;
+  }>(res);
+}
+
+export async function submitCreatorPortalIdentity(
+  getToken: GetToken,
+  body: {
+    frontFileDataUrl: string;
+    frontFileName?: string;
+    backFileDataUrl?: string;
+    backFileName?: string;
+  }
+) {
+  const res = await fetch("/api/creator-portal/identity", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    creator: Creator;
+    verification: NonNullable<Creator["identityVerification"]>;
+    canUpload: boolean;
+    hasFront: boolean;
+    hasBack: boolean;
+  }>(res);
+}
+
+export async function reviewCreatorIdentityVerification(
+  getToken: GetToken,
+  creatorId: string,
+  body: { action: "approve" | "reject"; rejectionReason?: string }
+): Promise<Creator> {
+  const res = await fetch(`/api/creators/${creatorId}/identity-verification`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  const data = await parseJson<{ creator: Creator }>(res);
+  return data.creator;
+}
+
+export async function viewCreatorIdentityDocument(
+  getToken: GetToken,
+  creatorId: string,
+  side: "front" | "back"
+): Promise<{ url: string; expiresInMs: number }> {
+  const res = await fetch(`/api/creators/${creatorId}/identity-verification`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ action: "view", side }),
+  });
+  return parseJson(res);
+}

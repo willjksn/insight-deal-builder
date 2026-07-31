@@ -70,6 +70,7 @@ export function CreatorPortalHome() {
   const agreementSigned =
     creator.networkAgreement?.status === "signed" &&
     Boolean(creator.networkAgreement.version);
+  const idStatus = creator.identityVerification?.status ?? "none";
 
   return (
     <div className="space-y-6">
@@ -82,7 +83,7 @@ export function CreatorPortalHome() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Link href="/creator-portal/profile" className="block">
           <Card className="h-full transition hover:border-sky-200 hover:shadow-md">
             <CardHeader>
@@ -114,6 +115,22 @@ export function CreatorPortalHome() {
               {agreementSigned
                 ? "Contractor agreement signed."
                 : "Review and e-sign the independent contractor agreement."}
+            </CardBody>
+          </Card>
+        </Link>
+        <Link href="/creator-portal/identity" className="block">
+          <Card className="h-full transition hover:border-sky-200 hover:shadow-md">
+            <CardHeader>
+              <h2 className="font-semibold text-slate-900">ID verification</h2>
+            </CardHeader>
+            <CardBody className="text-sm text-slate-600">
+              {idStatus === "approved"
+                ? "ID verified by IMG."
+                : idStatus === "pending"
+                  ? "ID submitted — awaiting staff review."
+                  : idStatus === "rejected"
+                    ? "ID needs resubmission."
+                    : "Upload your government ID for staff review."}
             </CardBody>
           </Card>
         </Link>

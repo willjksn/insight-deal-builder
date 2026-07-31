@@ -29,6 +29,8 @@ import {
   setCreatorApplicationStatus,
   updateCreator,
   voidCreatorNetworkAgreement,
+  reviewCreatorIdentityVerification,
+  viewCreatorIdentityDocument,
 } from "@/lib/creators/apiClient";
 import {
   CREATOR_READINESS_LABELS,
@@ -53,6 +55,8 @@ import { CreatorAvailabilityPanel } from "@/components/creators/CreatorAvailabil
 import { CreatorReadinessPanel } from "@/components/creators/CreatorReadinessPanel";
 import { CreatorOnboardingPanel } from "@/components/creators/CreatorOnboardingPanel";
 import { CreatorNetworkAgreementPanel } from "@/components/creators/CreatorNetworkAgreementPanel";
+import { CreatorIdentityVerificationPanel } from "@/components/creators/CreatorIdentityVerificationPanel";
+import { CreatorChangeHistoryPanel } from "@/components/creators/CreatorChangeHistoryPanel";
 import { CreatorDocumentsPanel } from "@/components/creators/CreatorDocumentsPanel";
 import { CreatorApplicationPanel } from "@/components/creators/CreatorApplicationPanel";
 import { CreatorPortalInviteCard } from "@/components/creators/CreatorPortalInviteCard";
@@ -489,6 +493,44 @@ export default function CreatorDetailPage() {
           }}
         />
 
+        <CreatorIdentityVerificationPanel
+          key={`idv-${creator.updatedAt}`}
+          verification={creator.identityVerification}
+          canEdit={canManage}
+          canViewSensitive={canViewSensitive}
+          saving={saving}
+          onApprove={async () => {
+            if (!id) return;
+            setSaving(true);
+            try {
+              const updated = await reviewCreatorIdentityVerification(getToken, id, {
+                action: "approve",
+              });
+              hydrate(updated);
+            } finally {
+              setSaving(false);
+            }
+          }}
+          onReject={async (rejectionReason) => {
+            if (!id) return;
+            setSaving(true);
+            try {
+              const updated = await reviewCreatorIdentityVerification(getToken, id, {
+                action: "reject",
+                rejectionReason,
+              });
+              hydrate(updated);
+            } finally {
+              setSaving(false);
+            }
+          }}
+          onView={async (side) => {
+            if (!id) return;
+            const { url } = await viewCreatorIdentityDocument(getToken, id, side);
+            window.open(url, "_blank", "noopener,noreferrer");
+          }}
+        />
+
         <CreatorOnboardingPanel
           key={`onboard-${creator.updatedAt}`}
           onboarding={creator.onboarding}
@@ -563,31 +605,7 @@ export default function CreatorDetailPage() {
           }}
         />
 
-        {creator.changeHistory && creator.changeHistory.length > 0 && (
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-semibold">Recent changes</h2>
-            </CardHeader>
-            <CardBody>
-              <ul className="space-y-2 text-sm text-slate-600">
-                {creator.changeHistory.slice(0, 10).map((entry) => (
-                  <li key={entry.id} className="flex flex-wrap items-center gap-2">
-                    <Badge variant="default">{entry.field}</Badge>
-                    <span className="text-slate-400 line-through">
-                      {entry.previousValue || "—"}
-                    </span>
-                    <span aria-hidden>→</span>
-                    <span className="text-slate-900">{entry.newValue || "—"}</span>
-                    <span className="text-xs text-slate-400">
-                      {new Date(entry.changedAt).toLocaleDateString()}
-                      {entry.changedByDisplayName ? ` · ${entry.changedByDisplayName}` : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardBody>
-          </Card>
-        )}
+        <CreatorChangeHistoryPanel changeHistory={creator.changeHistory} />
       </div>
 
       <ConfirmDialog

@@ -15,6 +15,7 @@ import { sendTransactionalEmail } from "@/lib/notifications/delivery";
 import { CreatorError } from "@/lib/creators/errors";
 import {
   CREATORS_COLLECTION,
+  CREATOR_ID_ONBOARDING_TASK_ID,
   buildDefaultOnboarding,
   sanitizeCreatorOnboarding,
   isApprovedApplication,
@@ -107,18 +108,31 @@ export async function updateOwnCreatorProfile(
     const agreementSigned =
       creator.networkAgreement?.status === "signed" &&
       creator.networkAgreement.version === CREATOR_NETWORK_AGREEMENT_VERSION;
+    const idApproved = creator.identityVerification?.status === "approved";
     onboarding = sanitizeCreatorOnboarding(onboarding).map((t) => {
-      if (t.id !== CREATOR_AGREEMENT_ONBOARDING_TASK_ID) return t;
-      if (agreementSigned) {
-        return {
-          ...t,
-          done: true,
-          doneAt: creator.networkAgreement?.signedAt ?? t.doneAt,
-          notes: t.notes || "Signed in ShootSpine",
-        };
+      if (t.id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID) {
+        if (agreementSigned) {
+          return {
+            ...t,
+            done: true,
+            doneAt: creator.networkAgreement?.signedAt ?? t.doneAt,
+            notes: t.notes || "Signed in ShootSpine",
+          };
+        }
+        return { ...t, done: false, doneAt: undefined };
       }
-      // Agreement completion is e-sign only — checklist toggle cannot mark it done.
-      return { ...t, done: false, doneAt: undefined };
+      if (t.id === CREATOR_ID_ONBOARDING_TASK_ID) {
+        if (idApproved) {
+          return {
+            ...t,
+            done: true,
+            doneAt: creator.identityVerification?.reviewedAt ?? t.doneAt,
+            notes: t.notes || "Verified by IMG staff",
+          };
+        }
+        return { ...t, done: false, doneAt: undefined };
+      }
+      return t;
     });
   }
 
