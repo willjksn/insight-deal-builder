@@ -498,6 +498,53 @@ export async function removeCampaignAssignment(
   });
 }
 
+/**
+ * Mark an assignment paid outside Stripe (PayPal, ACH, Venmo, check, etc.).
+ * Amount defaults to assignment.compensation.
+ */
+export async function markCreatorCampaignAssignmentPaid(
+  appUser: AppUser,
+  campaignId: string,
+  assignmentId: string,
+  opts?: { amount?: number }
+): Promise<CreatorCampaign> {
+  const campaign = await getCreatorCampaign(appUser, campaignId);
+  const existing = (campaign.assignments ?? []).find((a) => a.id === assignmentId);
+  if (!existing) throw new CreatorError("NOT_FOUND", "Assignment not found");
+
+  if (existing.stripeTransferId || existing.paidAt) {
+    throw new CreatorError("VALIDATION_FAILED", "This assignment is already marked paid");
+  }
+
+  const amount =
+    typeof opts?.amount === "number" && Number.isFinite(opts.amount)
+      ? opts.amount
+      : existing.compensation;
+  if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+    throw new CreatorError(
+      "VALIDATION_FAILED",
+      "Set a positive compensation amount before marking paid"
+    );
+  }
+
+  const paidAt = new Date().toISOString();
+  const assignments = (campaign.assignments ?? []).map((a) =>
+    a.id === assignmentId
+      ? {
+          ...a,
+          paidAt,
+          paidAmount: amount,
+          paidVia: "manual" as const,
+          paidByUserId: appUser.id,
+          paidByDisplayName: appUser.displayName || appUser.email || undefined,
+          status: "paid",
+        }
+      : a
+  );
+
+  return updateCreatorCampaign(appUser, campaignId, { assignments });
+}
+
 /** Find an existing creator-ops campaign linked to a revenue campaign (if any). */
 export async function findCreatorCampaignByRevenueId(
   appUser: AppUser,

@@ -4,6 +4,7 @@ import {
   deleteCreatorCampaign,
   getCreatorCampaign,
   linkCampaignToProject,
+  markCreatorCampaignAssignmentPaid,
   removeCampaignAssignment,
   updateCampaignAssignment,
   updateCreatorCampaign,
@@ -75,6 +76,15 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
     }
     if (body.action === "payAssignmentStripe" && body.assignmentId) {
       const campaign = await payCreatorCampaignAssignmentViaStripe(
+        appUser,
+        id,
+        body.assignmentId,
+        { amount: typeof body.amount === "number" ? body.amount : undefined }
+      );
+      return NextResponse.json({ campaign });
+    }
+    if (body.action === "markAssignmentPaid" && body.assignmentId) {
+      const campaign = await markCreatorCampaignAssignmentPaid(
         appUser,
         id,
         body.assignmentId,

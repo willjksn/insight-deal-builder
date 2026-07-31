@@ -89,6 +89,7 @@ export async function payCreatorCampaignAssignmentViaStripe(
             ...a,
             paidAt,
             paidAmount: amount,
+            paidVia: "stripe" as const,
             stripeTransferId: transfer.id,
             paidByUserId: appUser.id,
             paidByDisplayName: appUser.displayName || appUser.email || undefined,

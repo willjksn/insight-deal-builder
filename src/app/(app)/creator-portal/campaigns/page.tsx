@@ -110,6 +110,11 @@ export default function CreatorPortalCampaignsPage() {
                       {typeof c.paidAmount === "number"
                         ? ` $${c.paidAmount.toLocaleString()}`
                         : ""}
+                      {c.paidVia === "stripe"
+                        ? " via Stripe"
+                        : c.paidVia === "manual"
+                          ? " (recorded)"
+                          : ""}
                     </span>
                   ) : null}
                   {c.compensationNotes && <span>{c.compensationNotes}</span>}

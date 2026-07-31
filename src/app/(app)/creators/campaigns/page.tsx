@@ -67,7 +67,10 @@ export default function CreatorCampaignsPage() {
   const [assignComp, setAssignComp] = useState<number | undefined>(undefined);
   const [assignWarnOpen, setAssignWarnOpen] = useState(false);
   const [assignWarnText, setAssignWarnText] = useState("");
-  const [payTarget, setPayTarget] = useState<CreatorCampaignAssignment | null>(null);
+  const [payTarget, setPayTarget] = useState<{
+    assignment: CreatorCampaignAssignment;
+    mode: "stripe" | "manual";
+  } | null>(null);
 
   // Brief / deliverable quick add (tied to assigned creators)
   const [briefCreatorId, setBriefCreatorId] = useState("");
@@ -438,11 +441,10 @@ export default function CreatorCampaignsPage() {
                       const gaps = creator ? getCreatorCampaignAssignGaps(creator) : [];
                       const connectReady = isStripeConnectReady(creator);
                       const alreadyPaid = Boolean(a.paidAt || a.stripeTransferId);
-                      const canPayStripe =
-                        !alreadyPaid &&
-                        typeof a.compensation === "number" &&
-                        a.compensation > 0 &&
-                        connectReady;
+                      const hasComp =
+                        typeof a.compensation === "number" && a.compensation > 0;
+                      const canPayStripe = !alreadyPaid && hasComp && connectReady;
+                      const canMarkPaid = !alreadyPaid && hasComp;
                       return (
                       <li
                         key={a.id}
@@ -473,15 +475,20 @@ export default function CreatorCampaignsPage() {
                                   typeof a.paidAmount === "number"
                                     ? ` · $${a.paidAmount.toLocaleString()}`
                                     : ""
+                                }${
+                                  a.paidVia === "stripe"
+                                    ? " · Stripe"
+                                    : a.paidVia === "manual"
+                                      ? " · Manual"
+                                      : a.stripeTransferId
+                                        ? " · Stripe"
+                                        : ""
                                 }`
                               : ""}
                             {!alreadyPaid && gaps.length
                               ? ` · ${gaps.map((g) => g.label).join("; ")}`
                               : ""}
-                            {!alreadyPaid &&
-                            typeof a.compensation === "number" &&
-                            a.compensation > 0 &&
-                            !connectReady
+                            {!alreadyPaid && hasComp && !connectReady
                               ? " · Stripe Connect not ready"
                               : ""}
                           </div>
@@ -493,9 +500,20 @@ export default function CreatorCampaignsPage() {
                               size="sm"
                               variant="outline"
                               disabled={busy}
-                              onClick={() => setPayTarget(a)}
+                              onClick={() => setPayTarget({ assignment: a, mode: "stripe" })}
                             >
                               Pay via Stripe
+                            </Button>
+                          ) : null}
+                          {canMarkPaid ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              onClick={() => setPayTarget({ assignment: a, mode: "manual" })}
+                            >
+                              Mark paid
                             </Button>
                           ) : null}
                           <Button
@@ -767,13 +785,19 @@ export default function CreatorCampaignsPage() {
 
       <ConfirmDialog
         open={Boolean(payTarget)}
-        title="Pay creator via Stripe?"
+        title={
+          payTarget?.mode === "manual"
+            ? "Mark assignment paid?"
+            : "Pay creator via Stripe?"
+        }
         description={
           payTarget
-            ? `Transfer $${(payTarget.compensation ?? 0).toLocaleString()} USD to ${payTarget.creatorName} through their Stripe Connect Express account. This uses your platform Stripe balance.`
+            ? payTarget.mode === "manual"
+              ? `Record $${(payTarget.assignment.compensation ?? 0).toLocaleString()} as paid to ${payTarget.assignment.creatorName} outside Stripe (PayPal, ACH, Venmo, check, etc.). No money will move from ShootSpine.`
+              : `Transfer $${(payTarget.assignment.compensation ?? 0).toLocaleString()} USD to ${payTarget.assignment.creatorName} through their Stripe Connect Express account. This uses your platform Stripe balance.`
             : ""
         }
-        confirmLabel="Pay via Stripe"
+        confirmLabel={payTarget?.mode === "manual" ? "Mark paid" : "Pay via Stripe"}
         cancelLabel="Cancel"
         loading={busy}
         onCancel={() => setPayTarget(null)}
@@ -784,14 +808,23 @@ export default function CreatorCampaignsPage() {
             setError(null);
             try {
               const res = await patchCreatorCampaign(getToken, active.id, {
-                action: "payAssignmentStripe",
-                assignmentId: payTarget.id,
+                action:
+                  payTarget.mode === "manual"
+                    ? "markAssignmentPaid"
+                    : "payAssignmentStripe",
+                assignmentId: payTarget.assignment.id,
               });
               setActive(res.campaign);
               setPayTarget(null);
               await reload();
             } catch (e) {
-              setError(e instanceof Error ? e.message : "Stripe payout failed");
+              setError(
+                e instanceof Error
+                  ? e.message
+                  : payTarget.mode === "manual"
+                    ? "Could not mark paid"
+                    : "Stripe payout failed"
+              );
             } finally {
               setBusy(false);
             }

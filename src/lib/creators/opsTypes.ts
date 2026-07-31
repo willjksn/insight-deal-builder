@@ -143,9 +143,10 @@ export interface CreatorCampaignAssignment {
   shortlistEntryId?: string;
   briefId?: string;
   status?: string;
-  /** Stripe Connect transfer payout record */
+  /** Payout record (Stripe Transfer or staff-marked manual) */
   paidAt?: string;
   paidAmount?: number;
+  paidVia?: "stripe" | "manual";
   stripeTransferId?: string;
   paidByUserId?: string;
   paidByDisplayName?: string;
