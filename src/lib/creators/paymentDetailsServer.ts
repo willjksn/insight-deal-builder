@@ -115,63 +115,32 @@ export async function getPaymentDetailsForPortal(appUser: AppUser): Promise<{
   };
 }
 
+/** Manual payee collection removed — payouts use Stripe Connect only. */
 export async function savePaymentDetailsForPortal(
-  appUser: AppUser,
-  input: unknown
+  _appUser: AppUser,
+  _input: unknown
 ): Promise<{ creator: Creator; paymentDetails: CreatorPaymentDetails }> {
-  const creator = await getLinkedCreatorForUser(appUser);
-  const parsed = parsePaymentDetailsInput(input);
-  const updatedAt = new Date().toISOString();
-  const paymentDetails: CreatorPaymentDetails = {
-    ...parsed,
-    updatedAt,
-    updatedByUserId: appUser.id,
-  };
-  const onboarding = markPaymentTask(creator.onboarding, true, updatedAt);
-
-  const db = requireDb();
-  const ref = db.collection(CREATORS_COLLECTION).doc(creator.id);
-  await ref.update({
-    paymentDetails,
-    onboarding,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
-  const snap = await ref.get();
-  return {
-    creator: serializeDoc<Creator>(snap.id, snap.data()!),
-    paymentDetails,
-  };
+  void _appUser;
+  void _input;
+  throw new CreatorError(
+    "VALIDATION_FAILED",
+    "Manual payee details are not collected. Connect Stripe in the creator portal instead."
+  );
 }
 
-/** Staff save of payment details (same validation). */
+/** Manual payee collection removed — payouts use Stripe Connect only. */
 export async function saveCreatorPaymentDetails(
-  appUser: AppUser,
-  creatorId: string,
-  input: unknown
+  _appUser: AppUser,
+  _creatorId: string,
+  _input: unknown
 ): Promise<Creator> {
-  const db = requireDb();
-  const ref = db.collection(CREATORS_COLLECTION).doc(creatorId);
-  const snap = await ref.get();
-  if (!snap.exists) throw new CreatorError("NOT_FOUND", "Creator not found");
-  const current = serializeDoc<Creator>(snap.id, snap.data()!);
-  if (current.organizationCompany !== appUser.company) {
-    throw new CreatorError("NOT_FOUND", "Creator not found");
-  }
-  const parsed = parsePaymentDetailsInput(input);
-  const updatedAt = new Date().toISOString();
-  const paymentDetails: CreatorPaymentDetails = {
-    ...parsed,
-    updatedAt,
-    updatedByUserId: appUser.id,
-  };
-  const onboarding = markPaymentTask(current.onboarding, true, updatedAt);
-  await ref.update({
-    paymentDetails,
-    onboarding,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
-  const next = await ref.get();
-  return serializeDoc<Creator>(next.id, next.data()!);
+  void _appUser;
+  void _creatorId;
+  void _input;
+  throw new CreatorError(
+    "VALIDATION_FAILED",
+    "Manual payee details are not collected. Creators must connect Stripe for payouts."
+  );
 }
 
 /** Redact account numbers for viewers without sensitive-doc rights. */

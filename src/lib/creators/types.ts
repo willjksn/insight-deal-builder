@@ -346,13 +346,12 @@ export function isPaymentDetailsComplete(
   return true;
 }
 
-/** Payment onboarding satisfied via Connect or manual payee details. */
+/** Payment onboarding satisfied only via Stripe Connect (no bank details stored in ShootSpine). */
 export function isCreatorPaymentOnboardingComplete(creator: {
-  paymentDetails?: CreatorPaymentDetails;
   stripeConnectAccountId?: string;
   stripeConnect?: CreatorStripeConnectStatus;
 }): boolean {
-  return isStripeConnectReady(creator) || isPaymentDetailsComplete(creator.paymentDetails);
+  return isStripeConnectReady(creator);
 }
 
 /** Audited manual change entry (review-before-write history). */

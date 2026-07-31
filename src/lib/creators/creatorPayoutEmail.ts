@@ -82,9 +82,9 @@ export function buildCreatorConnectNudgeEmail(params: {
 
   const text = `Hi ${name},
 
-${PRODUCER_LEGAL_NAME} needs your Stripe Connect (or payee details) set up so we can pay you for creator work.
+${PRODUCER_LEGAL_NAME} needs your Stripe Connect set up so we can pay you for creator work. Bank details stay with Stripe — we never store them in ShootSpine.
 
-Open the payment page in ShootSpine and choose Connect with Stripe (recommended), or enter manual payee details:
+Open the payment page and choose Connect with Stripe:
 ${paymentUrl}
 
 — ${PRODUCER_LEGAL_NAME}`;
@@ -93,8 +93,8 @@ ${paymentUrl}
     <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.55;color:#0f172a;max-width:560px;">
       <p style="margin:0 0 16px;">Hi ${escapeHtml(name)},</p>
       <p style="margin:0 0 16px;">
-        <strong>${escapeHtml(PRODUCER_LEGAL_NAME)}</strong> needs your Stripe Connect (or payee details)
-        set up so we can pay you for creator work.
+        <strong>${escapeHtml(PRODUCER_LEGAL_NAME)}</strong> needs your Stripe Connect set up so we can
+        pay you for creator work. Bank details stay with Stripe — we never store them in ShootSpine.
       </p>
       <p style="margin:0 0 24px;">
         <a href="${paymentUrl}" style="color:#0284c7;">Open payment setup</a>

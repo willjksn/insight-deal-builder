@@ -16,7 +16,6 @@ export function getCreatorCampaignAssignGaps(
     | "networkAgreement"
     | "identityVerification"
     | "professionalName"
-    | "paymentDetails"
     | "stripeConnectAccountId"
     | "stripeConnect"
   >
@@ -43,7 +42,7 @@ export function getCreatorCampaignAssignGaps(
       id: "payment",
       label: startedConnect
         ? "Stripe Connect onboarding incomplete"
-        : "Payment / Stripe Connect not set up",
+        : "Stripe Connect not set up",
     });
   }
   return gaps;

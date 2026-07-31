@@ -46,7 +46,8 @@ export function CreatorStripeConnectPanel({
       <CardBody className="space-y-3 text-sm text-slate-600">
         <p>
           Creators connect an Express account in the portal so IMG can pay them via Stripe
-          Transfers. Manual payee details remain available as a fallback.
+          Transfers. Bank details stay with Stripe — ShootSpine does not collect payee or banking
+          information.
         </p>
 
         {error ? (

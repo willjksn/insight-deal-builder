@@ -142,8 +142,8 @@ export function CreatorPortalHome() {
             </CardHeader>
             <CardBody className="text-sm text-slate-600">
               {paymentOk
-                ? "Payout setup complete."
-                : "Connect Stripe or add how IMG should pay you."}
+                ? "Stripe Connect ready for payouts."
+                : "Connect Stripe so IMG can pay you."}
             </CardBody>
           </Card>
         </Link>

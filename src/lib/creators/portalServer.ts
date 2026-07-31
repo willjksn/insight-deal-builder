@@ -141,17 +141,11 @@ export async function updateOwnCreatorProfile(
       }
       if (t.id === CREATOR_PAYMENT_ONBOARDING_TASK_ID) {
         if (paymentOk) {
-          const connectReady = Boolean(
-            creator.stripeConnectAccountId && creator.stripeConnect?.payoutsEnabled
-          );
           return {
             ...t,
             done: true,
-            doneAt:
-              creator.stripeConnect?.updatedAt ??
-              creator.paymentDetails?.updatedAt ??
-              t.doneAt,
-            notes: t.notes || (connectReady ? "Stripe Connect ready" : "Saved in ShootSpine"),
+            doneAt: creator.stripeConnect?.updatedAt ?? t.doneAt,
+            notes: t.notes || "Stripe Connect ready",
           };
         }
         return { ...t, done: false, doneAt: undefined };

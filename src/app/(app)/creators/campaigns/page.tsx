@@ -815,7 +815,7 @@ export default function CreatorCampaignsPage() {
             ? payTarget.mode === "clear"
               ? `Remove the paid mark for ${payTarget.assignment.creatorName}. This does not reverse any money already sent outside ShootSpine.`
               : payTarget.mode === "manual"
-                ? `Record $${(payTarget.assignment.compensation ?? 0).toLocaleString()} as paid to ${payTarget.assignment.creatorName} outside Stripe (PayPal, ACH, Venmo, check, etc.). No money will move from ShootSpine.`
+                ? `Record $${(payTarget.assignment.compensation ?? 0).toLocaleString()} as paid to ${payTarget.assignment.creatorName} without a Stripe transfer. This only updates ShootSpine — it does not collect or store bank details.`
                 : `Transfer $${(payTarget.assignment.compensation ?? 0).toLocaleString()} USD to ${payTarget.assignment.creatorName} through their Stripe Connect Express account. This uses your platform Stripe balance.`
             : ""
         }

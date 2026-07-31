@@ -9,15 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import {
-  CreatorPaymentDetailsForm,
-  formToPaymentDetails,
-  paymentDetailsToForm,
-  type PaymentDetailsFormValue,
-} from "@/components/creators/CreatorPaymentDetailsForm";
-import {
-  getCreatorPortalPayment,
   getCreatorPortalStripeConnect,
-  saveCreatorPortalPayment,
   startCreatorPortalStripeConnect,
   openCreatorPortalStripeDashboard,
 } from "@/lib/creators/apiClient";
@@ -28,14 +20,11 @@ export default function CreatorPortalPaymentPage() {
   const searchParams = useSearchParams();
   const connectParam = searchParams.get("connect");
 
-  const [form, setForm] = useState<PaymentDetailsFormValue>(paymentDetailsToForm(null));
-  const [complete, setComplete] = useState(false);
   const [connectConfigured, setConnectConfigured] = useState(false);
   const [connectReady, setConnectReady] = useState(false);
   const [connectAccountId, setConnectAccountId] = useState<string | null>(null);
   const [connectStatus, setConnectStatus] = useState<CreatorStripeConnectStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [connectBusy, setConnectBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectBanner, setConnectBanner] = useState<string | null>(null);
@@ -46,12 +35,7 @@ export default function CreatorPortalPaymentPage() {
   }, [user]);
 
   const reload = useCallback(async () => {
-    const [payment, connect] = await Promise.all([
-      getCreatorPortalPayment(getToken),
-      getCreatorPortalStripeConnect(getToken),
-    ]);
-    setForm(paymentDetailsToForm(payment.paymentDetails));
-    setComplete(payment.complete || connect.ready);
+    const connect = await getCreatorPortalStripeConnect(getToken);
     setConnectConfigured(connect.configured);
     setConnectReady(connect.ready);
     setConnectAccountId(connect.accountId);
@@ -76,7 +60,7 @@ export default function CreatorPortalPaymentPage() {
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load payment details");
+          setError(e instanceof Error ? e.message : "Failed to load payment setup");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -86,20 +70,6 @@ export default function CreatorPortalPaymentPage() {
       cancelled = true;
     };
   }, [user, reload, connectParam]);
-
-  const save = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const data = await saveCreatorPortalPayment(getToken, formToPaymentDetails(form));
-      setForm(paymentDetailsToForm(data.paymentDetails));
-      setComplete(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save payment details");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const startConnect = async () => {
     setConnectBusy(true);
@@ -146,7 +116,8 @@ export default function CreatorPortalPaymentPage() {
         </Link>
         <h1 className="text-2xl font-bold text-slate-900">Payment</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Connect Stripe so IMG can pay you, or enter manual payee details. This is not a W-9.
+          Connect Stripe so IMG can pay you. Bank and tax details stay with Stripe — ShootSpine does
+          not store your banking information.
         </p>
       </div>
 
@@ -162,14 +133,10 @@ export default function CreatorPortalPaymentPage() {
         </div>
       ) : null}
 
-      {complete ? (
+      {connectReady ? (
         <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-          <p>
-            {connectReady
-              ? "Stripe Connect is ready for payouts."
-              : "Payment details on file. Update anytime below."}
-          </p>
+          <p>Stripe Connect is ready for payouts.</p>
         </div>
       ) : null}
 
@@ -180,8 +147,8 @@ export default function CreatorPortalPaymentPage() {
         <CardBody className="space-y-3 text-sm text-slate-600">
           {!connectConfigured ? (
             <p>
-              Stripe Connect is not configured for this environment yet. Use manual payee details
-              below, or ask IMG to enable Connect.
+              Stripe Connect is not configured for this environment yet. Ask IMG to enable it, then
+              return here to connect.
             </p>
           ) : connectReady ? (
             <>
@@ -193,7 +160,7 @@ export default function CreatorPortalPaymentPage() {
                     (<span className="font-mono text-xs">{connectAccountId}</span>)
                   </>
                 ) : null}
-                . Manage bank and tax info in Stripe.
+                . Manage bank and tax info in Stripe — not in ShootSpine.
               </p>
               <Button
                 type="button"
@@ -208,8 +175,9 @@ export default function CreatorPortalPaymentPage() {
           ) : (
             <>
               <p>
-                Recommended: connect with Stripe Express (same flow as EchoFlux). You&apos;ll
-                complete identity and bank details on Stripe&apos;s site, then return here.
+                Connect with Stripe Express. You&apos;ll complete identity and bank details on
+                Stripe&apos;s site, then return here. IMG never sees or stores your bank account
+                numbers.
               </p>
               {connectAccountId && !connectStatus?.detailsSubmitted ? (
                 <p className="text-amber-800">
@@ -229,23 +197,6 @@ export default function CreatorPortalPaymentPage() {
               </Button>
             </>
           )}
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-semibold">Manual payee details</h2>
-        </CardHeader>
-        <CardBody className="space-y-2">
-          <p className="text-sm text-slate-600">
-            Optional fallback if you prefer PayPal, Venmo, ACH, or wire instead of Connect.
-          </p>
-          <CreatorPaymentDetailsForm
-            value={form}
-            onChange={setForm}
-            onSubmit={() => void save()}
-            saving={saving}
-          />
         </CardBody>
       </Card>
     </div>

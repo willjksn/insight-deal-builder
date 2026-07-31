@@ -61,10 +61,10 @@ describe("getCreatorCampaignAssignGaps", () => {
 describe("formatCreatorAssignGapWarning", () => {
   it("joins gap labels", () => {
     const text = formatCreatorAssignGapWarning("Ada", [
-      { id: "payment", label: "Payment / Stripe Connect not set up" },
+      { id: "payment", label: "Stripe Connect not set up" },
     ]);
     expect(text).toContain("Ada");
-    expect(text).toContain("Payment / Stripe Connect not set up");
+    expect(text).toContain("Stripe Connect not set up");
     expect(text).toContain("still assign");
   });
 });
