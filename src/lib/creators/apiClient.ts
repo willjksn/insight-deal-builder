@@ -502,6 +502,9 @@ export async function listCreatorPortalCampaigns(getToken: GetToken): Promise<{
     role?: string;
     compensation?: number;
     compensationNotes?: string;
+    paidAt?: string;
+    paidAmount?: number;
+    paidVia?: "stripe" | "manual";
     briefs: CreatorBrief[];
     deliverables: CreatorDeliverable[];
     updatedAt: string;
