@@ -1,7 +1,10 @@
 import { Timestamp } from "firebase/firestore";
 import { ProductionChecklistItem, ProductionChecklistMode } from "@/lib/production/checklist";
 import { CrewPrintoutPacket } from "@/lib/production/crewPacketTypes";
+import type { SceneCoverageChecklist } from "@/lib/production/sceneCoverageChecklist";
 import { ProductionShootingKit } from "@/lib/production/shootingKit";
+
+export type { SceneCoverageChecklist } from "@/lib/production/sceneCoverageChecklist";
 
 export type ProductionPersonGroup = "cast" | "production_team" | "camera_department";
 
@@ -147,6 +150,11 @@ export interface ProductionDay {
   shots: ProductionDayShot[];
   /** Scene-level storyboard cards (one per scene). */
   sceneFrames?: ProductionSceneFrame[];
+  /**
+   * Required coverage checklist per scene — seeded from script-writer settings
+   * (detailed shot list, content type, cast size, mood).
+   */
+  coverageChecklists?: SceneCoverageChecklist[];
   /** Generated crew printout packet (master list + per-role sections). */
   crewPacket?: CrewPrintoutPacket;
   crewCall?: string;

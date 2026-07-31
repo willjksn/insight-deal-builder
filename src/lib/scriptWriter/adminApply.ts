@@ -16,6 +16,11 @@ import {
   sceneNumbersFromScript,
 } from "@/lib/scriptWriter/scriptMappers";
 import { mergeBoardCoverageFromScript } from "@/lib/production/coverageSync";
+import {
+  buildSceneCoverageChecklists,
+  mergeSceneCoverageChecklists,
+  syncCoverageChecklistWithShots,
+} from "@/lib/production/sceneCoverageChecklist";
 import { flattenShootingKit, normalizeShootingKit, shootingKitHasGear } from "@/lib/production/shootingKit";
 import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
@@ -124,20 +129,47 @@ export async function applyScriptToProject(params: {
     ? mergeBoardCoverageFromScript(boardDays, script, sessionImages, mergedInspiration)
     : boardDays;
 
+  const sceneRefs = sceneNumbersFromScript(script);
+  const sceneHeadings: Record<string, string> = {};
+  for (const scene of script.scenes ?? []) {
+    const num = String(scene.sceneNumber ?? "").trim();
+    if (num && scene.heading?.trim()) sceneHeadings[num] = scene.heading.trim();
+  }
+  const seededCoverage = buildSceneCoverageChecklists({
+    sceneRefs,
+    sceneHeadings,
+    detailedShotList: session.detailedShotList !== false,
+    brief: session.brief ?? null,
+  });
+
   const updatedDays = mergedDays.length
-    ? mergedDays.map((day, index) =>
-        index === 0
+    ? mergedDays.map((day, index) => {
+        const shots = hasExistingShots
+          ? day.shots
+          : index === 0
+            ? productionShotsFromScript(script, sessionImages, mergedInspiration)
+            : day.shots;
+        const coverageChecklists = syncCoverageChecklistWithShots(
+          mergeSceneCoverageChecklists(day.coverageChecklists, seededCoverage),
+          shots
+        );
+        return index === 0
           ? stripUndefined({
               ...day,
               title: script.title || day.title,
-              scenes: sceneNumbersFromScript(script),
-              shots: hasExistingShots
-                ? day.shots
-                : productionShotsFromScript(script, sessionImages, mergedInspiration),
+              scenes: sceneRefs,
+              shots,
               sceneFrames,
+              coverageChecklists,
             })
-          : day
-      )
+          : stripUndefined({
+              ...day,
+              coverageChecklists: syncCoverageChecklistWithShots(
+                mergeSceneCoverageChecklists(day.coverageChecklists, seededCoverage),
+                day.shots
+              ),
+            });
+      })
     : boardDays;
 
   const notesPrefix = filmingNotesFromScript(script);

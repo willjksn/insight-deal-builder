@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ProductionDayNav } from "@/components/production/ProductionDayNav";
 import { ProductionShotListEditor } from "@/components/production/ProductionShotListEditor";
+import { SceneCoverageChecklistPanel } from "@/components/production/SceneCoverageChecklistPanel";
 import { CoverageBoardView } from "@/components/production/CoverageBoardView";
 import { ShotListPrintView } from "@/components/production/ShotListPrintView";
 import { StoryboardPrintView } from "@/components/production/StoryboardPrintView";
@@ -22,8 +23,16 @@ import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import {
   mergeProductionSceneFramesFromScript,
   productionSceneFramesFromScript,
+  sceneNumbersFromScript,
 } from "@/lib/scriptWriter/scriptMappers";
 import { mergeDayShotsFromScript } from "@/lib/production/coverageSync";
+import {
+  buildSceneCoverageChecklists,
+  collectSceneRefsFromShots,
+  mergeSceneCoverageChecklists,
+  sceneHeadingsFromShots,
+  syncCoverageChecklistWithShots,
+} from "@/lib/production/sceneCoverageChecklist";
 import {
   applyAutoSplitToBoard,
   buildAutoSplitPlan,
@@ -139,13 +148,31 @@ export default function ShotListDayPage() {
         return;
       }
       const sessionImages = session.inspirationImages ?? [];
+      const nextShots = mergeDayShotsFromScript(
+        day.shots,
+        script,
+        sessionImages,
+        board.inspirationImages
+      );
+      const sceneRefs =
+        sceneNumbersFromScript(script).length > 0
+          ? sceneNumbersFromScript(script)
+          : collectSceneRefsFromShots(nextShots);
+      const sceneHeadings: Record<string, string> = {
+        ...sceneHeadingsFromShots(nextShots),
+      };
+      for (const scene of script.scenes ?? []) {
+        const num = String(scene.sceneNumber ?? "").trim();
+        if (num && scene.heading?.trim()) sceneHeadings[num] = scene.heading.trim();
+      }
+      const seededCoverage = buildSceneCoverageChecklists({
+        sceneRefs,
+        sceneHeadings,
+        detailedShotList: session.detailedShotList !== false,
+        brief: session.brief ?? null,
+      });
       patchDay({
-        shots: mergeDayShotsFromScript(
-          day.shots,
-          script,
-          sessionImages,
-          board.inspirationImages
-        ),
+        shots: nextShots,
         sceneFrames: script.scenes?.length
           ? mergeProductionSceneFramesFromScript(
               sceneFrames,
@@ -154,12 +181,68 @@ export default function ShotListDayPage() {
               board.inspirationImages
             )
           : sceneFrames,
+        coverageChecklists: syncCoverageChecklistWithShots(
+          mergeSceneCoverageChecklists(day.coverageChecklists, seededCoverage),
+          nextShots
+        ),
       });
     } catch (e) {
       setRefreshError(e instanceof Error ? e.message : "Could not refresh from script");
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const seedCoverageChecklist = async () => {
+    if (!user || !scriptSessionId) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const { session: loaded } = await scriptWriterGetSession(
+        () => user.getIdToken(),
+        scriptSessionId
+      );
+      const session = loaded as ScriptWriterSession;
+      const script = session.script as ScriptDocument | null;
+      const sceneRefs =
+        (script ? sceneNumbersFromScript(script) : []).length > 0
+          ? sceneNumbersFromScript(script!)
+          : collectSceneRefsFromShots(day.shots).length > 0
+            ? collectSceneRefsFromShots(day.shots)
+            : day.scenes?.length
+              ? day.scenes
+              : ["1"];
+      const sceneHeadings: Record<string, string> = {
+        ...sceneHeadingsFromShots(day.shots),
+      };
+      for (const scene of script?.scenes ?? []) {
+        const num = String(scene.sceneNumber ?? "").trim();
+        if (num && scene.heading?.trim()) sceneHeadings[num] = scene.heading.trim();
+      }
+      const seededCoverage = buildSceneCoverageChecklists({
+        sceneRefs,
+        sceneHeadings,
+        detailedShotList: session.detailedShotList !== false,
+        brief: session.brief ?? null,
+      });
+      patchDay({
+        coverageChecklists: syncCoverageChecklistWithShots(
+          mergeSceneCoverageChecklists(day.coverageChecklists, seededCoverage),
+          day.shots
+        ),
+      });
+    } catch (e) {
+      setRefreshError(e instanceof Error ? e.message : "Could not build coverage checklist");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const patchShots = (shots: typeof day.shots) => {
+    patchDay({
+      shots,
+      coverageChecklists: syncCoverageChecklistWithShots(day.coverageChecklists, shots),
+    });
   };
 
   const buildSceneFramesFromScript = async () => {
@@ -440,17 +523,49 @@ export default function ShotListDayPage() {
       )}
 
       {viewMode === "list" ? (
-        <ProductionShotListEditor
-          shots={day.shots}
-          onChange={(shots) => patchDay({ shots })}
-          readOnly={!canEditShots}
-          className="print:hidden"
-          currentDayId={dayId}
-          otherDays={otherDays}
-          onMoveToDay={moveShotToDay}
-          draggingShotId={draggingShotId}
-          onDragStateChange={setDraggingShotId}
-        />
+        <div className="space-y-4 print:hidden">
+          {(day.coverageChecklists?.length ?? 0) > 0 ? (
+            <SceneCoverageChecklistPanel
+              checklists={day.coverageChecklists!}
+              canEdit={canEditShots}
+              onToggle={(sceneRef, itemId) => {
+                const next = (day.coverageChecklists ?? []).map((c) =>
+                  c.sceneRef === sceneRef
+                    ? {
+                        ...c,
+                        items: c.items.map((item) =>
+                          item.id === itemId ? { ...item, done: !item.done } : item
+                        ),
+                      }
+                    : c
+                );
+                patchDay({ coverageChecklists: next });
+              }}
+            />
+          ) : scriptSessionId && canEditShots ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
+              No required coverage checklist yet.{" "}
+              <button
+                type="button"
+                className="font-medium text-sky-700 underline"
+                disabled={refreshing}
+                onClick={() => void seedCoverageChecklist()}
+              >
+                Build from script-writer settings
+              </button>
+            </div>
+          ) : null}
+          <ProductionShotListEditor
+            shots={day.shots}
+            onChange={patchShots}
+            readOnly={!canEditShots}
+            currentDayId={dayId}
+            otherDays={otherDays}
+            onMoveToDay={moveShotToDay}
+            draggingShotId={draggingShotId}
+            onDragStateChange={setDraggingShotId}
+          />
+        </div>
       ) : viewMode === "grid" ? (
         <>
           {dayCoverageShots.length === 0 && scriptSessionId && canEditShots && (
@@ -473,11 +588,10 @@ export default function ShotListDayPage() {
             layout="grid"
             readOnly={!canEditShots}
             getIdToken={user ? () => user.getIdToken() : undefined}
-            onPatchShot={(_dayId, shotId, patch) =>
-              patchDay({
-                shots: day.shots.map((s) => (s.id === shotId ? { ...s, ...patch } : s)),
-              })
-            }
+            onPatchShot={(_dayId, shotId, patch) => {
+              const shots = day.shots.map((s) => (s.id === shotId ? { ...s, ...patch } : s));
+              patchShots(shots);
+            }}
             className="print:hidden"
           />
         </>

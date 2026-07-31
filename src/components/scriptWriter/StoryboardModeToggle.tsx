@@ -83,8 +83,8 @@ export function ShotListOptions({
           <span className="font-medium text-slate-900">Full detailed shot list</span>
           {!compact && (
             <span className="mt-0.5 block text-xs text-slate-500">
-              WS / MS / CU coverage per scene — checklist on the shot list page. Can be combined
-              with storyboard mode.
+              WS / MS / CU per scene, plus a Required coverage checklist on the day shot list
+              (tuned from format, cast size, and mood). Can combine with storyboard mode.
             </span>
           )}
         </span>

@@ -303,56 +303,39 @@ Sound: Primary dialogue · Backup audio · Room tone · Footsteps · Doors · Pr
     id: "scene-coverage-tracking-sheet",
     category: "movement",
     title: "On-set shot tracking sheet",
-    summary: "Printable-style checklist for required coverage and best-take notes.",
-    keywords: ["tracking sheet", "slate", "take notes", "checklist"],
+    summary:
+      "Interactive Required coverage lives on each day shot list — seeded from Script writer settings.",
+    keywords: ["tracking sheet", "slate", "take notes", "checklist", "shot list"],
     tables: [
       {
-        headers: ["Field", "Fill in"],
+        headers: ["Where", "What you get"],
         rows: [
-          ["Scene", "__________"],
-          ["Setup", "__________"],
+          [
+            "Project → Production day → Shot list",
+            "Interactive Required coverage checklist per scene (check off on set)",
+          ],
+          [
+            "Script writer → Full detailed shot list ON",
+            "Dialogue / single-actor / product / horror template from brief",
+          ],
+          [
+            "Script writer → Full detailed shot list OFF",
+            "Five-shot safety method checklist",
+          ],
+          [
+            "Refresh from script",
+            "Re-seeds checklist from current brief + detailed setting; keeps checks you already made",
+          ],
         ],
       },
       {
-        headers: ["Required coverage", "Done"],
+        headers: ["Required coverage (full tracking sheet)", "Typical auto-link"],
         rows: [
-          ["Establishing shot", "[ ]"],
-          ["Master wide", "[ ]"],
-          ["Medium wide", "[ ]"],
-          ["Two-shot", "[ ]"],
-          ["Over-the-shoulder Actor A", "[ ]"],
-          ["Over-the-shoulder Actor B", "[ ]"],
-          ["Medium Actor A", "[ ]"],
-          ["Medium Actor B", "[ ]"],
-          ["Close-up Actor A", "[ ]"],
-          ["Close-up Actor B", "[ ]"],
-          ["Reaction Actor A", "[ ]"],
-          ["Reaction Actor B", "[ ]"],
-          ["Point-of-view shot", "[ ]"],
-          ["Insert 1 / Insert 2", "[ ] / [ ]"],
-          ["Cutaway 1", "[ ]"],
-          ["Entrance / Exit", "[ ] / [ ]"],
-          ["Moving shot", "[ ]"],
-          ["Clean plate", "[ ]"],
-          ["Room tone", "[ ]"],
-          ["Wild lines", "[ ]"],
-          ["Slow-motion option", "[ ]"],
-          ["Vertical version", "[ ]"],
-          ["Safety take", "[ ]"],
-        ],
-      },
-      {
-        headers: ["Take notes", "Value"],
-        rows: [
-          ["Best wide take", "__________"],
-          ["Best Actor A take", "__________"],
-          ["Best Actor B take", "__________"],
-          ["Best reaction", "__________"],
-          ["Best insert", "__________"],
-          ["Audio issue", "__________"],
-          ["Focus issue", "__________"],
-          ["Continuity issue", "__________"],
-          ["Additional shot needed", "__________"],
+          ["Establishing / Master wide", "master_wide shots marked done"],
+          ["Medium / Close-up", "medium_shot / close_up"],
+          ["Insert / Reaction / Movement", "insert_shot / reaction_shot / movement_shot"],
+          ["Room tone / Wild lines / Vertical", "room_tone / wild_line / vertical_social_shot"],
+          ["OTS, two-shot, POV, cutaway, entrance…", "Manual check (no single shot-type mapping)"],
         ],
       },
     ],
@@ -368,6 +351,8 @@ For every important moment, capture:
 * The environment around them
 * The emotional result
 
-That combination gives the editor enough material to create rhythm, tension, emotion, and clarity.`,
+That combination gives the editor enough material to create rhythm, tension, emotion, and clarity.
+
+Use the interactive checklist on the day shot list — this reference page is the guide; the shot list is where you track completion.`,
   },
 ];
