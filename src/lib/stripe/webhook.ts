@@ -5,6 +5,7 @@ import { getStripeWebhookSecret } from "@/lib/stripe/config";
 import { getStripe } from "@/lib/stripe/server";
 import { applyStripePaymentToAgreement, persistStripePayment } from "@/lib/stripe/applyPayment";
 import { handleStripeConnectAccountUpdated } from "@/lib/stripe/creatorConnect";
+import { handleStripeTransferReversed } from "@/lib/stripe/creatorPayout";
 import { installmentPayableAmount } from "@/lib/stripe/eligibility";
 
 const WEBHOOK_EVENTS_COLLECTION = "stripeWebhookEvents";
@@ -91,6 +92,7 @@ export async function processStripeWebhookEvent(
   applied?: boolean;
   agreementId?: string;
   creatorId?: string;
+  campaignId?: string;
 }> {
   const isNew = await markEventProcessed(db, event.id);
   if (!isNew) {
@@ -107,6 +109,18 @@ export async function processStripeWebhookEvent(
     const account = event.data.object as Stripe.Account;
     const result = await handleStripeConnectAccountUpdated(account);
     return { handled: true, applied: result.updated, creatorId: result.creatorId };
+  }
+
+  // transfer.failed / transfer.paid are legacy (pre-2017) and never fire on modern API.
+  // Connect transfers fail synchronously on create; async undos arrive as transfer.reversed.
+  if (event.type === "transfer.reversed") {
+    const transfer = event.data.object as Stripe.Transfer;
+    const result = await handleStripeTransferReversed(transfer);
+    return {
+      handled: true,
+      applied: result.updated,
+      campaignId: result.campaignId,
+    };
   }
 
   return { handled: false };

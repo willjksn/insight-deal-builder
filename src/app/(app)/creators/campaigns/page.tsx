@@ -491,6 +491,9 @@ export default function CreatorCampaignsPage() {
                             {!alreadyPaid && hasComp && !connectReady
                               ? " · Stripe Connect not ready"
                               : ""}
+                            {a.payoutError ? (
+                              <span className="mt-0.5 block text-amber-800">{a.payoutError}</span>
+                            ) : null}
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-1">

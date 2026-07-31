@@ -148,6 +148,10 @@ export interface CreatorCampaignAssignment {
   paidAmount?: number;
   paidVia?: "stripe" | "manual";
   stripeTransferId?: string;
+  /** Prior transfer id after a Stripe reversal cleared the paid state. */
+  lastStripeTransferId?: string;
+  /** Staff-visible note when a Stripe transfer was reversed / failed to stick. */
+  payoutError?: string;
   paidByUserId?: string;
   paidByDisplayName?: string;
 }
