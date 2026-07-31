@@ -67,6 +67,9 @@ export function CreatorPortalHome() {
   const onboarding = creator.onboarding ?? [];
   const doneCount = onboarding.filter((t) => t.done).length;
   const remaining = onboarding.length - doneCount;
+  const agreementSigned =
+    creator.networkAgreement?.status === "signed" &&
+    Boolean(creator.networkAgreement.version);
 
   return (
     <div className="space-y-6">
@@ -79,7 +82,7 @@ export function CreatorPortalHome() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Link href="/creator-portal/profile" className="block">
           <Card className="h-full transition hover:border-sky-200 hover:shadow-md">
             <CardHeader>
@@ -99,6 +102,18 @@ export function CreatorPortalHome() {
               {campaignCount === 0
                 ? "No active assignments yet."
                 : `${campaignCount} campaign${campaignCount === 1 ? "" : "s"} assigned to you.`}
+            </CardBody>
+          </Card>
+        </Link>
+        <Link href="/creator-portal/agreement" className="block">
+          <Card className="h-full transition hover:border-sky-200 hover:shadow-md">
+            <CardHeader>
+              <h2 className="font-semibold text-slate-900">Agreement</h2>
+            </CardHeader>
+            <CardBody className="text-sm text-slate-600">
+              {agreementSigned
+                ? "Contractor agreement signed."
+                : "Review and e-sign the independent contractor agreement."}
             </CardBody>
           </Card>
         </Link>

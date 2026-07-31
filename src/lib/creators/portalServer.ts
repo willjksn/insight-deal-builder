@@ -7,11 +7,16 @@ import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelp
 import { CREATOR_PORTAL_PERMISSIONS } from "@/lib/constants/permissions";
 import { APP_DOMAIN } from "@/lib/brand";
 import { PRODUCER_LEGAL_NAME } from "@/lib/constants/legalTerms";
+import {
+  CREATOR_AGREEMENT_ONBOARDING_TASK_ID,
+  CREATOR_NETWORK_AGREEMENT_VERSION,
+} from "@/lib/creators/networkAgreementContent";
 import { sendTransactionalEmail } from "@/lib/notifications/delivery";
 import { CreatorError } from "@/lib/creators/errors";
 import {
   CREATORS_COLLECTION,
   buildDefaultOnboarding,
+  sanitizeCreatorOnboarding,
   isApprovedApplication,
   type Creator,
 } from "@/lib/creators/types";
@@ -96,6 +101,27 @@ export async function updateOwnCreatorProfile(
   const creator = await getLinkedCreatorForUser(appUser);
   const db = requireDb();
   const ref = db.collection(CREATORS_COLLECTION).doc(creator.id);
+
+  let onboarding = patch.onboarding;
+  if (onboarding) {
+    const agreementSigned =
+      creator.networkAgreement?.status === "signed" &&
+      creator.networkAgreement.version === CREATOR_NETWORK_AGREEMENT_VERSION;
+    onboarding = sanitizeCreatorOnboarding(onboarding).map((t) => {
+      if (t.id !== CREATOR_AGREEMENT_ONBOARDING_TASK_ID) return t;
+      if (agreementSigned) {
+        return {
+          ...t,
+          done: true,
+          doneAt: creator.networkAgreement?.signedAt ?? t.doneAt,
+          notes: t.notes || "Signed in ShootSpine",
+        };
+      }
+      // Agreement completion is e-sign only — checklist toggle cannot mark it done.
+      return { ...t, done: false, doneAt: undefined };
+    });
+  }
+
   const allowed = stripUndefined({
     professionalName: patch.professionalName?.trim() || undefined,
     phone: patch.phone?.trim() || undefined,
@@ -107,7 +133,7 @@ export async function updateOwnCreatorProfile(
     platforms: patch.platforms,
     availability: patch.availability,
     rates: patch.rates,
-    onboarding: patch.onboarding,
+    onboarding,
     updatedAt: FieldValue.serverTimestamp(),
   });
   await ref.update(allowed);

@@ -238,6 +238,21 @@ export interface CreatorOnboardingTask {
   notes?: string;
 }
 
+/** E-sign record for the Creator Network independent-contractor MSA. */
+export type CreatorNetworkAgreementStatus = "unsigned" | "signed" | "voided";
+
+export interface CreatorNetworkAgreement {
+  version: string;
+  status: CreatorNetworkAgreementStatus;
+  signedAt?: string;
+  signerName?: string;
+  signerEmail?: string;
+  signerUserId?: string;
+  typedSignature?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
 /** Audited manual change entry (review-before-write history). */
 export interface CreatorChangeEntry {
   id: string;
@@ -318,6 +333,8 @@ export interface Creator {
   onboarding?: CreatorOnboardingTask[];
   /** Incubator / development plan (Phase 7). */
   developmentPlan?: CreatorDevelopmentPlan;
+  /** Master Creator Network independent-contractor agreement (e-sign record). */
+  networkAgreement?: CreatorNetworkAgreement;
 
   // ── Links (dedup — point to existing records, never duplicate people) ──
   crewMemberId?: string;
@@ -366,7 +383,6 @@ export type CreatorUpdateInput = Partial<
 /** Default onboarding checklist seeded when a creator is approved/onboarded. */
 export const DEFAULT_ONBOARDING_TASK_LABELS: string[] = [
   "Signed creator agreement",
-  "W-9 / tax details on file",
   "ID verification complete",
   "Media kit / rate card uploaded",
   "Brand-safety review complete",
@@ -385,6 +401,19 @@ export function buildDefaultOnboarding(): CreatorOnboardingTask[] {
     label,
     done: false,
   }));
+}
+
+/** Drop legacy W-9 checklist items (contractors only — no W-9 collection in product). */
+export function sanitizeCreatorOnboarding(
+  tasks: CreatorOnboardingTask[] | undefined
+): CreatorOnboardingTask[] {
+  if (!tasks?.length) return [];
+  return tasks.filter(
+    (t) =>
+      t.id !== "w_9_tax_details_on_file" &&
+      !/^w-?9/i.test(t.label) &&
+      !/tax details/i.test(t.label)
+  );
 }
 
 /** Application stages still in the open pipeline (not terminal). */

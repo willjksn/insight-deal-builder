@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -56,6 +58,13 @@ export default function CreatorPortalCampaignsPage() {
   return (
     <div className="space-y-6">
       <div>
+        <Link
+          href="/creator-portal"
+          className="mb-4 inline-flex items-center text-sm text-sky-700 hover:underline"
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to portal
+        </Link>
         <h1 className="text-2xl font-bold text-slate-900">My campaigns</h1>
         <p className="mt-1 text-sm text-slate-600">
           Assignments, briefs, and deliverables IMG has shared with you.

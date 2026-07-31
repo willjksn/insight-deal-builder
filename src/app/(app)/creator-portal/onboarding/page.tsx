@@ -1,11 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { Lock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { getCreatorPortalMe, updateCreatorPortalMe } from "@/lib/creators/apiClient";
-import type { CreatorOnboardingTask } from "@/lib/creators/types";
+import { CREATOR_AGREEMENT_ONBOARDING_TASK_ID } from "@/lib/creators/networkAgreementContent";
+import {
+  sanitizeCreatorOnboarding,
+  type CreatorOnboardingTask,
+} from "@/lib/creators/types";
 
 export default function CreatorPortalOnboardingPage() {
   const { user } = useAuth();
@@ -26,7 +32,7 @@ export default function CreatorPortalOnboardingPage() {
       setLoading(true);
       try {
         const creator = await getCreatorPortalMe(getToken);
-        if (!cancelled) setTasks(creator.onboarding ?? []);
+        if (!cancelled) setTasks(sanitizeCreatorOnboarding(creator.onboarding));
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load onboarding");
       } finally {
@@ -39,6 +45,7 @@ export default function CreatorPortalOnboardingPage() {
   }, [user, getToken]);
 
   const toggle = async (id: string) => {
+    if (id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID) return;
     const next = tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
     setTasks(next);
     setSaving(true);
@@ -90,27 +97,56 @@ export default function CreatorPortalOnboardingPage() {
               when they start your setup.
             </p>
           ) : (
-            tasks.map((task) => (
-              <label
-                key={task.id}
-                className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50"
-              >
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-slate-300"
-                  checked={task.done}
-                  disabled={saving}
-                  onChange={() => void toggle(task.id)}
-                />
-                <span
-                  className={
-                    task.done ? "text-sm text-slate-500 line-through" : "text-sm text-slate-800"
-                  }
+            tasks.map((task) => {
+              const locked = task.id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID;
+              return (
+                <div
+                  key={task.id}
+                  className="rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50"
                 >
-                  {task.label}
-                </span>
-              </label>
-            ))
+                  <label className="flex cursor-pointer items-start gap-3">
+                    {locked ? (
+                      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                    ) : (
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 rounded border-slate-300"
+                        checked={task.done}
+                        disabled={saving}
+                        onChange={() => void toggle(task.id)}
+                      />
+                    )}
+                    <span
+                      className={
+                        task.done
+                          ? "text-sm text-slate-500 line-through"
+                          : "text-sm text-slate-800"
+                      }
+                    >
+                      {task.label}
+                    </span>
+                  </label>
+                  {locked ? (
+                    <p className="mt-1.5 pl-7 text-xs text-slate-500">
+                      {task.done ? (
+                        "Completed via e-signature."
+                      ) : (
+                        <>
+                          Sign in{" "}
+                          <Link
+                            href="/creator-portal/agreement"
+                            className="font-medium text-sky-700 hover:text-sky-900"
+                          >
+                            Agreement
+                          </Link>{" "}
+                          to complete this step.
+                        </>
+                      )}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })
           )}
           {saving && <p className="pt-2 text-xs text-slate-500">Saving…</p>}
         </CardBody>

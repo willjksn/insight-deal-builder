@@ -22,6 +22,7 @@ import {
   Star,
   Target,
   Briefcase,
+  FileSignature,
 } from "lucide-react";
 import { AppUser } from "@/lib/types";
 import { Workspace } from "@/lib/workspace/types";
@@ -88,6 +89,7 @@ export const CREATOR_PORTAL_NAV_GROUPS: NavGroup[] = [
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
       { href: "/creator-portal/profile", label: "My profile", icon: UserCircle },
       { href: "/creator-portal/campaigns", label: "My campaigns", icon: Briefcase },
+      { href: "/creator-portal/agreement", label: "Agreement", icon: FileSignature },
       { href: "/creator-portal/onboarding", label: "Onboarding", icon: Target },
       { href: "/settings", label: "Settings", icon: Settings, exact: true },
     ],

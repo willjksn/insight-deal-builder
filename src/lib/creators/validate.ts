@@ -2,6 +2,7 @@ import { CreatorError } from "@/lib/creators/errors";
 import {
   CREATOR_LIST_FIELDS,
   SENSITIVE_CREATOR_DOCUMENT_KINDS,
+  sanitizeCreatorOnboarding,
   type CreatorApplicationStatus,
   type CreatorAvailability,
   type CreatorDocumentKind,
@@ -203,7 +204,7 @@ function parseReadiness(raw: unknown): CreatorReadiness {
 
 function parseOnboarding(raw: unknown): CreatorOnboardingTask[] {
   if (!Array.isArray(raw)) throw new CreatorError("VALIDATION_FAILED", "onboarding must be an array");
-  return raw.map((item, i) => {
+  const parsed = raw.map((item, i) => {
     if (!item || typeof item !== "object") {
       throw new CreatorError("VALIDATION_FAILED", `Invalid onboarding task at index ${i}`);
     }
@@ -218,6 +219,7 @@ function parseOnboarding(raw: unknown): CreatorOnboardingTask[] {
       notes: typeof o.notes === "string" ? o.notes.trim() : undefined,
     };
   });
+  return sanitizeCreatorOnboarding(parsed);
 }
 
 /** Validate a Phase 2-capable creator PATCH body. */

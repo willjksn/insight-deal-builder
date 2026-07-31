@@ -14,9 +14,9 @@ import {
   type CreatorDocumentKind,
 } from "@/lib/creators/types";
 
-const KIND_OPTIONS = (Object.keys(CREATOR_DOCUMENT_KIND_LABELS) as CreatorDocumentKind[]).map(
-  (value) => ({ value, label: CREATOR_DOCUMENT_KIND_LABELS[value] })
-);
+const KIND_OPTIONS = (Object.keys(CREATOR_DOCUMENT_KIND_LABELS) as CreatorDocumentKind[])
+  .filter((value) => value !== "w9")
+  .map((value) => ({ value, label: CREATOR_DOCUMENT_KIND_LABELS[value] }));
 
 type Props = {
   documents: CreatorDocument[];
@@ -194,7 +194,7 @@ export function CreatorDocumentsPanel({
               )}
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  {sensitiveKind ? "Upload file (required for W-9 / ID)" : "Or upload a file"}
+                  {sensitiveKind ? "Upload file (required for ID)" : "Or upload a file"}
                 </label>
                 <input
                   type="file"

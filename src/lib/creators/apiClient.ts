@@ -512,3 +512,45 @@ export async function listCreatorPortalCampaigns(getToken: GetToken): Promise<{
   });
   return parseJson(res);
 }
+
+export async function getCreatorPortalAgreement(getToken: GetToken) {
+  const res = await fetch("/api/creator-portal/agreement", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    document: import("@/lib/creators/networkAgreementContent").CreatorAgreementDocument;
+    version: string;
+    updated: string;
+    record: Creator["networkAgreement"] | null;
+    needsSignature: boolean;
+  }>(res);
+}
+
+export async function signCreatorPortalAgreement(
+  getToken: GetToken,
+  body: { typedSignature: string; accepted: boolean }
+) {
+  const res = await fetch("/api/creator-portal/agreement", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    creator: Creator;
+    record: NonNullable<Creator["networkAgreement"]>;
+    needsSignature: boolean;
+  }>(res);
+}
+
+export async function voidCreatorNetworkAgreement(
+  getToken: GetToken,
+  creatorId: string
+): Promise<Creator> {
+  const res = await fetch(`/api/creators/${creatorId}/network-agreement`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ action: "void" }),
+  });
+  const data = await parseJson<{ creator: Creator }>(res);
+  return data.creator;
+}

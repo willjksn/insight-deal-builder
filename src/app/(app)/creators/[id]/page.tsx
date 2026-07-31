@@ -28,6 +28,7 @@ import {
   sendCreatorPortalInvite,
   setCreatorApplicationStatus,
   updateCreator,
+  voidCreatorNetworkAgreement,
 } from "@/lib/creators/apiClient";
 import {
   CREATOR_READINESS_LABELS,
@@ -51,6 +52,7 @@ import { CreatorRatesPanel } from "@/components/creators/CreatorRatesPanel";
 import { CreatorAvailabilityPanel } from "@/components/creators/CreatorAvailabilityPanel";
 import { CreatorReadinessPanel } from "@/components/creators/CreatorReadinessPanel";
 import { CreatorOnboardingPanel } from "@/components/creators/CreatorOnboardingPanel";
+import { CreatorNetworkAgreementPanel } from "@/components/creators/CreatorNetworkAgreementPanel";
 import { CreatorDocumentsPanel } from "@/components/creators/CreatorDocumentsPanel";
 import { CreatorApplicationPanel } from "@/components/creators/CreatorApplicationPanel";
 import { CreatorPortalInviteCard } from "@/components/creators/CreatorPortalInviteCard";
@@ -468,6 +470,23 @@ export default function CreatorDetailPage() {
             readinessStatus: CreatorReadinessStatus;
             readiness: CreatorReadiness;
           }) => patch(payload)}
+        />
+
+        <CreatorNetworkAgreementPanel
+          key={`msa-${creator.updatedAt}`}
+          agreement={creator.networkAgreement}
+          canEdit={canManage}
+          saving={saving}
+          onVoid={async () => {
+            if (!id) return;
+            setSaving(true);
+            try {
+              const updated = await voidCreatorNetworkAgreement(getToken, id);
+              hydrate(updated);
+            } finally {
+              setSaving(false);
+            }
+          }}
         />
 
         <CreatorOnboardingPanel
