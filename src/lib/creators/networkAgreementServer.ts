@@ -8,7 +8,10 @@ import {
   CREATOR_NETWORK_AGREEMENT,
   CREATOR_NETWORK_AGREEMENT_UPDATED,
   CREATOR_NETWORK_AGREEMENT_VERSION,
+  networkAgreementNeedsSignature,
 } from "@/lib/creators/networkAgreementContent";
+
+export { networkAgreementNeedsSignature };
 import {
   CREATORS_COLLECTION,
   buildDefaultOnboarding,
@@ -24,13 +27,6 @@ function requireDb() {
   const db = getAdminDb();
   if (!db) throw new CreatorError("NOT_CONFIGURED", "Firebase Admin is not configured");
   return db;
-}
-
-export function networkAgreementNeedsSignature(
-  record: CreatorNetworkAgreement | undefined
-): boolean {
-  if (!record || record.status !== "signed") return true;
-  return record.version !== CREATOR_NETWORK_AGREEMENT_VERSION;
 }
 
 function markAgreementTaskDone(

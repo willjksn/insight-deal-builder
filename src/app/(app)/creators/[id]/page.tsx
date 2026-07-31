@@ -31,6 +31,7 @@ import {
   voidCreatorNetworkAgreement,
   reviewCreatorIdentityVerification,
   viewCreatorIdentityDocument,
+  saveCreatorPaymentDetails,
 } from "@/lib/creators/apiClient";
 import {
   CREATOR_READINESS_LABELS,
@@ -56,8 +57,10 @@ import { CreatorReadinessPanel } from "@/components/creators/CreatorReadinessPan
 import { CreatorOnboardingPanel } from "@/components/creators/CreatorOnboardingPanel";
 import { CreatorNetworkAgreementPanel } from "@/components/creators/CreatorNetworkAgreementPanel";
 import { CreatorIdentityVerificationPanel } from "@/components/creators/CreatorIdentityVerificationPanel";
+import { CreatorPaymentDetailsPanel } from "@/components/creators/CreatorPaymentDetailsPanel";
 import { CreatorChangeHistoryPanel } from "@/components/creators/CreatorChangeHistoryPanel";
 import { CreatorDocumentsPanel } from "@/components/creators/CreatorDocumentsPanel";
+import type { CreatorPaymentDetails } from "@/lib/creators/types";
 import { CreatorApplicationPanel } from "@/components/creators/CreatorApplicationPanel";
 import { CreatorPortalInviteCard } from "@/components/creators/CreatorPortalInviteCard";
 import { CreatorDevelopmentPanel } from "@/components/creators/CreatorDevelopmentPanel";
@@ -479,6 +482,7 @@ export default function CreatorDetailPage() {
         <CreatorNetworkAgreementPanel
           key={`msa-${creator.updatedAt}`}
           agreement={creator.networkAgreement}
+          creatorDisplayName={creator.professionalName}
           canEdit={canManage}
           saving={saving}
           onVoid={async () => {
@@ -528,6 +532,24 @@ export default function CreatorDetailPage() {
             if (!id) return;
             const { url } = await viewCreatorIdentityDocument(getToken, id, side);
             window.open(url, "_blank", "noopener,noreferrer");
+          }}
+        />
+
+        <CreatorPaymentDetailsPanel
+          key={`pay-${creator.updatedAt}`}
+          paymentDetails={creator.paymentDetails}
+          canEdit={canManage}
+          canViewSensitive={canViewSensitive}
+          saving={saving}
+          onSave={async (details: CreatorPaymentDetails) => {
+            if (!id) return;
+            setSaving(true);
+            try {
+              const updated = await saveCreatorPaymentDetails(getToken, id, details);
+              hydrate(updated);
+            } finally {
+              setSaving(false);
+            }
           }}
         />
 

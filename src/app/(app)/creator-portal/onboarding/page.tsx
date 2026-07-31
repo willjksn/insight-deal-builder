@@ -10,6 +10,7 @@ import { getCreatorPortalMe, updateCreatorPortalMe } from "@/lib/creators/apiCli
 import { CREATOR_AGREEMENT_ONBOARDING_TASK_ID } from "@/lib/creators/networkAgreementContent";
 import {
   CREATOR_ID_ONBOARDING_TASK_ID,
+  CREATOR_PAYMENT_ONBOARDING_TASK_ID,
   sanitizeCreatorOnboarding,
   type CreatorOnboardingTask,
 } from "@/lib/creators/types";
@@ -17,6 +18,7 @@ import {
 const LOCKED_TASK_IDS = new Set([
   CREATOR_AGREEMENT_ONBOARDING_TASK_ID,
   CREATOR_ID_ONBOARDING_TASK_ID,
+  CREATOR_PAYMENT_ONBOARDING_TASK_ID,
 ]);
 
 export default function CreatorPortalOnboardingPage() {
@@ -107,6 +109,7 @@ export default function CreatorPortalOnboardingPage() {
               const locked = LOCKED_TASK_IDS.has(task.id);
               const isAgreement = task.id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID;
               const isId = task.id === CREATOR_ID_ONBOARDING_TASK_ID;
+              const isPayment = task.id === CREATOR_PAYMENT_ONBOARDING_TASK_ID;
               return (
                 <div
                   key={task.id}
@@ -140,6 +143,8 @@ export default function CreatorPortalOnboardingPage() {
                         "Completed via e-signature."
                       ) : task.done && isId ? (
                         "Verified by IMG staff."
+                      ) : task.done && isPayment ? (
+                        "Payment details on file."
                       ) : isAgreement ? (
                         <>
                           Sign in{" "}
@@ -151,7 +156,7 @@ export default function CreatorPortalOnboardingPage() {
                           </Link>{" "}
                           to complete this step.
                         </>
-                      ) : (
+                      ) : isId ? (
                         <>
                           Upload ID in{" "}
                           <Link
@@ -161,6 +166,17 @@ export default function CreatorPortalOnboardingPage() {
                             ID verification
                           </Link>{" "}
                           for IMG to review.
+                        </>
+                      ) : (
+                        <>
+                          Add details in{" "}
+                          <Link
+                            href="/creator-portal/payment"
+                            className="font-medium text-sky-700 hover:text-sky-900"
+                          >
+                            Payment
+                          </Link>
+                          .
                         </>
                       )}
                     </p>

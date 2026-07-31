@@ -9,6 +9,15 @@ export const CREATOR_NETWORK_AGREEMENT_VERSION = "2026-07-29";
 export const CREATOR_NETWORK_AGREEMENT_UPDATED = "July 29, 2026";
 export const CREATOR_NETWORK_AGREEMENT_CONTACT = "contact@insightmediagroupllc.com";
 
+/** Client-safe: true when creator must sign (or re-sign) the current MSA version. */
+export function networkAgreementNeedsSignature(record?: {
+  status?: string;
+  version?: string;
+} | null): boolean {
+  if (!record || record.status !== "signed") return true;
+  return record.version !== CREATOR_NETWORK_AGREEMENT_VERSION;
+}
+
 const company = PRODUCER_LEGAL_NAME;
 
 export type CreatorAgreementSection = {

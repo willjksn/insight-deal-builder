@@ -100,6 +100,7 @@ describe("getVisibleNavGroups", () => {
     expect(hrefs).toContain("/creator-portal/profile");
     expect(hrefs).toContain("/creator-portal/agreement");
     expect(hrefs).toContain("/creator-portal/identity");
+    expect(hrefs).toContain("/creator-portal/payment");
     expect(hrefs).not.toContain("/revenue");
     expect(hrefs).not.toContain("/creators");
   });

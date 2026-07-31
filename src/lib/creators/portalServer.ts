@@ -16,7 +16,9 @@ import { CreatorError } from "@/lib/creators/errors";
 import {
   CREATORS_COLLECTION,
   CREATOR_ID_ONBOARDING_TASK_ID,
+  CREATOR_PAYMENT_ONBOARDING_TASK_ID,
   buildDefaultOnboarding,
+  isPaymentDetailsComplete,
   sanitizeCreatorOnboarding,
   isApprovedApplication,
   type Creator,
@@ -109,6 +111,7 @@ export async function updateOwnCreatorProfile(
       creator.networkAgreement?.status === "signed" &&
       creator.networkAgreement.version === CREATOR_NETWORK_AGREEMENT_VERSION;
     const idApproved = creator.identityVerification?.status === "approved";
+    const paymentOk = isPaymentDetailsComplete(creator.paymentDetails);
     onboarding = sanitizeCreatorOnboarding(onboarding).map((t) => {
       if (t.id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID) {
         if (agreementSigned) {
@@ -128,6 +131,17 @@ export async function updateOwnCreatorProfile(
             done: true,
             doneAt: creator.identityVerification?.reviewedAt ?? t.doneAt,
             notes: t.notes || "Verified by IMG staff",
+          };
+        }
+        return { ...t, done: false, doneAt: undefined };
+      }
+      if (t.id === CREATOR_PAYMENT_ONBOARDING_TASK_ID) {
+        if (paymentOk) {
+          return {
+            ...t,
+            done: true,
+            doneAt: creator.paymentDetails?.updatedAt ?? t.doneAt,
+            notes: t.notes || "Saved in ShootSpine",
           };
         }
         return { ...t, done: false, doneAt: undefined };

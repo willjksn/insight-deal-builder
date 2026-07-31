@@ -8,10 +8,12 @@ import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CREATOR_NETWORK_AGREEMENT_VERSION } from "@/lib/creators/networkAgreementContent";
 import type { CreatorNetworkAgreement } from "@/lib/creators/types";
+import { downloadCreatorNetworkAgreementPdf } from "@/lib/pdf/generateCreatorNetworkAgreementPdf";
 import { formatDateTime } from "@/lib/utils/format";
 
 type Props = {
   agreement?: CreatorNetworkAgreement;
+  creatorDisplayName?: string;
   canEdit: boolean;
   saving?: boolean;
   onVoid: () => Promise<void>;
@@ -19,6 +21,7 @@ type Props = {
 
 export function CreatorNetworkAgreementPanel({
   agreement,
+  creatorDisplayName,
   canEdit,
   saving,
   onVoid,
@@ -74,17 +77,31 @@ export function CreatorNetworkAgreementPanel({
           ) : (
             <p className="text-slate-500">Creator has not signed yet.</p>
           )}
-          {canEdit && agreement?.status === "signed" ? (
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
               variant="outline"
-              disabled={saving}
-              onClick={() => setConfirmVoid(true)}
+              onClick={() =>
+                downloadCreatorNetworkAgreementPdf(agreement, {
+                  creatorDisplayName: creatorDisplayName || agreement?.signerName,
+                })
+              }
             >
-              Void signature
+              Download PDF
             </Button>
-          ) : null}
+            {canEdit && agreement?.status === "signed" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                onClick={() => setConfirmVoid(true)}
+              >
+                Void signature
+              </Button>
+            ) : null}
+          </div>
         </CardBody>
       </Card>
 

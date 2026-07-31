@@ -275,6 +275,57 @@ export interface CreatorIdentityVerification {
 /** Stable onboarding task id for ID verification (matches buildDefaultOnboarding slug). */
 export const CREATOR_ID_ONBOARDING_TASK_ID = "id_verification_complete";
 
+/** Stable onboarding task id for payment details (matches buildDefaultOnboarding slug). */
+export const CREATOR_PAYMENT_ONBOARDING_TASK_ID = "payment_details_collected";
+
+export type CreatorPaymentMethod =
+  | "ach"
+  | "paypal"
+  | "venmo"
+  | "wire"
+  | "check"
+  | "other";
+
+export const CREATOR_PAYMENT_METHOD_LABELS: Record<CreatorPaymentMethod, string> = {
+  ach: "ACH / bank transfer",
+  paypal: "PayPal",
+  venmo: "Venmo",
+  wire: "Wire transfer",
+  check: "Check",
+  other: "Other",
+};
+
+/** How IMG pays this contractor. Treat as sensitive payee data. */
+export interface CreatorPaymentDetails {
+  method: CreatorPaymentMethod;
+  payeeName: string;
+  paypalEmail?: string;
+  venmoHandle?: string;
+  bankName?: string;
+  routingNumber?: string;
+  accountNumber?: string;
+  notes?: string;
+  updatedAt?: string;
+  updatedByUserId?: string;
+}
+
+/** Client-safe completeness check for payment onboarding. */
+export function isPaymentDetailsComplete(
+  details: CreatorPaymentDetails | undefined
+): boolean {
+  if (!details?.method || !details.payeeName?.trim()) return false;
+  if (details.method === "paypal") return Boolean(details.paypalEmail?.trim());
+  if (details.method === "venmo") return Boolean(details.venmoHandle?.trim());
+  if (details.method === "ach" || details.method === "wire") {
+    return Boolean(
+      details.bankName?.trim() &&
+        details.routingNumber?.trim() &&
+        details.accountNumber?.trim()
+    );
+  }
+  return true;
+}
+
 /** Audited manual change entry (review-before-write history). */
 export interface CreatorChangeEntry {
   id: string;
@@ -359,6 +410,8 @@ export interface Creator {
   networkAgreement?: CreatorNetworkAgreement;
   /** Government ID upload + staff verification status. */
   identityVerification?: CreatorIdentityVerification;
+  /** Contractor payee / payout details. */
+  paymentDetails?: CreatorPaymentDetails;
 
   // ── Links (dedup — point to existing records, never duplicate people) ──
   crewMemberId?: string;

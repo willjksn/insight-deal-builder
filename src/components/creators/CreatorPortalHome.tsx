@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { getCreatorPortalMe, listCreatorPortalCampaigns } from "@/lib/creators/apiClient";
-import type { Creator } from "@/lib/creators/types";
+import { isPaymentDetailsComplete, type Creator } from "@/lib/creators/types";
 import { PRODUCER_LEGAL_NAME } from "@/lib/constants/legalTerms";
 
 export function CreatorPortalHome() {
@@ -71,6 +71,7 @@ export function CreatorPortalHome() {
     creator.networkAgreement?.status === "signed" &&
     Boolean(creator.networkAgreement.version);
   const idStatus = creator.identityVerification?.status ?? "none";
+  const paymentOk = isPaymentDetailsComplete(creator.paymentDetails);
 
   return (
     <div className="space-y-6">
@@ -131,6 +132,18 @@ export function CreatorPortalHome() {
                   : idStatus === "rejected"
                     ? "ID needs resubmission."
                     : "Upload your government ID for staff review."}
+            </CardBody>
+          </Card>
+        </Link>
+        <Link href="/creator-portal/payment" className="block">
+          <Card className="h-full transition hover:border-sky-200 hover:shadow-md">
+            <CardHeader>
+              <h2 className="font-semibold text-slate-900">Payment</h2>
+            </CardHeader>
+            <CardBody className="text-sm text-slate-600">
+              {paymentOk
+                ? "Payee details on file."
+                : "Add how IMG should pay you as a contractor."}
             </CardBody>
           </Card>
         </Link>

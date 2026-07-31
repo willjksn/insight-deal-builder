@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/Select";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { NumberInput } from "@/components/ui/NumberInput";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { canManageCreators } from "@/lib/utils/permissions";
 import {
@@ -21,6 +22,10 @@ import {
   listCreators,
   patchCreatorCampaign,
 } from "@/lib/creators/apiClient";
+import {
+  formatCreatorAssignGapWarning,
+  getCreatorCampaignAssignGaps,
+} from "@/lib/creators/onboardingGate";
 import {
   CREATOR_CAMPAIGN_STATUS_LABELS,
   CREATOR_DELIVERABLE_STATUS_LABELS,
@@ -58,6 +63,8 @@ export default function CreatorCampaignsPage() {
   const [assignCreatorId, setAssignCreatorId] = useState("");
   const [assignRole, setAssignRole] = useState("");
   const [assignComp, setAssignComp] = useState<number | undefined>(undefined);
+  const [assignWarnOpen, setAssignWarnOpen] = useState(false);
+  const [assignWarnText, setAssignWarnText] = useState("");
 
   // Brief / deliverable quick add (tied to assigned creators)
   const [briefCreatorId, setBriefCreatorId] = useState("");
@@ -127,6 +134,57 @@ export default function CreatorCampaignsPage() {
       })),
     [active?.assignments]
   );
+
+  const rosterById = useMemo(() => new Map(roster.map((c) => [c.id, c])), [roster]);
+
+  const runAssign = useCallback(async () => {
+    if (!active || !assignCreatorId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await patchCreatorCampaign(getToken, active.id, {
+        action: "addAssignment",
+        assignment: {
+          creatorId: assignCreatorId,
+          role: assignRole.trim() || undefined,
+          compensation: assignComp,
+        },
+      });
+      setActive(res.campaign);
+      await reload();
+      if (!briefCreatorId) setBriefCreatorId(assignCreatorId);
+      if (!delCreatorId) setDelCreatorId(assignCreatorId);
+      setAssignCreatorId("");
+      setAssignRole("");
+      setAssignComp(undefined);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Assign failed");
+    } finally {
+      setBusy(false);
+      setAssignWarnOpen(false);
+    }
+  }, [
+    active,
+    assignCreatorId,
+    assignRole,
+    assignComp,
+    getToken,
+    reload,
+    briefCreatorId,
+    delCreatorId,
+  ]);
+
+  const requestAssign = () => {
+    if (!assignCreatorId) return;
+    const creator = rosterById.get(assignCreatorId);
+    const gaps = creator ? getCreatorCampaignAssignGaps(creator) : [];
+    if (gaps.length && creator) {
+      setAssignWarnText(formatCreatorAssignGapWarning(creator.professionalName, gaps));
+      setAssignWarnOpen(true);
+      return;
+    }
+    void runAssign();
+  };
 
   if (!canManage) return <div className="p-6 text-sm">Not authorized.</div>;
 
@@ -372,24 +430,37 @@ export default function CreatorCampaignsPage() {
                   </p>
                 ) : (
                   <ul className="space-y-2">
-                    {(active.assignments ?? []).map((a) => (
+                    {(active.assignments ?? []).map((a) => {
+                      const gaps = (() => {
+                        const c = rosterById.get(a.creatorId);
+                        return c ? getCreatorCampaignAssignGaps(c) : [];
+                      })();
+                      return (
                       <li
                         key={a.id}
                         className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm"
                       >
                         <div>
-                          <Link
-                            href={`/creators/${a.creatorId}`}
-                            className="font-semibold text-sky-800 hover:underline"
-                          >
-                            {a.creatorName}
-                          </Link>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/creators/${a.creatorId}`}
+                              className="font-semibold text-sky-800 hover:underline"
+                            >
+                              {a.creatorName}
+                            </Link>
+                            {gaps.length > 0 ? (
+                              <Badge variant="warning">Onboarding incomplete</Badge>
+                            ) : null}
+                          </div>
                           <div className="text-xs text-slate-500">
                             {a.role || "Role TBD"}
                             {typeof a.compensation === "number"
                               ? ` · $${a.compensation.toLocaleString()}`
                               : ""}
                             {a.status ? ` · ${a.status}` : ""}
+                            {gaps.length
+                              ? ` · ${gaps.map((g) => g.label).join("; ")}`
+                              : ""}
                           </div>
                         </div>
                         <Button
@@ -423,7 +494,8 @@ export default function CreatorCampaignsPage() {
                           Remove
                         </Button>
                       </li>
-                    ))}
+                    );
+                    })}
                   </ul>
                 )}
 
@@ -433,10 +505,13 @@ export default function CreatorCampaignsPage() {
                     value={assignCreatorId}
                     options={[
                       { value: "", label: "Select creator…" },
-                      ...assignableRoster.map((c) => ({
-                        value: c.id,
-                        label: `${c.professionalName}${c.primaryNiche ? ` · ${c.primaryNiche}` : ""}`,
-                      })),
+                      ...assignableRoster.map((c) => {
+                        const gaps = getCreatorCampaignAssignGaps(c);
+                        return {
+                          value: c.id,
+                          label: `${c.professionalName}${c.primaryNiche ? ` · ${c.primaryNiche}` : ""}${gaps.length ? " · onboarding incomplete" : ""}`,
+                        };
+                      }),
                     ]}
                     onChange={(e) => setAssignCreatorId(e.target.value)}
                     touch
@@ -459,31 +534,7 @@ export default function CreatorCampaignsPage() {
                       size="touch"
                       className="w-full"
                       disabled={busy || !assignCreatorId}
-                      onClick={async () => {
-                        setBusy(true);
-                        setError(null);
-                        try {
-                          const res = await patchCreatorCampaign(getToken, active.id, {
-                            action: "addAssignment",
-                            assignment: {
-                              creatorId: assignCreatorId,
-                              role: assignRole.trim() || undefined,
-                              compensation: assignComp,
-                            },
-                          });
-                          setActive(res.campaign);
-                          await reload();
-                          if (!briefCreatorId) setBriefCreatorId(assignCreatorId);
-                          if (!delCreatorId) setDelCreatorId(assignCreatorId);
-                          setAssignCreatorId("");
-                          setAssignRole("");
-                          setAssignComp(undefined);
-                        } catch (e) {
-                          setError(e instanceof Error ? e.message : "Assign failed");
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
+                      onClick={requestAssign}
                     >
                       Assign creator
                     </Button>
@@ -666,6 +717,17 @@ export default function CreatorCampaignsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={assignWarnOpen}
+        title="Assign creator with incomplete onboarding?"
+        description={assignWarnText}
+        confirmLabel="Assign anyway"
+        cancelLabel="Cancel"
+        loading={busy}
+        onCancel={() => setAssignWarnOpen(false)}
+        onConfirm={() => void runAssign()}
+      />
     </div>
   );
 }

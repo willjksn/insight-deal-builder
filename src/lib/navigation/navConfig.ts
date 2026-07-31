@@ -24,6 +24,7 @@ import {
   Briefcase,
   FileSignature,
   IdCard,
+  Wallet,
 } from "lucide-react";
 import { AppUser } from "@/lib/types";
 import { Workspace } from "@/lib/workspace/types";
@@ -92,6 +93,7 @@ export const CREATOR_PORTAL_NAV_GROUPS: NavGroup[] = [
       { href: "/creator-portal/campaigns", label: "My campaigns", icon: Briefcase },
       { href: "/creator-portal/agreement", label: "Agreement", icon: FileSignature },
       { href: "/creator-portal/identity", label: "ID verification", icon: IdCard },
+      { href: "/creator-portal/payment", label: "Payment", icon: Wallet },
       { href: "/creator-portal/onboarding", label: "Onboarding", icon: Target },
       { href: "/settings", label: "Settings", icon: Settings, exact: true },
     ],

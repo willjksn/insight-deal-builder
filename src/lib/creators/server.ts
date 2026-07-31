@@ -26,6 +26,7 @@ import {
   type CreatorUpdateInput,
 } from "@/lib/creators/types";
 import { AppUser } from "@/lib/types";
+import { redactPaymentDetails } from "@/lib/creators/paymentDetailsServer";
 import { canViewSensitiveCreatorDocs } from "@/lib/utils/permissions";
 
 const MAX_CHANGE_HISTORY = 100;
@@ -90,22 +91,24 @@ export function diffCreatorChanges(
   return entries;
 }
 
-/** Strip sensitive document URLs/paths for users without W-9/ID view rights. */
+/** Strip sensitive document URLs/paths and bank numbers for users without sensitive-doc rights. */
 export function redactCreatorForViewer(creator: Creator, appUser: AppUser): Creator {
   if (canViewSensitiveCreatorDocs(appUser)) return creator;
   const docs = creator.documents;
-  if (!docs?.length) return creator;
   return {
     ...creator,
-    documents: docs.map((d) => {
-      if (!d.sensitive && !SENSITIVE_CREATOR_DOCUMENT_KINDS.includes(d.kind)) return d;
-      return {
-        ...d,
-        url: "",
-        storagePath: undefined,
-        label: d.label ?? d.kind,
-      };
-    }),
+    paymentDetails: redactPaymentDetails(creator.paymentDetails),
+    documents: !docs?.length
+      ? docs
+      : docs.map((d) => {
+          if (!d.sensitive && !SENSITIVE_CREATOR_DOCUMENT_KINDS.includes(d.kind)) return d;
+          return {
+            ...d,
+            url: "",
+            storagePath: undefined,
+            label: d.label ?? d.kind,
+          };
+        }),
   };
 }
 

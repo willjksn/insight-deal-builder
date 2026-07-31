@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils/cn";
 import { CREATOR_AGREEMENT_ONBOARDING_TASK_ID } from "@/lib/creators/networkAgreementContent";
 import {
   CREATOR_ID_ONBOARDING_TASK_ID,
+  CREATOR_PAYMENT_ONBOARDING_TASK_ID,
   buildDefaultOnboarding,
   sanitizeCreatorOnboarding,
   type CreatorOnboardingTask,
@@ -18,6 +19,7 @@ import {
 const LOCKED_TASK_IDS = new Set([
   CREATOR_AGREEMENT_ONBOARDING_TASK_ID,
   CREATOR_ID_ONBOARDING_TASK_ID,
+  CREATOR_PAYMENT_ONBOARDING_TASK_ID,
 ]);
 
 type Props = {
@@ -100,6 +102,7 @@ export function CreatorOnboardingPanel({
               const locked = LOCKED_TASK_IDS.has(task.id);
               const isAgreement = task.id === CREATOR_AGREEMENT_ONBOARDING_TASK_ID;
               const isId = task.id === CREATOR_ID_ONBOARDING_TASK_ID;
+              const isPayment = task.id === CREATOR_PAYMENT_ONBOARDING_TASK_ID;
               return (
                 <li
                   key={task.id}
@@ -138,6 +141,8 @@ export function CreatorOnboardingPanel({
                         "Completed via e-signature."
                       ) : task.done && isId ? (
                         "Verified by IMG staff."
+                      ) : task.done && isPayment ? (
+                        "Payment details on file."
                       ) : portalMode && isAgreement ? (
                         <>
                           Completes automatically when you{" "}
@@ -160,10 +165,23 @@ export function CreatorOnboardingPanel({
                           </Link>
                           .
                         </>
+                      ) : portalMode && isPayment ? (
+                        <>
+                          Completes when you save{" "}
+                          <Link
+                            href="/creator-portal/payment"
+                            className="font-medium text-sky-700 hover:text-sky-900"
+                          >
+                            payment details
+                          </Link>
+                          .
+                        </>
                       ) : isAgreement ? (
                         "Completes when the creator e-signs the network contractor agreement in the portal (not toggleable here)."
-                      ) : (
+                      ) : isId ? (
                         "Completes when staff approve the creator’s ID upload (not toggleable here)."
+                      ) : (
+                        "Completes when payment details are saved (portal or staff)."
                       )}
                     </p>
                   ) : null}

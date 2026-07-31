@@ -616,3 +616,43 @@ export async function viewCreatorIdentityDocument(
   });
   return parseJson(res);
 }
+
+export async function getCreatorPortalPayment(getToken: GetToken) {
+  const res = await fetch("/api/creator-portal/payment", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    paymentDetails: Creator["paymentDetails"] | null;
+    complete: boolean;
+  }>(res);
+}
+
+export async function saveCreatorPortalPayment(
+  getToken: GetToken,
+  body: NonNullable<Creator["paymentDetails"]>
+) {
+  const res = await fetch("/api/creator-portal/payment", {
+    method: "PUT",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    creator: Creator;
+    paymentDetails: NonNullable<Creator["paymentDetails"]>;
+    complete: boolean;
+  }>(res);
+}
+
+export async function saveCreatorPaymentDetails(
+  getToken: GetToken,
+  creatorId: string,
+  body: NonNullable<Creator["paymentDetails"]>
+): Promise<Creator> {
+  const res = await fetch(`/api/creators/${creatorId}/payment`, {
+    method: "PUT",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  const data = await parseJson<{ creator: Creator }>(res);
+  return data.creator;
+}

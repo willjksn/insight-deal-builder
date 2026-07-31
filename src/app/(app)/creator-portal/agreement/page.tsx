@@ -14,6 +14,7 @@ import {
 } from "@/lib/creators/apiClient";
 import type { CreatorAgreementDocument } from "@/lib/creators/networkAgreementContent";
 import type { CreatorNetworkAgreement } from "@/lib/creators/types";
+import { downloadCreatorNetworkAgreementPdf } from "@/lib/pdf/generateCreatorNetworkAgreementPdf";
 import { formatDateTime } from "@/lib/utils/format";
 
 export default function CreatorPortalAgreementPage() {
@@ -123,16 +124,30 @@ export default function CreatorPortalAgreementPage() {
       )}
 
       {signedCurrent ? (
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-          <div>
-            <p className="font-semibold">Signed</p>
-            <p className="mt-0.5">
-              {record?.signerName}
-              {record?.signedAt ? ` · ${formatDateTime(record.signedAt)}` : ""}
-              {record?.version ? ` · v${record.version}` : ""}
-            </p>
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+            <div>
+              <p className="font-semibold">Signed</p>
+              <p className="mt-0.5">
+                {record?.signerName}
+                {record?.signedAt ? ` · ${formatDateTime(record.signedAt)}` : ""}
+                {record?.version ? ` · v${record.version}` : ""}
+              </p>
+            </div>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              downloadCreatorNetworkAgreementPdf(record, {
+                creatorDisplayName: record?.signerName,
+              })
+            }
+          >
+            Download PDF
+          </Button>
         </div>
       ) : (
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">

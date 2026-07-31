@@ -84,6 +84,7 @@ const FIELD_LABELS: Record<string, string> = {
   onboarding: "Onboarding",
   networkAgreement: "Network agreement",
   identityVerification: "ID verification",
+  paymentDetails: "Payment details",
 };
 
 /** Human label for a change-history field key. */
