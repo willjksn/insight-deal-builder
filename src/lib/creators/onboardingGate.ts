@@ -1,14 +1,25 @@
 import { networkAgreementNeedsSignature } from "@/lib/creators/networkAgreementContent";
-import type { Creator } from "@/lib/creators/types";
+import {
+  isCreatorPaymentOnboardingComplete,
+  type Creator,
+} from "@/lib/creators/types";
 
 export type CreatorOnboardingGap = {
-  id: "agreement" | "identity";
+  id: "agreement" | "identity" | "payment";
   label: string;
 };
 
 /** Soft-gate checks before campaign assignment (warn, do not hard-block). */
 export function getCreatorCampaignAssignGaps(
-  creator: Pick<Creator, "networkAgreement" | "identityVerification" | "professionalName">
+  creator: Pick<
+    Creator,
+    | "networkAgreement"
+    | "identityVerification"
+    | "professionalName"
+    | "paymentDetails"
+    | "stripeConnectAccountId"
+    | "stripeConnect"
+  >
 ): CreatorOnboardingGap[] {
   const gaps: CreatorOnboardingGap[] = [];
   if (networkAgreementNeedsSignature(creator.networkAgreement)) {
@@ -24,6 +35,15 @@ export function getCreatorCampaignAssignGaps(
         creator.identityVerification?.status === "pending"
           ? "ID submitted — awaiting staff approval"
           : "ID verification not approved",
+    });
+  }
+  if (!isCreatorPaymentOnboardingComplete(creator)) {
+    const startedConnect = Boolean(creator.stripeConnectAccountId);
+    gaps.push({
+      id: "payment",
+      label: startedConnect
+        ? "Stripe Connect onboarding incomplete"
+        : "Payment / Stripe Connect not set up",
     });
   }
   return gaps;
