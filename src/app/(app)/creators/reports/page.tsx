@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { DataTable, DataRow } from "@/components/ui/DataTable";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,7 +42,7 @@ export default function CreatorReportsPage() {
     <div>
       <PageHeader
         title="Creator reports"
-        subtitle="Network health, campaign economics, and pipeline rollups"
+        subtitle="Network health, unpaid payouts, campaign economics, and pipeline rollups"
       />
       <Link href="/reports" className="mb-4 inline-block text-sm text-sky-700 hover:underline">
         ← Business reports
@@ -83,6 +84,104 @@ export default function CreatorReportsPage() {
               accent="emerald"
             />
           </div>
+
+          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              label="Unpaid assignments"
+              value={report.unpaidPayouts?.unpaidCount ?? 0}
+              accent="amber"
+            />
+            <StatCard
+              label="Unpaid total"
+              value={formatCurrency(report.unpaidPayouts?.unpaidTotal ?? 0)}
+              accent="amber"
+            />
+            <StatCard
+              label="Connect blocked"
+              value={report.unpaidPayouts?.connectBlockedCount ?? 0}
+              accent="violet"
+            />
+            <StatCard
+              label="Blocked amount"
+              value={formatCurrency(report.unpaidPayouts?.connectBlockedTotal ?? 0)}
+              accent="violet"
+            />
+          </div>
+
+          <Card className="mb-6">
+            <CardHeader>
+              <h2 className="font-semibold">Unpaid payouts</h2>
+              <p className="text-xs font-normal text-slate-500">
+                Assignments with compensation that are not marked paid. Open a campaign to pay via
+                Stripe or mark paid.
+              </p>
+            </CardHeader>
+            <CardBody className="p-0 sm:p-0">
+              {(report.unpaidPayouts?.rows.length ?? 0) === 0 ? (
+                <p className="px-4 py-6 text-sm text-slate-500">No unpaid compensated assignments.</p>
+              ) : (
+                <DataTable
+                  headers={[
+                    "Creator",
+                    "Campaign",
+                    "Amount",
+                    "Connect",
+                    "Status",
+                    "Notes",
+                  ]}
+                >
+                  {report.unpaidPayouts.rows.map((row) => (
+                    <DataRow
+                      key={`${row.campaignId}-${row.assignmentId}`}
+                      cells={[
+                        <Link
+                          key="creator"
+                          href={`/creators/${row.creatorId}`}
+                          className="font-semibold text-sky-800 hover:underline"
+                        >
+                          {row.creatorName}
+                        </Link>,
+                        <div key="campaign">
+                          <Link
+                            href={`/creators/campaigns?open=${row.campaignId}`}
+                            className="font-medium text-sky-800 hover:underline"
+                          >
+                            {row.campaignName}
+                          </Link>
+                          {row.brandName ? (
+                            <div className="text-xs text-slate-500">{row.brandName}</div>
+                          ) : null}
+                          {row.role ? (
+                            <div className="text-xs text-slate-500">{row.role}</div>
+                          ) : null}
+                        </div>,
+                        formatCurrency(row.compensation),
+                        row.connectReady ? (
+                          <Badge key="ready" variant="success">
+                            Ready
+                          </Badge>
+                        ) : (
+                          <Badge key="blocked" variant="warning">
+                            Not ready
+                          </Badge>
+                        ),
+                        CREATOR_CAMPAIGN_STATUS_LABELS[
+                          row.campaignStatus as CreatorCampaignStatus
+                        ] ?? row.campaignStatus,
+                        row.payoutError ? (
+                          <span key="err" className="text-amber-800">
+                            {row.payoutError}
+                          </span>
+                        ) : (
+                          "—"
+                        ),
+                      ]}
+                    />
+                  ))}
+                </DataTable>
+              )}
+            </CardBody>
+          </Card>
 
           <div className="mb-6 grid gap-4 lg:grid-cols-2">
             <Card>
@@ -128,7 +227,11 @@ export default function CreatorReportsPage() {
               <DataRow
                 key={c.id}
                 cells={[
-                  <Link key="n" href="/creators/campaigns" className="font-semibold text-sky-800">
+                  <Link
+                    key="n"
+                    href={`/creators/campaigns?open=${c.id}`}
+                    className="font-semibold text-sky-800"
+                  >
                     {c.name}
                   </Link>,
                   c.brandName || "—",

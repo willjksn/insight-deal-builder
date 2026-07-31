@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCreatorNetworkSummary, listCreatorCampaigns, listShortlists } from "@/lib/creators/opsServer";
+import {
+  getCreatorNetworkSummary,
+  listCreatorCampaigns,
+  listShortlists,
+} from "@/lib/creators/opsServer";
+import { listCreators } from "@/lib/creators/server";
+import { buildUnpaidPayoutLedger } from "@/lib/creators/unpaidPayoutLedger";
 import { creatorApiError, requireCreatorManager } from "@/lib/creators/routeHelpers";
 
 export const runtime = "nodejs";
@@ -8,10 +14,11 @@ export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   try {
     const { appUser } = await requireCreatorManager(request);
-    const [summary, campaigns, shortlists] = await Promise.all([
+    const [summary, campaigns, shortlists, creators] = await Promise.all([
       getCreatorNetworkSummary(appUser),
       listCreatorCampaigns(appUser),
       listShortlists(appUser),
+      listCreators(appUser),
     ]);
 
     const economics = campaigns.reduce(
@@ -23,6 +30,9 @@ export async function GET(request: NextRequest) {
       },
       { revenue: 0, compensation: 0, costs: 0 }
     );
+
+    const creatorsById = new Map(creators.map((c) => [c.id, c]));
+    const unpaidPayouts = buildUnpaidPayoutLedger(campaigns, creatorsById);
 
     return NextResponse.json({
       report: {
@@ -37,6 +47,7 @@ export async function GET(request: NextRequest) {
           ...economics,
           estimatedMargin: economics.revenue - economics.compensation - economics.costs,
         },
+        unpaidPayouts,
         campaigns: campaigns.map((c) => ({
           id: c.id,
           name: c.name,

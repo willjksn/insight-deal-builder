@@ -406,6 +406,25 @@ export async function getCreatorReports(getToken: GetToken) {
         costs: number;
         estimatedMargin: number;
       };
+      unpaidPayouts: {
+        rows: {
+          campaignId: string;
+          campaignName: string;
+          brandName?: string;
+          campaignStatus: string;
+          assignmentId: string;
+          creatorId: string;
+          creatorName: string;
+          role?: string;
+          compensation: number;
+          connectReady: boolean;
+          payoutError?: string;
+        }[];
+        unpaidCount: number;
+        unpaidTotal: number;
+        connectBlockedCount: number;
+        connectBlockedTotal: number;
+      };
       campaigns: {
         id: string;
         name: string;
