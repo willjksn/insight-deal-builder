@@ -1,5 +1,7 @@
 import type { ScriptWriterBrief } from "@/lib/scriptWriter/brief";
-import type { ProductionDayShot } from "@/lib/production/types";
+import type { ProductionDay, ProductionDayShot } from "@/lib/production/types";
+import type { ScriptDocument } from "@/lib/scriptWriter/types";
+import { sceneNumbersFromScript } from "@/lib/scriptWriter/scriptMappers";
 
 export type SceneCoverageTemplateId =
   | "full"
@@ -331,4 +333,81 @@ export function sceneHeadingsFromShots(shots: ProductionDayShot[]): Record<strin
     map[ref] = shot.sceneHeading.trim();
   }
   return map;
+}
+
+function sceneHeadingsFromScript(script: ScriptDocument | null | undefined): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const scene of script?.scenes ?? []) {
+    const num = String(scene.sceneNumber ?? "").trim();
+    if (num && scene.heading?.trim()) map[num] = scene.heading.trim();
+  }
+  return map;
+}
+
+/** Seed/merge required coverage for one production day from script-writer settings. */
+export function seedDayCoverageChecklists(params: {
+  day: Pick<ProductionDay, "scenes" | "shots" | "coverageChecklists">;
+  script?: ScriptDocument | null;
+  detailedShotList?: boolean;
+  brief?: Pick<ScriptWriterBrief, "contentType" | "castSize" | "mood" | "genre"> | null;
+}): SceneCoverageChecklist[] {
+  const shots = params.day.shots ?? [];
+  const fromScript = params.script ? sceneNumbersFromScript(params.script) : [];
+  const sceneRefs =
+    fromScript.length > 0
+      ? fromScript
+      : collectSceneRefsFromShots(shots).length > 0
+        ? collectSceneRefsFromShots(shots)
+        : params.day.scenes?.length
+          ? params.day.scenes
+          : ["1"];
+  const sceneHeadings = {
+    ...sceneHeadingsFromShots(shots),
+    ...sceneHeadingsFromScript(params.script),
+  };
+  const seeded = buildSceneCoverageChecklists({
+    sceneRefs,
+    sceneHeadings,
+    detailedShotList: params.detailedShotList,
+    brief: params.brief,
+  });
+  return (
+    syncCoverageChecklistWithShots(
+      mergeSceneCoverageChecklists(params.day.coverageChecklists, seeded),
+      shots
+    ) ?? seeded
+  );
+}
+
+/** Seed/merge coverage checklists across all board days (Coverage desk refresh). */
+export function seedBoardCoverageChecklists(params: {
+  days: ProductionDay[];
+  script?: ScriptDocument | null;
+  detailedShotList?: boolean;
+  brief?: Pick<ScriptWriterBrief, "contentType" | "castSize" | "mood" | "genre"> | null;
+}): ProductionDay[] {
+  return params.days.map((day) => ({
+    ...day,
+    coverageChecklists: seedDayCoverageChecklists({
+      day,
+      script: params.script,
+      detailedShotList: params.detailedShotList,
+      brief: params.brief,
+    }),
+  }));
+}
+
+export function coverageChecklistProgress(checklists: SceneCoverageChecklist[] | undefined): {
+  done: number;
+  total: number;
+} {
+  let done = 0;
+  let total = 0;
+  for (const c of checklists ?? []) {
+    for (const item of c.items) {
+      total += 1;
+      if (item.done) done += 1;
+    }
+  }
+  return { done, total };
 }

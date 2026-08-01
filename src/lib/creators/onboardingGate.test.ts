@@ -6,6 +6,7 @@ import {
   getCampaignLiveStatusGaps,
   getCreatorCampaignAssignGaps,
   isCreatorCampaignLiveStatus,
+  isCreatorCampaignSoftGateStatus,
 } from "@/lib/creators/onboardingGate";
 
 describe("getCreatorCampaignAssignGaps", () => {
@@ -107,5 +108,65 @@ describe("campaign live status soft-gate", () => {
     expect(rows[0].creatorName).toBe("Ada");
     expect(formatCampaignLiveStatusWarning("In production", rows)).toContain("Ada");
     expect(formatCampaignLiveStatusWarning("In production", rows)).toContain("still update");
+  });
+
+  it("includes completed in soft-gate statuses", () => {
+    expect(isCreatorCampaignSoftGateStatus("completed")).toBe(true);
+    expect(isCreatorCampaignLiveStatus("completed")).toBe(false);
+  });
+
+  it("flags unpaid compensation even when onboarding is complete", () => {
+    const rows = getCampaignLiveStatusGaps(
+      [{ creatorId: "c2", creatorName: "Bob", compensation: 1500 }],
+      new Map([
+        [
+          "c2",
+          {
+            professionalName: "Bob",
+            networkAgreement: {
+              status: "signed",
+              version: CREATOR_NETWORK_AGREEMENT_VERSION,
+              signedAt: "2026-07-01T00:00:00.000Z",
+            },
+            identityVerification: { status: "approved" },
+            stripeConnectAccountId: "acct_1",
+            stripeConnect: { detailsSubmitted: true, payoutsEnabled: true },
+          },
+        ],
+      ])
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].gaps.map((g) => g.id)).toEqual(["unpaid"]);
+    expect(rows[0].gaps[0].label).toContain("1,500");
+  });
+
+  it("skips unpaid gap when paidAt is set", () => {
+    const rows = getCampaignLiveStatusGaps(
+      [
+        {
+          creatorId: "c2",
+          creatorName: "Bob",
+          compensation: 1500,
+          paidAt: "2026-07-30T00:00:00.000Z",
+        },
+      ],
+      new Map([
+        [
+          "c2",
+          {
+            professionalName: "Bob",
+            networkAgreement: {
+              status: "signed",
+              version: CREATOR_NETWORK_AGREEMENT_VERSION,
+              signedAt: "2026-07-01T00:00:00.000Z",
+            },
+            identityVerification: { status: "approved" },
+            stripeConnectAccountId: "acct_1",
+            stripeConnect: { detailsSubmitted: true, payoutsEnabled: true },
+          },
+        ],
+      ])
+    );
+    expect(rows).toHaveLength(0);
   });
 });

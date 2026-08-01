@@ -5,6 +5,7 @@ import {
   formatProductionShotLabel,
   formatShotTypeLabel,
 } from "@/lib/production/shotLabels";
+import { templateLabel } from "@/lib/production/sceneCoverageChecklist";
 import { cn } from "@/lib/utils/cn";
 
 export function ShotListPrintView({
@@ -17,6 +18,7 @@ export function ShotListPrintView({
   day: ProductionDay;
 }) {
   const sorted = [...day.shots].sort((a, b) => a.sortOrder - b.sortOrder);
+  const checklists = day.coverageChecklists ?? [];
 
   return (
     <div className="text-sm text-slate-900">
@@ -28,6 +30,42 @@ export function ShotListPrintView({
         {boardTitle || projectName}
         {day.shootDate ? ` · ${day.shootDate}` : ""}
       </p>
+
+      {checklists.length > 0 ? (
+        <div className="mt-4 space-y-3">
+          {checklists.map((checklist) => {
+            const doneCount = checklist.items.filter((i) => i.done).length;
+            return (
+              <div key={checklist.sceneRef} className="break-inside-avoid">
+                <h2 className="text-sm font-semibold">
+                  Required coverage — Scene {checklist.sceneRef}
+                  <span className="ml-2 font-normal text-slate-500">
+                    {doneCount}/{checklist.items.length} · {templateLabel(checklist.templateId)}
+                  </span>
+                </h2>
+                {checklist.sceneHeading ? (
+                  <p className="text-xs text-slate-500">{checklist.sceneHeading}</p>
+                ) : null}
+                <ul className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+                  {checklist.items.map((item) => (
+                    <li key={item.id} className="flex items-start gap-1.5">
+                      <span
+                        className={cn(
+                          "mt-0.5 inline-flex h-3 w-3 shrink-0 items-center justify-center rounded border",
+                          item.done ? "border-emerald-700 bg-emerald-100" : "border-slate-400"
+                        )}
+                      />
+                      <span className={item.done ? "text-slate-500 line-through" : ""}>
+                        {item.label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {sorted.length === 0 ? (
         <p className="mt-4 text-slate-500">No shots listed.</p>

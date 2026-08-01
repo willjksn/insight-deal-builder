@@ -29,6 +29,13 @@ import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { CoverageBoardView, type CoverageShotRow } from "@/components/production/CoverageBoardView";
 import { CoverageListView } from "@/components/production/CoverageListView";
+import { SceneCoverageChecklistPanel } from "@/components/production/SceneCoverageChecklistPanel";
+import {
+  coverageChecklistProgress,
+  seedBoardCoverageChecklists,
+  syncCoverageChecklistWithShots,
+  type SceneCoverageChecklist,
+} from "@/lib/production/sceneCoverageChecklist";
 import { cn } from "@/lib/utils/cn";
 
 type CoverageView = "board" | "linear" | "list";
@@ -170,14 +177,20 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
     if (!board || !canEdit) return;
     persistBoard({
       ...board,
-      productionDays: board.productionDays.map((day) =>
-        day.id !== dayId
-          ? day
-          : {
-              ...day,
-              shots: (day.shots ?? []).map((s) => (s.id === shotId ? { ...s, ...patch } : s)),
-            }
-      ),
+      productionDays: board.productionDays.map((day) => {
+        if (day.id !== dayId) return day;
+        const shots = (day.shots ?? []).map((s) =>
+          s.id === shotId ? { ...s, ...patch } : s
+        );
+        const next = { ...day, shots };
+        if ("done" in patch || "shotType" in patch || "sceneRef" in patch) {
+          next.coverageChecklists = syncCoverageChecklistWithShots(
+            day.coverageChecklists,
+            shots
+          );
+        }
+        return next;
+      }),
     });
   };
 
@@ -209,17 +222,69 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
     if (!board || !canEdit) return;
     persistBoard({
       ...board,
-      productionDays: board.productionDays.map((day) =>
-        day.id !== dayId
-          ? day
-          : {
-              ...day,
-              shots: (day.shots ?? [])
-                .filter((s) => s.id !== shotId)
-                .map((s, i) => ({ ...s, sortOrder: i })),
-            }
-      ),
+      productionDays: board.productionDays.map((day) => {
+        if (day.id !== dayId) return day;
+        const shots = (day.shots ?? [])
+          .filter((s) => s.id !== shotId)
+          .map((s, i) => ({ ...s, sortOrder: i }));
+        return {
+          ...day,
+          shots,
+          coverageChecklists: syncCoverageChecklistWithShots(
+            day.coverageChecklists,
+            shots
+          ),
+        };
+      }),
     });
+  };
+
+  const toggleCoverageItem = (dayId: string, sceneRef: string, itemId: string) => {
+    if (!board || !canEdit) return;
+    persistBoard({
+      ...board,
+      productionDays: board.productionDays.map((day) => {
+        if (day.id !== dayId || !day.coverageChecklists?.length) return day;
+        return {
+          ...day,
+          coverageChecklists: day.coverageChecklists.map((checklist) =>
+            checklist.sceneRef !== sceneRef
+              ? checklist
+              : {
+                  ...checklist,
+                  items: checklist.items.map((item) =>
+                    item.id === itemId ? { ...item, done: !item.done } : item
+                  ),
+                }
+          ),
+        };
+      }),
+    });
+  };
+
+  const seedCoverageChecklists = async () => {
+    if (!user || !board?.scriptSessionId || !canEdit) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const { session: loaded } = await scriptWriterGetSession(
+        () => user.getIdToken(),
+        board.scriptSessionId
+      );
+      const session = loaded as ScriptWriterSession;
+      const days = seedBoardCoverageChecklists({
+        days: board.productionDays,
+        script: session.script as ScriptDocument | null,
+        detailedShotList: session.detailedShotList !== false,
+        brief: session.brief ?? null,
+      });
+      persistBoard({ ...board, productionDays: days }, true);
+      setMigrateNote("Built required coverage checklists from script-writer settings.");
+    } catch (e) {
+      setRefreshError(e instanceof Error ? e.message : "Could not build coverage checklists");
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const refreshFromScript = async () => {
@@ -239,15 +304,21 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
         );
         return;
       }
-      const days = mergeBoardCoverageFromScript(
+      const merged = mergeBoardCoverageFromScript(
         board.productionDays,
         script,
         session.inspirationImages ?? [],
         board.inspirationImages ?? []
       );
+      const days = seedBoardCoverageChecklists({
+        days: merged,
+        script,
+        detailedShotList: session.detailedShotList !== false,
+        brief: session.brief ?? null,
+      });
       persistBoard({ ...board, productionDays: days }, true);
       setMigrateNote(
-        "Synced from script — uploaded frames, day placement, and filled-in DP fields were kept."
+        "Synced from script — uploaded frames, day placement, filled-in DP fields, and required coverage were kept/updated."
       );
     } catch (e) {
       setRefreshError(e instanceof Error ? e.message : "Could not refresh from script");
@@ -322,6 +393,27 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
 
   const totalShots = countCoverageShots(board.productionDays);
   const withImages = countCoverageWithImages(board.productionDays);
+  const visibleDays =
+    dayFilter === "all" ? sortedDays : sortedDays.filter((d) => d.id === dayFilter);
+  const deskChecklists: {
+    dayId: string;
+    dayNumber: number;
+    dayTitle?: string;
+    checklists: SceneCoverageChecklist[];
+  }[] = visibleDays
+    .map((d) => ({
+      dayId: d.id,
+      dayNumber: d.dayNumber,
+      dayTitle: d.title,
+      checklists: d.coverageChecklists ?? [],
+    }))
+    .filter((d) => d.checklists.length > 0);
+  const boardCoverageProgress = coverageChecklistProgress(
+    visibleDays.flatMap((d) => d.coverageChecklists ?? [])
+  );
+  const anyChecklistsOnBoard = board.productionDays.some(
+    (d) => (d.coverageChecklists?.length ?? 0) > 0
+  );
 
   return (
     <>
@@ -363,6 +455,16 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
                 {refreshing ? "Syncing…" : "Sync from script"}
               </Button>
             )}
+            {board.scriptSessionId && canEdit && !anyChecklistsOnBoard && (
+              <Button
+                size="touch"
+                variant="outline"
+                disabled={refreshing || saving}
+                onClick={() => void seedCoverageChecklists()}
+              >
+                Build required coverage
+              </Button>
+            )}
             <Link href={`/projects/${projectId}/production`}>
               <Button size="touch" variant="outline">
                 Prep board
@@ -383,6 +485,9 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
         <p className="text-sm text-slate-600">
           {totalShots} shot{totalShots === 1 ? "" : "s"}
           {withImages > 0 ? ` · ${withImages} with frames` : ""}
+          {boardCoverageProgress.total > 0
+            ? ` · Coverage ${boardCoverageProgress.done}/${boardCoverageProgress.total}`
+            : ""}
           {saving ? " · Saving…" : ""}
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -481,6 +586,27 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
           </div>
         </div>
       )}
+
+      {deskChecklists.length > 0 ? (
+        <div className="mb-6 space-y-4">
+          {deskChecklists.map(({ dayId, dayNumber, dayTitle, checklists }) => (
+            <div key={dayId}>
+              {deskChecklists.length > 1 || dayFilter === "all" ? (
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Day {dayNumber}
+                  {dayTitle && dayTitle !== `Day ${dayNumber}` ? ` — ${dayTitle}` : ""}
+                </p>
+              ) : null}
+              <SceneCoverageChecklistPanel
+                checklists={checklists}
+                canEdit={canEdit}
+                compact
+                onToggle={(sceneRef, itemId) => toggleCoverageItem(dayId, sceneRef, itemId)}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {(view === "board" || view === "linear") && (
         <CoverageBoardView

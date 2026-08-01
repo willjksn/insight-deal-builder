@@ -27,7 +27,7 @@ import {
   formatCreatorAssignGapWarning,
   getCampaignLiveStatusGaps,
   getCreatorCampaignAssignGaps,
-  isCreatorCampaignLiveStatus,
+  isCreatorCampaignSoftGateStatus,
 } from "@/lib/creators/onboardingGate";
 import {
   CREATOR_CAMPAIGN_STATUS_LABELS,
@@ -220,9 +220,7 @@ export default function CreatorCampaignsPage() {
 
   const requestStatusChange = (next: CreatorCampaignStatus) => {
     if (!active || next === active.status) return;
-    const leavingLive =
-      !isCreatorCampaignLiveStatus(active.status) && isCreatorCampaignLiveStatus(next);
-    if (leavingLive) {
+    if (isCreatorCampaignSoftGateStatus(next)) {
       const rows = getCampaignLiveStatusGaps(active.assignments ?? [], rosterById);
       if (rows.length) {
         setPendingStatus(next);

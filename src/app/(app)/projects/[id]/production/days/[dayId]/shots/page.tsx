@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CalendarRange, FileStack, LayoutGrid, List, Printer, RefreshCw, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -23,14 +23,10 @@ import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import {
   mergeProductionSceneFramesFromScript,
   productionSceneFramesFromScript,
-  sceneNumbersFromScript,
 } from "@/lib/scriptWriter/scriptMappers";
 import { mergeDayShotsFromScript } from "@/lib/production/coverageSync";
 import {
-  buildSceneCoverageChecklists,
-  collectSceneRefsFromShots,
-  mergeSceneCoverageChecklists,
-  sceneHeadingsFromShots,
+  seedDayCoverageChecklists,
   syncCoverageChecklistWithShots,
 } from "@/lib/production/sceneCoverageChecklist";
 import {
@@ -79,6 +75,57 @@ export default function ShotListDayPage() {
     addProductionDay,
     removeProductionDay,
   } = useProductionDayPage(projectId, dayId);
+
+  // Auto-seed required coverage once when a linked script exists but the day has none.
+  const autoSeedAttempted = useRef(false);
+  useEffect(() => {
+    autoSeedAttempted.current = false;
+  }, [dayId]);
+  useEffect(() => {
+    if (!user || !board?.scriptSessionId || !canEditShots || !day || loading) return;
+    if ((day.coverageChecklists?.length ?? 0) > 0) return;
+    if (autoSeedAttempted.current) return;
+    autoSeedAttempted.current = true;
+    let cancelled = false;
+    const daySnapshot = day;
+    (async () => {
+      try {
+        const { session: loaded } = await scriptWriterGetSession(
+          () => user.getIdToken(),
+          board.scriptSessionId!
+        );
+        if (cancelled) {
+          autoSeedAttempted.current = false;
+          return;
+        }
+        const session = loaded as ScriptWriterSession;
+        patchDay({
+          coverageChecklists: seedDayCoverageChecklists({
+            day: daySnapshot,
+            script: session.script as ScriptDocument | null,
+            detailedShotList: session.detailedShotList !== false,
+            brief: session.brief ?? null,
+          }),
+        });
+      } catch {
+        autoSeedAttempted.current = false;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally omit full `day` — seed from snapshot when checklist count is empty.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    user,
+    board?.scriptSessionId,
+    canEditShots,
+    dayId,
+    day?.id,
+    day?.coverageChecklists?.length,
+    loading,
+    patchDay,
+  ]);
 
   if (loading) return <LoadingSpinner className="py-20" />;
 
@@ -154,23 +201,6 @@ export default function ShotListDayPage() {
         sessionImages,
         board.inspirationImages
       );
-      const sceneRefs =
-        sceneNumbersFromScript(script).length > 0
-          ? sceneNumbersFromScript(script)
-          : collectSceneRefsFromShots(nextShots);
-      const sceneHeadings: Record<string, string> = {
-        ...sceneHeadingsFromShots(nextShots),
-      };
-      for (const scene of script.scenes ?? []) {
-        const num = String(scene.sceneNumber ?? "").trim();
-        if (num && scene.heading?.trim()) sceneHeadings[num] = scene.heading.trim();
-      }
-      const seededCoverage = buildSceneCoverageChecklists({
-        sceneRefs,
-        sceneHeadings,
-        detailedShotList: session.detailedShotList !== false,
-        brief: session.brief ?? null,
-      });
       patchDay({
         shots: nextShots,
         sceneFrames: script.scenes?.length
@@ -181,10 +211,12 @@ export default function ShotListDayPage() {
               board.inspirationImages
             )
           : sceneFrames,
-        coverageChecklists: syncCoverageChecklistWithShots(
-          mergeSceneCoverageChecklists(day.coverageChecklists, seededCoverage),
-          nextShots
-        ),
+        coverageChecklists: seedDayCoverageChecklists({
+          day: { ...day, shots: nextShots },
+          script,
+          detailedShotList: session.detailedShotList !== false,
+          brief: session.brief ?? null,
+        }),
       });
     } catch (e) {
       setRefreshError(e instanceof Error ? e.message : "Could not refresh from script");
@@ -204,32 +236,13 @@ export default function ShotListDayPage() {
       );
       const session = loaded as ScriptWriterSession;
       const script = session.script as ScriptDocument | null;
-      const sceneRefs =
-        (script ? sceneNumbersFromScript(script) : []).length > 0
-          ? sceneNumbersFromScript(script!)
-          : collectSceneRefsFromShots(day.shots).length > 0
-            ? collectSceneRefsFromShots(day.shots)
-            : day.scenes?.length
-              ? day.scenes
-              : ["1"];
-      const sceneHeadings: Record<string, string> = {
-        ...sceneHeadingsFromShots(day.shots),
-      };
-      for (const scene of script?.scenes ?? []) {
-        const num = String(scene.sceneNumber ?? "").trim();
-        if (num && scene.heading?.trim()) sceneHeadings[num] = scene.heading.trim();
-      }
-      const seededCoverage = buildSceneCoverageChecklists({
-        sceneRefs,
-        sceneHeadings,
-        detailedShotList: session.detailedShotList !== false,
-        brief: session.brief ?? null,
-      });
       patchDay({
-        coverageChecklists: syncCoverageChecklistWithShots(
-          mergeSceneCoverageChecklists(day.coverageChecklists, seededCoverage),
-          day.shots
-        ),
+        coverageChecklists: seedDayCoverageChecklists({
+          day,
+          script,
+          detailedShotList: session.detailedShotList !== false,
+          brief: session.brief ?? null,
+        }),
       });
     } catch (e) {
       setRefreshError(e instanceof Error ? e.message : "Could not build coverage checklist");
