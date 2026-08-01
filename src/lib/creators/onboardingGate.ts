@@ -1,4 +1,5 @@
 import { networkAgreementNeedsSignature } from "@/lib/creators/networkAgreementContent";
+import type { CreatorCampaignStatus } from "@/lib/creators/opsTypes";
 import {
   isCreatorPaymentOnboardingComplete,
   type Creator,
@@ -9,16 +10,38 @@ export type CreatorOnboardingGap = {
   label: string;
 };
 
+export type CreatorLiveStatusGap = {
+  creatorId: string;
+  creatorName: string;
+  gaps: CreatorOnboardingGap[];
+};
+
+/** Statuses where creators should be fully onboarded (soft-warn on change). */
+export const CREATOR_CAMPAIGN_LIVE_STATUSES: ReadonlySet<CreatorCampaignStatus> = new Set([
+  "agreed",
+  "in_production",
+  "posting",
+  "reporting",
+]);
+
+export function isCreatorCampaignLiveStatus(
+  status: string | undefined
+): status is CreatorCampaignStatus {
+  return Boolean(status && CREATOR_CAMPAIGN_LIVE_STATUSES.has(status as CreatorCampaignStatus));
+}
+
+type CreatorOnboardingPick = Pick<
+  Creator,
+  | "networkAgreement"
+  | "identityVerification"
+  | "professionalName"
+  | "stripeConnectAccountId"
+  | "stripeConnect"
+>;
+
 /** Soft-gate checks before campaign assignment (warn, do not hard-block). */
 export function getCreatorCampaignAssignGaps(
-  creator: Pick<
-    Creator,
-    | "networkAgreement"
-    | "identityVerification"
-    | "professionalName"
-    | "stripeConnectAccountId"
-    | "stripeConnect"
-  >
+  creator: CreatorOnboardingPick
 ): CreatorOnboardingGap[] {
   const gaps: CreatorOnboardingGap[] = [];
   if (networkAgreementNeedsSignature(creator.networkAgreement)) {
@@ -55,4 +78,37 @@ export function formatCreatorAssignGapWarning(
   if (!gaps.length) return "";
   const list = gaps.map((g) => g.label).join("; ");
   return `${creatorName} is not fully onboarded (${list}). You can still assign them — they should finish these steps before going live.`;
+}
+
+/** Soft-gate: assignees with incomplete onboarding when moving campaign toward live. */
+export function getCampaignLiveStatusGaps(
+  assignments: { creatorId: string; creatorName: string }[],
+  creatorsById: Map<string, CreatorOnboardingPick>
+): CreatorLiveStatusGap[] {
+  const out: CreatorLiveStatusGap[] = [];
+  for (const a of assignments) {
+    const creator = creatorsById.get(a.creatorId);
+    const gaps = getCreatorCampaignAssignGaps(
+      creator ?? { professionalName: a.creatorName }
+    );
+    if (!gaps.length) continue;
+    out.push({
+      creatorId: a.creatorId,
+      creatorName: a.creatorName || creator?.professionalName || "Creator",
+      gaps,
+    });
+  }
+  return out;
+}
+
+export function formatCampaignLiveStatusWarning(
+  statusLabel: string,
+  rows: CreatorLiveStatusGap[]
+): string {
+  if (!rows.length) return "";
+  const lines = rows.map((r) => {
+    const list = r.gaps.map((g) => g.label).join("; ");
+    return `${r.creatorName} (${list})`;
+  });
+  return `Moving to ${statusLabel} while assignees are not fully onboarded: ${lines.join(" · ")}. You can still update status — finish agreement, ID, and Stripe Connect before going live.`;
 }

@@ -23,8 +23,11 @@ import {
   patchCreatorCampaign,
 } from "@/lib/creators/apiClient";
 import {
+  formatCampaignLiveStatusWarning,
   formatCreatorAssignGapWarning,
+  getCampaignLiveStatusGaps,
   getCreatorCampaignAssignGaps,
+  isCreatorCampaignLiveStatus,
 } from "@/lib/creators/onboardingGate";
 import {
   CREATOR_CAMPAIGN_STATUS_LABELS,
@@ -71,6 +74,9 @@ export default function CreatorCampaignsPage() {
     assignment: CreatorCampaignAssignment;
     mode: "stripe" | "manual" | "clear";
   } | null>(null);
+  const [statusWarnOpen, setStatusWarnOpen] = useState(false);
+  const [statusWarnText, setStatusWarnText] = useState("");
+  const [pendingStatus, setPendingStatus] = useState<CreatorCampaignStatus | null>(null);
 
   // Brief / deliverable quick add (tied to assigned creators)
   const [briefCreatorId, setBriefCreatorId] = useState("");
@@ -192,6 +198,44 @@ export default function CreatorCampaignsPage() {
     void runAssign();
   };
 
+  const applyStatus = useCallback(
+    async (status: CreatorCampaignStatus) => {
+      if (!active) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const res = await patchCreatorCampaign(getToken, active.id, { status });
+        setActive(res.campaign);
+        await reload();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not update status");
+      } finally {
+        setBusy(false);
+        setStatusWarnOpen(false);
+        setPendingStatus(null);
+      }
+    },
+    [active, getToken, reload]
+  );
+
+  const requestStatusChange = (next: CreatorCampaignStatus) => {
+    if (!active || next === active.status) return;
+    const leavingLive =
+      !isCreatorCampaignLiveStatus(active.status) && isCreatorCampaignLiveStatus(next);
+    if (leavingLive) {
+      const rows = getCampaignLiveStatusGaps(active.assignments ?? [], rosterById);
+      if (rows.length) {
+        setPendingStatus(next);
+        setStatusWarnText(
+          formatCampaignLiveStatusWarning(CREATOR_CAMPAIGN_STATUS_LABELS[next], rows)
+        );
+        setStatusWarnOpen(true);
+        return;
+      }
+    }
+    void applyStatus(next);
+  };
+
   if (!canManage) return <div className="p-6 text-sm">Not authorized.</div>;
 
   return (
@@ -307,13 +351,10 @@ export default function CreatorCampaignsPage() {
                   label="Status"
                   value={active.status}
                   options={STATUS_OPTIONS}
-                  onChange={async (e) => {
-                    const res = await patchCreatorCampaign(getToken, active.id, {
-                      status: e.target.value as CreatorCampaignStatus,
-                    });
-                    setActive(res.campaign);
-                    await reload();
-                  }}
+                  disabled={busy}
+                  onChange={(e) =>
+                    requestStatusChange(e.target.value as CreatorCampaignStatus)
+                  }
                 />
               </CardHeader>
               <CardBody className="space-y-4">
@@ -799,6 +840,22 @@ export default function CreatorCampaignsPage() {
         loading={busy}
         onCancel={() => setAssignWarnOpen(false)}
         onConfirm={() => void runAssign()}
+      />
+
+      <ConfirmDialog
+        open={statusWarnOpen}
+        title="Move campaign toward live with incomplete onboarding?"
+        description={statusWarnText}
+        confirmLabel="Update status anyway"
+        cancelLabel="Cancel"
+        loading={busy}
+        onCancel={() => {
+          setStatusWarnOpen(false);
+          setPendingStatus(null);
+        }}
+        onConfirm={() => {
+          if (pendingStatus) void applyStatus(pendingStatus);
+        }}
       />
 
       <ConfirmDialog
