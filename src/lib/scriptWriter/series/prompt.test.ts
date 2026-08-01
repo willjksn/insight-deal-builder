@@ -38,19 +38,46 @@ describe("formatSeriesContextForPrompt", () => {
     expect(out).toContain("full EPISODE");
   });
 
-  it("adds a story-so-far recap from prior entries", () => {
+  it("adds a story-so-far recap from prior entries in continues mode", () => {
     const prior: ScriptSeriesEntry[] = [
-      { sessionId: "e1", title: "The First Look", entryKind: "episode", order: 1, recap: "Elara notices the watcher." },
+      {
+        sessionId: "e1",
+        title: "The First Look",
+        entryKind: "episode",
+        order: 1,
+        recap: "Elara notices the watcher.",
+        endingBeat: "INT. STUDIO — NIGHT — The webcam light blinks on.",
+      },
     ];
-    const out = formatSeriesContextForPrompt(baseSeries, "episode", prior);
+    const out = formatSeriesContextForPrompt(baseSeries, "episode", prior, "continues");
+    expect(out).toContain("CONTINUITY MODE: CONTINUES PREVIOUS");
     expect(out).toContain("STORY SO FAR");
     expect(out).toContain("Episode 1: The First Look — Elara notices the watcher.");
+    expect(out).toContain("Ending beat to pick up from");
+    expect(out).toContain("IMMEDIATE HAND-OFF");
+  });
+
+  it("treats standalone mode as anthology (no plot continuation)", () => {
+    const prior: ScriptSeriesEntry[] = [
+      {
+        sessionId: "e1",
+        title: "The First Look",
+        entryKind: "episode",
+        order: 1,
+        recap: "Elara notices the watcher.",
+      },
+    ];
+    const out = formatSeriesContextForPrompt(baseSeries, "episode", prior, "standalone");
+    expect(out).toContain("SAME WORLD, NEW STORY");
+    expect(out).toContain("PRIOR ENTRIES");
+    expect(out).not.toContain("STORY SO FAR (prior entries");
+    expect(out).not.toContain("IMMEDIATE HAND-OFF");
   });
 
   it("uses a trailer-specific directive", () => {
     const out = formatSeriesContextForPrompt(baseSeries, "trailer", []);
     expect(out).toContain("TRAILER");
-    expect(out).not.toContain("STORY SO FAR");
+    expect(out).not.toContain("STORY SO FAR (prior entries");
   });
 });
 

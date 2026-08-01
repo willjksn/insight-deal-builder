@@ -17,11 +17,14 @@ import {
   scriptWriterGetSeries,
   scriptWriterUpdateSeries,
 } from "@/lib/scriptWriter/apiClient";
+import { Select } from "@/components/ui/Select";
 import {
   ScriptSeries,
   ScriptSeriesCharacter,
+  ScriptSeriesContinuityMode,
   ScriptSeriesEntry,
   ScriptSeriesEntryKind,
+  SCRIPT_SERIES_CONTINUITY_LABELS,
   SCRIPT_SERIES_ENTRY_KIND_LABELS,
 } from "@/lib/scriptWriter/series/types";
 import { canManageUsers } from "@/lib/utils/permissions";
@@ -42,7 +45,7 @@ export default function SeriesDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Editable bible fields.
+  // Editable series settings.
   const [title, setTitle] = useState("");
   const [premise, setPremise] = useState("");
   const [theme, setTheme] = useState("");
@@ -53,6 +56,8 @@ export default function SeriesDetailPage() {
   const [motifsText, setMotifsText] = useState("");
   const [characters, setCharacters] = useState<CharacterDraft[]>([]);
   const [spicyMode, setSpicyMode] = useState(false);
+  const [defaultContinuity, setDefaultContinuity] =
+    useState<ScriptSeriesContinuityMode>("continues");
 
   const hydrate = useCallback((series: ScriptSeries) => {
     setTitle(series.title ?? "");
@@ -130,7 +135,7 @@ export default function SeriesDetailPage() {
     setCharacters((prev) => prev.filter((c) => c.id !== id));
 
   const newEntryHref = (kind: ScriptSeriesEntryKind) =>
-    `/script-writer?seriesId=${encodeURIComponent(seriesId)}&entryKind=${kind}`;
+    `/script-writer?seriesId=${encodeURIComponent(seriesId)}&entryKind=${kind}&continuity=${defaultContinuity}`;
 
   if (loading) return <LoadingSpinner className="py-20" />;
 
@@ -145,7 +150,7 @@ export default function SeriesDetailPage() {
 
       <PageHeader
         title={title || "Series"}
-        subtitle="Shared canon for every episode, teaser, and trailer. Edit the bible once — new entries inherit the world, cast, and motifs, and generation carries the story forward."
+        subtitle="Shared settings for every episode, teaser, and trailer. Set these once — new entries inherit the world, cast, and motifs, and generation can carry the story forward."
       />
 
       {error ? (
@@ -155,7 +160,7 @@ export default function SeriesDetailPage() {
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] lg:items-start">
-        {/* Bible editor */}
+        {/* Series settings editor */}
         <Card>
           <CardBody className="space-y-4">
             <Input
@@ -310,7 +315,7 @@ export default function SeriesDetailPage() {
               </Button>
               <Button type="button" onClick={() => void save()} disabled={saving}>
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Save bible
+                Save series settings
               </Button>
             </div>
           </CardBody>
@@ -325,6 +330,21 @@ export default function SeriesDetailPage() {
               </p>
               <p className="text-sm text-slate-600">
                 Start a new script that inherits this series&apos; canon.
+              </p>
+              <Select
+                label="Story continuity for next entry"
+                value={defaultContinuity}
+                onChange={(e) =>
+                  setDefaultContinuity(e.target.value as ScriptSeriesContinuityMode)
+                }
+                options={(
+                  Object.keys(SCRIPT_SERIES_CONTINUITY_LABELS) as ScriptSeriesContinuityMode[]
+                ).map((k) => ({ value: k, label: SCRIPT_SERIES_CONTINUITY_LABELS[k] }))}
+              />
+              <p className="text-xs text-slate-500">
+                {defaultContinuity === "continues"
+                  ? "Continues previous: next chapter picks up plot and ending beats."
+                  : "Same world, new story: anthology-style self-contained plot."}
               </p>
               <div className="grid grid-cols-3 gap-2">
                 {(Object.keys(SCRIPT_SERIES_ENTRY_KIND_LABELS) as ScriptSeriesEntryKind[]).map(
@@ -363,9 +383,18 @@ export default function SeriesDetailPage() {
                           <p className="truncate text-sm font-medium text-slate-900">
                             {SCRIPT_SERIES_ENTRY_KIND_LABELS[e.entryKind]} {e.order} · {e.title}
                           </p>
-                          {e.recap ? (
-                            <p className="truncate text-xs text-slate-500">{e.recap}</p>
-                          ) : null}
+                          <p className="truncate text-xs text-slate-500">
+                            {[
+                              e.continuityMode === "standalone"
+                                ? "Same world, new story"
+                                : e.order > 1
+                                  ? "Continues previous"
+                                  : null,
+                              e.recap,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") || "No recap yet"}
+                          </p>
                         </div>
                       </Link>
                     </li>
@@ -380,7 +409,7 @@ export default function SeriesDetailPage() {
       <ConfirmDialog
         open={deleteOpen}
         title="Delete this series?"
-        description="The series bible will be removed. Existing scripts are kept but detached from the series."
+        description="Series settings will be removed. Existing scripts are kept but detached from the series."
         confirmLabel="Delete series"
         cancelLabel="Keep series"
         loading={deleting}

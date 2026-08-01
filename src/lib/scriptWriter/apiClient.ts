@@ -10,6 +10,7 @@ import {
 } from "@/lib/scriptWriter/types";
 import {
   ScriptSeries,
+  ScriptSeriesContinuityMode,
   ScriptSeriesCreateInput,
   ScriptSeriesEntry,
   ScriptSeriesEntryKind,
@@ -47,6 +48,7 @@ export async function scriptWriterCreateSession(
     storyboardMode?: boolean;
     seriesId?: string;
     seriesEntryKind?: ScriptSeriesEntryKind;
+    seriesContinuityMode?: ScriptSeriesContinuityMode;
   }
 ) {
   const res = await fetch("/api/script-writer/sessions", {
@@ -425,6 +427,7 @@ export async function scriptWriterAttachToSeries(
     seriesId?: string;
     newSeriesTitle?: string;
     entryKind?: ScriptSeriesEntryKind;
+    continuityMode?: ScriptSeriesContinuityMode;
   }
 ) {
   const res = await fetch(`/api/script-writer/sessions/${sessionId}/series`, {

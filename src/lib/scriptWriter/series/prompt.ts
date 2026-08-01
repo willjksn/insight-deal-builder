@@ -1,5 +1,6 @@
 import {
   ScriptSeries,
+  ScriptSeriesContinuityMode,
   ScriptSeriesEntry,
   ScriptSeriesEntryKind,
   ScriptTrailerResolvedScene,
@@ -8,27 +9,45 @@ import {
 
 const ENTRY_KIND_DIRECTIVE: Record<ScriptSeriesEntryKind, string> = {
   episode:
-    "This is a full EPISODE in the series. Advance the ongoing story while keeping the world and recurring characters consistent.",
+    "This is a full EPISODE in the series. Keep the world and recurring characters consistent.",
   teaser:
     "This is a short TEASER for the series. Tease the world and central mystery with mood and a single hook — do not resolve anything.",
   trailer:
     "This is a TRAILER for the series. Assemble a fast, escalating montage of charged moments drawn from the series world; imply the stakes without spoiling resolutions.",
 };
 
+const CONTINUITY_DIRECTIVE: Record<ScriptSeriesContinuityMode, string> = {
+  continues: [
+    "CONTINUITY MODE: CONTINUES PREVIOUS.",
+    "This episode must feel like the next chapter — same emotional temperature, visual grammar, and character voices.",
+    "Pick up threads from prior entries: unresolved tension, relationships, and the last episode's ending beat.",
+    "Do not soft-reboot or re-introduce the world from scratch. Do not repeat prior plot beats.",
+    "Advance the story with a clear new turn that could only happen after what already occurred.",
+  ].join(" "),
+  standalone: [
+    "CONTINUITY MODE: SAME WORLD, NEW STORY (anthology).",
+    "Reuse the series world, tone, look, motifs, and recurring cast identities,",
+    "but tell a self-contained story that does not require knowing prior episodes.",
+    "Do not continue unresolved plot from prior entries; you may echo themes only.",
+  ].join(" "),
+};
+
 /**
  * Build the high-priority "series canon" block injected into generation so
- * every entry shares one world, recurring cast, and motifs, and carries the
- * story forward from prior entries.
+ * every entry shares one world, recurring cast, and motifs — and optionally
+ * carries the story forward from prior entries.
  */
 export function formatSeriesContextForPrompt(
   series: ScriptSeries,
   entryKind: ScriptSeriesEntryKind,
-  priorEntries: ScriptSeriesEntry[]
+  priorEntries: ScriptSeriesEntry[],
+  continuityMode: ScriptSeriesContinuityMode = "continues"
 ): string {
   const lines: string[] = [
     `=== SERIES CANON — "${series.title}" (HIGH PRIORITY — keep continuity) ===`,
     "This piece belongs to a series. Stay consistent with the canon below: same world, tone, and recurring characters. Never rename or recast a recurring character, and do not contradict established facts.",
     ENTRY_KIND_DIRECTIVE[entryKind],
+    CONTINUITY_DIRECTIVE[continuityMode],
   ];
 
   if (series.premise) lines.push(`Series premise: ${series.premise}`);
@@ -56,9 +75,36 @@ export function formatSeriesContextForPrompt(
     for (const m of series.motifs) lines.push(`- ${m}`);
   }
 
-  if (priorEntries.length) {
-    lines.push("", "STORY SO FAR (prior entries — continue from here, do not repeat):");
+  if (continuityMode === "continues" && priorEntries.length) {
+    lines.push(
+      "",
+      "STORY SO FAR (prior entries — continue from here; honor ending beats):"
+    );
     for (const e of priorEntries) {
+      const label = `${SCRIPT_SERIES_ENTRY_KIND_LABELS[e.entryKind]} ${e.order}: ${e.title}`;
+      lines.push(`- ${label}${e.recap ? ` — ${e.recap}` : ""}`);
+      if (e.endingBeat) {
+        lines.push(`  Ending beat to pick up from: ${e.endingBeat}`);
+      }
+    }
+    const last = priorEntries[priorEntries.length - 1];
+    if (last) {
+      lines.push(
+        "",
+        `IMMEDIATE HAND-OFF: Your opening should feel continuous with ${SCRIPT_SERIES_ENTRY_KIND_LABELS[last.entryKind]} ${last.order} ("${last.title}").` +
+          (last.endingBeat
+            ? ` Start from the aftermath of: ${last.endingBeat}`
+            : last.recap
+              ? ` Carry forward: ${last.recap}`
+              : "")
+      );
+    }
+  } else if (continuityMode === "standalone" && priorEntries.length) {
+    lines.push(
+      "",
+      "PRIOR ENTRIES (theme/world reference only — do NOT continue their plots):"
+    );
+    for (const e of priorEntries.slice(-3)) {
       const label = `${SCRIPT_SERIES_ENTRY_KIND_LABELS[e.entryKind]} ${e.order}: ${e.title}`;
       lines.push(`- ${label}${e.recap ? ` — ${e.recap}` : ""}`);
     }

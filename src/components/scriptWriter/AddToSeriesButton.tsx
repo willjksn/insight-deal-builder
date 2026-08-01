@@ -12,7 +12,9 @@ import {
 } from "@/lib/scriptWriter/apiClient";
 import {
   ScriptSeries,
+  ScriptSeriesContinuityMode,
   ScriptSeriesEntryKind,
+  SCRIPT_SERIES_CONTINUITY_LABELS,
   SCRIPT_SERIES_ENTRY_KIND_LABELS,
 } from "@/lib/scriptWriter/series/types";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
@@ -22,6 +24,7 @@ interface AddToSeriesButtonProps {
   getToken: () => Promise<string | null>;
   seriesId?: string;
   seriesEntryKind?: ScriptSeriesEntryKind;
+  seriesContinuityMode?: ScriptSeriesContinuityMode;
   onChanged: (session: ScriptWriterSession) => void;
 }
 
@@ -30,6 +33,7 @@ export function AddToSeriesButton({
   getToken,
   seriesId,
   seriesEntryKind,
+  seriesContinuityMode,
   onChanged,
 }: AddToSeriesButtonProps) {
   const [open, setOpen] = useState(false);
@@ -40,6 +44,9 @@ export function AddToSeriesButton({
   const [newTitle, setNewTitle] = useState("");
   const [entryKind, setEntryKind] = useState<ScriptSeriesEntryKind>(
     seriesEntryKind ?? "episode"
+  );
+  const [continuityMode, setContinuityMode] = useState<ScriptSeriesContinuityMode>(
+    seriesContinuityMode ?? "continues"
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +72,7 @@ export function AddToSeriesButton({
     setError(null);
     setSelectedId(seriesId ?? "");
     setEntryKind(seriesEntryKind ?? "episode");
+    setContinuityMode(seriesContinuityMode ?? "continues");
     setMode(series.length > 0 ? "existing" : "new");
     if (series.length === 0) loadList();
     setOpen(true);
@@ -76,8 +84,8 @@ export function AddToSeriesButton({
     try {
       const body =
         mode === "new"
-          ? { newSeriesTitle: newTitle.trim(), entryKind }
-          : { seriesId: selectedId, entryKind };
+          ? { newSeriesTitle: newTitle.trim(), entryKind, continuityMode }
+          : { seriesId: selectedId, entryKind, continuityMode };
       if (mode === "new" && !newTitle.trim()) throw new Error("Enter a series name");
       if (mode === "existing" && !selectedId) throw new Error("Pick a series");
       const res = await scriptWriterAttachToSeries(getToken, sessionId, body);
@@ -200,6 +208,22 @@ export function AddToSeriesButton({
                   Object.keys(SCRIPT_SERIES_ENTRY_KIND_LABELS) as ScriptSeriesEntryKind[]
                 ).map((k) => ({ value: k, label: SCRIPT_SERIES_ENTRY_KIND_LABELS[k] }))}
               />
+
+              <Select
+                label="Story continuity"
+                value={continuityMode}
+                onChange={(e) =>
+                  setContinuityMode(e.target.value as ScriptSeriesContinuityMode)
+                }
+                options={(
+                  Object.keys(SCRIPT_SERIES_CONTINUITY_LABELS) as ScriptSeriesContinuityMode[]
+                ).map((k) => ({ value: k, label: SCRIPT_SERIES_CONTINUITY_LABELS[k] }))}
+              />
+              <p className="text-xs text-slate-500">
+                {continuityMode === "continues"
+                  ? "Next chapter: pick up plot and ending beats from prior entries."
+                  : "Anthology: same world and cast, self-contained story."}
+              </p>
             </div>
 
             <div className="mt-5 flex items-center justify-between gap-2">

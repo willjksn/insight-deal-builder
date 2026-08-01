@@ -20,7 +20,10 @@ import {
 import { ScriptWriterMessage } from "@/lib/scriptWriter/types";
 import { serializeScriptSession } from "@/lib/scriptWriter/adminApply";
 import { getScriptSeries, nextSeriesOrder } from "@/lib/scriptWriter/series/server";
-import { ScriptSeriesEntryKind } from "@/lib/scriptWriter/series/types";
+import {
+  ScriptSeriesContinuityMode,
+  ScriptSeriesEntryKind,
+} from "@/lib/scriptWriter/series/types";
 import { canManageUsers, canUseProductionTools } from "@/lib/utils/permissions";
 
 export const runtime = "nodejs";
@@ -65,6 +68,7 @@ export async function POST(request: NextRequest) {
       storyboardMode?: boolean;
       seriesId?: string;
       seriesEntryKind?: ScriptSeriesEntryKind;
+      seriesContinuityMode?: ScriptSeriesContinuityMode;
     };
 
     const db = getAdminDb();
@@ -92,11 +96,14 @@ export async function POST(request: NextRequest) {
     // the shared "bible" so the world/genre/theme/cast stay consistent.
     let seriesEntryKind: ScriptSeriesEntryKind | undefined;
     let seriesOrder: number | undefined;
+    let seriesContinuityMode: ScriptSeriesContinuityMode | undefined;
     if (body.seriesId) {
       // getScriptSeries enforces access (owner or global admin) and throws otherwise.
       const series = await getScriptSeries(body.seriesId, uid, appUser);
       seriesEntryKind = body.seriesEntryKind ?? "episode";
       seriesOrder = await nextSeriesOrder(body.seriesId);
+      seriesContinuityMode =
+        body.seriesContinuityMode === "standalone" ? "standalone" : "continues";
       if (!brief.setting?.trim() && series.world) brief.setting = series.world;
       if (!brief.genre?.trim() && series.genre) brief.genre = series.genre;
       if (!brief.theme?.trim()) brief.theme = series.theme || series.premise || brief.theme;
@@ -155,6 +162,7 @@ export async function POST(request: NextRequest) {
         seriesId: body.seriesId,
         seriesEntryKind,
         seriesOrder,
+        seriesContinuityMode,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       })

@@ -394,8 +394,15 @@ export interface ScriptWriterSession {
   seriesEntryKind?: ScriptSeriesEntryKind;
   /** 1-based ordering of this entry within its series. */
   seriesOrder?: number;
+  /**
+   * continues = build on prior episodes; standalone = shared world only.
+   * Default when omitted: continues.
+   */
+  seriesContinuityMode?: import("@/lib/scriptWriter/series/types").ScriptSeriesContinuityMode;
   /** One-line "story so far" recap captured after the script is written. */
   seriesRecap?: string;
+  /** Closing beat from the last scene — used when the next episode continues. */
+  seriesEndingBeat?: string;
   /** For trailer/teaser entries: scenes picked from sibling episodes to assemble from. */
   trailerSources?: ScriptTrailerSceneRef[];
   createdAt: Timestamp;

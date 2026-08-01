@@ -10,6 +10,7 @@ import { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/types";
 import {
   ScriptSeries,
   ScriptSeriesCharacter,
+  ScriptSeriesContinuityMode,
   ScriptSeriesCreateInput,
   ScriptSeriesEntry,
   ScriptSeriesEntryKind,
@@ -184,6 +185,9 @@ export async function deleteScriptSeries(
         seriesId: FieldValue.delete(),
         seriesEntryKind: FieldValue.delete(),
         seriesOrder: FieldValue.delete(),
+        seriesContinuityMode: FieldValue.delete(),
+        seriesRecap: FieldValue.delete(),
+        seriesEndingBeat: FieldValue.delete(),
       })
     )
   );
@@ -202,22 +206,65 @@ export async function listSeriesEntries(seriesId: string): Promise<ScriptSeriesE
   return snap.docs
     .map((d) => {
       const data = d.data() as Partial<ScriptWriterSession>;
+      const continuityMode = data.seriesContinuityMode;
       return {
         sessionId: d.id,
         title: data.title || "Untitled",
         entryKind: (data.seriesEntryKind as ScriptSeriesEntryKind) || "episode",
         order: typeof data.seriesOrder === "number" ? data.seriesOrder : 0,
         recap: data.seriesRecap,
+        endingBeat: data.seriesEndingBeat,
+        continuityMode:
+          continuityMode === "standalone" || continuityMode === "continues"
+            ? continuityMode
+            : undefined,
         status: data.status,
       } satisfies ScriptSeriesEntry;
     })
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
 }
 
 /** Next 1-based order value for a new entry appended to the series. */
 export async function nextSeriesOrder(seriesId: string): Promise<number> {
   const entries = await listSeriesEntries(seriesId);
   return entries.reduce((max, e) => Math.max(max, e.order), 0) + 1;
+}
+
+/**
+ * Compact seriesOrder to 1..N in current sort order.
+ * Fixes gaps (e.g. missing Episode 1 after re-attach bumped orders).
+ */
+export async function renumberSeriesEntries(seriesId: string): Promise<ScriptSeriesEntry[]> {
+  const db = requireDb();
+  const snap = await db
+    .collection(SCRIPT_WRITER_SESSIONS_COLLECTION)
+    .where("seriesId", "==", seriesId)
+    .limit(100)
+    .get();
+  const sorted = snap.docs
+    .map((d) => {
+      const data = d.data() as Partial<ScriptWriterSession>;
+      return {
+        ref: d.ref,
+        order: typeof data.seriesOrder === "number" ? data.seriesOrder : 0,
+        title: data.title || "",
+        createdAt: String(data.createdAt ?? ""),
+      };
+    })
+    .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt) || a.title.localeCompare(b.title));
+
+  const needsRenumber = sorted.some((e, i) => e.order !== i + 1);
+  if (needsRenumber) {
+    await Promise.all(
+      sorted.map((e, i) =>
+        e.ref.update({
+          seriesOrder: i + 1,
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      )
+    );
+  }
+  return listSeriesEntries(seriesId);
 }
 
 interface SeriesEntryDoc {
@@ -308,8 +355,15 @@ export async function resolveTrailerSourceScenes(
  * to inject "story so far" continuity into generation.
  */
 export async function loadSeriesContinuity(
-  session: Pick<ScriptWriterSession, "id" | "seriesId" | "seriesOrder">
-): Promise<{ series: ScriptSeries; priorEntries: ScriptSeriesEntry[] } | null> {
+  session: Pick<
+    ScriptWriterSession,
+    "id" | "seriesId" | "seriesOrder" | "seriesContinuityMode"
+  >
+): Promise<{
+  series: ScriptSeries;
+  priorEntries: ScriptSeriesEntry[];
+  continuityMode: ScriptSeriesContinuityMode;
+} | null> {
   if (!session.seriesId) return null;
   const db = requireDb();
   const snap = await db.collection(SCRIPT_SERIES_COLLECTION).doc(session.seriesId).get();
@@ -320,5 +374,7 @@ export async function loadSeriesContinuity(
   const priorEntries = entries.filter(
     (e) => e.sessionId !== session.id && e.order < order
   );
-  return { series, priorEntries };
+  const continuityMode: ScriptSeriesContinuityMode =
+    session.seriesContinuityMode === "standalone" ? "standalone" : "continues";
+  return { series, priorEntries, continuityMode };
 }

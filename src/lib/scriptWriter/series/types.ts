@@ -12,6 +12,18 @@ export const SCRIPT_SERIES_ENTRY_KIND_LABELS: Record<ScriptSeriesEntryKind, stri
   trailer: "Trailer",
 };
 
+/**
+ * How a new entry relates to prior entries:
+ * - continues: pick up plot/emotional threads from the story so far
+ * - standalone: same series world/cast/tone, self-contained plot (anthology)
+ */
+export type ScriptSeriesContinuityMode = "continues" | "standalone";
+
+export const SCRIPT_SERIES_CONTINUITY_LABELS: Record<ScriptSeriesContinuityMode, string> = {
+  continues: "Continues previous",
+  standalone: "Same world, new story",
+};
+
 /** A recurring character reused across every entry in the series. */
 export interface ScriptSeriesCharacter {
   id: string;
@@ -58,6 +70,10 @@ export interface ScriptSeriesEntry {
   order: number;
   /** One-line "what happened" recap captured after the script is written. */
   recap?: string;
+  /** How this entry relates to prior ones (default continues). */
+  continuityMode?: ScriptSeriesContinuityMode;
+  /** Last-scene beat for stronger continuity prompts. */
+  endingBeat?: string;
   status?: string;
 }
 

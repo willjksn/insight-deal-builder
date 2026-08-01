@@ -27,9 +27,12 @@ import {
   scriptWriterListSessions,
   scriptWriterResearchTrends,
 } from "@/lib/scriptWriter/apiClient";
+import { Select } from "@/components/ui/Select";
 import {
   ScriptSeries,
+  ScriptSeriesContinuityMode,
   ScriptSeriesEntryKind,
+  SCRIPT_SERIES_CONTINUITY_LABELS,
   SCRIPT_SERIES_ENTRY_KIND_LABELS,
 } from "@/lib/scriptWriter/series/types";
 import {
@@ -64,6 +67,8 @@ function ScriptWriterPageContent() {
   const [deleting, setDeleting] = useState(false);
   const [seriesId, setSeriesId] = useState<string>();
   const [seriesEntryKind, setSeriesEntryKind] = useState<ScriptSeriesEntryKind>("episode");
+  const [seriesContinuityMode, setSeriesContinuityMode] =
+    useState<ScriptSeriesContinuityMode>("continues");
   const [series, setSeries] = useState<ScriptSeries | null>(null);
 
   const hasInspiration =
@@ -85,9 +90,13 @@ function ScriptWriterPageContent() {
     if (kind === "episode" || kind === "teaser" || kind === "trailer") {
       setSeriesEntryKind(kind);
     }
+    const continuity = searchParams.get("continuity");
+    if (continuity === "standalone" || continuity === "continues") {
+      setSeriesContinuityMode(continuity);
+    }
   }, [searchParams]);
 
-  // When adding an entry to a series, load the bible and pre-fill empty fields.
+  // When adding an entry to a series, load series settings and pre-fill empty fields.
   useEffect(() => {
     if (!user || !seriesId) return;
     scriptWriterGetSeries(() => user.getIdToken(), seriesId)
@@ -158,6 +167,7 @@ function ScriptWriterPageContent() {
         storyboardMode,
         seriesId,
         seriesEntryKind: seriesId ? seriesEntryKind : undefined,
+        seriesContinuityMode: seriesId ? seriesContinuityMode : undefined,
       });
 
       if (hasInspiration) {
@@ -289,22 +299,39 @@ function ScriptWriterPageContent() {
       />
 
       {series ? (
-        <div className="mb-6 flex items-start justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-violet-900">
-              Adding to series: {series.title}
-            </p>
-            <p className="mt-0.5 text-xs text-violet-700">
-              New {SCRIPT_SERIES_ENTRY_KIND_LABELS[seriesEntryKind].toLowerCase()} · inherits the
-              world, recurring cast, and motifs from the bible.
-            </p>
+        <div className="mb-6 space-y-3 rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-violet-900">
+                Adding to series: {series.title}
+              </p>
+              <p className="mt-0.5 text-xs text-violet-700">
+                New {SCRIPT_SERIES_ENTRY_KIND_LABELS[seriesEntryKind].toLowerCase()} · inherits the
+                world, recurring cast, and motifs from series settings.
+              </p>
+            </div>
+            <Link
+              href={`/script-writer/series/${seriesId}`}
+              className="shrink-0 text-xs font-medium text-violet-700 hover:text-violet-900"
+            >
+              Edit series
+            </Link>
           </div>
-          <Link
-            href={`/script-writer/series/${seriesId}`}
-            className="shrink-0 text-xs font-medium text-violet-700 hover:text-violet-900"
-          >
-            Edit bible
-          </Link>
+          <Select
+            label="Story continuity"
+            value={seriesContinuityMode}
+            onChange={(e) =>
+              setSeriesContinuityMode(e.target.value as ScriptSeriesContinuityMode)
+            }
+            options={(
+              Object.keys(SCRIPT_SERIES_CONTINUITY_LABELS) as ScriptSeriesContinuityMode[]
+            ).map((k) => ({ value: k, label: SCRIPT_SERIES_CONTINUITY_LABELS[k] }))}
+          />
+          <p className="text-xs text-violet-700/90">
+            {seriesContinuityMode === "continues"
+              ? "Continues previous: generation will pick up plot threads and the last ending beat."
+              : "Same world, new story: shared canon only — self-contained plot."}
+          </p>
         </div>
       ) : null}
 

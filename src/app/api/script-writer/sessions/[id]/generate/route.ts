@@ -21,6 +21,7 @@ import {
   formatSeriesContextForPrompt,
   formatTrailerSourcesForPrompt,
 } from "@/lib/scriptWriter/series/prompt";
+import { buildSeriesRecapFields } from "@/lib/scriptWriter/series/recap";
 import { ScriptDocument } from "@/lib/scriptWriter/types";
 import { prepareScriptDocumentForFirestore } from "@/lib/screenplay/serialize";
 
@@ -67,7 +68,7 @@ export async function POST(
 
     const shootingKit = await resolveShootingKitForSession(db, session);
 
-    // Series continuity: inject shared canon + "story so far" from prior entries.
+    // Series continuity: inject shared canon + optional "story so far".
     let seriesContext: string | null = null;
     if (session.seriesId) {
       const continuity = await loadSeriesContinuity(session);
@@ -76,7 +77,8 @@ export async function POST(
         seriesContext = formatSeriesContextForPrompt(
           continuity.series,
           kind,
-          continuity.priorEntries
+          continuity.priorEntries,
+          continuity.continuityMode
         );
         // Trailers/teasers assemble from specific scenes picked in sibling entries.
         if ((kind === "trailer" || kind === "teaser") && session.trailerSources?.length) {
@@ -106,11 +108,9 @@ export async function POST(
       await archiveScriptVersion(db, id, session.script as ScriptDocument, "generate", "Before regenerate");
     }
 
-    // For series entries, capture a one-line recap so later entries carry the
-    // story forward (uses the logline / premise — no extra AI call).
-    const seriesRecap = session.seriesId
-      ? (script.logline || script.productionPack?.premise || "").trim() || undefined
-      : undefined;
+    // For series entries, capture recap + ending beat so continuing episodes
+    // can pick up the story (no extra AI call).
+    const recapFields = session.seriesId ? buildSeriesRecapFields(script) : {};
 
     await db.collection(SCRIPT_WRITER_SESSIONS_COLLECTION).doc(id).update(
       stripUndefined({
@@ -120,7 +120,7 @@ export async function POST(
         refineUsed: false,
         detailedShotList,
         storyboardMode,
-        seriesRecap,
+        ...recapFields,
         updatedAt: FieldValue.serverTimestamp(),
       })
     );

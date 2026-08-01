@@ -477,6 +477,7 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
                 getToken={() => user.getIdToken()}
                 seriesId={session.seriesId}
                 seriesEntryKind={session.seriesEntryKind}
+                seriesContinuityMode={session.seriesContinuityMode}
                 onChanged={(updated) => setSession(updated)}
               />
             ) : null}

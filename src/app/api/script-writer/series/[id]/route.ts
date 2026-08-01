@@ -4,7 +4,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 import {
   deleteScriptSeries,
   getScriptSeries,
-  listSeriesEntries,
+  renumberSeriesEntries,
   updateScriptSeries,
 } from "@/lib/scriptWriter/series/server";
 import { ScriptSeriesUpdateInput } from "@/lib/scriptWriter/series/types";
@@ -22,7 +22,8 @@ export async function GET(
     if (!getAdminDb()) throw new Error("Firebase Admin is not configured");
 
     const series = await getScriptSeries(id, uid, appUser);
-    const entries = await listSeriesEntries(id);
+    // Repair gaps (e.g. Episode 1 missing after re-attach bumped orders).
+    const entries = await renumberSeriesEntries(id);
     return NextResponse.json({ series, entries });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load series";
