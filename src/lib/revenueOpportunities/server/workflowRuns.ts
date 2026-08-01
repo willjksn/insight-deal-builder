@@ -245,7 +245,21 @@ export async function applyWorkflowWebhookUpdate(body: {
   if (body.status === "completed" || body.status === "failed") {
     patch.completedAt = new Date().toISOString();
   }
-  return updateWorkflowRunStatus(body.runId, body.organizationCompany, patch);
+  const updated = await updateWorkflowRunStatus(body.runId, body.organizationCompany, patch);
+  if (body.status === "completed" && workflowName === "revenue_daily_brief") {
+    try {
+      const { upsertN8nDailyBrief } = await import(
+        "@/lib/revenueOpportunities/server/dailyBriefs"
+      );
+      await upsertN8nDailyBrief({
+        organizationCompany: body.organizationCompany,
+        outputSummary: outputSummary,
+      });
+    } catch (err) {
+      console.error("applyWorkflowWebhookUpdate: daily brief persist error:", err);
+    }
+  }
+  return updated;
 }
 
 export async function retryFailedWorkflowRun(appUser: AppUser, runId: string): Promise<RevenueWorkflowRun> {

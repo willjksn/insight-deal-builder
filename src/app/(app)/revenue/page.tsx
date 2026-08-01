@@ -17,6 +17,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Card, CardBody } from "@/components/ui/Card";
 import { OpportunitySummaryCards, OpportunityTable } from "@/components/revenue/OpportunityTable";
 import { FollowUpTasksPanel } from "@/components/revenue/FollowUpTasksPanel";
+import { DailyBriefCard } from "@/components/revenue/DailyBriefCard";
 
 export default function RevenueCommandCenterPage() {
   const { user, appUser } = useAuth();
@@ -98,6 +99,10 @@ export default function RevenueCommandCenterPage() {
 
       {summary && (
         <>
+          {user ? (
+            <DailyBriefCard getToken={() => user.getIdToken()} canManage={canManage} />
+          ) : null}
+
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <OpportunitySummaryCards
               count={summary.awaitingReview}

@@ -32,6 +32,7 @@ import type {
   RevenueSuppressionCreateInput,
   RevenueSuppressionEntry,
 } from "@/lib/revenueOpportunities/types/suppression";
+import type { RevenueDailyBrief } from "@/lib/revenueOpportunities/types/dailyBrief";
 import type { RevenueWorkflowCatalogEntry, RevenueWorkflowRun } from "@/lib/revenueOpportunities/types/workflowRun";
 import type { Agreement } from "@/lib/types";
 
@@ -464,6 +465,22 @@ export async function revenueDeleteSuppression(getToken: () => Promise<string | 
     headers: await authHeaders(getToken),
   });
   return parseJson<{ ok: true }>(res);
+}
+
+export async function revenueGetTodayBrief(getToken: () => Promise<string | null>) {
+  const res = await fetch(`/api/revenue/daily-briefs?today=1`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ brief: RevenueDailyBrief }>(res);
+}
+
+export async function revenueRefreshDailyBrief(getToken: () => Promise<string | null>) {
+  const res = await fetch(`/api/revenue/daily-briefs`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({}),
+  });
+  return parseJson<{ brief: RevenueDailyBrief }>(res);
 }
 
 export async function revenueTranscribeMeeting(getToken: () => Promise<string | null>, id: string) {
