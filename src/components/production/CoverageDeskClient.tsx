@@ -539,10 +539,17 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
           {migrateNote}
         </p>
       )}
-      {!board.scriptSessionId && (
+      {board.scriptSessionId ? (
+        <p className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          <strong className="font-medium text-slate-800">Apply</strong> (in Script writer) = first
+          push of shots into Prep + Coverage.{" "}
+          <strong className="font-medium text-slate-800">Sync from script</strong> = refresh after the
+          script changes — keeps your frames, day placement, and filled DP fields.
+        </p>
+      ) : (
         <p className="mb-4 text-sm text-slate-500">
-          Link a script via Script writer → Apply to enable <strong>Sync from script</strong> (keeps
-          your uploaded frames and day assignments).
+          From Script writer, use <strong>Apply to Prep + Coverage</strong> once to seed this desk.
+          After that, use <strong>Sync from script</strong> here when the script changes.
         </p>
       )}
 
@@ -550,19 +557,19 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
         <div className="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-sm text-sky-950">
           <p className="font-semibold">
             {board.scriptSessionId
-              ? "Script linked — Apply hasn't run yet"
+              ? "Script linked — no coverage shots yet"
               : "No coverage shots yet"}
           </p>
           <p className="mt-1 text-sky-900/90">
             {board.scriptSessionId ? (
               <>
-                Open the linked script and use <strong>Apply to Prep + Coverage</strong>, or Sync
-                from script above after Apply once. Then fill frames here.
+                Use <strong>Sync from script</strong> above to pull the shot list (or reopen the
+                script and Apply again). Then fill frames here.
               </>
             ) : (
               <>
-                From Script writer, use <strong>Apply to Prep + Coverage</strong>, or open Prep and
-                apply the linked script. Then fill frames here (upload, library, or AI).
+                From Script writer, use <strong>Apply to Prep + Coverage</strong> once. That seeds
+                Prep and this Coverage desk. Later script edits → Sync here (not Apply again).
               </>
             )}
           </p>
