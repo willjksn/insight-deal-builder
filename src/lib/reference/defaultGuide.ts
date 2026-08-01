@@ -1,13 +1,14 @@
 import { ReferenceGuideDocument } from "@/lib/reference/types";
+import { GIMBAL_GUIDE_SECTIONS } from "@/lib/reference/gimbalGuide";
 import { PRODUCTION_SOUND_SECTIONS } from "@/lib/reference/productionSoundGuide";
 import { SCENE_COVERAGE_SECTIONS } from "@/lib/reference/sceneCoverageGuide";
 
 /** Baseline on-set reference — seeded from Master Filmmaking Reference Guide + FX6 + lens expansion. */
 export const DEFAULT_REFERENCE_GUIDE: ReferenceGuideDocument = {
-  version: 1,
+  version: 2,
   title: "ShootSpine production reference",
   subtitle:
-    "Lighting, cameras, lenses, scene coverage, scripts & writing, and on-set workflow — iPad-friendly reference for ShootSpine crews.",
+    "Lighting, cameras, lenses, gimbal, scene coverage, scripts & writing, and on-set workflow — iPad-friendly reference for ShootSpine crews.",
   sections: [
     {
       id: "how-to-use",
@@ -994,6 +995,7 @@ In video, color sets mood and guides the eye: match scenes for consistency, push
       ],
       tips: ["Wide = location · Medium = body language · Close-up = emotion · Insert = story detail"],
     },
+    ...GIMBAL_GUIDE_SECTIONS,
     ...SCENE_COVERAGE_SECTIONS,
     ...PRODUCTION_SOUND_SECTIONS,
     {

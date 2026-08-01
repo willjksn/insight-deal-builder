@@ -29,7 +29,7 @@ Menu wording on FX3, FX30, F8n Pro, THEOS, TC-1, and DJI gear may vary by firmwa
     tips: [
       "Final dialogue lives on the F8n Pro — sync in post with timecode, not camera mics",
       "Never format a production card until audio exists in two verified backup locations",
-      "23 sections in this guide — use sidebar when Audio category is selected",
+      "TC how-tos: Deity TC-1 → camera · Deity TC-1 → F8n — use sidebar under Audio",
     ],
   },
   {
@@ -206,56 +206,186 @@ Warning: DJI output can overload or underfeed F8n — loud-dialogue rehearsal on
     id: "production-sound-tc1-workflow",
     category: "audio",
     title: "Deity TC-1 timecode workflow",
-    summary: "TC-1 #1 FX3 · #2 FX30 · #3 F8N — same frame rate everywhere, Free Run.",
-    keywords: ["TC-1", "timecode", "Sidus", "23.976", "24"],
-    body: `Assignment: TC-1 #1 → Sony FX3 · #2 → Sony FX30 · #3 → Zoom F8n Pro. Permanent labels.
+    summary: "TC-1 #1 FX3 · #2 FX30 · #3 F8N — same frame rate everywhere, Free Run. See camera + F8n how-tos below.",
+    keywords: ["TC-1", "timecode", "Sidus", "23.976", "24", "jam"],
+    body: `Assignment (permanent labels): TC-1 #1 → Sony FX3 · #2 → Sony FX30 · #3 → Zoom F8n Pro.
 
 23.976 and 24.00 are DIFFERENT — every device must use the exact same project frame rate.
 
 Mode: Free Run for narrative.
 
-Daily procedure:
-1. Power all three TC-1 units
-2. Sidus Audio app — confirm units visible
-3. Set project frame rate on all
-4. Sync units
-5. Confirm matching displays
-6. Connect each to assigned device
-7. Confirm FX3, FX30, F8n reading external TC
-8. Record short camera + audio test · compare TC values · slate
+## Sync the three TC-1 boxes first (Sidus Audio)
 
-Recheck TC: start of day · after lunch · battery change · disconnect · camera frame-rate change · slow-motion / S&Q · before one-time performances.
+1. Charge and power all three TC-1 units
+2. Open Sidus Audio — Bluetooth on — add all TC-1s (name them FX3 / FX30 / F8N)
+3. Set the same project frame rate on every unit
+4. Sync All (or sync each to the master) — displays must match
+5. Then wire each TC-1 to its device (camera or F8n) — see the next two sections
+
+Wireless master sync (no phone): one TC-1 in Master Run, others Auto Jam / Jam Once And Lock, same channel, SYNC from master.
+
+Recheck TC: start of day · after lunch · battery change · disconnect · camera frame-rate change · S&Q / HFR · before one-time performances.
 
 Slow motion: record dialogue at normal speed; treat HFR inserts separately; verify camera TC behavior before relying on it.`,
-    tips: ["Slate every sync test — visual + audio backup to timecode"],
+    tips: [
+      "Slate every sync test — visual + audio backup to timecode",
+      "Never mix 23.976 and 24.00 across camera and F8n",
+    ],
+  },
+  {
+    id: "deity-tc1-to-camera",
+    category: "audio",
+    title: "Deity TC-1 → camera (FX3 / FX30)",
+    summary:
+      "Match fps → TC-1 L-Out → Deity C23 / Sony Multi → camera TC/UB Preset + Free Run → confirm incoming TC.",
+    keywords: [
+      "TC-1",
+      "FX3",
+      "FX30",
+      "C23",
+      "timecode",
+      "Sony",
+      "Multi Terminal",
+      "Free Run",
+      "Preset",
+    ],
+    body: `Confirmed Deity path for Sony FX3 / FX30: Multi Terminal + Deity C23 TC cable (or current Deity Sony-compatible TC cable). Firmware can change menus — verify on the camera.
+
+## On the TC-1 (camera unit)
+
+1. Power the TC-1 labeled for this camera (FX3 or FX30)
+2. Frame rate = project rate (same as F8n and the other camera)
+3. Out type = L-Out (LTC out to camera)
+4. Confirm it is already synced with the other TC-1s (Sidus Sync All)
+
+## Cable & mount
+
+1. Hook-and-loop / cold shoe: sandwich TC-1 so the screen is readable
+2. Plug Deity C23 (or kit Sony TC cable) into TC-1 → camera Multi / TC input
+3. Strain relief — no tension on the Multi port
+4. On FX30 / RS 4 Pro: short flexible cable, clear of gimbal motors — then rebalance the gimbal
+
+## On the Sony camera (TC/UB menu)
+
+1. Set project frame rate / recording mode first (before trusting TC)
+2. Menu → camera (shooting) → TC/UB (wording varies by firmware)
+3. Time Code Format: DF or NDF to match the project (most narrative 23.976/24 = NDF)
+4. Time Code Make: Preset
+5. Time Code Run: Free Run
+6. Confirm the camera display shows running TC that matches the TC-1 screen
+
+Sony’s on-screen “fps” labels can be misleading (e.g. 24 vs 23.976) — confirm the true project rate with the DP before syncing.
+
+## Verify
+
+1. Record 5–10 seconds on camera
+2. Compare TC on TC-1 vs camera display while recording
+3. Slate once (visual clap) as backup
+4. After lunch / battery / disconnect: reconfirm TC still matches
+
+Scratch mic (MKE400 on FX3): reference / emergency sync only — not master dialogue.`,
+    tips: [
+      "Do not change camera frame rate after sync without re-syncing the whole TC system",
+      "HFR / S&Q: verify TC still advances correctly before a hero take",
+    ],
+    tables: [
+      {
+        headers: ["Device", "Key setting"],
+        rows: [
+          ["TC-1", "Project fps · L-Out · synced via Sidus"],
+          ["Cable", "Deity C23 / Sony Multi TC cable"],
+          ["Camera TC/UB", "Preset · Free Run · DF/NDF match"],
+          ["Check", "TC-1 screen = camera TC while recording"],
+        ],
+      },
+    ],
+  },
+  {
+    id: "deity-tc1-to-f8n",
+    category: "audio",
+    title: "Deity TC-1 → Zoom F8n / F8n Pro",
+    summary:
+      "BNC→3.5 TRS into F8n TC port · TC-1 L-Out · F8n Timecode Mode = External · matching frame rate.",
+    keywords: [
+      "TC-1",
+      "F8n",
+      "F8n Pro",
+      "Zoom",
+      "timecode",
+      "External",
+      "BNC",
+      "L-Out",
+    ],
+    body: `Master recorder gets continuous external TC from the TC-1 labeled TC — F8N.
+
+## On the TC-1 (F8n unit)
+
+1. Power the TC-1 labeled F8N
+2. Frame rate = exact project rate (same as cameras)
+3. Out type = L-Out
+4. Confirm Sidus sync with camera TC-1s first
+
+## Cable
+
+1. Use a Deity-compatible TC cable: BNC (or TC-1 out) → 3.5 mm TRS into the Zoom F8n / F8n Pro timecode port (rear)
+2. Right-angle / short run preferred in the bag — label TC — F8N
+3. Secure so the plug cannot yank the TC-1 or press recorder controls
+
+## On the Zoom F8n / F8n Pro
+
+1. Menu → Timecode
+2. Mode: External (must read external / slave — not Free Run from the recorder’s internal generator)
+3. Frame rate: match project (and TC-1)
+4. Confirm the home screen shows valid running TC (not blanks / zeros / “no TC”)
+
+## Verify with picture
+
+1. Record a short take on F8n + both cameras
+2. Compare TC numbers across F8n display and camera displays at the same moment
+3. Slate for backup
+4. Recheck after lunch, battery swaps, and any cable reseat
+
+If TC drops: reseat cable · confirm L-Out · confirm External mode · confirm fps match · re-sync TC-1s in Sidus.`,
+    tips: [
+      "F8n Free Run internal TC will drift from cameras — always External from TC-1 on set",
+      "Poly WAV ISOs still carry the external TC metadata when Mode = External",
+    ],
+    tables: [
+      {
+        headers: ["Step", "Action"],
+        rows: [
+          ["1", "TC-1 F8N: fps match · L-Out · synced"],
+          ["2", "Cable into F8n TC IN (BNC→3.5 TRS or kit cable)"],
+          ["3", "F8n Menu → Timecode → Mode = External"],
+          ["4", "F8n frame rate = project"],
+          ["5", "Confirm TC on home screen · slate test with cameras"],
+        ],
+      },
+    ],
   },
   {
     id: "production-sound-fx3-tc",
     category: "audio",
     title: "Sony FX3 timecode setup",
-    summary: "Match project fps · Preset · Free Run · TC-1 via Sony adapter · MKE400 scratch.",
+    summary: "See Deity TC-1 → camera · Preset · Free Run · C23 · MKE400 scratch.",
     keywords: ["FX3", "Sony", "timecode", "MKE400"],
-    body: `Set project frame rate first. Timecode: Preset mode · Free Run · match drop/non-drop to project. Connect TC-1 with Sony-compatible timecode cable/adapter — confirm incoming TC on display and during record. Do not change frame rate after sync without resetting entire TC system.
+    body: `Use the full checklist in “Deity TC-1 → camera (FX3 / FX30)”.
 
-Scratch audio (MKE400): reference, emergency sync, editorial playback, ambience — NOT main dialogue. Set levels conservatively to avoid clipping.
+Quick FX3 reminders: project fps first · TC/UB Make = Preset · Run = Free Run · Deity C23 into Multi · TC-1 L-Out · mount with strain relief · MKE400 scratch only.
 
-TC-1 mount: cage rear/side · screen visible · cable strain relief · clear of monitor and controls.
-
-Verify exact menu paths in current FX3 help guide — firmware may differ.`,
+Verify exact menu paths in the current FX3 help guide — firmware may differ.`,
   },
   {
     id: "production-sound-fx30-tc",
     category: "audio",
     title: "Sony FX30 timecode setup",
-    summary: "Same TC discipline as FX3 · RS4 Pro balance · lightweight TC mount.",
+    summary: "Same as FX3 TC path · lightweight mount · rebalance RS 4 Pro after TC-1.",
     keywords: ["FX30", "RS4", "gimbal", "timecode"],
-    body: `Match project fps · Preset · Free Run · Sony-compatible TC connection · verify incoming TC · recheck after recording mode changes and after mounting on DJI RS4 Pro.
+    body: `Use “Deity TC-1 → camera (FX3 / FX30)” for the TC menu and cable steps.
 
-Gimbal: mount TC-1 lightweight side · short flexible cable · strain relief · rebalance gimbal after install — avoid motor interference, balance shift, cable tension.
+Gimbal extras: mount TC-1 light side · short flexible cable · strain relief · rebalance RS 4 Pro + Auto Tune after install (see Movement → DJI RS 4 Pro).
 
-Scratch: compact on-camera mic if practical — minimize weight and cable pull on gimbal.
-
-Verify FX30 connection method against current Sony documentation for your firmware.`,
+Scratch: compact on-camera mic only if weight allows — minimize cable pull on the gimbal.`,
   },
   {
     id: "production-sound-mke600",
