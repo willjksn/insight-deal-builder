@@ -4,9 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { Mic, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
-/** Keep in sync with uploadMeetingAudio's MAX_AUDIO_MB (Gemini inline-audio cap). */
-const MAX_AUDIO_MB = 20;
-const AUTO_STOP_BYTES = 19 * 1024 * 1024;
+import {
+  MAX_MEETING_TRANSCRIBE_MB,
+  MAX_MEETING_UPLOAD_MB,
+} from "@/lib/revenueOpportunities/meetings/storage";
+
+/** Auto-stop at storage upload budget; warn when past transcription cap. */
+const MAX_AUDIO_MB = MAX_MEETING_UPLOAD_MB;
+const TRANSCRIBE_WARN_BYTES = MAX_MEETING_TRANSCRIBE_MB * 1024 * 1024;
+const AUTO_STOP_BYTES = MAX_MEETING_UPLOAD_MB * 1024 * 1024;
 
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
@@ -111,8 +117,16 @@ export function MeetingAudioRecorder({ onRecorded, disabled }: Props) {
         if (e.data && e.data.size > 0) {
           chunksRef.current.push(e.data);
           bytesRef.current += e.data.size;
+          if (
+            bytesRef.current >= TRANSCRIBE_WARN_BYTES &&
+            bytesRef.current - e.data.size < TRANSCRIBE_WARN_BYTES
+          ) {
+            setError(
+              `Past ${MAX_MEETING_TRANSCRIBE_MB} MB — file will still upload, but transcription needs a shorter cut.`
+            );
+          }
           if (bytesRef.current >= AUTO_STOP_BYTES && rec.state === "recording") {
-            setError(`Reached the ${MAX_AUDIO_MB} MB limit — recording stopped automatically.`);
+            setError(`Reached the ${MAX_AUDIO_MB} MB upload limit — recording stopped automatically.`);
             rec.stop();
           }
         }

@@ -6,16 +6,19 @@ Revenue & Opportunities is a major feature area inside **ShootSpine** (not a sep
 
 ### Owned by Revenue & Opportunities
 
-- Prospecting campaigns (IMG client + Stormi brand modes)
-- Opportunity research, evidence, and scoring
+- Prospecting campaigns (IMG client + Stormi / creator-brand modes)
+- Business profiles (reusable BD identities)
+- Opportunity research, evidence, and scoring (IMG + Stormi models)
 - High-level campaign concepts (not full scripts or shot lists)
-- Outreach preparation and approval
-- Gmail draft integration (Phase 6+)
-- AI email receptionist (Phase 6+)
-- Pipeline, discovery prep, proposal drafts
-- Revenue tracking and operational briefs
-- n8n workflow monitoring (Phase 9+)
-- Convert won opportunity → ShootSpine project
+- Outreach preparation, approval, and suppression list
+- Follow-up task queue
+- Gmail draft + inbox classification
+- Pipeline, discovery prep, meetings (record/upload → transcribe → analyze)
+- Proposals + agreement prefill / signed → won loop
+- Contacts CRM (shared across opportunities)
+- Daily briefs (persisted on Command Center)
+- n8n workflow monitoring
+- Convert won opportunity → ShootSpine project **with Prep handoff**
 
 ### Remains in existing ShootSpine
 
@@ -23,14 +26,15 @@ Revenue & Opportunities is a major feature area inside **ShootSpine** (not a sep
 - Agreements, signatures, Stripe payments
 - Call sheets, crew packets, stage planner
 - Content Idea Engine (creative ideation, not sales prospecting)
+- Creator network / portal (parallel Business track)
 
 ## Primary workflows
 
 **IMG client prospecting** — Find businesses that may buy cinematic production, retainers, or creator-led campaigns.
 
-**Stormi brand prospecting** — Find brands that fit Stormi’s niche for creator fees, IMG production, usage rights, and WitMe conversion.
+**Creator-brand prospecting** — Find brands that fit Stormi / network creators for fees, IMG production, usage rights, and WitMe conversion.
 
-Every recommended opportunity must answer: fit, observable opportunity, timing, pitch, campaign concept, evidence, confirmed vs inferred, confidence, next action, and project handoff fields.
+Every recommended opportunity should answer: fit, observable opportunity, timing, pitch, campaign concept, evidence, confirmed vs inferred, confidence, next action, and project handoff fields.
 
 ## Architecture fit (current ShootSpine)
 
@@ -38,13 +42,13 @@ Every recommended opportunity must answer: fit, observable opportunity, timing, 
 |-------|--------|
 | Auth | Firebase email/password, `requireApprovedAuthUser` |
 | Tenant | `users.company` (Insight Media Group LLC vs partners) |
-| Permissions | Extended `UserPermissions` |
+| Permissions | `manageRevenueOpportunities` (+ project manage for convert) |
 | Data | Firestore via Admin SDK in API routes (server-only collections) |
-| AI | `geminiClient`, `usageLog`, Tavily via `tavilyClient` |
-| Projects | `POST /api/projects`, `createProjectFromIdea` pattern |
-| Proposals | Existing agreements / quick quote (extend, do not duplicate) |
-| Email | Resend today; Gmail OAuth added in Phase 6 |
-| Automation | Vercel Cron today; n8n in Phase 9 |
+| AI | `geminiClient` / Vertex, `usageLog`, Tavily via `tavilyClient` |
+| Projects | Conversion seeds project + Prep board |
+| Proposals | Agreement prefill + signed → won link |
+| Email | Gmail OAuth + Resend elsewhere |
+| Automation | n8n catalog + webhook status callbacks |
 
 ## Feature flag
 
@@ -54,19 +58,20 @@ Revenue is **on by default**. Set `REVENUE_OPPORTUNITIES_ENABLED=false` (and opt
 
 Campaign **Run deep research** uses multi-query Tavily discovery + per-prospect Gemini qualify. Requires `SCOUT_USE_MOCK_AI=false`, `TAVILY_API_KEY`, and Gemini/Vertex. Dummy prospects are disabled — misconfigured env fails loudly instead of inventing businesses.
 
-## Implementation status
+## Implementation status (as of 2026-07)
 
-| Phase | Status |
-|-------|--------|
-| 1 — Foundation | In progress |
-| 2 — Manual workflow | Not started |
-| 3 — Agent framework | Not started |
-| 4 — Research | Not started |
-| 5 — Outreach | Not started |
-| 6 — Gmail | Not started |
-| 7 — Discovery & proposals | Not started |
-| 8 — Project conversion | Not started |
-| 9 — n8n | Not started |
-| 10 — Hardening | Not started |
+| Area | Status |
+|------|--------|
+| Foundation, campaigns, opportunities, agents | **Shipped** |
+| Business profiles + Stormi scoring | **Shipped** |
+| Outreach, Gmail, inbox | **Shipped** |
+| Discovery, meetings, proposals, agreement loop | **Shipped** |
+| Won → project + Prep handoff | **Shipped** (richer seed) |
+| Follow-up tasks + suppression | **Shipped** |
+| Daily briefs (persisted) | **Shipped** |
+| Contacts CRM | **Shipped** (v1) |
+| Meeting upload up to 100 MB | **Shipped** (transcription still ≤20 MB inline) |
+| Chunked / async transcription for long calls | Open |
+| Global search, deep analytics, learning loop | Open |
 
-See [revenue-opportunities-implementation-plan.md](./revenue-opportunities-implementation-plan.md) for phased delivery.
+See [revenue-opportunities-implementation-plan.md](./revenue-opportunities-implementation-plan.md) for historical phased delivery notes (many phases marked “not started” there are outdated relative to the codebase).

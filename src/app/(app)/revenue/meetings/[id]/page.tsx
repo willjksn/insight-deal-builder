@@ -65,6 +65,11 @@ export default function MeetingDetailPage() {
         audioMimeType: uploaded.contentType,
       });
       setMeeting(res.meeting);
+      if (uploaded.exceedsTranscribeLimit) {
+        setError(
+          "Audio saved. Transcription supports up to 20 MB — export a shorter cut to run Transcribe."
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {

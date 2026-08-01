@@ -1,5 +1,7 @@
 # Revenue & Opportunities — Implementation Plan
 
+> **Status (2026-07):** Phases 1–9 below are largely **shipped** in the codebase (campaigns, agents, Gmail, meetings, proposals, n8n catalog, conversion handoff, follow-ups, daily briefs, contacts). Treat this document as historical delivery notes. For current gaps, see [revenue-opportunities-overview.md](./revenue-opportunities-overview.md) → Implementation status.
+
 This plan adapts the product specification to the **existing ShootSpine repository** (`insight-deal-builder`). Do not create a new Firebase project, Vercel project, or Next.js app.
 
 ## Repository inspection summary (Phase 0)

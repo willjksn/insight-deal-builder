@@ -2,9 +2,10 @@ import { callGeminiJson, fetchMediaInlineData, type GeminiPart } from "@/lib/ai/
 import { aiUsesMock } from "@/lib/ai/mockAi";
 import { TRANSCRIBE_SYSTEM } from "@/lib/revenueOpportunities/meetings/prompts";
 import { parseTranscript, type ParsedTranscript } from "@/lib/revenueOpportunities/meetings/parseAnalysis";
+import { MAX_MEETING_TRANSCRIBE_MB } from "@/lib/revenueOpportunities/meetings/storage";
 
 /** Gemini inline-audio cap; longer meetings need chunking (future work). */
-const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
+const MAX_AUDIO_BYTES = MAX_MEETING_TRANSCRIBE_MB * 1024 * 1024;
 
 export async function transcribeAudio(input: {
   audioUrl: string;
@@ -31,7 +32,9 @@ export async function transcribeAudio(input: {
 
   const inline = await fetchMediaInlineData(input.audioUrl, MAX_AUDIO_BYTES);
   if (!inline) {
-    throw new Error("Could not load meeting audio for transcription (must be reachable and under 20 MB).");
+    throw new Error(
+      `Could not load meeting audio for transcription (must be reachable and under ${MAX_MEETING_TRANSCRIBE_MB} MB). Larger files stay in Storage — trim/export a shorter cut to transcribe.`
+    );
   }
 
   const parts: GeminiPart[] = [
