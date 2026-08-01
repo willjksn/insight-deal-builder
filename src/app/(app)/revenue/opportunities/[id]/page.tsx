@@ -523,7 +523,11 @@ export default function OpportunityDetailPage() {
                 });
                 setOpportunity(res.opportunity);
                 await reload();
-                return { projectId: res.projectId, alreadyConverted: res.alreadyConverted };
+                return {
+                  projectId: res.projectId,
+                  alreadyConverted: res.alreadyConverted,
+                  productionBoardId: res.productionBoardId,
+                };
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Conversion failed");
                 throw e;

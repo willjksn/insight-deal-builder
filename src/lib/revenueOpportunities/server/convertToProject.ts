@@ -1,13 +1,25 @@
 import { FieldValue, Firestore } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { stripUndefined } from "@/lib/firebase/firestore";
+import { PRODUCTION_BOARDS_COLLECTION } from "@/lib/firebase/productionRepos";
+import type { ProductionBoard } from "@/lib/production/types";
 import { newActivity } from "@/lib/revenueOpportunities/defaults";
 import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";
-import { opportunityToProjectPayload } from "@/lib/revenueOpportunities/opportunityToProjectPayload";
+import {
+  opportunityToProjectBackfill,
+  opportunityToProjectPayload,
+} from "@/lib/revenueOpportunities/opportunityToProjectPayload";
+import {
+  buildProductionBoardHandoff,
+  mergeBoardHandoffIntoExisting,
+  type RevenueBoardHandoffSummary,
+} from "@/lib/revenueOpportunities/revenueProjectHandoff";
 import { ensureClientFromOpportunity } from "@/lib/revenueOpportunities/server/ensureClientFromOpportunity";
 import { getOpportunity, updateOpportunity } from "@/lib/revenueOpportunities/server/opportunities";
 import { getProposal } from "@/lib/revenueOpportunities/server/proposals";
 import { linkOpportunityMeetingsToProject } from "@/lib/revenueOpportunities/server/meetings";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
+import type { Project } from "@/lib/types";
 import { AppUser } from "@/lib/types";
 
 function requireDb(): Firestore {
@@ -27,6 +39,78 @@ export interface ConvertOpportunityToProjectResult {
   alreadyConverted: boolean;
   /** Number of meetings linked from the opportunity to the new project. */
   meetingsLinked: number;
+  productionBoardId?: string;
+  handoff?: RevenueBoardHandoffSummary;
+}
+
+async function getBoardForProject(
+  db: Firestore,
+  projectId: string
+): Promise<ProductionBoard | null> {
+  const q = await db
+    .collection(PRODUCTION_BOARDS_COLLECTION)
+    .where("projectId", "==", projectId)
+    .limit(1)
+    .get();
+  if (q.empty) return null;
+  const docSnap = q.docs[0];
+  return { id: docSnap.id, ...(docSnap.data() as Omit<ProductionBoard, "id">) };
+}
+
+async function seedProductionBoardHandoff(params: {
+  db: Firestore;
+  projectId: string;
+  ownerUserId: string;
+  opportunity: RevenueOpportunity;
+  proposal: Awaited<ReturnType<typeof getProposal>> | undefined;
+  projectName?: string;
+}): Promise<{ productionBoardId: string; handoff: RevenueBoardHandoffSummary }> {
+  const { db, projectId, ownerUserId, opportunity, proposal, projectName } = params;
+  const projectSnap = await db.collection("projects").doc(projectId).get();
+  if (!projectSnap.exists) {
+    throw new Error("Project missing after conversion");
+  }
+  const project = {
+    id: projectSnap.id,
+    ...projectSnap.data(),
+  } as Project;
+
+  const { board, summary } = buildProductionBoardHandoff({
+    project: {
+      ...project,
+      projectName:
+        projectName?.trim() || project.projectName || opportunity.subject.name,
+    },
+    ownerUserId,
+    opportunity,
+    proposal,
+  });
+
+  const existing = await getBoardForProject(db, projectId);
+  if (!existing) {
+    const ref = await db.collection(PRODUCTION_BOARDS_COLLECTION).add(
+      stripUndefined({
+        ...board,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+    );
+    return { productionBoardId: ref.id, handoff: summary };
+  }
+
+  const patch = mergeBoardHandoffIntoExisting(existing, board);
+  if (Object.keys(patch).length) {
+    await db
+      .collection(PRODUCTION_BOARDS_COLLECTION)
+      .doc(existing.id)
+      .update(
+        stripUndefined({
+          ...patch,
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      );
+  }
+  return { productionBoardId: existing.id, handoff: summary };
 }
 
 export async function convertOpportunityToProject(
@@ -68,12 +152,16 @@ export async function convertOpportunityToProject(
       }
     }
 
-    const payload = opportunityToProjectPayload({
-      opportunity: workingOpportunity,
-      proposal,
-      projectName: input.projectName,
-      ownerUserId: appUser.id,
-    });
+    const payload = {
+      ...opportunityToProjectPayload({
+        opportunity: workingOpportunity,
+        proposal,
+        projectName: input.projectName,
+        ownerUserId: appUser.id,
+      }),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
     // Idempotency guard: a prior attempt may have created the project before
     // failing mid-conversion. Reuse it instead of creating a duplicate on retry.
     let projectId: string;
@@ -84,6 +172,19 @@ export async function convertOpportunityToProject(
       .get();
     if (!existingProject.empty) {
       projectId = existingProject.docs[0].id;
+      const existingData = existingProject.docs[0].data() as Partial<Project>;
+      const backfill = opportunityToProjectBackfill({
+        opportunity: workingOpportunity,
+        proposal,
+        projectName: input.projectName,
+        existing: existingData,
+      });
+      if (Object.keys(backfill).length > 0) {
+        await db.collection("projects").doc(projectId).update({
+          ...backfill,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
     } else {
       const projectRef = await db.collection("projects").add(payload);
       projectId = projectRef.id;
@@ -99,6 +200,23 @@ export async function convertOpportunityToProject(
       console.error("convertToProject: meeting link error:", linkErr);
     }
 
+    let productionBoardId: string | undefined;
+    let handoff: RevenueBoardHandoffSummary | undefined;
+    try {
+      const seeded = await seedProductionBoardHandoff({
+        db,
+        projectId,
+        ownerUserId: appUser.id,
+        opportunity: workingOpportunity,
+        proposal,
+        projectName: input.projectName,
+      });
+      productionBoardId = seeded.productionBoardId;
+      handoff = seeded.handoff;
+    } catch (boardErr) {
+      console.error("convertToProject: production board handoff error:", boardErr);
+    }
+
     const updated = await updateOpportunity(appUser, opportunityId, {
       projectConversion: {
         status: "converted",
@@ -111,7 +229,7 @@ export async function convertOpportunityToProject(
         ...workingOpportunity.workflow,
         pipelineStage: "converted_to_project",
         nextAction: workingOpportunity.clientId
-          ? "Open project and create agreement from proposal"
+          ? "Open Prep board — scope & brief were seeded from the proposal"
           : "Add contact email on opportunity, then create agreement",
       },
       activityLog: [
@@ -121,11 +239,25 @@ export async function convertOpportunityToProject(
           ...(workingOpportunity.clientId ? { clientId: workingOpportunity.clientId } : {}),
           ...(proposal?.id ? { proposalId: proposal.id } : {}),
           ...(meetingsLinked > 0 ? { meetingsLinked: String(meetingsLinked) } : {}),
+          ...(productionBoardId ? { productionBoardId } : {}),
+          ...(handoff
+            ? {
+                handoffDays: String(handoff.productionDays),
+                handoffNotes: handoff.filmingNotes ? "yes" : "no",
+              }
+            : {}),
         }),
       ],
     });
 
-    return { projectId, opportunity: updated, alreadyConverted: false, meetingsLinked };
+    return {
+      projectId,
+      opportunity: updated,
+      alreadyConverted: false,
+      meetingsLinked,
+      productionBoardId,
+      handoff,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Project creation failed";
     await updateOpportunity(appUser, opportunityId, {

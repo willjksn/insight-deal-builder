@@ -805,6 +805,8 @@ export async function revenueConvertOpportunityToProject(
     projectId: string;
     opportunity: RevenueOpportunity;
     alreadyConverted: boolean;
+    meetingsLinked?: number;
+    productionBoardId?: string;
   }>(res);
 }
 
