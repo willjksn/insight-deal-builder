@@ -16,6 +16,7 @@ import {
   Megaphone,
   IdCard,
   Mic,
+  Contact,
 } from "lucide-react";
 
 export type RevenueNavItem = {
@@ -49,6 +50,12 @@ export const REVENUE_NAV_ITEMS: RevenueNavItem[] = [
     label: "Opportunities",
     icon: Target,
     description: "Researched businesses and brands awaiting review",
+  },
+  {
+    href: "/revenue/contacts",
+    label: "Contacts",
+    icon: Contact,
+    description: "Shared CRM contacts across opportunities and outreach",
   },
   {
     href: "/revenue/outreach",

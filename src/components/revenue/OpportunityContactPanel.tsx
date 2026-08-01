@@ -18,14 +18,18 @@ export function OpportunityContactPanel({
   canManage,
   busy,
   onSave,
+  onSaveToCrm,
 }: {
   opportunity: RevenueOpportunity;
   canManage: boolean;
   busy?: boolean;
   onSave: (patch: ContactSavePayload) => Promise<void>;
+  /** Upsert into first-class revenue Contacts CRM. */
+  onSaveToCrm?: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [crmMessage, setCrmMessage] = useState<string | null>(null);
   const [name, setName] = useState(opportunity.contact?.name ?? "");
   const [title, setTitle] = useState(opportunity.contact?.title ?? "");
   const [email, setEmail] = useState(opportunity.contact?.email ?? "");
@@ -108,13 +112,53 @@ export function OpportunityContactPanel({
                     Verification: {contact.verificationStatus}
                   </p>
                 )}
+                {opportunity.contactId ? (
+                  <p className="text-xs text-emerald-700">
+                    Linked in CRM ·{" "}
+                    <a href="/revenue/contacts" className="underline">
+                      View contacts
+                    </a>
+                  </p>
+                ) : null}
               </div>
             )}
             {canManage && (
-              <Button size="sm" variant="outline" disabled={busy || saving} onClick={() => setEditing(true)}>
-                Edit contact
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" disabled={busy || saving} onClick={() => setEditing(true)}>
+                  Edit contact
+                </Button>
+                {onSaveToCrm ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy || saving || !hasContact}
+                    onClick={async () => {
+                      setCrmMessage(null);
+                      setSaving(true);
+                      try {
+                        await onSaveToCrm();
+                        setCrmMessage("Saved to Contacts CRM");
+                      } catch (e) {
+                        setCrmMessage(e instanceof Error ? e.message : "Could not save to CRM");
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >
+                    Save to Contacts
+                  </Button>
+                ) : null}
+              </div>
             )}
+            {crmMessage ? (
+              <p
+                className={
+                  crmMessage.startsWith("Saved") ? "text-xs text-emerald-700" : "text-xs text-red-600"
+                }
+              >
+                {crmMessage}
+              </p>
+            ) : null}
           </>
         )}
 

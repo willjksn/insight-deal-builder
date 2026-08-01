@@ -26,6 +26,7 @@ import {
   revenueRunVerification,
   revenueFindContact,
   revenueResolveContactSuggestion,
+  revenueSaveOpportunityContact,
   revenueRunOpportunityIntel,
   revenueSetOpportunityStage,
   revenueUpdateOutreach,
@@ -221,6 +222,22 @@ export default function OpportunityDetailPage() {
                 setOpportunity(res.opportunity);
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Failed to save contact");
+                throw e;
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onSaveToCrm={async () => {
+              if (!user) return;
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await revenueSaveOpportunityContact(() => user.getIdToken(), id);
+                const refreshed = await revenueGetOpportunity(() => user.getIdToken(), id);
+                setOpportunity(refreshed.opportunity);
+                if (!res.contact) throw new Error("Contact not returned");
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Failed to save to Contacts");
                 throw e;
               } finally {
                 setBusy(false);

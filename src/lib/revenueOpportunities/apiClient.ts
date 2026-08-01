@@ -33,6 +33,10 @@ import type {
   RevenueSuppressionEntry,
 } from "@/lib/revenueOpportunities/types/suppression";
 import type { RevenueDailyBrief } from "@/lib/revenueOpportunities/types/dailyBrief";
+import type {
+  RevenueContact,
+  RevenueContactCreateInput,
+} from "@/lib/revenueOpportunities/types/contact";
 import type { RevenueWorkflowCatalogEntry, RevenueWorkflowRun } from "@/lib/revenueOpportunities/types/workflowRun";
 import type { Agreement } from "@/lib/types";
 
@@ -481,6 +485,42 @@ export async function revenueRefreshDailyBrief(getToken: () => Promise<string | 
     body: JSON.stringify({}),
   });
   return parseJson<{ brief: RevenueDailyBrief }>(res);
+}
+
+export async function revenueListContacts(getToken: () => Promise<string | null>) {
+  const res = await fetch(`/api/revenue/contacts`, { headers: await authHeaders(getToken) });
+  return parseJson<{ contacts: RevenueContact[] }>(res);
+}
+
+export async function revenueCreateContact(
+  getToken: () => Promise<string | null>,
+  body: RevenueContactCreateInput
+) {
+  const res = await fetch(`/api/revenue/contacts`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ contact: RevenueContact }>(res);
+}
+
+export async function revenueDeleteContact(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/contacts/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: true }>(res);
+}
+
+export async function revenueSaveOpportunityContact(
+  getToken: () => Promise<string | null>,
+  opportunityId: string
+) {
+  const res = await fetch(`/api/revenue/opportunities/${opportunityId}/save-contact`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: true; contact: RevenueContact; opportunityId: string }>(res);
 }
 
 export async function revenueTranscribeMeeting(getToken: () => Promise<string | null>, id: string) {

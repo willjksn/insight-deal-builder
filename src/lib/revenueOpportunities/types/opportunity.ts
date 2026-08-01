@@ -233,6 +233,8 @@ export interface RevenueOpportunity {
   campaignName?: string;
   opportunityType: RevenueOpportunityType;
   clientId?: string;
+  /** First-class revenue contact linked from the CRM. */
+  contactId?: string;
   /** Roster creators this brand opportunity is being matched/pitched to. */
   linkedCreatorIds?: string[];
   shortlistId?: string;
