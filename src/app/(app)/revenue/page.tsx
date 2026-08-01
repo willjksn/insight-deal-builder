@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Card, CardBody } from "@/components/ui/Card";
 import { OpportunitySummaryCards, OpportunityTable } from "@/components/revenue/OpportunityTable";
+import { FollowUpTasksPanel } from "@/components/revenue/FollowUpTasksPanel";
 
 export default function RevenueCommandCenterPage() {
   const { user, appUser } = useAuth();
@@ -159,6 +160,16 @@ export default function RevenueCommandCenterPage() {
                 </div>
               </CardBody>
             </Card>
+          </div>
+
+          <div className="mb-8">
+            {user ? (
+              <FollowUpTasksPanel
+                getToken={() => user.getIdToken()}
+                canManage={canManage}
+                compact
+              />
+            ) : null}
           </div>
 
           <div className="mb-4 flex items-center justify-between">

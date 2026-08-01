@@ -5,6 +5,7 @@ import {
   Briefcase,
   Inbox,
   LayoutDashboard,
+  ListTodo,
   Mail,
   Phone,
   Settings,
@@ -54,6 +55,12 @@ export const REVENUE_NAV_ITEMS: RevenueNavItem[] = [
     label: "Outreach",
     icon: Mail,
     description: "AI Writer + approve drafts before Gmail",
+  },
+  {
+    href: "/revenue/follow-ups",
+    label: "Follow-ups",
+    icon: ListTodo,
+    description: "Open follow-up tasks across opportunities",
   },
   {
     href: "/revenue/inbox",

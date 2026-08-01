@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { SuppressionListPanel } from "@/components/revenue/SuppressionListPanel";
 
 export default function RevenueSettingsPage() {
   const { user, appUser } = useAuth();
@@ -57,7 +58,10 @@ export default function RevenueSettingsPage() {
         <ArrowLeft className="mr-1 h-4 w-4" />
         Command center
       </Link>
-      <PageHeader title="Settings" subtitle="Connect Gmail and check n8n automation status." />
+      <PageHeader
+        title="Settings"
+        subtitle="Gmail, suppression list, and n8n automation status."
+      />
       {gmailParam === "connected" && (
         <p className="mb-4 text-sm text-emerald-700">Gmail connected successfully.</p>
       )}
@@ -140,6 +144,13 @@ export default function RevenueSettingsPage() {
           </CardBody>
         </Card>
       )}
+      {user ? (
+        <SuppressionListPanel
+          getToken={() => user.getIdToken()}
+          canManage={canManage}
+        />
+      ) : null}
+
       {featureStatus && (
         <Card className="mt-6">
           <CardHeader>

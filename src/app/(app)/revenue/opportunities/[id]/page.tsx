@@ -52,6 +52,7 @@ import { OpportunityOutreachPanel } from "@/components/revenue/OpportunityOutrea
 import { OpportunityDiscoveryPanel } from "@/components/revenue/OpportunityDiscoveryPanel";
 import { OpportunityProposalPanel } from "@/components/revenue/OpportunityProposalPanel";
 import { OpportunityConversionPanel } from "@/components/revenue/OpportunityConversionPanel";
+import { FollowUpTasksPanel } from "@/components/revenue/FollowUpTasksPanel";
 
 export default function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -507,6 +508,13 @@ export default function OpportunityDetailPage() {
               }
             }}
           />
+          {user ? (
+            <FollowUpTasksPanel
+              getToken={() => user.getIdToken()}
+              canManage={canManage}
+              opportunity={opportunity}
+            />
+          ) : null}
           <OpportunityConversionPanel
             opportunity={opportunity}
             latestProposal={proposals[0]}

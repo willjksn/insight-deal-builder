@@ -404,19 +404,34 @@ export function runPursuitForOpportunity(appUser: AppUser, opportunityId: string
   });
 }
 
-export function runFollowUpForOpportunity(appUser: AppUser, opportunityId: string) {
-  return runIntelAgentForOpportunity(appUser, opportunityId, "follow_up", "Follow-up plan", (result) => {
-    const { followUp } = result as { followUp: OpportunityFollowUpPlan };
-    return {
-      patch: { followUp },
-      activityType: "agent_follow_up",
-      message: followUp.due
-        ? "Follow-up is due"
-        : followUp.dueInDays != null
-          ? `Follow-up due in ${followUp.dueInDays} day(s)`
-          : "Follow-up planned",
-    };
-  });
+export async function runFollowUpForOpportunity(appUser: AppUser, opportunityId: string) {
+  const result = await runIntelAgentForOpportunity(
+    appUser,
+    opportunityId,
+    "follow_up",
+    "Follow-up plan",
+    (agentResult) => {
+      const { followUp } = agentResult as { followUp: OpportunityFollowUpPlan };
+      return {
+        patch: { followUp },
+        activityType: "agent_follow_up",
+        message: followUp.due
+          ? "Follow-up is due"
+          : followUp.dueInDays != null
+            ? `Follow-up due in ${followUp.dueInDays} day(s)`
+            : "Follow-up planned",
+      };
+    }
+  );
+  try {
+    const { ensureFollowUpTaskFromPlan } = await import(
+      "@/lib/revenueOpportunities/server/followUpTasks"
+    );
+    await ensureFollowUpTaskFromPlan(appUser, result.opportunity);
+  } catch (err) {
+    console.error("runFollowUpForOpportunity: task seed error:", err);
+  }
+  return result;
 }
 
 export async function runRevisionForOpportunity(

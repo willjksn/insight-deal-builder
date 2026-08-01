@@ -133,6 +133,10 @@ export async function approveOutreachActivity(
   if (existing.data()!.organizationCompany !== tenantCompany(appUser)) {
     throw new RevenueOpportunityError("NOT_AUTHORIZED", "Outreach draft not found");
   }
+  const { assertEmailNotSuppressed } = await import(
+    "@/lib/revenueOpportunities/server/suppression"
+  );
+  await assertEmailNotSuppressed(appUser, existing.data()!.recipientEmail as string | undefined);
   await ref.update(
     stripUndefined({
       status: "approved",

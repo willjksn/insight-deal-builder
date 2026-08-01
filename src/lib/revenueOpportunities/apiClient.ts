@@ -23,6 +23,15 @@ import type {
   RevenueMeetingCreateInput,
   RevenueMeetingUpdateInput,
 } from "@/lib/revenueOpportunities/types/meeting";
+import type {
+  RevenueFollowUpTask,
+  RevenueFollowUpTaskCreateInput,
+  RevenueFollowUpTaskUpdateInput,
+} from "@/lib/revenueOpportunities/types/followUpTask";
+import type {
+  RevenueSuppressionCreateInput,
+  RevenueSuppressionEntry,
+} from "@/lib/revenueOpportunities/types/suppression";
 import type { RevenueWorkflowCatalogEntry, RevenueWorkflowRun } from "@/lib/revenueOpportunities/types/workflowRun";
 import type { Agreement } from "@/lib/types";
 
@@ -379,6 +388,78 @@ export async function revenueUpdateMeeting(
 
 export async function revenueDeleteMeeting(getToken: () => Promise<string | null>, id: string) {
   const res = await fetch(`/api/revenue/meetings/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: true }>(res);
+}
+
+export async function revenueListFollowUpTasks(
+  getToken: () => Promise<string | null>,
+  filters?: { opportunityId?: string; status?: string }
+) {
+  const qs = new URLSearchParams();
+  if (filters?.opportunityId) qs.set("opportunityId", filters.opportunityId);
+  if (filters?.status) qs.set("status", filters.status);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const res = await fetch(`/api/revenue/follow-up-tasks${suffix}`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ tasks: RevenueFollowUpTask[] }>(res);
+}
+
+export async function revenueCreateFollowUpTask(
+  getToken: () => Promise<string | null>,
+  body: RevenueFollowUpTaskCreateInput
+) {
+  const res = await fetch(`/api/revenue/follow-up-tasks`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ task: RevenueFollowUpTask }>(res);
+}
+
+export async function revenueUpdateFollowUpTask(
+  getToken: () => Promise<string | null>,
+  id: string,
+  body: RevenueFollowUpTaskUpdateInput
+) {
+  const res = await fetch(`/api/revenue/follow-up-tasks/${id}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ task: RevenueFollowUpTask }>(res);
+}
+
+export async function revenueDeleteFollowUpTask(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/follow-up-tasks/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: true }>(res);
+}
+
+export async function revenueListSuppression(getToken: () => Promise<string | null>) {
+  const res = await fetch(`/api/revenue/suppression`, { headers: await authHeaders(getToken) });
+  return parseJson<{ entries: RevenueSuppressionEntry[] }>(res);
+}
+
+export async function revenueAddSuppression(
+  getToken: () => Promise<string | null>,
+  body: RevenueSuppressionCreateInput
+) {
+  const res = await fetch(`/api/revenue/suppression`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ entry: RevenueSuppressionEntry }>(res);
+}
+
+export async function revenueDeleteSuppression(getToken: () => Promise<string | null>, id: string) {
+  const res = await fetch(`/api/revenue/suppression/${id}`, {
     method: "DELETE",
     headers: await authHeaders(getToken),
   });
