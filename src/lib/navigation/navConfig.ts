@@ -25,6 +25,7 @@ import {
   FileSignature,
   IdCard,
   Wallet,
+  BarChart3,
 } from "lucide-react";
 import { AppUser } from "@/lib/types";
 import { Workspace } from "@/lib/workspace/types";
@@ -169,6 +170,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/creators/campaigns",
         label: "Creator campaigns",
         icon: Briefcase,
+        canAccess: canManageCreators,
+      },
+      {
+        href: "/creators/reports",
+        label: "Creator reports",
+        icon: BarChart3,
         canAccess: canManageCreators,
       },
     ],

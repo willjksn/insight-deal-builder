@@ -128,7 +128,8 @@ export function buildStormiResearchQuery(campaign: RevenueCampaign): string {
 
 export function buildCampaignContextLines(
   campaign: RevenueCampaign,
-  profile?: BusinessProfile | null
+  profile?: BusinessProfile | null,
+  pastRejectionLabels?: string[]
 ): string[] {
   const lines = [
     `Campaign: ${campaign.name}`,
@@ -138,6 +139,12 @@ export function buildCampaignContextLines(
     `Minimum confidence: ${campaign.minConfidenceScore}`,
     `Opportunities requested: ${campaign.opportunityCountRequested}`,
   ];
+
+  if (pastRejectionLabels?.length) {
+    lines.push(
+      `Past rejection reasons to avoid repeating (org learning): ${pastRejectionLabels.join("; ")}`
+    );
+  }
 
   if (campaign.requiredSignals?.length) {
     lines.push(`Required signals (prefer these): ${campaign.requiredSignals.join("; ")}`);

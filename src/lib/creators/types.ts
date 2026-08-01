@@ -444,6 +444,8 @@ export interface Creator {
   stripeConnectAccountId?: string;
   /** Cached Connect readiness from Stripe account.updated / retrieve. */
   stripeConnect?: CreatorStripeConnectStatus;
+  /** Last time we emailed a Stripe Connect setup nudge (debounce auto-reminders). */
+  stripeConnectNudgeSentAt?: string;
 
   // ── Links (dedup — point to existing records, never duplicate people) ──
   crewMemberId?: string;

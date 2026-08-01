@@ -74,6 +74,11 @@ describe("getVisibleNavGroups", () => {
     expect(hrefs).not.toContain("/companies");
   });
 
+  it("exposes Creator reports for IMG admins in Relationships", () => {
+    const hrefs = itemHrefs(imgAdmin, "business");
+    expect(hrefs).toContain("/creators/reports");
+  });
+
   it("still exposes Projects to a partner in the production workspace", () => {
     const hrefs = itemHrefs(partner, "production");
     expect(hrefs).toContain("/projects");

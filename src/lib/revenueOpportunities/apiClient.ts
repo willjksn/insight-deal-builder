@@ -310,6 +310,17 @@ export async function revenueGetDashboard(getToken: () => Promise<string | null>
   return parseJson<{ summary: RevenueDashboardSummary }>(res);
 }
 
+export async function revenueGetFeedback(getToken: () => Promise<string | null>) {
+  const res = await fetch("/api/revenue/feedback", { headers: await authHeaders(getToken) });
+  return parseJson<{
+    summary: {
+      total: number;
+      byReason: { reason: string; label: string; count: number }[];
+      recent: unknown[];
+    };
+  }>(res);
+}
+
 export async function revenueListAgents(getToken: () => Promise<string | null>) {
   const res = await fetch("/api/revenue/agents", { headers: await authHeaders(getToken) });
   return parseJson<{ agents: RevenueAgentCatalogEntry[] }>(res);

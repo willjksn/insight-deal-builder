@@ -7,6 +7,8 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
 import { NotificationBell } from "./NotificationBell";
+import { GlobalSearchDialog } from "./GlobalSearchDialog";
+import { GlobalSearchTrigger } from "./GlobalSearchTrigger";
 import { PendingApprovalScreen } from "./PendingApprovalScreen";
 import { isUserPendingApproval } from "@/lib/users/approval";
 
@@ -76,6 +78,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       <main className="safe-area-main-pb lg:pl-64 lg:pb-0 print:pl-0 print:pb-0">
         {!publicPath ? (
           <div className="sticky top-0 z-30 flex justify-end border-b border-slate-200/80 bg-white/90 px-4 py-2 backdrop-blur-sm print:hidden md:px-6">
+            <GlobalSearchTrigger />
             <NotificationBell />
           </div>
         ) : null}
@@ -83,6 +86,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+      {!publicPath ? <GlobalSearchDialog /> : null}
     </div>
   );
 }

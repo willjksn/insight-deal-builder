@@ -5,7 +5,10 @@ import { stripUndefined } from "@/lib/firebase/firestore";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import { getOrderedQueryDocs } from "@/lib/revenueOpportunities/server/queryHelpers";
 import { CreatorError } from "@/lib/creators/errors";
-import { sendCreatorPaidEmail } from "@/lib/creators/creatorPayoutEmail";
+import {
+  maybeAutoNudgeCreatorStripeConnect,
+  sendCreatorPaidEmail,
+} from "@/lib/creators/creatorPayoutEmail";
 import { getCreator, listCreators } from "@/lib/creators/server";
 import { isStormiCreator } from "@/lib/creators/types";
 import { getCampaign as getRevenueCampaign } from "@/lib/revenueOpportunities/server/campaigns";
@@ -440,19 +443,27 @@ export async function addCampaignAssignment(
   }
 
   const creator = await getCreator(appUser, creatorId);
+  const compensation =
+    typeof input.compensation === "number" ? input.compensation : undefined;
   const assignment: CreatorCampaignAssignment = stripUndefined({
     id: randomUUID(),
     creatorId: creator.id,
     creatorName: creator.professionalName,
     role: input.role?.trim() || undefined,
-    compensation: typeof input.compensation === "number" ? input.compensation : undefined,
+    compensation,
     compensationNotes: input.compensationNotes?.trim() || undefined,
     status: input.status?.trim() || "assigned",
   }) as CreatorCampaignAssignment;
 
-  return updateCreatorCampaign(appUser, campaignId, {
+  const updated = await updateCreatorCampaign(appUser, campaignId, {
     assignments: [...(campaign.assignments ?? []), assignment],
   });
+
+  if (typeof compensation === "number" && compensation > 0) {
+    void maybeAutoNudgeCreatorStripeConnect(creator);
+  }
+
+  return updated;
 }
 
 export async function updateCampaignAssignment(
@@ -604,7 +615,8 @@ export async function clearCreatorCampaignAssignmentPaid(
 
   const cleared: CreatorCampaignAssignment = {
     ...rest,
-    payoutError: "Paid record cleared by staff",
+    payoutError:
+      "Staff cleared the paid record. Assignment is unpaid again — you can re-pay.",
     status: existing.status === "paid" ? "assigned" : existing.status,
   };
 

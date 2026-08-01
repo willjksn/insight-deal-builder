@@ -15,11 +15,13 @@ import {
   canManageUsers,
   canSignQuotes,
   canUploadW9Docs,
+  canAccessRevenueOpportunities,
   canUseProductionTools,
   canViewIdentityDocs,
   canViewW9Docs,
   isInsightOrgUser,
   isPartnerOrgUser,
+  isRevenueOpportunitiesFeatureEnabled,
 } from "@/lib/utils/permissions";
 import { isUserApproved } from "@/lib/users/approval";
 import { AppUser } from "@/lib/types";
@@ -33,6 +35,9 @@ const deals = (user: AppUser | null) =>
   canSignQuotes(user) ||
   canDownloadPdf(user) ||
   canEmailQuotes(user);
+
+const revenue = (user: AppUser | null) =>
+  isRevenueOpportunitiesFeatureEnabled() && canAccessRevenueOpportunities(user);
 
 export const GUIDE_CATEGORIES: GuideCategory[] = [
   {
@@ -384,6 +389,61 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
               "Scroll to the section you need — no login steps beyond your normal app session.",
             ],
             links: [{ label: "Reference guide", href: "/reference" }],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "revenue",
+    label: "Revenue & opportunities",
+    canAccess: revenue,
+    sections: [
+      {
+        id: "revenue-overview",
+        title: "How Revenue works",
+        description: "Find, qualify, win, and hand off opportunities.",
+        canAccess: revenue,
+        blocks: [
+          {
+            paragraphs: [
+              "Revenue is the Business workspace for opportunities: research prospects, approve or reject them, outreach, meetings, proposals, then convert wins into Production projects.",
+            ],
+          },
+          {
+            heading: "Recommended flow",
+            bullets: [
+              "Open Revenue & opportunities for the command center (briefs, follow-ups, pipeline snapshot).",
+              "Create or open a campaign, then run research to pull qualified prospects.",
+              "Approve strong fits; reject with a reason so learning feeds future research.",
+              "Draft outreach, book discovery, write proposals, and convert won deals to projects.",
+            ],
+            links: [
+              { label: "Revenue command center", href: "/revenue" },
+              { label: "Full Revenue playbook", href: "/revenue/guide" },
+            ],
+          },
+        ],
+      },
+      {
+        id: "revenue-daily",
+        title: "What to do each day",
+        description: "Briefs, follow-ups, and contacts.",
+        canAccess: revenue,
+        blocks: [
+          {
+            heading: "Daily loop",
+            bullets: [
+              "Check the daily brief on the Revenue home for prioritized actions.",
+              "Work follow-up tasks so nurture and replies do not stall.",
+              "Use Contacts to keep people linked across opportunities and clients.",
+              "Open Analytics to see approval rates and rejection reasons.",
+            ],
+            links: [
+              { label: "Opportunities", href: "/revenue/opportunities" },
+              { label: "Contacts", href: "/revenue/contacts" },
+              { label: "Analytics", href: "/revenue/analytics" },
+            ],
           },
         ],
       },

@@ -1,3 +1,4 @@
+import { FieldValue } from "firebase-admin/firestore";
 import { APP_DOMAIN } from "@/lib/brand";
 import { PRODUCER_LEGAL_NAME } from "@/lib/constants/legalTerms";
 import { sendTransactionalEmail } from "@/lib/notifications/delivery";
@@ -143,6 +144,24 @@ export async function sendCreatorConnectNudgeEmail(params: {
   }
 }
 
+const CONNECT_NUDGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+function nudgeIsFresh(sentAt?: string): boolean {
+  if (!sentAt) return false;
+  const t = Date.parse(sentAt);
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t < CONNECT_NUDGE_COOLDOWN_MS;
+}
+
+async function markConnectNudgeSent(creatorId: string): Promise<void> {
+  const db = getAdminDb();
+  if (!db) return;
+  await db.collection(CREATORS_COLLECTION).doc(creatorId).update({
+    stripeConnectNudgeSentAt: new Date().toISOString(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
 /** Staff action: email creator to finish Connect / payment setup. */
 export async function remindCreatorStripeConnect(
   creatorId: string
@@ -177,5 +196,89 @@ export async function remindCreatorStripeConnect(
     );
   }
 
-  return { sent: true, creator };
+  await markConnectNudgeSent(creatorId);
+  const refreshed = await db.collection(CREATORS_COLLECTION).doc(creatorId).get();
+  return {
+    sent: true,
+    creator: serializeDoc<Creator>(refreshed.id, refreshed.data()!),
+  };
 }
+
+/**
+ * Best-effort auto nudge when assigning compensated work and Connect isn't ready.
+ * Debounced to once per 7 days. Never throws.
+ */
+export async function maybeAutoNudgeCreatorStripeConnect(
+  creator: Creator
+): Promise<{ sent: boolean }> {
+  try {
+    if (isStripeConnectReady(creator)) return { sent: false };
+    if (!creator.email?.trim()) return { sent: false };
+    if (nudgeIsFresh(creator.stripeConnectNudgeSentAt)) return { sent: false };
+
+    const { sent } = await sendCreatorConnectNudgeEmail({
+      to: creator.email,
+      professionalName: creator.professionalName,
+    });
+    if (sent) await markConnectNudgeSent(creator.id);
+    return { sent };
+  } catch (err) {
+    console.error("[creators] auto Connect nudge failed", err);
+    return { sent: false };
+  }
+}
+
+export function buildCreatorPayoutReversedEmail(params: {
+  professionalName: string;
+  campaignName: string;
+}): { subject: string; html: string; text: string } {
+  const name = params.professionalName.trim() || "there";
+  const subject = `Payment reversed · ${params.campaignName}`;
+  const portalUrl = `${appBaseUrl()}/creator-portal/campaigns`;
+
+  const text = `Hi ${name},
+
+A Stripe payment for "${params.campaignName}" was reversed, so this assignment shows as unpaid again in the creator portal.
+
+View your campaigns:
+${portalUrl}
+
+Questions? Reply to this email or write to contact@insightmediagroupllc.com.
+
+— ${PRODUCER_LEGAL_NAME}`;
+
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.55;color:#0f172a;max-width:560px;">
+      <p style="margin:0 0 16px;">Hi ${escapeHtml(name)},</p>
+      <p style="margin:0 0 16px;">
+        A Stripe payment for <strong>${escapeHtml(params.campaignName)}</strong> was reversed,
+        so this assignment shows as unpaid again in the creator portal.
+      </p>
+      <p style="margin:0 0 24px;">
+        <a href="${portalUrl}" style="color:#0284c7;">View your campaigns</a>
+      </p>
+      <p style="margin:0;color:#64748b;font-size:13px;">— ${escapeHtml(PRODUCER_LEGAL_NAME)}</p>
+    </div>
+  `;
+
+  return { subject, html, text };
+}
+
+/** Best-effort — never throws. */
+export async function sendCreatorPayoutReversedEmail(params: {
+  to: string;
+  professionalName: string;
+  campaignName: string;
+}): Promise<{ sent: boolean }> {
+  const to = params.to.trim();
+  if (!to) return { sent: false };
+  const content = buildCreatorPayoutReversedEmail(params);
+  try {
+    const result = await sendTransactionalEmail({ to, ...content });
+    return { sent: result.sent };
+  } catch (err) {
+    console.error("[creators] payout reversed email failed", err);
+    return { sent: false };
+  }
+}
+

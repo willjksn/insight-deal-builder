@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { revenueGetDashboard } from "@/lib/revenueOpportunities/apiClient";
+import { revenueGetDashboard, revenueGetFeedback } from "@/lib/revenueOpportunities/apiClient";
 import type { RevenueDashboardSummary } from "@/lib/revenueOpportunities/types/opportunity";
 import { formatCurrency } from "@/lib/utils/format";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -19,6 +19,9 @@ function rateLabel(rate: number | null): string {
 export default function RevenueAnalyticsPage() {
   const { user } = useAuth();
   const [summary, setSummary] = useState<RevenueDashboardSummary | null>(null);
+  const [rejectionReasons, setRejectionReasons] = useState<
+    { reason: string; label: string; count: number }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,8 +32,14 @@ export default function RevenueAnalyticsPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await revenueGetDashboard(() => user.getIdToken());
-        if (!cancelled) setSummary(res.summary);
+        const [dash, feedback] = await Promise.all([
+          revenueGetDashboard(() => user.getIdToken()),
+          revenueGetFeedback(() => user.getIdToken()).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setSummary(dash.summary);
+          setRejectionReasons(feedback?.summary.byReason ?? []);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load analytics");
       } finally {
@@ -97,6 +106,30 @@ export default function RevenueAnalyticsPage() {
               href="/revenue/opportunities"
             />
           </div>
+
+          <Card className="mb-6">
+            <CardHeader>
+              <h3 className="font-semibold text-slate-900">Rejection learning</h3>
+              <p className="text-xs text-slate-500">
+                Why opportunities were rejected — fed back into research prompts so the system avoids
+                repeating the same misses.
+              </p>
+            </CardHeader>
+            <CardBody>
+              {rejectionReasons.length === 0 ? (
+                <p className="text-sm text-slate-500">No rejection feedback recorded yet.</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {rejectionReasons.map((r) => (
+                    <li key={r.reason} className="flex items-center justify-between gap-3">
+                      <span className="text-slate-700">{r.label}</span>
+                      <span className="font-semibold text-slate-900">{r.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
 
           <Card>
             <CardHeader>

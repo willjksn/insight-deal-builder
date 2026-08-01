@@ -1,18 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { DataTable, DataRow } from "@/components/ui/DataTable";
 import { useAuth } from "@/contexts/AuthContext";
 import { canManageCreators } from "@/lib/utils/permissions";
-import { getCreatorReports } from "@/lib/creators/apiClient";
+import { getCreatorReports, remindCreatorStripeConnect } from "@/lib/creators/apiClient";
 import { StatCard } from "@/components/dashboard/widgets";
 import { formatCurrency } from "@/lib/utils/format";
 import { CREATOR_CAMPAIGN_STATUS_LABELS, type CreatorCampaignStatus } from "@/lib/creators/opsTypes";
+
+type UnpaidFilter = "all" | "ready" | "blocked" | "error";
 
 export default function CreatorReportsPage() {
   const { user, appUser } = useAuth();
@@ -22,6 +25,9 @@ export default function CreatorReportsPage() {
   >["report"] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unpaidFilter, setUnpaidFilter] = useState<UnpaidFilter>("all");
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+  const [remindNote, setRemindNote] = useState<string | null>(null);
 
   const getToken = useCallback(() => {
     if (!user) throw new Error("Not signed in");
@@ -36,7 +42,43 @@ export default function CreatorReportsPage() {
       .finally(() => setLoading(false));
   }, [user, canManage, getToken]);
 
+  const unpaidRows = useMemo(() => {
+    const rows = report?.unpaidPayouts?.rows ?? [];
+    if (unpaidFilter === "ready") return rows.filter((r) => r.connectReady);
+    if (unpaidFilter === "blocked") return rows.filter((r) => !r.connectReady);
+    if (unpaidFilter === "error") return rows.filter((r) => Boolean(r.payoutError));
+    return rows;
+  }, [report, unpaidFilter]);
+
+  const remind = async (creatorId: string) => {
+    setRemindingId(creatorId);
+    setRemindNote(null);
+    try {
+      await remindCreatorStripeConnect(getToken, creatorId);
+      setRemindNote("Connect reminder emailed.");
+    } catch (e) {
+      setRemindNote(e instanceof Error ? e.message : "Remind failed");
+    } finally {
+      setRemindingId(null);
+    }
+  };
+
   if (!canManage) return <div className="p-6 text-sm">Not authorized.</div>;
+
+  const filterChip = (id: UnpaidFilter, label: string) => (
+    <button
+      key={id}
+      type="button"
+      onClick={() => setUnpaidFilter(id)}
+      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+        unpaidFilter === id
+          ? "bg-slate-900 text-white"
+          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+      }`}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div>
@@ -113,12 +155,25 @@ export default function CreatorReportsPage() {
               <h2 className="font-semibold">Unpaid payouts</h2>
               <p className="text-xs font-normal text-slate-500">
                 Assignments with compensation that are not marked paid. Open a campaign to pay via
-                Stripe or mark paid.
+                Stripe or mark paid. Remind creators who still need Connect.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {filterChip("all", "All")}
+                {filterChip("ready", "Connect ready")}
+                {filterChip("blocked", "Connect blocked")}
+                {filterChip("error", "Has payout note")}
+              </div>
+              {remindNote ? (
+                <p className="mt-2 text-xs text-slate-600">{remindNote}</p>
+              ) : null}
             </CardHeader>
             <CardBody className="p-0 sm:p-0">
-              {(report.unpaidPayouts?.rows.length ?? 0) === 0 ? (
-                <p className="px-4 py-6 text-sm text-slate-500">No unpaid compensated assignments.</p>
+              {unpaidRows.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-slate-500">
+                  {(report.unpaidPayouts?.rows.length ?? 0) === 0
+                    ? "No unpaid compensated assignments."
+                    : "No rows match this filter."}
+                </p>
               ) : (
                 <DataTable
                   headers={[
@@ -128,9 +183,10 @@ export default function CreatorReportsPage() {
                     "Connect",
                     "Status",
                     "Notes",
+                    "",
                   ]}
                 >
-                  {report.unpaidPayouts.rows.map((row) => (
+                  {unpaidRows.map((row) => (
                     <DataRow
                       key={`${row.campaignId}-${row.assignmentId}`}
                       cells={[
@@ -174,6 +230,27 @@ export default function CreatorReportsPage() {
                           </span>
                         ) : (
                           "—"
+                        ),
+                        !row.connectReady ? (
+                          <Button
+                            key="remind"
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={remindingId === row.creatorId}
+                            onClick={() => void remind(row.creatorId)}
+                          >
+                            {remindingId === row.creatorId ? "…" : "Remind"}
+                          </Button>
+                        ) : (
+                          <span key="pay">
+                            <Link
+                              href={`/creators/campaigns?open=${row.campaignId}`}
+                              className="text-xs font-medium text-sky-700 hover:underline"
+                            >
+                              Pay
+                            </Link>
+                          </span>
                         ),
                       ]}
                     />

@@ -3,13 +3,16 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { CreatorError } from "@/lib/creators/errors";
-import { sendCreatorPaidEmail } from "@/lib/creators/creatorPayoutEmail";
+import {
+  sendCreatorPaidEmail,
+  sendCreatorPayoutReversedEmail,
+} from "@/lib/creators/creatorPayoutEmail";
 import { getCreator } from "@/lib/creators/server";
 import {
   getCreatorCampaign,
   updateCreatorCampaign,
 } from "@/lib/creators/opsServer";
-import { isStripeConnectReady } from "@/lib/creators/types";
+import { CREATORS_COLLECTION, isStripeConnectReady } from "@/lib/creators/types";
 import {
   CREATOR_CAMPAIGNS_COLLECTION,
   type CreatorCampaign,
@@ -295,5 +298,22 @@ export async function handleStripeTransferReversed(
       updatedAt: FieldValue.serverTimestamp(),
     })
   );
+
+  try {
+    const creatorSnap = await db.collection(CREATORS_COLLECTION).doc(existing.creatorId).get();
+    if (creatorSnap.exists) {
+      const data = creatorSnap.data() as { email?: string; professionalName?: string };
+      if (data.email?.trim()) {
+        await sendCreatorPayoutReversedEmail({
+          to: data.email,
+          professionalName: data.professionalName || existing.creatorName,
+          campaignName: campaign.name,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[creators] reverse email failed", err);
+  }
+
   return { updated: true, campaignId, assignmentId };
 }

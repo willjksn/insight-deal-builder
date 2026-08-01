@@ -17,6 +17,35 @@ import {
 } from "@/lib/revenueOpportunities/research/prompts";
 import { revenueResearchLive } from "@/lib/revenueOpportunities/research/mode";
 import { liveResearchRequirementsMessage } from "@/lib/revenueOpportunities/research/liveRequirements";
+import { getAdminDb } from "@/lib/firebase/admin";
+import { REVENUE_FEEDBACK_EVENTS_COLLECTION } from "@/lib/revenueOpportunities/collections";
+import { REJECTION_REASON_LABELS } from "@/lib/revenueOpportunities/labels";
+import type { RevenueRejectionReason } from "@/lib/revenueOpportunities/types";
+
+async function loadPastRejectionLabels(organizationCompany?: string): Promise<string[]> {
+  if (!organizationCompany?.trim()) return [];
+  try {
+    const db = getAdminDb();
+    if (!db) return [];
+    const snap = await db
+      .collection(REVENUE_FEEDBACK_EVENTS_COLLECTION)
+      .where("organizationCompany", "==", organizationCompany)
+      .limit(120)
+      .get();
+    const counts = new Map<RevenueRejectionReason, number>();
+    for (const doc of snap.docs) {
+      const reason = doc.data().reason as RevenueRejectionReason | undefined;
+      if (!reason || !(reason in REJECTION_REASON_LABELS)) continue;
+      counts.set(reason, (counts.get(reason) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([reason, count]) => `${REJECTION_REASON_LABELS[reason]} (${count})`);
+  } catch {
+    return [];
+  }
+}
 
 export interface ResearchPassResult {
   prospects: ParsedResearchProspect[];
@@ -57,11 +86,12 @@ async function runDeepResearchPass(
     );
   }
 
+  const pastRejectionLabels = await loadPastRejectionLabels(campaign.organizationCompany);
   const discoverSystem = kind === "stormi" ? STORMI_DISCOVER_SYSTEM : IMG_DISCOVER_SYSTEM;
   const discoverRaw = await summarizeWebResearch<unknown>(
     discoverSystem,
     merged,
-    buildCampaignContextLines(campaign, profile)
+    buildCampaignContextLines(campaign, profile, pastRejectionLabels)
   );
   const candidates = parseDiscoverCandidates(discoverRaw).filter(
     (c) => !isExcludedName(c.name, campaign)

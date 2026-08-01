@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { listCreatorPortalCampaigns } from "@/lib/creators/apiClient";
+import { formatCreatorPayoutErrorForPortal } from "@/lib/creators/payoutErrorCopy";
 import type { CreatorProductionDay } from "@/lib/creators/opsTypes";
 
 type PortalCampaign = Awaited<
@@ -121,7 +122,7 @@ export default function CreatorPortalCampaignsPage() {
                 </div>
                 {c.payoutError ? (
                   <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                    {c.payoutError}
+                    {formatCreatorPayoutErrorForPortal(c.payoutError)}
                   </p>
                 ) : null}
                 {c.briefs.length > 0 && (
