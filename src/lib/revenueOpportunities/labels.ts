@@ -74,7 +74,8 @@ export const REJECTION_REASON_LABELS: Record<RevenueRejectionReason, string> = {
   other: "Other",
 };
 
-export const IMG_INDUSTRY_OPTIONS = [
+/** Preset industries for IMG campaigns (excludes the custom-industry UI sentinel). */
+export const IMG_INDUSTRY_PRESETS = [
   "Hotels and resorts",
   "Restaurants",
   "Beauty and skincare",
@@ -87,8 +88,18 @@ export const IMG_INDUSTRY_OPTIONS = [
   "Event venues",
   "Regional consumer brands",
   "Professional services",
-  "Custom industry",
-];
+] as const;
+
+/** Select value that reveals the free-text industry field — never stored as the industry name. */
+export const IMG_INDUSTRY_CUSTOM_VALUE = "__custom_industry__";
+
+/** @deprecated Prefer IMG_INDUSTRY_PRESETS + IMG_INDUSTRY_CUSTOM_VALUE */
+export const IMG_INDUSTRY_OPTIONS = [...IMG_INDUSTRY_PRESETS, "Custom industry"];
+
+export function isImgIndustryPreset(value: string | undefined | null): boolean {
+  if (!value) return false;
+  return (IMG_INDUSTRY_PRESETS as readonly string[]).includes(value);
+}
 
 export const STORMI_CATEGORY_OPTIONS = [
   "Beauty",
