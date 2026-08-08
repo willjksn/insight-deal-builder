@@ -21,6 +21,8 @@ import {
   type AgentResolveWriteHandoffResponse,
   type AgentSafeDeleteFile,
   type AgentSafeDeleteResponse,
+  type AgentSessionRegisterRequest,
+  type AgentSessionRegisterResponse,
   type AgentProxyResponse,
   type AgentStorageStatResponse,
   type AgentThumbnailResponse,
@@ -42,6 +44,29 @@ async function agentFetch<T>(
     },
   });
   const data = (await res.json()) as T & { error?: string };
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error("Agent session expired — reconnect this computer and try again");
+    }
+    throw new Error(data.error ?? res.statusText);
+  }
+  return data;
+}
+
+/** Register a ShootSpine-minted token with the local agent (required unless DEV_OPEN=1). */
+export async function agentRegisterSession(
+  baseUrl: string,
+  body: AgentSessionRegisterRequest
+) {
+  const res = await fetch(
+    `${baseUrl.replace(/\/$/, "")}${AGENT_API_PREFIX}/session/register`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
+  const data = (await res.json()) as AgentSessionRegisterResponse & { error?: string };
   if (!res.ok) throw new Error(data.error ?? res.statusText);
   return data;
 }

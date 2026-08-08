@@ -11,8 +11,19 @@ Supports verified copy, proxies, local AI analysis, media stream, archive/restor
 ## Communication
 
 1. Browser (Firebase auth) calls ShootSpine API → mints short-lived **agent session token**.
-2. Browser connects to `http://127.0.0.1:<port>` with that token.
-3. Agent binds **localhost only**. No remote shell. No arbitrary command execution from LLM output.
+2. Browser **registers** that token with the agent (`POST /v1/session/register`).
+3. Browser calls agent APIs with `Authorization: Bearer <token>` (or `?token=` for media streams).
+4. Agent binds **localhost only**. No remote shell. No arbitrary command execution from LLM output.
+
+### Auth modes (v0.13+)
+
+| Mode | When | Behavior |
+|------|------|----------|
+| `registered` (default) | No special env | Only tokens registered after mint are accepted |
+| `app_verify` | `SHOOTSPINE_APP_URL` set | Register/verify calls ShootSpine `/api/ai-editor/agent/verify-session` |
+| `dev_open` | `SHOOTSPINE_AGENT_DEV_OPEN=1` | Any non-empty Bearer token (agent testing only) |
+
+Archive / restore / reclaim batches return **per-file** success/failure so the UI patches only what actually changed on disk.
 
 ## Scaffold location
 

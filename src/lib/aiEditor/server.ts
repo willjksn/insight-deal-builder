@@ -249,13 +249,17 @@ export async function mintAgentSession(
 
 export async function verifyAgentSession(
   token: string
-): Promise<{ projectId: string; userId: string } | null> {
+): Promise<{ projectId: string; userId: string; expiresAt: string } | null> {
   const db = requireDb();
   const snap = await db.collection(AI_EDITOR_AGENT_SESSIONS_COLLECTION).doc(token).get();
   if (!snap.exists) return null;
   const data = snap.data() as { projectId: string; userId: string; expiresAt: string };
   if (Date.parse(data.expiresAt) < Date.now()) return null;
-  return { projectId: data.projectId, userId: data.userId };
+  return {
+    projectId: data.projectId,
+    userId: data.userId,
+    expiresAt: data.expiresAt,
+  };
 }
 
 export function newMediaAssetId(): string {

@@ -14,8 +14,14 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.12.0";
-const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN !== "0";
+const VERSION = "0.13.0";
+/** Set SHOOTSPINE_AGENT_DEV_OPEN=1 to accept any non-empty Bearer token (local agent testing). */
+const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN === "1";
+/** Optional: ShootSpine origin for verifying minted tokens (e.g. http://localhost:3000). */
+const APP_VERIFY_URL = (process.env.SHOOTSPINE_APP_URL || "").replace(/\/$/, "");
+
+/** @type {Map<string, { expiresAt: number, projectId?: string }>} */
+const sessions = new Map();
 
 const MEDIA_EXTS = new Set([
   ".mp4",
@@ -81,9 +87,71 @@ function requestToken(req) {
   }
 }
 
-function requireAuth(req) {
-  // health is public; others need a token (Bearer or ?token= for <video src>)
-  return Boolean(requestToken(req));
+function pruneSessions() {
+  const now = Date.now();
+  for (const [token, s] of sessions) {
+    if (s.expiresAt <= now) sessions.delete(token);
+  }
+}
+
+function registerSession(body) {
+  const token = String(body?.token || "").trim();
+  if (!token || token.length < 16) throw new Error("Invalid session token");
+  const expMs = body?.expiresAt
+    ? Date.parse(String(body.expiresAt))
+    : Date.now() + 15 * 60 * 1000;
+  if (!Number.isFinite(expMs) || expMs <= Date.now()) {
+    throw new Error("Session already expired");
+  }
+  sessions.set(token, {
+    expiresAt: expMs,
+    projectId: body?.projectId ? String(body.projectId) : undefined,
+  });
+  return { ok: true, expiresAt: new Date(expMs).toISOString() };
+}
+
+async function verifyTokenWithApp(token) {
+  if (!APP_VERIFY_URL) return null;
+  try {
+    const res = await fetch(`${APP_VERIFY_URL}/api/ai-editor/agent/verify-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data?.ok === true ? data : false;
+  } catch {
+    return false;
+  }
+}
+
+async function requireAuth(req) {
+  // health / session register are public; others need a registered token
+  // (or DEV_OPEN=1 for agent-only testing)
+  const token = requestToken(req);
+  if (!token) return false;
+  if (DEV_OPEN) return true;
+  pruneSessions();
+  const local = sessions.get(token);
+  if (local && local.expiresAt > Date.now()) return true;
+  if (APP_VERIFY_URL) {
+    const verified = await verifyTokenWithApp(token);
+    if (verified) {
+      const expMs = verified.expiresAt
+        ? Date.parse(verified.expiresAt)
+        : Date.now() + 15 * 60 * 1000;
+      if (Number.isFinite(expMs) && expMs > Date.now()) {
+        sessions.set(token, {
+          expiresAt: expMs,
+          projectId: verified.projectId ? String(verified.projectId) : undefined,
+        });
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function mimeForPath(filePath) {
@@ -995,15 +1063,32 @@ async function copyVerifiedBatch(body) {
   if (files.length > 500) throw new Error("Max 500 files per batch");
 
   const results = [];
+  let okCount = 0;
+  let failedCount = 0;
   for (const f of files) {
-    if (!f?.sourcePath || !f?.destPath) throw new Error("sourcePath and destPath required");
-    const copied = await copyVerified(f.sourcePath, f.destPath);
-    results.push({
-      id: f.id || null,
-      ...copied,
-    });
+    try {
+      if (!f?.sourcePath || !f?.destPath) {
+        throw new Error("sourcePath and destPath required");
+      }
+      const copied = await copyVerified(f.sourcePath, f.destPath);
+      results.push({
+        ok: true,
+        id: f.id || null,
+        ...copied,
+      });
+      okCount += 1;
+    } catch (e) {
+      results.push({
+        ok: false,
+        id: f?.id || null,
+        sourcePath: f?.sourcePath || "",
+        destPath: f?.destPath || "",
+        error: e instanceof Error ? e.message : "Copy failed",
+      });
+      failedCount += 1;
+    }
   }
-  return { ok: true, count: results.length, results };
+  return { ok: true, count: okCount, failedCount, results };
 }
 
 function isPathUnderRoot(root, candidate) {
@@ -1042,32 +1127,50 @@ async function safeDeleteFiles(body) {
   if (files.length > 500) throw new Error("Max 500 files per delete batch");
 
   const results = [];
+  let okCount = 0;
+  let failedCount = 0;
   for (const f of files) {
     const filePath = path.resolve(f.path || f.filePath || "");
-    assertSafePath(filePath);
-    if (isDriveRoot(filePath)) throw new Error(`Refusing to delete drive root: ${filePath}`);
-    if (!isPathUnderRoot(projectRoot, filePath)) {
-      throw new Error(`Refusing delete outside project root (camera cards never erased): ${filePath}`);
-    }
-    if (neverDelete.has(filePath.toLowerCase())) {
-      throw new Error(`Refusing to delete protected path (archive): ${filePath}`);
-    }
-    const st = await fs.stat(filePath);
-    if (!st.isFile()) throw new Error(`Not a file: ${filePath}`);
-    if (f.expectedChecksum) {
-      const checksum = await sha256File(filePath);
-      if (checksum !== f.expectedChecksum) {
-        throw new Error(`Checksum mismatch before delete — aborting: ${filePath}`);
+    try {
+      assertSafePath(filePath);
+      if (isDriveRoot(filePath)) {
+        throw new Error(`Refusing to delete drive root: ${filePath}`);
       }
+      if (!isPathUnderRoot(projectRoot, filePath)) {
+        throw new Error(
+          `Refusing delete outside project root (camera cards never erased): ${filePath}`
+        );
+      }
+      if (neverDelete.has(filePath.toLowerCase())) {
+        throw new Error(`Refusing to delete protected path (archive): ${filePath}`);
+      }
+      const st = await fs.stat(filePath);
+      if (!st.isFile()) throw new Error(`Not a file: ${filePath}`);
+      if (f.expectedChecksum) {
+        const checksum = await sha256File(filePath);
+        if (checksum !== f.expectedChecksum) {
+          throw new Error(`Checksum mismatch before delete: ${filePath}`);
+        }
+      }
+      await fs.unlink(filePath);
+      results.push({
+        ok: true,
+        id: f.id || null,
+        path: filePath,
+        deleted: true,
+      });
+      okCount += 1;
+    } catch (e) {
+      results.push({
+        ok: false,
+        id: f?.id || null,
+        path: filePath || undefined,
+        error: e instanceof Error ? e.message : "Delete failed",
+      });
+      failedCount += 1;
     }
-    await fs.unlink(filePath);
-    results.push({
-      id: f.id || null,
-      path: filePath,
-      deleted: true,
-    });
   }
-  return { ok: true, count: results.length, results };
+  return { ok: true, count: okCount, failedCount, results };
 }
 
 const RESOLVE_HANDOFF_REL = path.join("03_PROJECT_FILES", "shootspine_resolve");
@@ -2070,11 +2173,39 @@ const server = http.createServer(async (req, res) => {
         ffprobeAvailable: tools.ffprobe,
         ffmpegAvailable: tools.ffmpeg,
         whisperAvailable: tools.whisper,
+        authMode: DEV_OPEN ? "dev_open" : APP_VERIFY_URL ? "app_verify" : "registered",
       });
     }
 
-    if (!requireAuth(req)) {
-      return json(res, 401, { error: "Missing agent session token" });
+    if (req.method === "POST" && pathname === "/v1/session/register") {
+      const body = await readBody(req);
+      try {
+        if (APP_VERIFY_URL) {
+          const verified = await verifyTokenWithApp(body.token);
+          if (!verified) {
+            return json(res, 401, { error: "Session not recognized by ShootSpine" });
+          }
+          const registered = registerSession({
+            token: body.token,
+            expiresAt: verified.expiresAt || body.expiresAt,
+            projectId: verified.projectId || body.projectId,
+          });
+          return json(res, 200, registered);
+        }
+        return json(res, 200, registerSession(body));
+      } catch (e) {
+        return json(res, 400, {
+          error: e instanceof Error ? e.message : "Could not register session",
+        });
+      }
+    }
+
+    if (!(await requireAuth(req))) {
+      return json(res, 401, {
+        error: DEV_OPEN
+          ? "Missing agent session token"
+          : "Register a ShootSpine session first (reconnect this computer)",
+      });
     }
 
     if (req.method === "POST" && pathname === "/v1/folders/create") {
@@ -2230,5 +2361,8 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`[ShootSpine Desktop Agent] http://${HOST}:${PORT} (v${VERSION})`);
-  console.log(`[ShootSpine Desktop Agent] DEV_OPEN=${DEV_OPEN ? "1" : "0"}`);
+  console.log(
+    `[ShootSpine Desktop Agent] auth=${DEV_OPEN ? "dev_open" : APP_VERIFY_URL ? "app_verify" : "registered"}` +
+      (APP_VERIFY_URL ? ` app=${APP_VERIFY_URL}` : "")
+  );
 });

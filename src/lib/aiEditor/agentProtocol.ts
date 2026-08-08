@@ -252,18 +252,30 @@ export type AgentCopyVerifiedBatchFile = {
   destPath: string;
 };
 
+export type AgentCopyVerifiedBatchResult =
+  | {
+      ok: true;
+      id: string | null;
+      sourcePath: string;
+      destPath: string;
+      sizeBytes: number;
+      checksum: string;
+      checksumAlgorithm: "sha256";
+      verified: true;
+    }
+  | {
+      ok: false;
+      id: string | null;
+      sourcePath?: string;
+      destPath?: string;
+      error: string;
+    };
+
 export type AgentCopyVerifiedBatchResponse = {
   ok: true;
   count: number;
-  results: Array<{
-    id: string | null;
-    sourcePath: string;
-    destPath: string;
-    sizeBytes: number;
-    checksum: string;
-    checksumAlgorithm: "sha256";
-    verified: true;
-  }>;
+  failedCount: number;
+  results: AgentCopyVerifiedBatchResult[];
 };
 
 export type AgentSafeDeleteFile = {
@@ -272,10 +284,26 @@ export type AgentSafeDeleteFile = {
   expectedChecksum?: string;
 };
 
+export type AgentSafeDeleteResult =
+  | { ok: true; id: string | null; path: string; deleted: true }
+  | { ok: false; id: string | null; path?: string; error: string };
+
 export type AgentSafeDeleteResponse = {
   ok: true;
   count: number;
-  results: Array<{ id: string | null; path: string; deleted: true }>;
+  failedCount: number;
+  results: AgentSafeDeleteResult[];
+};
+
+export type AgentSessionRegisterRequest = {
+  token: string;
+  expiresAt?: string;
+  projectId?: string;
+};
+
+export type AgentSessionRegisterResponse = {
+  ok: true;
+  expiresAt: string;
 };
 
 export type AgentAnalyzeResponse = {

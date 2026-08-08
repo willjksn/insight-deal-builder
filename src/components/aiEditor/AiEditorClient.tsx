@@ -37,6 +37,7 @@ import {
   agentResolveImportEdl,
   agentResolveScriptingProbe,
   agentResolveSyncFromNle,
+  agentRegisterSession,
   agentRevealPath,
   agentSafeDelete,
   agentStorageStat,
@@ -179,6 +180,7 @@ export function AiEditorClient({ projectId }: Props) {
   const [storagePath, setStoragePath] = useState("");
   const [indexFolderPath, setIndexFolderPath] = useState("");
   const [agentToken, setAgentToken] = useState<string | null>(null);
+  const [agentExpiresAt, setAgentExpiresAt] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
   const [createProjectFolders, setCreateProjectFolders] = useState(true);
   const [addMode, setAddMode] = useState<"in_place" | "copy">("in_place");
@@ -300,11 +302,29 @@ export function AiEditorClient({ projectId }: Props) {
   }, [load]);
 
   const ensureAgentSession = useCallback(async (): Promise<string> => {
-    if (agentToken) return agentToken;
+    const register = async (token: string, expiresAt?: string | null) => {
+      await agentRegisterSession(DEFAULT_AGENT_BASE_URL, {
+        token,
+        expiresAt: expiresAt || undefined,
+        projectId,
+      });
+    };
+
+    if (agentToken) {
+      try {
+        await register(agentToken, agentExpiresAt);
+        return agentToken;
+      } catch {
+        // Agent may have restarted or token expired — mint a fresh one.
+      }
+    }
+
     const { session } = await aiEditorMintAgentSession(getToken, projectId);
+    await register(session.token, session.expiresAt);
     setAgentToken(session.token);
+    setAgentExpiresAt(session.expiresAt);
     return session.token;
-  }, [agentToken, getToken, projectId]);
+  }, [agentExpiresAt, agentToken, getToken, projectId]);
 
   const needsPrepare = useMemo(
     () =>
@@ -413,6 +433,8 @@ export function AiEditorClient({ projectId }: Props) {
         }
       } else {
         setStatusNote("Restarting connection…");
+        setAgentToken(null);
+        setAgentExpiresAt(null);
       }
       await aiEditorLaunchAgent(getToken, { restart });
       const after = await checkAgentHealth();
@@ -1682,11 +1704,13 @@ export function AiEditorClient({ projectId }: Props) {
           destPath: i.destPath,
         }))
       );
-      const byId = new Map(batch.results.map((r) => [r.id, r]));
+      const okResults = batch.results.filter((r) => r.ok);
+      const failedCount = batch.failedCount ?? batch.results.filter((r) => !r.ok).length;
+      const byId = new Map(okResults.map((r) => [r.id, r]));
       const patches = plan.archive.items
         .map((item) => {
           const r = byId.get(item.mediaAssetId);
-          if (!r) return null;
+          if (!r || !r.ok) return null;
           const prev = media.find((m) => m.id === item.mediaAssetId);
           const prevCount = prev?.verifiedCopyCount ?? (prev?.ingestStatus === "verified" ? 1 : 0);
           return {
@@ -1699,18 +1723,30 @@ export function AiEditorClient({ projectId }: Props) {
           };
         })
         .filter(Boolean) as Array<{ id: string } & Partial<MediaAsset>>;
-      await aiEditorPatchMedia(getToken, projectId, patches);
+      if (patches.length) {
+        await aiEditorPatchMedia(getToken, projectId, patches);
+      }
       const log = await aiEditorArchiveAction(getToken, projectId, {
         action: "log",
         type: "archive",
         count: patches.length,
         mediaIds: patches.map((p) => p.id),
-        message: `Archived ${patches.length} clip(s) with checksum verify`,
+        message: `Archived ${patches.length} clip(s) with checksum verify` +
+          (failedCount ? ` (${failedCount} failed)` : ""),
       });
       if (log.job) setJobs((prev) => [log.job!, ...prev]);
-      setStatusNote(
-        `Backed up ${patches.length} clip${patches.length === 1 ? "" : "s"}. Camera cards were not touched.`
-      );
+      if (!patches.length) {
+        setError(
+          failedCount
+            ? `Backup didn’t finish for any clips (${failedCount} failed). Check disk space and paths.`
+            : "Backup didn’t finish for any clips."
+        );
+      } else {
+        setStatusNote(
+          `Backed up ${patches.length} clip${patches.length === 1 ? "" : "s"}. Camera cards were not touched.` +
+            (failedCount ? ` ${failedCount} couldn’t be copied — try again for those.` : "")
+        );
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Backup failed");
@@ -1745,11 +1781,13 @@ export function AiEditorClient({ projectId }: Props) {
           destPath: i.destPath,
         }))
       );
-      const byId = new Map(batch.results.map((r) => [r.id, r]));
+      const okResults = batch.results.filter((r) => r.ok);
+      const failedCount = batch.failedCount ?? batch.results.filter((r) => !r.ok).length;
+      const byId = new Map(okResults.map((r) => [r.id, r]));
       const patches = plan.restore.items
         .map((item) => {
           const r = byId.get(item.mediaAssetId);
-          if (!r) return null;
+          if (!r || !r.ok) return null;
           return {
             id: item.mediaAssetId,
             currentPath: r.destPath,
@@ -1762,18 +1800,31 @@ export function AiEditorClient({ projectId }: Props) {
           };
         })
         .filter(Boolean) as Array<{ id: string } & Partial<MediaAsset>>;
-      await aiEditorPatchMedia(getToken, projectId, patches);
+      if (patches.length) {
+        await aiEditorPatchMedia(getToken, projectId, patches);
+      }
       const log = await aiEditorArchiveAction(getToken, projectId, {
         action: "log",
         type: "restore",
         count: patches.length,
         mediaIds: patches.map((p) => p.id),
-        message: `Restored ${patches.length} clip(s) from archive`,
+        message:
+          `Restored ${patches.length} clip(s) from archive` +
+          (failedCount ? ` (${failedCount} failed)` : ""),
       });
       if (log.job) setJobs((prev) => [log.job!, ...prev]);
-      setStatusNote(
-        `Brought back ${patches.length} clip${patches.length === 1 ? "" : "s"} to this PC.`
-      );
+      if (!patches.length) {
+        setError(
+          failedCount
+            ? `Restore didn’t finish for any clips (${failedCount} failed).`
+            : "Restore didn’t finish for any clips."
+        );
+      } else {
+        setStatusNote(
+          `Brought back ${patches.length} clip${patches.length === 1 ? "" : "s"} to this PC.` +
+            (failedCount ? ` ${failedCount} couldn’t be restored — try again for those.` : "")
+        );
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Restore failed");
@@ -1810,7 +1861,7 @@ export function AiEditorClient({ projectId }: Props) {
       const neverDeletePaths = eligible
         .map((m) => m.archivePath?.trim())
         .filter(Boolean) as string[];
-      await agentSafeDelete(DEFAULT_AGENT_BASE_URL, token, {
+      const deleted = await agentSafeDelete(DEFAULT_AGENT_BASE_URL, token, {
         projectRoot,
         confirmPhrase: SAFE_DELETE_CONFIRM_PHRASE,
         neverDeletePaths,
@@ -1820,25 +1871,47 @@ export function AiEditorClient({ projectId }: Props) {
           expectedChecksum: m.checksum,
         })),
       });
-      const patches = eligible.map((m) => ({
-        id: m.id,
-        currentPath: "",
-        onlineStatus: "offline" as const,
-        verifiedCopyCount: Math.max(1, (m.verifiedCopyCount ?? 2) - 1),
-      }));
-      await aiEditorPatchMedia(getToken, projectId, patches);
+      const okIds = new Set(
+        deleted.results.filter((r) => r.ok).map((r) => r.id).filter(Boolean) as string[]
+      );
+      const failedCount =
+        deleted.failedCount ?? deleted.results.filter((r) => !r.ok).length;
+      const patches = eligible
+        .filter((m) => okIds.has(m.id))
+        .map((m) => ({
+          id: m.id,
+          currentPath: "",
+          onlineStatus: "offline" as const,
+          verifiedCopyCount: Math.max(1, (m.verifiedCopyCount ?? 2) - 1),
+        }));
+      if (patches.length) {
+        await aiEditorPatchMedia(getToken, projectId, patches);
+      }
       const log = await aiEditorArchiveAction(getToken, projectId, {
         action: "log",
         type: "reclaim",
         count: patches.length,
         mediaIds: patches.map((p) => p.id),
-        message: `Reclaimed ${patches.length} active copy(ies); archive kept`,
+        message:
+          `Reclaimed ${patches.length} active copy(ies); archive kept` +
+          (failedCount ? ` (${failedCount} failed)` : ""),
       });
       if (log.job) setJobs((prev) => [log.job!, ...prev]);
       setReclaimConfirm("");
-      setStatusNote(
-        `Freed space for ${patches.length} clip${patches.length === 1 ? "" : "s"}. Backup copies kept. Camera cards never erased.`
-      );
+      if (!patches.length) {
+        setError(
+          failedCount
+            ? `Couldn’t free space for any clips (${failedCount} failed). Active copies left as-is.`
+            : "Couldn’t free space for any clips."
+        );
+      } else {
+        setStatusNote(
+          `Freed space for ${patches.length} clip${patches.length === 1 ? "" : "s"}. Backup copies kept. Camera cards never erased.` +
+            (failedCount
+              ? ` ${failedCount} still on this PC — check those files and try again.`
+              : "")
+        );
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not free space");
