@@ -36,8 +36,9 @@
 | **V11 Look defaults + Mac brief** | Cross-project Look seeding; LOOKS.txt creative brief; Resolve preflight tips |
 | **V12 Dual-drive setup** | Drive labels (SSD/HDD/USB) + guided edit SSD / backup HDD folders |
 | **V13 Offline remount** | Remember volume id; relink edit/backup paths when drive letter changes |
+| **V14 Recommendations** | Ranked next steps on hub + project tips (checklists, wrap-up, backup) |
 
-Later: richer anonymized analytics / recommendations engine
+Later: deeper anonymized analytics across orgs (opt-in)
 
 ## Current implementation status
 
@@ -66,4 +67,5 @@ Later: richer anonymized analytics / recommendations engine
 - **V11 Look defaults + Mac brief (initial)** — seed Look from cross-project patterns when no wrap-up; LOOKS.txt includes look/client notes; “Before you finish” preflight tips  
 - **V12 Dual-drive setup (initial)** — Desktop Agent lists volume name / SSD·HDD·USB / free space; Step 2 guided edit + backup folders with type detection  
 - **V13 Offline remount (initial)** — persist volume serial on save; detect letter change; Relink paths for edit/backup + media  
-- Later: richer anonymized analytics / recommendations engine
+- **V14 Recommendations (initial)** — ranked hub “Suggested next steps” with deep links; light project-page tip  
+- Later: deeper anonymized analytics across orgs (opt-in)

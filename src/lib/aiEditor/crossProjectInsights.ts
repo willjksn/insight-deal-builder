@@ -10,6 +10,10 @@ import type {
   TransitionStyleId,
 } from "@/lib/aiEditor/types";
 import { getMoodPreset, getTransitionPreset } from "@/lib/aiEditor/finishing";
+import {
+  buildRecommendations,
+  type CrossProjectRecommendation,
+} from "@/lib/aiEditor/recommendations";
 
 export type CrossProjectSource = {
   projectId: string;
@@ -37,6 +41,8 @@ export type CrossProjectInsightsSummary = {
   projectCount: number;
   withDataCount: number;
   insights: CrossProjectInsight[];
+  /** V14 — ranked next steps with optional deep links */
+  recommendations: CrossProjectRecommendation[];
   lookDefaults: CrossProjectLookDefaults | null;
 };
 
@@ -185,6 +191,7 @@ export function buildCrossProjectInsights(
     projectCount: projects.length,
     withDataCount: withData,
     insights: insights.slice(0, 6),
+    recommendations: buildRecommendations(projects),
     lookDefaults: lookDefaultsFromTallies(moodCounts, transitionCounts),
   };
 }

@@ -48,6 +48,7 @@ import {
   playbackPathForAsset,
 } from "@/lib/aiEditor/agentClient";
 import type { AgentDriveEntry } from "@/lib/aiEditor/agentProtocol";
+import { buildProjectRecommendations } from "@/lib/aiEditor/recommendations";
 import {
   findRemountCandidates,
   planMediaRemount,
@@ -466,6 +467,15 @@ export function AiEditorClient({ projectId }: Props) {
   const archiveSummary = useMemo(
     () => summarizeArchiveState(media, settings?.projectRootPath),
     [media, settings?.projectRootPath]
+  );
+  const projectTips = useMemo(
+    () =>
+      buildProjectRecommendations(
+        projectId,
+        context?.projectName || "This edit",
+        settings
+      ),
+    [projectId, context?.projectName, settings]
   );
   const step11Done = archiveSummary.archived > 0;
   const step12Done = Boolean(settings?.lastFinishingFeedback);
@@ -2295,6 +2305,13 @@ export function AiEditorClient({ projectId }: Props) {
       {statusNote ? (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
           {statusNote}
+        </div>
+      ) : null}
+
+      {projectTips[0] ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-slate-800">
+          <p className="font-medium text-amber-950">{projectTips[0].title}</p>
+          <p className="mt-0.5 text-xs text-slate-600">{projectTips[0].detail}</p>
         </div>
       ) : null}
 

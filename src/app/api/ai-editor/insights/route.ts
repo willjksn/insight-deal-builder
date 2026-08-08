@@ -18,7 +18,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * V10 — patterns across the user's AI Editor projects (settings metadata only).
+ * V10/V14 — patterns + actionable recommendations across AI Editor projects
+ * (settings metadata only; no media bytes).
  */
 export async function GET(request: NextRequest) {
   try {

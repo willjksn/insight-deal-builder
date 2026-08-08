@@ -93,6 +93,7 @@ describe("crossProjectInsights", () => {
     expect(summary.insights.some((i) => i.id === "open_checklist")).toBe(true);
     expect(summary.lookDefaults?.moodId).toBe("warm");
     expect(summary.lookDefaults?.weight).toBe(2);
+    expect(summary.recommendations.some((r) => r.id === "checklist-3")).toBe(true);
   });
 });
 

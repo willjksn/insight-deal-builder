@@ -3,9 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clapperboard, FolderKanban, Loader2, Plus, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  Clapperboard,
+  FolderKanban,
+  ListChecks,
+  Loader2,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,9 +22,16 @@ import {
   aiEditorCreateSession,
   aiEditorCrossProjectInsights,
   aiEditorListSessions,
+  type AiEditorRecommendation,
   type AiEditorSessionListItem,
 } from "@/lib/aiEditor/apiClient";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
+
+function priorityBadge(priority: AiEditorRecommendation["priority"]) {
+  if (priority === "high") return <Badge variant="warning">Do next</Badge>;
+  if (priority === "medium") return <Badge variant="info">Soon</Badge>;
+  return <Badge variant="default">Tip</Badge>;
+}
 
 export function AiEditorHubClient() {
   const { user } = useAuth();
@@ -28,6 +44,9 @@ export function AiEditorHubClient() {
   const [insights, setInsights] = useState<
     Array<{ id: string; text: string; weight: number }>
   >([]);
+  const [recommendations, setRecommendations] = useState<AiEditorRecommendation[]>(
+    []
+  );
   const [insightsMeta, setInsightsMeta] = useState<{
     projectCount: number;
     withDataCount: number;
@@ -48,13 +67,19 @@ export function AiEditorHubClient() {
       try {
         const insightRes = await aiEditorCrossProjectInsights(getToken);
         setInsights(insightRes.insights);
+        setRecommendations(insightRes.recommendations ?? []);
         setInsightsMeta({
           projectCount: insightRes.projectCount,
           withDataCount: insightRes.withDataCount,
         });
-        setInsightsStatus(insightRes.insights.length ? "ok" : "empty");
+        setInsightsStatus(
+          insightRes.insights.length || (insightRes.recommendations?.length ?? 0)
+            ? "ok"
+            : "empty"
+        );
       } catch {
         setInsights([]);
+        setRecommendations([]);
         setInsightsMeta(null);
         setInsightsStatus("error");
       }
@@ -108,28 +133,81 @@ export function AiEditorHubClient() {
         </div>
       ) : null}
 
-      {!loading && insightsStatus ? (
+      {!loading && insightsStatus === "error" ? (
+        <Card>
+          <CardBody className="space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-slate-900">
+              <Sparkles className="h-4 w-4 text-sky-700" />
+              Insights
+            </div>
+            <p className="text-sm text-slate-600">
+              Couldn’t load suggestions right now.{" "}
+              <button
+                type="button"
+                className="font-medium text-sky-800 underline"
+                onClick={() => void load()}
+              >
+                Try again
+              </button>
+            </p>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {!loading && insightsStatus === "ok" && recommendations.length > 0 ? (
+        <Card>
+          <CardBody className="space-y-3">
+            <div className="flex items-center gap-2 font-semibold text-slate-900">
+              <ListChecks className="h-4 w-4 text-sky-700" />
+              Suggested next steps
+            </div>
+            <p className="text-sm text-slate-600">
+              Ranked from your checklists, Resolve sync, and workspace setup. No footage leaves
+              your drives.
+            </p>
+            <ul className="space-y-2">
+              {recommendations.map((rec) => (
+                <li
+                  key={rec.id}
+                  className="flex flex-col gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {priorityBadge(rec.priority)}
+                      <span className="text-sm font-medium text-slate-900">{rec.title}</span>
+                    </div>
+                    <p className="text-xs text-slate-600">{rec.detail}</p>
+                  </div>
+                  {rec.href ? (
+                    <Link href={rec.href} className="shrink-0">
+                      <Button size="sm" variant="secondary">
+                        Open
+                        <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {!loading && insightsStatus && insightsStatus !== "error" ? (
         <Card>
           <CardBody className="space-y-3">
             <div className="flex items-center gap-2 font-semibold text-slate-900">
               <Sparkles className="h-4 w-4 text-sky-700" />
               Patterns across your edits
             </div>
-            {insightsStatus === "error" ? (
+            {insightsStatus === "empty" ? (
               <p className="text-sm text-slate-600">
-                Couldn’t load patterns right now.{" "}
-                <button
-                  type="button"
-                  className="font-medium text-sky-800 underline"
-                  onClick={() => void load()}
-                >
-                  Try again
-                </button>
+                As you finish edits, sync Resolve, and build next-shoot checklists, suggestions
+                and patterns will show up here. No footage leaves your drives.
               </p>
-            ) : insightsStatus === "empty" ? (
+            ) : insights.length === 0 ? (
               <p className="text-sm text-slate-600">
-                As you finish edits, sync Resolve, and build next-shoot checklists, patterns will
-                show up here. No footage leaves your drives.
+                Patterns will appear once a few projects share the same look or coverage gaps.
               </p>
             ) : (
               <>
