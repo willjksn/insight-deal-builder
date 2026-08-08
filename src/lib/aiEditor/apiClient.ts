@@ -232,6 +232,11 @@ export async function aiEditorChatEdit(
     proposal: ChatEditProposalClient;
     descriptions?: string[];
     validation?: { ok: boolean; errors: string[]; warnings: string[] };
+    scope?: {
+      reelName?: string | null;
+      truncated?: boolean;
+      totalInReel?: number;
+    };
     timeline?: Timeline;
     versions?: TimelineVersion[];
     job?: AiEditorJob;

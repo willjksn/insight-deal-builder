@@ -40,13 +40,29 @@ export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
     if (!el || !item) return;
     setLoading(true);
     setError(null);
+
+    const start = item.startSeconds ?? 0;
+    const seekAndPlay = () => {
+      try {
+        if (start > 0 && Number.isFinite(start)) {
+          el.currentTime = start;
+        }
+      } catch {
+        /* some codecs reject seek until more data arrives */
+      }
+      const play = el.play();
+      if (play && typeof play.catch === "function") {
+        play.catch(() => {
+          /* autoplay may be blocked until user hits play — controls remain */
+        });
+      }
+    };
+
+    el.addEventListener("loadedmetadata", seekAndPlay);
     el.load();
-    const play = el.play();
-    if (play && typeof play.catch === "function") {
-      play.catch(() => {
-        /* autoplay may be blocked until user hits play — controls remain */
-      });
-    }
+    return () => {
+      el.removeEventListener("loadedmetadata", seekAndPlay);
+    };
   }, [src, item]);
 
   if (!item) return null;
@@ -109,7 +125,7 @@ export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
       </div>
       {error ? <p className="px-3 py-2 text-xs text-amber-200">{error}</p> : null}
       <p className="px-3 py-2 text-[11px] text-slate-400">
-        Playing from this PC via Desktop Agent — nothing uploads to the cloud.
+        Playing from this computer — nothing uploads to the cloud.
       </p>
     </div>
   );

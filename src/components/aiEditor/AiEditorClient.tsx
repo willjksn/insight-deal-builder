@@ -91,7 +91,10 @@ import {
   aiEditorTimelineAction,
   type ChatEditProposalClient,
 } from "@/lib/aiEditor/apiClient";
-import { FEATURE_DEFAULT_RUNTIME_SECONDS } from "@/lib/aiEditor/limits";
+import {
+  FEATURE_DEFAULT_RUNTIME_SECONDS,
+  MAX_CHAT_CONTEXT_CLIPS,
+} from "@/lib/aiEditor/limits";
 import { summarizeReels } from "@/lib/aiEditor/reels";
 import {
   FEEDBACK_OUTCOMES,
@@ -205,6 +208,8 @@ export function AiEditorClient({ projectId }: Props) {
   const [editNoteDraft, setEditNoteDraft] = useState("");
   const [editNoteSource, setEditNoteSource] = useState<EditNoteSource>("client");
   const [exportFiles, setExportFiles] = useState<Record<string, string> | null>(null);
+  /** Invalidate cached Resolve export when the timeline changes. */
+  const [exportStamp, setExportStamp] = useState<string | null>(null);
   const [handoffDirOnDisk, setHandoffDirOnDisk] = useState<string | null>(null);
   const [finishWhere, setFinishWhere] = useState<"here" | "mac">("here");
   const [moodId, setMoodId] = useState<FinishingMoodId>("natural");
@@ -269,11 +274,16 @@ export function AiEditorClient({ projectId }: Props) {
       if (dash.settings?.lastFinishingFeedback?.note) {
         setFeedbackNote(dash.settings.lastFinishingFeedback.note);
       }
-      setResolveImported(
-        (dash.jobs ?? []).some(
-          (j) => j.type === "resolve_import" && j.status === "completed"
-        )
+      const resolveJobs = (dash.jobs ?? []).filter(
+        (j) =>
+          (j.type === "resolve_import" || j.type === "resolve_open") &&
+          j.status === "completed"
       );
+      setResolveImported(resolveJobs.some((j) => j.type === "resolve_import"));
+      const priorHandoff = resolveJobs
+        .map((j) => j.payload?.handoffDir)
+        .find((d): d is string => typeof d === "string" && d.trim().length > 0);
+      if (priorHandoff) setHandoffDirOnDisk(priorHandoff);
       const health = await checkAgentHealth(DEFAULT_AGENT_BASE_URL);
       setAgent(health);
     } catch (e) {
@@ -335,7 +345,7 @@ export function AiEditorClient({ projectId }: Props) {
   const step7Done = Boolean(timeline && timeline.tracks.some((t) => t.clips.length));
   const step8Done = Boolean(timeline && timeline.version > 1);
   const step9Done = Boolean(timeline?.finishing);
-  const step10Done = Boolean(handoffDirOnDisk);
+  const step10Done = Boolean(handoffDirOnDisk || resolveImported);
   const archiveSummary = useMemo(
     () => summarizeArchiveState(media, settings?.projectRootPath),
     [media, settings?.projectRootPath]
@@ -412,7 +422,9 @@ export function AiEditorClient({ projectId }: Props) {
           setStatusNote(restart ? "Reconnected and ready." : "Connected and ready.");
         }
       } else {
-        throw new Error("Could not connect. Try Restart, or run desktop-agent/start-agent.cmd");
+        throw new Error(
+          "Could not connect. Try Restart, or start the ShootSpine helper on this computer."
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not connect this computer");
@@ -714,14 +726,20 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onAnalyzeFootage() {
-    const targets = media.filter((m) => m.currentPath).slice(0, 40);
+    const eligible = media.filter((m) => m.currentPath);
+    const targets = eligible.slice(0, 40);
     if (!targets.length) {
       setStatusNote("Add footage first.");
       return;
     }
+    const capped = eligible.length > targets.length;
     setBusy("analyze");
     setError(null);
-    setStatusNote(null);
+    setStatusNote(
+      capped
+        ? `Analyzing the first ${targets.length} of ${eligible.length} clips this pass…`
+        : null
+    );
     try {
       const health = await checkAgentHealth();
       setAgent(health);
@@ -779,17 +797,22 @@ export function AiEditorClient({ projectId }: Props) {
       setAnalysis(saved.analysis);
       setJobs((prev) => [saved.job, ...prev]);
       await load();
+      const capNote = capped
+        ? ` First ${targets.length} of ${eligible.length} this pass — run again for the rest.`
+        : "";
       if (failedCount > 0) {
         setStatusNote(
           `Understood ${okCount} of ${results.length} clip(s)` +
             (runTranscription ? " (transcript where available)" : "") +
-            `. ${failedCount} couldn’t be analyzed — check those files and try again.`
+            `. ${failedCount} couldn’t be analyzed — check those files and try again.` +
+            capNote
         );
       } else {
         setStatusNote(
           `Analyzed ${okCount} clip(s): technical checks + shot breaks` +
             (runTranscription ? " + transcript where available" : "") +
-            "."
+            "." +
+            capNote
         );
       }
     } catch (e) {
@@ -839,6 +862,16 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onBuildRoughCut() {
+    const hasCut = Boolean(videoTrack?.clips?.length);
+    const multiReels = (timeline?.reels?.length ?? 0) > 1;
+    if (hasCut) {
+      const ok = window.confirm(
+        multiReels
+          ? "Rebuild replaces your current cut and act/reel layout with a new assembly from preferred takes. Earlier versions stay under Versions → Restore. Continue?"
+          : "Rebuild replaces your current rough cut with a new assembly from preferred takes. Earlier versions stay under Versions → Restore. Continue?"
+      );
+      if (!ok) return;
+    }
     setBusy("rough_cut");
     setError(null);
     setStatusNote(null);
@@ -848,6 +881,8 @@ export function AiEditorClient({ projectId }: Props) {
         note: "Rough cut from preferred takes",
       });
       setTimeline(res.timeline);
+      setExportFiles(null);
+      setExportStamp(null);
       setTimelineVersions(res.versions);
       setJobs((prev) => [res.job, ...prev]);
       setStatusNote(
@@ -870,6 +905,8 @@ export function AiEditorClient({ projectId }: Props) {
         note: "Ripple delete",
       });
       setTimeline(res.timeline);
+      setExportFiles(null);
+      setExportStamp(null);
       setTimelineVersions(res.versions);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Edit failed");
@@ -887,6 +924,8 @@ export function AiEditorClient({ projectId }: Props) {
         versionId,
       });
       setTimeline(res.timeline);
+      setExportFiles(null);
+      setExportStamp(null);
       setTimelineVersions(res.versions);
       setStatusNote(`Restored timeline to a previous version (now v${res.summary.version}).`);
     } catch (e) {
@@ -943,10 +982,10 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   function previewRoughCut() {
-    if (!timeline || !videoTrack?.clips.length) return;
+    if (!timeline || !visibleClips.length) return;
     const items: PreviewItem[] = [];
     let skipped = 0;
-    for (const clip of videoTrack.clips) {
+    for (const clip of visibleClips) {
       const asset = media.find((m) => m.id === clip.mediaAssetId);
       const path = asset ? playbackPathForAsset(asset) : null;
       if (!path) {
@@ -973,7 +1012,10 @@ export function AiEditorClient({ projectId }: Props) {
         `Preview skipped ${skipped} offline clip${skipped === 1 ? "" : "s"} — the full cut may be longer.`
       );
     }
-    void openPreview(`Rough cut v${timeline.version}`, items);
+    const title = activeReelName
+      ? `${activeReelName} · rough cut v${timeline.version}`
+      : `Rough cut v${timeline.version}`;
+    void openPreview(title, items);
   }
 
   async function persistEditNotes(next: EditNote[]) {
@@ -1035,7 +1077,11 @@ export function AiEditorClient({ projectId }: Props) {
         validationOk: res.validation?.ok ?? res.proposal.action === "undo",
         validationErrors: res.validation?.errors ?? [],
       });
-      setStatusNote(res.proposal.summary);
+      const truncNote =
+        res.scope?.truncated && res.scope.totalInReel
+          ? ` (using first ${MAX_CHAT_CONTEXT_CLIPS} of ${res.scope.totalInReel} clips in this reel — switch acts/reels for the rest)`
+          : "";
+      setStatusNote(res.proposal.summary + truncNote);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not interpret edit");
     } finally {
@@ -1058,6 +1104,8 @@ export function AiEditorClient({ projectId }: Props) {
             : "Feature reels (~20 min each)",
       });
       setTimeline(res.timeline);
+      setExportFiles(null);
+      setExportStamp(null);
       setTimelineVersions(res.versions);
       setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
       setStatusNote(
@@ -1102,7 +1150,11 @@ export function AiEditorClient({ projectId }: Props) {
         apply: true,
         reelId: timeline?.activeReelId ?? null,
       });
-      if (res.timeline) setTimeline(res.timeline);
+      if (res.timeline) {
+        setTimeline(res.timeline);
+        setExportFiles(null);
+        setExportStamp(null);
+      }
       if (res.versions) setTimelineVersions(res.versions);
       if (res.job) setJobs((prev) => [res.job!, ...prev]);
       setChatProposal(null);
@@ -1123,7 +1175,11 @@ export function AiEditorClient({ projectId }: Props) {
         message: "undo",
         apply: true,
       });
-      if (res.timeline) setTimeline(res.timeline);
+      if (res.timeline) {
+        setTimeline(res.timeline);
+        setExportFiles(null);
+        setExportStamp(null);
+      }
       if (res.versions) setTimelineVersions(res.versions);
       if (res.job) setJobs((prev) => [res.job!, ...prev]);
       setChatProposal(null);
@@ -1150,6 +1206,8 @@ export function AiEditorClient({ projectId }: Props) {
         transitionStyle,
       });
       setTimeline(res.timeline);
+      setExportFiles(null);
+      setExportStamp(null);
       setTimelineVersions(res.versions);
       if (res.job) setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
       setStatusNote(
@@ -1260,9 +1318,16 @@ export function AiEditorClient({ projectId }: Props) {
       setTimeline(res.timeline);
       setTimelineVersions(res.versions);
       setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
+      setExportFiles(null);
+      setExportStamp(null);
+      const unmatched = res.importMeta?.unmatchedNames ?? [];
+      const unmatchedNote = unmatched.length
+        ? ` Unmatched: ${unmatched.slice(0, 8).join(", ")}${unmatched.length > 8 ? "…" : ""}`
+        : "";
       setStatusNote(
         (res.importMeta?.summary || "Imported from Resolve") +
-          (res.summary ? ` · ${res.summary.durationTimecode}` : "")
+          (res.summary ? ` · ${res.summary.durationTimecode}` : "") +
+          unmatchedNote
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not import Resolve cut");
@@ -1356,11 +1421,19 @@ export function AiEditorClient({ projectId }: Props) {
     files: Record<string, string>;
     projectRootPath?: string | null;
   }> {
-    if (exportFiles && Object.keys(exportFiles).length) {
+    const stamp = timeline
+      ? `${timeline.version}:${timeline.updatedAt || ""}:${timeline.finishing?.moodId || ""}:${timeline.finishing?.transitionStyle || ""}`
+      : "";
+    if (
+      exportFiles &&
+      exportStamp === stamp &&
+      Object.keys(exportFiles).length
+    ) {
       return { files: exportFiles, projectRootPath: settings?.projectRootPath };
     }
     const res = await aiEditorExportResolve(getToken, projectId);
     setExportFiles(res.files);
+    setExportStamp(stamp);
     setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
     return { files: res.files, projectRootPath: res.projectRootPath };
   }
@@ -1419,7 +1492,6 @@ export function AiEditorClient({ projectId }: Props) {
     setBusy("open-resolve");
     setError(null);
     setStatusNote(null);
-    setResolveImported(false);
     try {
       const health = await checkAgentHealth();
       setAgent(health);
@@ -1727,7 +1799,7 @@ export function AiEditorClient({ projectId }: Props) {
       const patches = eligible.map((m) => ({
         id: m.id,
         currentPath: "",
-        onlineStatus: "online" as const,
+        onlineStatus: "offline" as const,
         verifiedCopyCount: Math.max(1, (m.verifiedCopyCount ?? 2) - 1),
       }));
       await aiEditorPatchMedia(getToken, projectId, patches);
@@ -1771,6 +1843,12 @@ export function AiEditorClient({ projectId }: Props) {
       const patches: Array<{ id: string; proxyPath: string; needsProxy: boolean }> = [];
       let failed = 0;
       const list = needsPrepare.slice(0, 40);
+      const capped = needsPrepare.length > list.length;
+      if (capped) {
+        setStatusNote(
+          `Preparing the first ${list.length} of ${needsPrepare.length} clips this pass…`
+        );
+      }
       for (let i = 0; i < list.length; i++) {
         const m = list[i];
         setProgress({
@@ -1798,7 +1876,10 @@ export function AiEditorClient({ projectId }: Props) {
       setStatusNote(
         `Prepared ${patches.length} clip(s) for smooth editing` +
           (failed ? ` (${failed} couldn’t convert)` : "") +
-          ". Your original camera files were not changed."
+          ". Your original camera files were not changed." +
+          (capped
+            ? ` First ${list.length} of ${needsPrepare.length} this pass — run again for the rest.`
+            : "")
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not prepare clips");
@@ -2543,7 +2624,7 @@ export function AiEditorClient({ projectId }: Props) {
                   disabled={!!busy || !agent.connected}
                 >
                   <Play className="mr-1.5 h-4 w-4" />
-                  Play rough cut
+                  {activeReelName ? `Play ${activeReelName}` : "Play rough cut"}
                 </Button>
               ) : null}
             </div>
@@ -2780,7 +2861,7 @@ export function AiEditorClient({ projectId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Edit by chat</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Describe an edit in plain language. ShootSpine proposes structured timeline ops —
+                Describe an edit in plain language. ShootSpine proposes clear edit steps —
                 you review, then apply. Saved edit notes are included as the creative brief.
                 {activeReelName
                   ? ` Focused on “${activeReelName}” (switch acts/reels in Rough cut).`
@@ -2855,9 +2936,14 @@ export function AiEditorClient({ projectId }: Props) {
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm">
                 <div className="font-medium text-slate-900">{chatProposal.proposal.summary}</div>
                 <div className="mt-1 text-xs text-slate-500">
-                  via {chatProposal.proposal.source}
+                  {chatProposal.proposal.source === "gemini"
+                    ? "Suggested with AI"
+                    : "Suggested from your wording"}
                   {typeof chatProposal.proposal.confidence === "number"
                     ? ` · ${Math.round(chatProposal.proposal.confidence * 100)}% confidence`
+                    : ""}
+                  {chatProposal.proposal.warnings?.includes("reel_truncated")
+                    ? " · long reel — only the first part was considered"
                     : ""}
                 </div>
                 {chatProposal.descriptions.length ? (

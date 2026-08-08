@@ -149,11 +149,19 @@ export async function POST(
       };
     }
 
+    if (truncated && !(proposal.warnings || []).includes("reel_truncated")) {
+      proposal = {
+        ...proposal,
+        warnings: [...(proposal.warnings || []), "reel_truncated"],
+      };
+    }
+
     if (proposal.action === "undo") {
       if (!body.apply) {
         return NextResponse.json({
           ok: true,
           proposal,
+          scope: scopeMeta,
           descriptions: ["Restore previous timeline version"],
           validation: { ok: versions.length > 1, errors: versions.length > 1 ? [] : ["No earlier version"], warnings: [] },
         });
@@ -205,6 +213,7 @@ export async function POST(
         proposal,
         descriptions,
         validation,
+        scope: scopeMeta,
       });
     }
 
@@ -252,6 +261,7 @@ export async function POST(
       proposal,
       descriptions,
       validation,
+      scope: scopeMeta,
       timeline: bumped,
       versions: nextVersions,
       job: completedJob,

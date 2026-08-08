@@ -79,7 +79,7 @@ export function compareResolveToRoughCut(input: {
   }
 
   if (sync.edlExported) {
-    parts.push("EDL snapshot saved as resolve_from_nle.edl");
+    parts.push("A timeline snapshot was saved in your project folder");
   }
 
   return {

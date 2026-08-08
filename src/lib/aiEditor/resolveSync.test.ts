@@ -29,7 +29,7 @@ describe("resolveSync", () => {
     });
     expect(c.lengthHint).toBe("longer");
     expect(c.title).toMatch(/Grade v2/);
-    expect(c.detail).toMatch(/resolve_from_nle\.edl/i);
+    expect(c.detail).toMatch(/timeline snapshot/i);
   });
 
   it("flags a shorter Resolve cut", () => {
