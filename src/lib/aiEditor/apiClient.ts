@@ -329,6 +329,26 @@ export async function aiEditorNextShootChecklist(
   }>(res);
 }
 
+export async function aiEditorBoardHandoff(
+  getToken: GetToken,
+  projectId: string,
+  body?: { includeDone?: boolean }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/board-handoff`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body ?? {}),
+  });
+  return parseJson<{
+    ok: true;
+    boardId: string;
+    openCount: number;
+    filmingNotes: string;
+    settings: AiEditorProjectSettings;
+    job: AiEditorJob;
+  }>(res);
+}
+
 export async function aiEditorLogResolveOpen(
   getToken: GetToken,
   projectId: string,

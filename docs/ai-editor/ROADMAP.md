@@ -31,8 +31,9 @@
 | **Long-form ready** | Raised soft caps + acts/reels for ~1h45 features |
 | **V7 Reverse import** | Import Resolve cut → new ShootSpine timeline version |
 | **V8 Next shoot checklist** | Checkable pickups from missing coverage + Resolve feedback |
+| **V9 Board handoff** | Send open checklist items → production board filming notes |
 
-Later: cross-project analytics / production-board handoff
+Later: cross-project analytics
 
 ## Current implementation status
 
@@ -56,4 +57,5 @@ Later: cross-project analytics / production-board handoff
 - **Long-form ready** — soft caps raised (5k media, 500/batch, 2k Resolve link/sync); acts/reels on timeline; Edit by chat scoped to active reel/act  
 - **V7 Reverse import (initial)** — “Import Resolve cut here” builds a new timeline version from Resolve clip names; prior cut kept in Versions  
 - **V8 Next shoot checklist (initial)** — checkable list from missing coverage + dropped/preferred insights; saved on project; AI Editor only  
-- Later: cross-project analytics / production-board handoff
+- **V9 Board handoff (initial)** — “Send to production board” merges open checklist into filming notes (marked section, replaceable)  
+- Later: cross-project analytics

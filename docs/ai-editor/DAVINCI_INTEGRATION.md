@@ -17,6 +17,7 @@ Do not assume Resolve and AI Editor share a machine or OS paths.
 - **V6 (initial)** — Clip list from Resolve → compare to rough cut / coverage → “For next time” planning notes.
 - **V7 (initial)** — Import Resolve cut into ShootSpine as a new timeline version (prior cut restorable).
 - **V8 (initial)** — Next shoot checklist (missing coverage + Resolve feedback), check-off in AI Editor.
+- **V9 (initial)** — Send open checklist to production board **filming notes** (marked, replaceable section).
 
 ## Phase plan
 
@@ -29,7 +30,8 @@ Do not assume Resolve and AI Editor share a machine or OS paths.
 7. **V6** — Planning feedback from final cut — initial landed
 8. **V7** — Reverse import into ShootSpine timeline — initial landed
 9. **V8** — Next shoot checklist — initial landed
-10. Later — cross-project analytics / board handoff
+10. **V9** — Board handoff (filming notes) — initial landed
+11. Later — cross-project analytics
 
 Always feature-detect Resolve capabilities. Prefer official developer docs for the installed version.
 

@@ -39,6 +39,7 @@ export type AiEditorJobType =
   | "resolve_sync"
   | "planning_feedback"
   | "next_shoot_checklist"
+  | "board_handoff"
   | "finishing"
   | "feedback";
 
@@ -89,6 +90,8 @@ export interface AiEditorProjectSettings {
   lastPlanningFeedback?: PlanningFeedback;
   /** V8 — checkable next-shoot list derived from planning feedback + coverage. */
   nextShootChecklist?: NextShootChecklist;
+  /** V9 — last time checklist was sent to production board filming notes. */
+  lastBoardHandoffAt?: string;
   /** Edit notes from set / client / look — fed into Edit by Chat. */
   editNotes?: EditNote[];
   createdAt: string;

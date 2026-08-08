@@ -79,6 +79,7 @@ import {
   aiEditorPatchMedia,
   aiEditorRunMatch,
   aiEditorSaveAnalysis,
+  aiEditorBoardHandoff,
   aiEditorNextShootChecklist,
   aiEditorSaveEditNotes,
   aiEditorSaveFeedback,
@@ -1161,6 +1162,23 @@ export function AiEditorClient({ projectId }: Props) {
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not rebuild checklist");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onSendChecklistToBoard() {
+    setBusy("board_handoff");
+    setError(null);
+    try {
+      const res = await aiEditorBoardHandoff(getToken, projectId);
+      setSettings(res.settings);
+      setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
+      setStatusNote(
+        `Sent ${res.openCount} open item${res.openCount === 1 ? "" : "s"} to Production → Filming notes.`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not send to production board");
     } finally {
       setBusy(null);
     }
@@ -3250,15 +3268,31 @@ export function AiEditorClient({ projectId }: Props) {
                           ? ` · ${checklistStats.remaining} remaining`
                           : ""}
                       </p>
-                      <button
-                        type="button"
-                        className="text-xs font-medium text-sky-800 underline disabled:opacity-50"
-                        disabled={!!busy}
-                        onClick={() => void onRebuildNextShootChecklist()}
-                      >
-                        Refresh list
-                      </button>
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-sky-800 underline disabled:opacity-50"
+                          disabled={!!busy || checklistStats.remaining === 0}
+                          onClick={() => void onSendChecklistToBoard()}
+                        >
+                          {busy === "board_handoff" ? "Sending…" : "Send to production board"}
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-sky-800 underline disabled:opacity-50"
+                          disabled={!!busy}
+                          onClick={() => void onRebuildNextShootChecklist()}
+                        >
+                          Refresh list
+                        </button>
+                      </div>
                     </div>
+                    {settings?.lastBoardHandoffAt ? (
+                      <p className="text-xs text-slate-500">
+                        Last sent to board{" "}
+                        {new Date(settings.lastBoardHandoffAt).toLocaleString()}
+                      </p>
+                    ) : null}
                     <ul className="space-y-1.5">
                       {checklist.items.map((item) => (
                         <li
