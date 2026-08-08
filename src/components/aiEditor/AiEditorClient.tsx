@@ -34,6 +34,8 @@ import {
   agentMediaStreamUrl,
   agentOpenResolve,
   agentProbe,
+  agentResolveImportEdl,
+  agentResolveScriptingProbe,
   agentRevealPath,
   agentSafeDelete,
   agentStorageStat,
@@ -53,6 +55,11 @@ import {
   TRANSITION_PRESETS,
   summarizeFinishing,
 } from "@/lib/aiEditor/finishing";
+import {
+  importResultMessage,
+  summarizeResolveWorkflow,
+  type ResolveWorkflowStatus,
+} from "@/lib/aiEditor/resolveWorkflow";
 import type { FinishingMoodId, TransitionStyleId } from "@/lib/aiEditor/types";
 import { framesToSeconds } from "@/lib/aiEditor/frames";
 import type { ClipAnalysisBundle } from "@/lib/aiEditor/analysis";
@@ -68,12 +75,19 @@ import {
   aiEditorPatchMedia,
   aiEditorRunMatch,
   aiEditorSaveAnalysis,
+  aiEditorSaveFeedback,
   aiEditorSaveStorage,
   aiEditorChatEdit,
   aiEditorExportResolve,
   aiEditorTimelineAction,
   type ChatEditProposalClient,
 } from "@/lib/aiEditor/apiClient";
+import {
+  FEEDBACK_OUTCOMES,
+  defaultsFromFeedback,
+  summarizeFeedback,
+} from "@/lib/aiEditor/feedback";
+import type { FinishingFeedbackOutcome } from "@/lib/aiEditor/types";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 import { mockMediaEngine } from "@/lib/aiEditor/mediaEngine";
 import { summarizeMediaSafety } from "@/lib/aiEditor/mediaSafety";
@@ -159,6 +173,12 @@ export function AiEditorClient({ projectId }: Props) {
   const [finishWhere, setFinishWhere] = useState<"here" | "mac">("here");
   const [moodId, setMoodId] = useState<FinishingMoodId>("natural");
   const [transitionStyle, setTransitionStyle] = useState<TransitionStyleId>("cuts");
+  const [resolveWorkflow, setResolveWorkflow] = useState<ResolveWorkflowStatus | null>(null);
+  const [resolveImported, setResolveImported] = useState(false);
+  const [feedbackOutcome, setFeedbackOutcome] =
+    useState<FinishingFeedbackOutcome>("kept_look");
+  const [feedbackNote, setFeedbackNote] = useState("");
+  const [feedbackHint, setFeedbackHint] = useState<string | null>(null);
   const [archivePath, setArchivePath] = useState("");
   const [reclaimConfirm, setReclaimConfirm] = useState("");
 
@@ -186,9 +206,20 @@ export function AiEditorClient({ projectId }: Props) {
       }
       if (dash.timeline?.finishing?.moodId) {
         setMoodId(dash.timeline.finishing.moodId);
+        if (dash.timeline.finishing.transitionStyle) {
+          setTransitionStyle(dash.timeline.finishing.transitionStyle);
+        }
+      } else {
+        const defaults = defaultsFromFeedback(dash.settings?.lastFinishingFeedback);
+        setMoodId(defaults.moodId);
+        setTransitionStyle(defaults.transitionStyle);
+        setFeedbackHint(defaults.hint);
       }
-      if (dash.timeline?.finishing?.transitionStyle) {
-        setTransitionStyle(dash.timeline.finishing.transitionStyle);
+      if (dash.settings?.lastFinishingFeedback?.outcome) {
+        setFeedbackOutcome(dash.settings.lastFinishingFeedback.outcome);
+      }
+      if (dash.settings?.lastFinishingFeedback?.note) {
+        setFeedbackNote(dash.settings.lastFinishingFeedback.note);
       }
       const health = await checkAgentHealth(DEFAULT_AGENT_BASE_URL);
       setAgent(health);
@@ -257,7 +288,9 @@ export function AiEditorClient({ projectId }: Props) {
     [media, settings?.projectRootPath]
   );
   const step11Done = archiveSummary.archived > 0;
+  const step12Done = Boolean(settings?.lastFinishingFeedback);
   const finishingSummary = summarizeFinishing(timeline?.finishing);
+  const feedbackSummary = summarizeFeedback(settings?.lastFinishingFeedback);
   const videoTrack = timeline?.tracks.find((t) => t.kind === "video");
 
   async function onRecheckAgent() {
@@ -937,6 +970,29 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  async function onSaveFeedback() {
+    setBusy("feedback");
+    setError(null);
+    setStatusNote(null);
+    try {
+      const res = await aiEditorSaveFeedback(getToken, projectId, {
+        moodId,
+        transitionStyle,
+        outcome: feedbackOutcome,
+        note: feedbackNote,
+      });
+      setSettings(res.settings);
+      setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
+      const defaults = defaultsFromFeedback(res.feedback);
+      setFeedbackHint(defaults.hint);
+      setStatusNote("Saved for next time — Look & transitions will remember this.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save feedback");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function ensureExportFiles(): Promise<{
     files: Record<string, string>;
     projectRootPath?: string | null;
@@ -986,16 +1042,31 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  async function refreshResolveWorkflow(token?: string) {
+    try {
+      const t = token || (await ensureAgentSession());
+      const probe = await agentResolveScriptingProbe(DEFAULT_AGENT_BASE_URL, t);
+      setResolveWorkflow(summarizeResolveWorkflow(probe));
+      return probe;
+    } catch {
+      setResolveWorkflow(
+        summarizeResolveWorkflow({ installed: false, pythonAvailable: false })
+      );
+      return null;
+    }
+  }
+
   async function onOpenInResolve() {
     setBusy("open-resolve");
     setError(null);
     setStatusNote(null);
+    setResolveImported(false);
     try {
       const health = await checkAgentHealth();
       setAgent(health);
       if (!health.connected) throw new Error("Desktop Agent not connected");
       const projectRoot = settings?.projectRootPath?.trim();
-      if (!projectRoot) throw new Error("Set a project folder in step 2 first");
+      if (!projectRoot) throw new Error("Set your project folder in step 2 first");
       const token = await ensureAgentSession();
       const { files } = await ensureExportFiles();
       const written = await agentWriteResolveHandoff(DEFAULT_AGENT_BASE_URL, token, {
@@ -1016,6 +1087,7 @@ export function AiEditorClient({ projectId }: Props) {
         handoffDir: written.handoffDir,
       });
       setJobs((prev) => [log.job, ...prev.filter((j) => j.id !== log.job.id)]);
+      await refreshResolveWorkflow(token);
       setStatusNote(
         opened.launched
           ? opened.alreadyRunning
@@ -1024,7 +1096,69 @@ export function AiEditorClient({ projectId }: Props) {
           : "Your edit is saved. Open Resolve from the Start menu if it didn’t appear."
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Open in Resolve failed");
+      setError(e instanceof Error ? e.message : "Could not open Resolve");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onBringIntoResolve() {
+    setBusy("import-resolve");
+    setError(null);
+    setStatusNote(null);
+    try {
+      const health = await checkAgentHealth();
+      setAgent(health);
+      if (!health.connected) throw new Error("Desktop Agent not connected");
+      const projectRoot = settings?.projectRootPath?.trim();
+      if (!projectRoot) throw new Error("Set your project folder in step 2 first");
+      const token = await ensureAgentSession();
+      const { files } = await ensureExportFiles();
+      const written = await agentWriteResolveHandoff(DEFAULT_AGENT_BASE_URL, token, {
+        projectRoot,
+        files,
+        relativeDir: RESOLVE_HANDOFF_REL_DIR,
+      });
+      setHandoffDirOnDisk(written.handoffDir);
+
+      let probe = await refreshResolveWorkflow(token);
+      if (!probe?.running) {
+        await agentOpenResolve(DEFAULT_AGENT_BASE_URL, token, {
+          projectRoot,
+          handoffDir: written.handoffDir,
+          launch: true,
+          reveal: false,
+        });
+        setStatusNote("Starting Resolve… open a project, then we’ll try again.");
+        await new Promise((r) => setTimeout(r, 2500));
+        probe = await refreshResolveWorkflow(token);
+      }
+
+      if (!probe?.projectOpen) {
+        setStatusNote("Open or create a project in Resolve, then press Bring edit into Resolve again.");
+        return;
+      }
+
+      const imported = await agentResolveImportEdl(DEFAULT_AGENT_BASE_URL, token, {
+        handoffDir: written.handoffDir,
+        timelineName: timeline?.name || "ShootSpine Rough Cut",
+      });
+      const msg = importResultMessage(imported);
+      setResolveImported(imported.imported);
+      const log = await aiEditorLogResolveOpen(getToken, projectId, {
+        type: "resolve_import",
+        message: imported.message,
+        launched: false,
+        handoffDir: written.handoffDir,
+      });
+      setJobs((prev) => [log.job, ...prev.filter((j) => j.id !== log.job.id)]);
+      setStatusNote(`${msg.title} ${msg.detail}`);
+      if (!imported.imported) {
+        setError(null);
+      }
+      await refreshResolveWorkflow(token);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not bring edit into Resolve");
     } finally {
       setBusy(null);
     }
@@ -1051,9 +1185,9 @@ export function AiEditorClient({ projectId }: Props) {
         return [res.storage, ...rest];
       });
       setArchivePath(res.settings.archiveRootPath || path);
-      setStatusNote(`Archive root saved: ${res.settings.archiveRootPath || path}`);
+      setStatusNote("Backup folder remembered.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save archive root");
+      setError(e instanceof Error ? e.message : "Could not save backup folder");
     } finally {
       setBusy(null);
     }
@@ -1076,8 +1210,8 @@ export function AiEditorClient({ projectId }: Props) {
       if (!plan.archive?.items.length) {
         setStatusNote(
           plan.archive?.skipped.length
-            ? `Nothing to archive (${plan.archive.skipped.length} skipped).`
-            : "Nothing to archive — set an archive folder and add clips first."
+            ? "Nothing new to back up — these clips may already be backed up."
+            : "Pick a backup folder and add clips first."
         );
         return;
       }
@@ -1117,10 +1251,12 @@ export function AiEditorClient({ projectId }: Props) {
         message: `Archived ${patches.length} clip(s) with checksum verify`,
       });
       if (log.job) setJobs((prev) => [log.job!, ...prev]);
-      setStatusNote(`Archived ${patches.length} clip(s). Camera cards were not touched.`);
+      setStatusNote(
+        `Backed up ${patches.length} clip${patches.length === 1 ? "" : "s"}. Camera cards were not touched.`
+      );
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Archive failed");
+      setError(e instanceof Error ? e.message : "Backup failed");
     } finally {
       setProgress(null);
       setBusy(null);
@@ -1139,7 +1275,7 @@ export function AiEditorClient({ projectId }: Props) {
       const token = await ensureAgentSession();
       const plan = await aiEditorArchiveAction(getToken, projectId, { action: "plan" });
       if (!plan.restore?.items.length) {
-        setStatusNote("Nothing to restore — active copies may already be present.");
+        setStatusNote("Nothing to bring back — the files may already be on this PC.");
         return;
       }
       setProgress({ pct: 20, label: `Restoring ${plan.restore.items.length} file(s)…` });
@@ -1178,7 +1314,9 @@ export function AiEditorClient({ projectId }: Props) {
         message: `Restored ${patches.length} clip(s) from archive`,
       });
       if (log.job) setJobs((prev) => [log.job!, ...prev]);
-      setStatusNote(`Restored ${patches.length} clip(s) into the project folder.`);
+      setStatusNote(
+        `Brought back ${patches.length} clip${patches.length === 1 ? "" : "s"} to this PC.`
+      );
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Restore failed");
@@ -1195,18 +1333,18 @@ export function AiEditorClient({ projectId }: Props) {
     }
     const projectRoot = settings?.projectRootPath?.trim();
     if (!projectRoot) {
-      setError("Project root required for reclaim");
+      setError("Set your project folder in step 2 first");
       return;
     }
     const eligible = media.filter((m) => canReclaimActiveCopy(m, projectRoot).ok);
     if (!eligible.length) {
-      setStatusNote("No reclaimable active copies — archive first.");
+      setStatusNote("Nothing to free yet — back up clips first.");
       return;
     }
     setBusy("reclaim");
     setError(null);
     setStatusNote(null);
-    setProgress({ pct: 10, label: `Reclaiming ${eligible.length} active copy(ies)…` });
+    setProgress({ pct: 10, label: `Freeing space for ${eligible.length} clip(s)…` });
     try {
       const health = await checkAgentHealth();
       setAgent(health);
@@ -1242,11 +1380,11 @@ export function AiEditorClient({ projectId }: Props) {
       if (log.job) setJobs((prev) => [log.job!, ...prev]);
       setReclaimConfirm("");
       setStatusNote(
-        `Deleted ${patches.length} active project copy(ies). Archive copies kept. Camera cards never erased.`
+        `Freed space for ${patches.length} clip${patches.length === 1 ? "" : "s"}. Backup copies kept. Camera cards never erased.`
       );
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Reclaim failed");
+      setError(e instanceof Error ? e.message : "Could not free space");
     } finally {
       setProgress(null);
       setBusy(null);
@@ -2231,6 +2369,11 @@ export function AiEditorClient({ projectId }: Props) {
             </div>
           </div>
           <div className="space-y-5 pl-10">
+            {feedbackHint ? (
+              <p className="rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2 text-sm text-sky-950">
+                {feedbackHint}
+              </p>
+            ) : null}
             <div>
               <p className="text-sm font-medium text-slate-800">How should it feel?</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -2349,23 +2492,79 @@ export function AiEditorClient({ projectId }: Props) {
 
             {finishWhere === "here" ? (
               <div className="space-y-4">
-                <Button
-                  onClick={() => void onOpenInResolve()}
-                  disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
-                >
-                  {busy === "open-resolve" ? (
-                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Clapperboard className="mr-1.5 h-4 w-4" />
-                  )}
-                  Save edit &amp; open Resolve
-                </Button>
+                {resolveWorkflow ? (
+                  <div
+                    className={`rounded-2xl border px-4 py-3 ${
+                      resolveWorkflow.level === "ready"
+                        ? "border-emerald-200 bg-emerald-50/70"
+                        : resolveWorkflow.level === "almost"
+                          ? "border-amber-200 bg-amber-50/60"
+                          : resolveWorkflow.level === "missing"
+                            ? "border-slate-200 bg-slate-50"
+                            : "border-sky-100 bg-sky-50/50"
+                    }`}
+                  >
+                    <p className="font-semibold text-slate-900">{resolveWorkflow.title}</p>
+                    <p className="mt-1 text-sm text-slate-600">{resolveWorkflow.detail}</p>
+                    <button
+                      type="button"
+                      className="mt-2 text-xs font-medium text-sky-800 underline disabled:opacity-50"
+                      disabled={!!busy || !agent.connected}
+                      onClick={() => void refreshResolveWorkflow()}
+                    >
+                      Check again
+                    </button>
+                  </div>
+                ) : agent.connected ? (
+                  <button
+                    type="button"
+                    className="text-sm text-sky-800 underline"
+                    disabled={!!busy}
+                    onClick={() => void refreshResolveWorkflow()}
+                  >
+                    Check if Resolve is ready
+                  </button>
+                ) : (
+                  <p className="text-sm text-slate-500">Connect this computer (step 1) first.</p>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => void onBringIntoResolve()}
+                    disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
+                  >
+                    {busy === "import-resolve" ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Clapperboard className="mr-1.5 h-4 w-4" />
+                    )}
+                    Bring edit into Resolve
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => void onOpenInResolve()}
+                    disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
+                  >
+                    {busy === "open-resolve" ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Just open Resolve
+                  </Button>
+                </div>
 
                 {!timeline ? (
                   <p className="text-sm text-slate-500">Build a rough cut above first.</p>
                 ) : null}
 
-                {handoffDirOnDisk ? (
+                {resolveImported ? (
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
+                    <p className="font-semibold text-emerald-950">Your rough cut is in Resolve</p>
+                    <p className="mt-1 text-sm text-emerald-900/80">
+                      If clips look missing, point Resolve at your project’s media folder. Read the
+                      look notes file in the saved folder for color tips.
+                    </p>
+                  </div>
+                ) : handoffDirOnDisk ? (
                   <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-white px-4 py-4 shadow-sm shadow-sky-100/50">
                     <div className="flex items-start gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700">
@@ -2373,30 +2572,25 @@ export function AiEditorClient({ projectId }: Props) {
                       </span>
                       <div className="space-y-3">
                         <div>
-                          <p className="font-semibold text-slate-900">You’re set — next in Resolve</p>
+                          <p className="font-semibold text-slate-900">Edit saved — almost there</p>
                           <p className="mt-1 text-sm text-slate-600">
-                            Give Resolve a minute to open. If you don’t see it, check the taskbar.
+                            Open a project in Resolve, then press{" "}
+                            <span className="font-medium">Bring edit into Resolve</span>. Or import
+                            by hand:
                           </p>
                         </div>
                         <ol className="space-y-2 text-sm text-slate-700">
                           <li className="flex gap-2">
                             <span className="font-semibold text-sky-700">1.</span>
-                            <span>Start or open a project in Resolve.</span>
+                            <span>In Resolve: File → Import → Timeline</span>
                           </li>
                           <li className="flex gap-2">
                             <span className="font-semibold text-sky-700">2.</span>
-                            <span>
-                              Bring in your rough cut:{" "}
-                              <span className="font-medium">File → Import → Timeline</span>, then
-                              choose the timeline file in the folder we saved.
-                            </span>
+                            <span>Pick the timeline file in the folder we saved</span>
                           </li>
                           <li className="flex gap-2">
                             <span className="font-semibold text-sky-700">3.</span>
-                            <span>
-                              If clips look blank or missing, point Resolve at your project’s media
-                              folder.
-                            </span>
+                            <span>If clips are missing, point Resolve at your media folder</span>
                           </li>
                         </ol>
                         <Button
@@ -2525,35 +2719,69 @@ export function AiEditorClient({ projectId }: Props) {
         </CardBody>
       </Card>
 
-      {/* Step 11 — V1H */}
+      {/* Step 11 — backup & free space */}
       <Card>
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
             <StepBadge n={11} done={step11Done} />
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Archive, restore & reclaim</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Backup &amp; free space</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Verified copy to your archive drive, restore when needed, then reclaim active disk.
-                Camera cards are never erased automatically.
+                Copy footage to a backup drive, bring it back if you need it, then free space on this
+                PC. We never erase camera cards.
               </p>
             </div>
           </div>
-          <div className="space-y-4 pl-10">
-            <p className="text-xs text-slate-500">
-              {archiveSummary.archived}/{archiveSummary.total} archived ·{" "}
-              {archiveSummary.reclaimable} reclaimable · {archiveSummary.restorable} restorable
-            </p>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-800">Archive folder</label>
+
+          <div className="space-y-5 pl-10">
+            <div
+              className={`rounded-2xl border px-4 py-3 ${
+                archiveSummary.archived > 0
+                  ? "border-emerald-200 bg-emerald-50/60"
+                  : "border-slate-200 bg-slate-50/80"
+              }`}
+            >
+              {media.length === 0 ? (
+                <p className="text-sm text-slate-600">Add clips first, then you can back them up.</p>
+              ) : archiveSummary.archived === 0 ? (
+                <p className="text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">No backup yet</span>
+                  <span className="text-slate-600">
+                    {" "}
+                    — {media.length} clip{media.length === 1 ? "" : "s"} in the project.
+                  </span>
+                </p>
+              ) : (
+                <p className="text-sm text-slate-700">
+                  <span className="font-semibold text-emerald-950">
+                    {archiveSummary.archived} of {archiveSummary.total} backed up
+                  </span>
+                  {archiveSummary.reclaimable > 0 ? (
+                    <span className="text-slate-600">
+                      {" "}
+                      · you can free space on this PC for {archiveSummary.reclaimable}
+                    </span>
+                  ) : null}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-slate-800">1. Choose your backup drive</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  External hard drive or NAS folder — not your camera card.
+                </p>
+              </div>
               <FolderPicker
-                label="Archive folder"
-                hint="External HDD or NAS folder for verified long-term copies."
+                label="Backup folder"
+                hint="Pick a folder on your backup drive."
                 value={archivePath}
                 onChange={setArchivePath}
                 getAgentToken={ensureAgentSession}
                 agentConnected={agent.connected}
                 disabled={!!busy}
-                placeholder="e.g. E:\\ARCHIVE"
+                placeholder="e.g. E:\\Backups\\Shoots"
               />
               <Button
                 variant="secondary"
@@ -2565,64 +2793,175 @@ export function AiEditorClient({ projectId }: Props) {
                 ) : (
                   <HardDrive className="mr-1.5 h-4 w-4" />
                 )}
-                Save archive root
+                Remember this folder
               </Button>
               {settings?.archiveRootPath ? (
                 <p className="text-xs text-slate-500">
-                  Saved: <span className="font-medium">{settings.archiveRootPath}</span>
+                  Using: <span className="font-medium text-slate-700">{settings.archiveRootPath}</span>
                 </p>
               ) : null}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => void onArchiveMedia()}
-                disabled={!!busy || !agent.connected || media.length === 0}
-              >
-                {busy === "archive" ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                ) : null}
-                Archive verified copy
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => void onRestoreMedia()}
-                disabled={!!busy || !agent.connected || archiveSummary.archived === 0}
-              >
-                {busy === "restore" ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                ) : null}
-                Restore to project
-              </Button>
-            </div>
-            <div className="space-y-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-3">
-              <p className="text-sm font-medium text-amber-950">Reclaim active disk</p>
-              <p className="text-xs text-amber-900/80">
-                Deletes only verified active copies under the project folder after archive. Type{" "}
-                <code className="rounded bg-white/80 px-1">{SAFE_DELETE_CONFIRM_PHRASE}</code> to
-                confirm.
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-800">2. Back up or bring back</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => void onArchiveMedia()}
+                  disabled={
+                    !!busy ||
+                    !agent.connected ||
+                    media.length === 0 ||
+                    !(archivePath.trim() || settings?.archiveRootPath)
+                  }
+                >
+                  {busy === "archive" ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <HardDrive className="mr-1.5 h-4 w-4" />
+                  )}
+                  Back up clips
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => void onRestoreMedia()}
+                  disabled={!!busy || !agent.connected || archiveSummary.restorable === 0}
+                >
+                  {busy === "restore" ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <FolderOpen className="mr-1.5 h-4 w-4" />
+                  )}
+                  Bring back to this PC
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500">
+                Backup makes a checked copy on your drive. Bring back copies files into the project
+                again if you removed them.
               </p>
-              <input
-                className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm"
-                value={reclaimConfirm}
-                onChange={(e) => setReclaimConfirm(e.target.value)}
-                placeholder={SAFE_DELETE_CONFIRM_PHRASE}
+            </div>
+
+            {archiveSummary.archived > 0 ? (
+              <details className="rounded-2xl border border-amber-100 bg-amber-50/50 px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-amber-950">
+                  3. Free space on this PC (optional)
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <p className="text-sm text-amber-950/90">
+                    Only deletes project copies that are already backed up. Your backup stays safe.
+                    Camera cards are never touched.
+                  </p>
+                  {archiveSummary.reclaimable === 0 ? (
+                    <p className="text-xs text-amber-900/70">
+                      Nothing to free right now — either everything is already only on backup, or
+                      backup isn’t finished.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-amber-900/80">
+                        Type{" "}
+                        <span className="font-mono font-medium">
+                          {SAFE_DELETE_CONFIRM_PHRASE}
+                        </span>{" "}
+                        to confirm ({archiveSummary.reclaimable} clip
+                        {archiveSummary.reclaimable === 1 ? "" : "s"}).
+                      </p>
+                      <input
+                        className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm"
+                        value={reclaimConfirm}
+                        onChange={(e) => setReclaimConfirm(e.target.value)}
+                        placeholder={SAFE_DELETE_CONFIRM_PHRASE}
+                        disabled={!!busy}
+                      />
+                      <Button
+                        variant="secondary"
+                        onClick={() => void onReclaimActive()}
+                        disabled={
+                          !!busy ||
+                          !agent.connected ||
+                          reclaimConfirm.trim() !== SAFE_DELETE_CONFIRM_PHRASE
+                        }
+                      >
+                        {busy === "reclaim" ? (
+                          <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                        ) : null}
+                        Free space on this PC
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </details>
+            ) : null}
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Step 12 — V3 feedback */}
+      <Card>
+        <CardBody className="space-y-5">
+          <div className="flex items-start gap-3">
+            <StepBadge n={12} done={step12Done} />
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">How did finishing go?</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Tell us what happened in Resolve so the next edit starts closer to what you like.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-5 pl-10">
+            <div className="grid gap-2 sm:grid-cols-3">
+              {FEEDBACK_OUTCOMES.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => setFeedbackOutcome(o.id)}
+                  className={`rounded-2xl border px-3 py-3 text-left transition ${
+                    feedbackOutcome === o.id
+                      ? "border-sky-300 bg-sky-50 shadow-sm"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="font-semibold text-slate-900">{o.label}</div>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">{o.blurb}</p>
+                </button>
+              ))}
+            </div>
+            <p className="text-sm text-slate-600">
+              We’ll remember the look selected above:{" "}
+              <span className="font-medium text-slate-800">
+                {MOOD_PRESETS.find((m) => m.id === moodId)?.label} ·{" "}
+                {TRANSITION_PRESETS.find((t) => t.id === transitionStyle)?.label}
+              </span>
+            </p>
+            <div>
+              <label className="text-sm font-medium text-slate-800" htmlFor="feedback-note">
+                Anything to remember? (optional)
+              </label>
+              <textarea
+                id="feedback-note"
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+                rows={2}
+                value={feedbackNote}
+                onChange={(e) => setFeedbackNote(e.target.value)}
+                placeholder="e.g. Keep it warmer next time, fewer dissolves…"
                 disabled={!!busy}
               />
-              <Button
-                variant="secondary"
-                onClick={() => void onReclaimActive()}
-                disabled={
-                  !!busy ||
-                  !agent.connected ||
-                  reclaimConfirm.trim() !== SAFE_DELETE_CONFIRM_PHRASE ||
-                  archiveSummary.reclaimable === 0
-                }
-              >
-                {busy === "reclaim" ? (
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={() => void onSaveFeedback()} disabled={!!busy}>
+                {busy === "feedback" ? (
                   <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                ) : null}
-                Reclaim active copies ({archiveSummary.reclaimable})
+                ) : (
+                  <Sparkles className="mr-1.5 h-4 w-4" />
+                )}
+                Save for next time
               </Button>
+              {feedbackSummary ? (
+                <span className="text-sm text-slate-600">
+                  Last saved: <span className="font-medium text-slate-800">{feedbackSummary}</span>
+                </span>
+              ) : (
+                <span className="text-sm text-slate-500">Optional — skip if you’re not done yet.</span>
+              )}
             </div>
           </div>
         </CardBody>

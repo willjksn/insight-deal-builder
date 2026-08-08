@@ -47,8 +47,8 @@ export async function POST(
       handoffDir?: string;
     };
 
-    if (body.type === "resolve_open") {
-      const created = await createJob(access.appUser, projectId, "resolve_open", {
+    if (body.type === "resolve_open" || body.type === "resolve_import") {
+      const created = await createJob(access.appUser, projectId, body.type, {
         launched: body.launched,
         handoffDir: body.handoffDir,
       });
@@ -57,7 +57,9 @@ export async function POST(
         progress: 100,
         startedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
-        message: body.message || "Resolve open / handoff write",
+        message:
+          body.message ||
+          (body.type === "resolve_import" ? "Resolve import" : "Resolve open / handoff write"),
       });
       return NextResponse.json({ ok: true, job });
     }

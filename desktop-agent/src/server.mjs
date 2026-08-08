@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.6.1";
+const VERSION = "0.7.0";
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN !== "0";
 
 const MEDIA_EXTS = new Set([
@@ -1234,25 +1234,31 @@ function revealInFileManager(targetPath) {
 
 function isResolveProcessRunning() {
   return new Promise((resolve) => {
-    if (os.platform() !== "win32") {
-      resolve(false);
+    if (os.platform() === "win32") {
+      const child = spawn(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          "-Command",
+          "if (Get-Process -Name Resolve -ErrorAction SilentlyContinue) { '1' } else { '0' }",
+        ],
+        { windowsHide: true }
+      );
+      let out = "";
+      child.stdout?.on("data", (d) => {
+        out += String(d);
+      });
+      child.on("error", () => resolve(false));
+      child.on("close", () => resolve(out.trim() === "1"));
       return;
     }
-    const child = spawn(
-      "powershell.exe",
-      [
-        "-NoProfile",
-        "-Command",
-        "if (Get-Process -Name Resolve -ErrorAction SilentlyContinue) { '1' } else { '0' }",
-      ],
-      { windowsHide: true }
-    );
-    let out = "";
-    child.stdout?.on("data", (d) => {
-      out += String(d);
-    });
-    child.on("error", () => resolve(false));
-    child.on("close", () => resolve(out.trim() === "1"));
+    if (os.platform() === "darwin") {
+      const child = spawn("pgrep", ["-f", "DaVinci Resolve"], { windowsHide: true });
+      child.on("error", () => resolve(false));
+      child.on("close", (code) => resolve(code === 0));
+      return;
+    }
+    resolve(false);
   });
 }
 
@@ -1279,6 +1285,244 @@ function launchWindowsGuiApp(exePath) {
     });
     child.unref();
   });
+}
+
+function runProcessCapture(bin, args, opts = {}, timeoutMs = 20000) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      try {
+        child.kill();
+      } catch {
+        /* ignore */
+      }
+      resolve(result);
+    };
+    const child = spawn(bin, args, {
+      windowsHide: true,
+      ...opts,
+    });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => finish({ ok: false, code: -1, stdout, stderr, timedOut: true }), timeoutMs);
+    child.stdout?.on("data", (d) => {
+      stdout += String(d);
+    });
+    child.stderr?.on("data", (d) => {
+      stderr += String(d);
+    });
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      finish({ ok: false, code: -1, stdout, stderr, error: err.message });
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      finish({ ok: code === 0, code: code ?? -1, stdout, stderr, timedOut: false });
+    });
+  });
+}
+
+async function findPythonLauncher() {
+  if (os.platform() === "win32") {
+    const py = await runProcessCapture("py", ["-3", "-c", "print('ok')"], {}, 5000);
+    if (py.ok && py.stdout.includes("ok")) return { bin: "py", prefixArgs: ["-3"] };
+  }
+  for (const bin of ["python3", "python"]) {
+    const r = await runProcessCapture(bin, ["-c", "print('ok')"], {}, 5000);
+    if (r.ok && r.stdout.includes("ok")) return { bin, prefixArgs: [] };
+  }
+  return null;
+}
+
+function resolveScriptEnvPrelude() {
+  if (os.platform() === "win32") {
+    return `
+import os, sys
+api = os.path.join(os.environ.get("PROGRAMDATA", r"C:\\ProgramData"), "Blackmagic Design", "DaVinci Resolve", "Support", "Developer", "Scripting")
+lib = os.path.join(os.environ.get("PROGRAMFILES", r"C:\\Program Files"), "Blackmagic Design", "DaVinci Resolve", "fusionscript.dll")
+os.environ["RESOLVE_SCRIPT_API"] = api
+os.environ["RESOLVE_SCRIPT_LIB"] = lib
+sys.path.insert(0, os.path.join(api, "Modules"))
+`;
+  }
+  if (os.platform() === "darwin") {
+    return `
+import os, sys
+api = "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting"
+lib = "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so"
+os.environ["RESOLVE_SCRIPT_API"] = api
+os.environ["RESOLVE_SCRIPT_LIB"] = lib
+sys.path.insert(0, os.path.join(api, "Modules"))
+`;
+  }
+  return `
+import os, sys
+api = "/opt/resolve/Developer/Scripting"
+lib = "/opt/resolve/libs/Fusion/fusionscript.so"
+os.environ["RESOLVE_SCRIPT_API"] = api
+os.environ["RESOLVE_SCRIPT_LIB"] = lib
+sys.path.insert(0, os.path.join(api, "Modules"))
+`;
+}
+
+/**
+ * Probe official DaVinciResolveScript (feature-detect). Resolve must be running for reachable=true.
+ */
+async function probeResolveScripting() {
+  const detect = await detectResolveInstall();
+  const running = await isResolveProcessRunning();
+  const python = await findPythonLauncher();
+  if (!python) {
+    return {
+      ok: true,
+      installed: detect.installed,
+      running,
+      scriptingModules: detect.scriptingAvailable,
+      scriptingReachable: false,
+      projectOpen: false,
+      pythonAvailable: false,
+      note: "Python not found — auto-import unavailable",
+      detect,
+    };
+  }
+  if (!detect.scriptingAvailable) {
+    return {
+      ok: true,
+      installed: detect.installed,
+      running,
+      scriptingModules: false,
+      scriptingReachable: false,
+      projectOpen: false,
+      pythonAvailable: true,
+      note: "Resolve scripting modules not found",
+      detect,
+    };
+  }
+
+  const code = `
+${resolveScriptEnvPrelude()}
+try:
+    import DaVinciResolveScript as dvr
+except Exception as e:
+    print("IMPORT_FAIL")
+    raise SystemExit(1)
+resolve = dvr.scriptapp("Resolve")
+if not resolve:
+    print("NO_RESOLVE")
+    raise SystemExit(2)
+proj = resolve.GetProjectManager().GetCurrentProject()
+if not proj:
+    print("NO_PROJECT")
+    raise SystemExit(3)
+print("OK")
+raise SystemExit(0)
+`;
+  const result = await runProcessCapture(
+    python.bin,
+    [...python.prefixArgs, "-c", code],
+    {},
+    12000
+  );
+  const out = (result.stdout || "").trim();
+  return {
+    ok: true,
+    installed: detect.installed,
+    running,
+    scriptingModules: true,
+    scriptingReachable: out === "OK" || out === "NO_PROJECT",
+    projectOpen: out === "OK",
+    pythonAvailable: true,
+    note: out || result.stderr?.slice(0, 200) || undefined,
+    detect,
+  };
+}
+
+/**
+ * Import EDL via official Resolve scripting API (ImportTimelineFromFile).
+ * Requires Resolve running with a project open + External scripting enabled.
+ */
+async function importEdlIntoResolve(body) {
+  let handoffDir = body.handoffDir ? path.resolve(body.handoffDir) : null;
+  if (!handoffDir && body.projectRoot) {
+    handoffDir = path.resolve(body.projectRoot, RESOLVE_HANDOFF_REL);
+  }
+  if (!handoffDir) throw new Error("handoffDir or projectRoot required");
+  assertSafePath(handoffDir);
+
+  const edlName = String(body.edlFilename || "shootspine_rough_cut.edl");
+  const edlPath = path.join(handoffDir, path.basename(edlName));
+  if (!(await pathExists(edlPath))) {
+    return {
+      ok: true,
+      imported: false,
+      reason: "EDL_MISSING",
+      message: "Timeline file not found — save the edit first",
+    };
+  }
+
+  const timelineName = String(body.timelineName || "ShootSpine Rough Cut").slice(0, 120);
+  const python = await findPythonLauncher();
+  if (!python) {
+    return {
+      ok: true,
+      imported: false,
+      reason: "NO_PYTHON",
+      message: "Python not found for Resolve scripting",
+    };
+  }
+
+  const code = `
+${resolveScriptEnvPrelude()}
+from pathlib import Path
+edl = Path(${JSON.stringify(edlPath)})
+name = ${JSON.stringify(timelineName)}
+try:
+    import DaVinciResolveScript as dvr
+except Exception:
+    print("IMPORT_FAIL")
+    raise SystemExit(1)
+resolve = dvr.scriptapp("Resolve")
+if not resolve:
+    print("NO_RESOLVE")
+    raise SystemExit(2)
+project = resolve.GetProjectManager().GetCurrentProject()
+if not project:
+    print("NO_PROJECT")
+    raise SystemExit(3)
+media_pool = project.GetMediaPool()
+imported = media_pool.ImportTimelineFromFile(str(edl), {"timelineName": name})
+if not imported:
+    print("IMPORT_FAILED")
+    raise SystemExit(4)
+print("IMPORTED")
+raise SystemExit(0)
+`;
+
+  const result = await runProcessCapture(
+    python.bin,
+    [...python.prefixArgs, "-c", code],
+    { cwd: handoffDir },
+    30000
+  );
+  const out = (result.stdout || "").trim();
+  if (out.includes("IMPORTED")) {
+    return {
+      ok: true,
+      imported: true,
+      reason: "OK",
+      message: "Timeline imported into the open Resolve project",
+      edlPath,
+    };
+  }
+  return {
+    ok: true,
+    imported: false,
+    reason: out || "UNKNOWN",
+    message: result.stderr?.slice(0, 300) || out || "Import did not succeed",
+    edlPath,
+  };
 }
 
 /**
@@ -1613,6 +1857,17 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const opened = await openResolve(body);
       return json(res, 200, opened);
+    }
+
+    if (req.method === "POST" && pathname === "/v1/resolve/scripting-probe") {
+      const probe = await probeResolveScripting();
+      return json(res, 200, probe);
+    }
+
+    if (req.method === "POST" && pathname === "/v1/resolve/import-edl") {
+      const body = await readBody(req);
+      const imported = await importEdlIntoResolve(body);
+      return json(res, 200, imported);
     }
 
     if (req.method === "POST" && pathname === "/v1/shutdown") {

@@ -188,6 +188,25 @@ export type AgentResolveOpenResponse = {
   message: string;
 };
 
+export type AgentResolveScriptingProbeResponse = {
+  ok: true;
+  installed: boolean;
+  running: boolean;
+  scriptingModules: boolean;
+  scriptingReachable: boolean;
+  projectOpen: boolean;
+  pythonAvailable: boolean;
+  note?: string;
+};
+
+export type AgentResolveImportEdlResponse = {
+  ok: true;
+  imported: boolean;
+  reason: string;
+  message: string;
+  edlPath?: string;
+};
+
 export type AgentFsRevealResponse = {
   ok: true;
   revealed: string;

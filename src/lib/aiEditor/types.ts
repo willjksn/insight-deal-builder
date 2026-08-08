@@ -34,7 +34,9 @@ export type AiEditorJobType =
   | "reclaim"
   | "resolve_export"
   | "resolve_open"
-  | "finishing";
+  | "resolve_import"
+  | "finishing"
+  | "feedback";
 
 export type AiEditorJobStatus =
   | "queued"
@@ -75,6 +77,8 @@ export interface AiEditorProjectSettings {
   ingestMode?: "managed" | "existing_folder" | "in_place";
   cameraLabels?: string[];
   agentLastSeenAt?: string;
+  /** V3 — last wrap-up after finishing in Resolve. */
+  lastFinishingFeedback?: FinishingFeedback;
   createdAt: string;
   updatedAt: string;
 }
@@ -255,6 +259,22 @@ export type FinishingMoodId =
   | "cool"
   | "cinematic"
   | "high_energy";
+
+/** V3 — what happened after Resolve, for next-edit defaults. */
+export type FinishingFeedbackOutcome =
+  | "kept_look"
+  | "tweaked_in_resolve"
+  | "started_fresh";
+
+export interface FinishingFeedback {
+  moodId: FinishingMoodId;
+  moodLabel: string;
+  transitionStyle: TransitionStyleId;
+  transitionLabel: string;
+  outcome: FinishingFeedbackOutcome;
+  note?: string;
+  updatedAt: string;
+}
 
 export interface ClipTransitionOut {
   type: TransitionType;

@@ -14,7 +14,9 @@ import {
   type AgentIngestCopyRequest,
   type AgentIngestCopyResponse,
   type AgentResolveDetectResponse,
+  type AgentResolveImportEdlResponse,
   type AgentResolveOpenResponse,
+  type AgentResolveScriptingProbeResponse,
   type AgentResolveWriteHandoffResponse,
   type AgentSafeDeleteFile,
   type AgentSafeDeleteResponse,
@@ -244,6 +246,34 @@ export async function agentRevealPath(baseUrl: string, token: string, dirPath: s
   return agentFetch<AgentFsRevealResponse>(baseUrl, token, "/fs/reveal", {
     method: "POST",
     body: JSON.stringify({ path: dirPath }),
+  });
+}
+
+export async function agentResolveScriptingProbe(baseUrl: string, token: string) {
+  return agentFetch<AgentResolveScriptingProbeResponse>(
+    baseUrl,
+    token,
+    "/resolve/scripting-probe",
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+export async function agentResolveImportEdl(
+  baseUrl: string,
+  token: string,
+  body: {
+    projectRoot?: string;
+    handoffDir?: string;
+    edlFilename?: string;
+    timelineName?: string;
+  }
+) {
+  return agentFetch<AgentResolveImportEdlResponse>(baseUrl, token, "/resolve/import-edl", {
+    method: "POST",
+    body: JSON.stringify(body),
   });
 }
 

@@ -22,8 +22,10 @@
 | **V1H Archive/Restore/Delete** | Verified archive, reclaim, safe delete |
 | **V1.5 Open in Resolve** | Write handoff to disk, detect/launch Resolve, Mac companion |
 | **V1.6 Finishing suggestions** | Mood/look notes + transition style → Resolve LOOKS.txt |
+| **V2 Workflow Integration** | Official Resolve scripting: status + auto-import when ready |
+| **V3 Feedback loop** | Wrap-up after Resolve → remember look defaults next time |
 
-Later: V2 Workflow Integration · V3 feedback loop
+Later: deeper Resolve bin automation, richer reverse-sync from NLE
 
 ## Current implementation status
 
@@ -38,4 +40,6 @@ Later: V2 Workflow Integration · V3 feedback loop
 - **V1 stabilize** — job APIs return completed status (not stale `queued`); archive unit tests green  
 - **V1.5 Open in Resolve (initial)** — write package to `03_PROJECT_FILES/shootspine_resolve`, detect/launch Resolve, Mac companion script + OPEN_ON_MAC.txt; plain-language finish-here vs finish-on-Mac UI  
 - **V1.6 Finishing suggestions (initial)** — mood presets + transition style on timeline; LOOKS.txt in Resolve package; Step 9 UI (suggestions only — grade in Resolve)  
-- Later: V2 Workflow Integration · V3 feedback loop
+- **V2 Workflow Integration (initial)** — scripting probe, Bring edit into Resolve (`ImportTimelineFromFile`), plain-language readiness status; manual fallback  
+- **V3 Feedback loop (initial)** — “How did finishing go?” wrap-up; stores last look preference; Look step pre-fills from feedback  
+- Later: deeper Resolve bin automation, richer reverse-sync from NLE

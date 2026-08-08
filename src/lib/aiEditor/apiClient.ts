@@ -5,6 +5,8 @@ import type {
   AiEditorJob,
   AiEditorProjectSettings,
   CoverageReport,
+  FinishingFeedback,
+  FinishingFeedbackOutcome,
   FinishingMoodId,
   MediaAsset,
   PreferredTakeOverride,
@@ -224,17 +226,47 @@ export async function aiEditorExportResolve(getToken: GetToken, projectId: strin
   }>(res);
 }
 
+export async function aiEditorSaveFeedback(
+  getToken: GetToken,
+  projectId: string,
+  body: {
+    moodId: FinishingMoodId;
+    transitionStyle: TransitionStyleId;
+    outcome: FinishingFeedbackOutcome;
+    note?: string;
+  }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/feedback`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    ok: true;
+    feedback: FinishingFeedback;
+    settings: AiEditorProjectSettings;
+    job: AiEditorJob;
+  }>(res);
+}
+
 export async function aiEditorLogResolveOpen(
   getToken: GetToken,
   projectId: string,
-  body: { message: string; launched?: boolean; handoffDir?: string }
+  body: {
+    message: string;
+    launched?: boolean;
+    handoffDir?: string;
+    type?: "resolve_open" | "resolve_import";
+  }
 ) {
   const res = await fetch(`/api/projects/${projectId}/ai-editor/jobs`, {
     method: "POST",
     headers: await authHeaders(getToken),
     body: JSON.stringify({
-      type: "resolve_open",
-      ...body,
+      type: body.type || "resolve_open",
+      message: body.message,
+      launched: body.launched,
+      handoffDir: body.handoffDir,
     }),
   });
   return parseJson<{ ok: true; job: AiEditorJob }>(res);

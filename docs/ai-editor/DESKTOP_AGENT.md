@@ -6,7 +6,7 @@ Companion process (not a separate product). Windows-first; macOS Resolve compani
 
 V1A: localhost HTTP API, session auth, storage root validation, create project folders, index folder, FFprobe stub/mock, thumbnail stub, job progress events.
 
-Supports verified copy, proxies, local AI analysis, media stream, archive/restore batch, safe-delete (project-root only), and Resolve detect / write-handoff / open (allowlisted launch only).
+Supports verified copy, proxies, local AI analysis, media stream, archive/restore batch, safe-delete (project-root only), and Resolve detect / scripting-probe / import-edl / write-handoff / open (allowlisted only).
 
 ## Communication
 
