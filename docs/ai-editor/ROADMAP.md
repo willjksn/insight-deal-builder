@@ -40,6 +40,7 @@
 | **V15 Storage health** | Live edit/backup coaching (internal vs SSD/HDD, same-drive risk, free space) |
 | **V16 Drive presence** | Detect unplugged edit/backup drives; Recheck + Relink banner |
 | **V17 Offline-safe actions** | Pause copy/prepare/Resolve/archive when edit or backup disk isn’t ready |
+| **V18 Continue / next step** | Hub resume card + in-project “Continue · Step N” coach with anchors |
 
 Later: deeper anonymized analytics across orgs (opt-in)
 
@@ -74,4 +75,5 @@ Later: deeper anonymized analytics across orgs (opt-in)
 - **V15 Storage health (initial)** — Step 2 workspace health for edit/backup placement + free space; guidance only  
 - **V16 Drive presence (initial)** — offline vs remount detection; top banner with Recheck; agent `storage/stat` reports `online: false`  
 - **V17 Offline-safe actions (initial)** — soft-gate disk ops (copy, prepare, analyze, Resolve write, archive/restore/reclaim) until Relink or plug-in  
+- **V18 Continue / next step (initial)** — local resume bookmark on hub; project Continue strip scrolls to next incomplete step  
 - Later: deeper anonymized analytics across orgs (opt-in)

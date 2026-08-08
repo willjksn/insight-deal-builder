@@ -26,6 +26,10 @@ import {
   type AiEditorSessionListItem,
 } from "@/lib/aiEditor/apiClient";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
+import {
+  readResumeBookmark,
+  type AiEditorResumeBookmark,
+} from "@/lib/aiEditor/workflowNextStep";
 
 function priorityBadge(priority: AiEditorRecommendation["priority"]) {
   if (priority === "high") return <Badge variant="warning">Do next</Badge>;
@@ -55,6 +59,7 @@ export function AiEditorHubClient() {
     null
   );
   const [name, setName] = useState("");
+  const [resume, setResume] = useState<AiEditorResumeBookmark | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -95,6 +100,10 @@ export function AiEditorHubClient() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    setResume(readResumeBookmark());
+  }, [loading]);
+
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
@@ -131,6 +140,32 @@ export function AiEditorHubClient() {
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </div>
+      ) : null}
+
+      {!loading && resume ? (
+        <Card>
+          <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">
+                Continue where you left off
+              </p>
+              <p className="truncate font-semibold text-slate-900">{resume.projectName}</p>
+              <p className="text-sm text-slate-600">
+                Step {resume.stepN}: {resume.stepTitle}
+              </p>
+              <p className="text-xs text-slate-500">{resume.stepDetail}</p>
+            </div>
+            <Link
+              href={`/projects/${resume.projectId}/ai-editor#${resume.anchor}`}
+              className="shrink-0"
+            >
+              <Button>
+                Continue
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardBody>
+        </Card>
       ) : null}
 
       {!loading && insightsStatus === "error" ? (
