@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clapperboard, FolderKanban, Loader2, Plus } from "lucide-react";
+import { Clapperboard, FolderKanban, Loader2, Plus, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -11,6 +11,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   aiEditorCreateSession,
+  aiEditorCrossProjectInsights,
   aiEditorListSessions,
   type AiEditorSessionListItem,
 } from "@/lib/aiEditor/apiClient";
@@ -24,6 +25,13 @@ export function AiEditorHubClient() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<AiEditorSessionListItem[]>([]);
+  const [insights, setInsights] = useState<
+    Array<{ id: string; text: string; weight: number }>
+  >([]);
+  const [insightsMeta, setInsightsMeta] = useState<{
+    projectCount: number;
+    withDataCount: number;
+  } | null>(null);
   const [name, setName] = useState("");
 
   const load = useCallback(async () => {
@@ -31,8 +39,18 @@ export function AiEditorHubClient() {
     setLoading(true);
     setError(null);
     try {
-      const res = await aiEditorListSessions(getToken);
+      const [res, insightRes] = await Promise.all([
+        aiEditorListSessions(getToken),
+        aiEditorCrossProjectInsights(getToken).catch(() => null),
+      ]);
       setSessions(res.sessions);
+      if (insightRes) {
+        setInsights(insightRes.insights);
+        setInsightsMeta({
+          projectCount: insightRes.projectCount,
+          withDataCount: insightRes.withDataCount,
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load edit sessions");
     } finally {
@@ -81,6 +99,34 @@ export function AiEditorHubClient() {
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </div>
+      ) : null}
+
+      {!loading && insights.length ? (
+        <Card>
+          <CardBody className="space-y-3">
+            <div className="flex items-center gap-2 font-semibold text-slate-900">
+              <Sparkles className="h-4 w-4 text-sky-700" />
+              Patterns across your edits
+            </div>
+            <p className="text-sm text-slate-600">
+              From looks, Resolve sync, and next-shoot checklists
+              {insightsMeta
+                ? ` · ${insightsMeta.withDataCount} of ${insightsMeta.projectCount} projects with data`
+                : ""}
+              . No footage leaves your drives.
+            </p>
+            <ul className="space-y-2">
+              {insights.map((insight) => (
+                <li
+                  key={insight.id}
+                  className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-800"
+                >
+                  {insight.text}
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
       ) : null}
 
       <Card>

@@ -47,6 +47,18 @@ export async function aiEditorListSessions(getToken: GetToken) {
   return parseJson<{ sessions: AiEditorSessionListItem[] }>(res);
 }
 
+export async function aiEditorCrossProjectInsights(getToken: GetToken) {
+  const res = await fetch("/api/ai-editor/insights", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    ok: true;
+    projectCount: number;
+    withDataCount: number;
+    insights: Array<{ id: string; text: string; weight: number }>;
+  }>(res);
+}
+
 export async function aiEditorCreateSession(getToken: GetToken, name: string) {
   const res = await fetch("/api/ai-editor/sessions", {
     method: "POST",

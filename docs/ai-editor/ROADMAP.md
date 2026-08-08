@@ -32,8 +32,9 @@
 | **V7 Reverse import** | Import Resolve cut → new ShootSpine timeline version |
 | **V8 Next shoot checklist** | Checkable pickups from missing coverage + Resolve feedback |
 | **V9 Board handoff** | Send open checklist items → production board filming notes |
+| **V10 Cross-project insights** | Patterns across looks / coverage / checklists on AI Editor hub |
 
-Later: cross-project analytics
+Later: richer anonymized analytics / recommendations engine
 
 ## Current implementation status
 
@@ -58,4 +59,5 @@ Later: cross-project analytics
 - **V7 Reverse import (initial)** — “Import Resolve cut here” builds a new timeline version from Resolve clip names; prior cut kept in Versions  
 - **V8 Next shoot checklist (initial)** — checkable list from missing coverage + dropped/preferred insights; saved on project; AI Editor only  
 - **V9 Board handoff (initial)** — “Send to production board” merges open checklist into filming notes (marked section, replaceable)  
-- Later: cross-project analytics
+- **V10 Cross-project insights (initial)** — hub “Patterns across your edits” from finishing feedback, planning insights, open checklists (metadata only)  
+- Later: richer anonymized analytics / recommendations engine
