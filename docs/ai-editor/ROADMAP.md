@@ -29,8 +29,9 @@
 | **V6 Planning feedback** | Clip-level compare Resolve ↔ rough cut → next-shoot notes |
 | **Edit notes** | Shoot / client / look notes → creative brief for Edit by Chat |
 | **Long-form ready** | Raised soft caps + acts/reels for ~1h45 features |
+| **V7 Reverse import** | Import Resolve cut → new ShootSpine timeline version |
 
-Later: deeper reverse import into ShootSpine timeline / cross-project analytics
+Later: cross-project analytics / richer planning from finals
 
 ## Current implementation status
 
@@ -52,4 +53,5 @@ Later: deeper reverse import into ShootSpine timeline / cross-project analytics
 - **V6 Planning feedback (initial)** — Resolve clip names matched to media; dropped/added vs rough cut; missing coverage + preferred-take notes for next shoot  
 - **Edit notes (initial)** — tagged notes (on set / client / look / general); saved on project; injected into Edit by Chat; “Propose from notes”  
 - **Long-form ready** — soft caps raised (5k media, 500/batch, 2k Resolve link/sync); acts/reels on timeline; Edit by chat scoped to active reel/act  
-- Later: deeper reverse import into ShootSpine timeline / cross-project analytics
+- **V7 Reverse import (initial)** — “Import Resolve cut here” builds a new timeline version from Resolve clip names; prior cut kept in Versions  
+- Later: cross-project analytics / richer planning from finals

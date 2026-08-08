@@ -9,6 +9,10 @@ import {
   setupFeatureReels,
 } from "@/lib/aiEditor/reels";
 import {
+  buildTimelineFromResolveSync,
+  resolveImportSummary,
+} from "@/lib/aiEditor/resolveImport";
+import {
   applyTimelineOps,
   buildRoughCutFromCoverage,
   bumpVersion,
@@ -17,6 +21,7 @@ import {
 } from "@/lib/aiEditor/timeline";
 import {
   createJob,
+  getAiEditorProjectSettings,
   getCoverageReport,
   getTimeline,
   listMediaAssets,
@@ -27,6 +32,7 @@ import {
 } from "@/lib/aiEditor/server";
 import type {
   FinishingMoodId,
+  ResolveSyncSnapshot,
   TimelineEditOp,
   TransitionStyleId,
 } from "@/lib/aiEditor/types";
@@ -76,7 +82,8 @@ export async function POST(
         | "restore_version"
         | "apply_finishing"
         | "setup_feature_reels"
-        | "set_active_reel";
+        | "set_active_reel"
+        | "import_resolve_cut";
       ops?: TimelineEditOp[];
       versionId?: string;
       note?: string;
@@ -88,15 +95,12 @@ export async function POST(
       reelMode?: "acts" | "reels";
       runtimeSeconds?: number;
       reelCount?: number;
+      /** Optional fresh snapshot; otherwise uses lastResolveSync. */
+      resolveSnapshot?: ResolveSyncSnapshot;
     };
     const action = body.action || "build_rough_cut";
 
-    const jobType =
-      action === "apply_finishing"
-        ? "finishing"
-        : action === "setup_feature_reels" || action === "set_active_reel"
-          ? "rough_cut"
-          : "rough_cut";
+    const jobType = action === "apply_finishing" ? "finishing" : "rough_cut";
     const job = await createJob(access.appUser, projectId, jobType, { action });
     await updateJob(job.id, {
       status: "running",
@@ -106,8 +110,77 @@ export async function POST(
     });
 
     let timeline = await getTimeline(projectId);
+    let importMeta: {
+      matched: number;
+      unmatchedNames: string[];
+      summary: string;
+    } | null = null;
 
-    if (action === "setup_feature_reels") {
+    if (action === "import_resolve_cut") {
+      const [media, settings] = await Promise.all([
+        listMediaAssets(projectId),
+        getAiEditorProjectSettings(projectId),
+      ]);
+      const snapshot = body.resolveSnapshot || settings?.lastResolveSync;
+      if (!snapshot?.clips?.length) {
+        await updateJob(job.id, {
+          status: "failed",
+          error: "No Resolve clip list — run Check what’s in Resolve first",
+          completedAt: new Date().toISOString(),
+        });
+        return NextResponse.json(
+          {
+            error:
+              "Check what’s in Resolve first (needs clip names), then import the cut here.",
+          },
+          { status: 400 }
+        );
+      }
+      if (timeline) {
+        // Keep prior ShootSpine cut in version history before replacing.
+        const prior = makeTimelineVersion(
+          timeline,
+          body.note || "Before Resolve import"
+        );
+        await saveTimelineVersion(prior);
+      }
+      const built = buildTimelineFromResolveSync({
+        projectId,
+        sync: snapshot,
+        media,
+        base: timeline,
+      });
+      if (built.matched < 1) {
+        await updateJob(job.id, {
+          status: "failed",
+          error: "No Resolve clips matched your media library",
+          completedAt: new Date().toISOString(),
+        });
+        return NextResponse.json(
+          {
+            error:
+              "None of the Resolve clip names matched your media. Relink names or sync again.",
+            unmatchedNames: built.unmatchedNames,
+          },
+          { status: 400 }
+        );
+      }
+      const nextVersion = (timeline?.version || 0) + 1;
+      const imported = { ...built.timeline, version: nextVersion, id: projectId };
+      const versionRecord = makeTimelineVersion(
+        imported,
+        body.note ||
+          `Imported from Resolve${snapshot.timelineName ? `: ${snapshot.timelineName}` : ""}`
+      );
+      timeline = imported;
+      await upsertTimeline(timeline);
+      await saveTimelineVersion(versionRecord);
+      importMeta = {
+        matched: built.matched,
+        unmatchedNames: built.unmatchedNames,
+        summary: resolveImportSummary(built),
+      };
+    } else if (action === "setup_feature_reels") {
       if (!timeline) {
         return NextResponse.json({ error: "Build a rough cut first" }, { status: 400 });
       }
@@ -245,9 +318,11 @@ export async function POST(
       progress: 100,
       completedAt: new Date().toISOString(),
       message:
-        action === "apply_finishing" && timeline.finishing
-          ? `${timeline.finishing.moodLabel} · ${timeline.finishing.transitionLabel} (v${timeline.version})`
-          : `Timeline v${timeline.version} saved`,
+        action === "import_resolve_cut" && importMeta
+          ? `${importMeta.summary} (v${timeline.version})`
+          : action === "apply_finishing" && timeline.finishing
+            ? `${timeline.finishing.moodLabel} · ${timeline.finishing.transitionLabel} (v${timeline.version})`
+            : `Timeline v${timeline.version} saved`,
     });
 
     const versions = await listTimelineVersions(projectId);
@@ -257,6 +332,7 @@ export async function POST(
       versions,
       summary: summarizeTimeline(timeline),
       job: completedJob,
+      importMeta: importMeta || undefined,
     });
   } catch (err) {
     return aiEditorErrorResponse(err);

@@ -21,6 +21,12 @@ Local playback via Desktop Agent `GET /v1/media/stream` (Range + `?token=`). UI 
 
 `editByChat.ts` + `POST .../ai-editor/chat-edit`: propose ops from natural language (deterministic rules first, Gemini JSON fallback), validate against the live timeline, apply with version bump, undo = restore prior version. Never sends camera media — only clip labels/ids/durations.
 
+## Reverse import from Resolve (V7)
+
+- `buildTimelineFromResolveSync` matches Resolve clip names to `MediaAsset`s
+- Timeline action `import_resolve_cut` saves prior cut as a version, then replaces with imported cut
+- UI: **Import Resolve cut here** (uses last sync, or syncs first)
+
 ## Long-form (acts / reels)
 
 - `Timeline.reels` + `clip.reelId` + `activeReelId`

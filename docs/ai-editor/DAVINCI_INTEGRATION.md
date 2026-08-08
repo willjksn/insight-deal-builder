@@ -15,6 +15,7 @@ Do not assume Resolve and AI Editor share a machine or OS paths.
 - **V4 (initial)** — Media Pool **ShootSpine** bin + `ImportMedia` from handoff paths, then `ImportTimelineFromFile`.
 - **V5 (initial)** — Read open Resolve timeline back (metadata + optional EDL snapshot). Non-destructive.
 - **V6 (initial)** — Clip list from Resolve → compare to rough cut / coverage → “For next time” planning notes.
+- **V7 (initial)** — Import Resolve cut into ShootSpine as a new timeline version (prior cut restorable).
 
 ## Phase plan
 
@@ -25,7 +26,8 @@ Do not assume Resolve and AI Editor share a machine or OS paths.
 5. **V4** — Resolve bin + media link — initial landed
 6. **V5** — Reverse sync from Resolve — initial landed
 7. **V6** — Planning feedback from final cut — initial landed
-8. Later — deeper reverse import into ShootSpine timeline
+8. **V7** — Reverse import into ShootSpine timeline — initial landed
+9. Later — cross-project analytics
 
 Always feature-detect Resolve capabilities. Prefer official developer docs for the installed version.
 

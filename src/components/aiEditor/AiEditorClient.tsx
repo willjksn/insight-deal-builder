@@ -1119,6 +1119,62 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  async function onImportResolveCut() {
+    setBusy("rough_cut");
+    setError(null);
+    setStatusNote(null);
+    try {
+      let snapshot = settings?.lastResolveSync;
+      if (!snapshot?.clips?.length) {
+        // Fresh sync if we don’t have clip names yet
+        const health = await checkAgentHealth();
+        setAgent(health);
+        if (!health.connected) throw new Error("Desktop Agent not connected");
+        const projectRoot = settings?.projectRootPath?.trim();
+        if (!projectRoot) throw new Error("Set your project folder in step 2 first");
+        const token = await ensureAgentSession();
+        const probe = await refreshResolveWorkflow(token);
+        if (!probe?.projectOpen) {
+          setStatusNote("Open Resolve with a timeline, then try again.");
+          return;
+        }
+        const handoffDir = handoffDirOnDisk || resolveHandoffAbsoluteDir(projectRoot);
+        const synced = await agentResolveSyncFromNle(DEFAULT_AGENT_BASE_URL, token, {
+          projectRoot,
+          handoffDir,
+          exportEdl: true,
+        });
+        if (!synced.synced || !synced.snapshot) {
+          setStatusNote(synced.message || "Couldn’t read Resolve yet.");
+          return;
+        }
+        const saved = await aiEditorSaveResolveSync(getToken, projectId, {
+          snapshot: synced.snapshot,
+        });
+        setSettings(saved.settings);
+        setPlanningFeedback(saved.planning);
+        snapshot = saved.sync;
+      }
+
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "import_resolve_cut",
+        resolveSnapshot: snapshot,
+        note: "Imported cut from Resolve",
+      });
+      setTimeline(res.timeline);
+      setTimelineVersions(res.versions);
+      setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
+      setStatusNote(
+        (res.importMeta?.summary || "Imported from Resolve") +
+          (res.summary ? ` · ${res.summary.durationTimecode}` : "")
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not import Resolve cut");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function onSyncFromResolve() {
     setBusy("resolve-sync");
     setError(null);
@@ -3096,8 +3152,8 @@ export function AiEditorClient({ projectId }: Props) {
               <div className="rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
                 <p className="font-semibold text-slate-900">After you finish in Resolve</p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Read the open timeline back (clips + length). We’ll compare it to your rough cut
-                  and note ideas for the next shoot. Your edit here is not overwritten.
+                  Read the open timeline back for notes, or import that cut into ShootSpine as a new
+                  version (your previous rough cut stays in Versions → Restore).
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <Button
@@ -3111,6 +3167,17 @@ export function AiEditorClient({ projectId }: Props) {
                       <RefreshCw className="mr-1.5 h-4 w-4" />
                     )}
                     Check what’s in Resolve
+                  </Button>
+                  <Button
+                    onClick={() => void onImportResolveCut()}
+                    disabled={!!busy || !agent.connected || !settings?.projectRootPath}
+                  >
+                    {busy === "rough_cut" ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Clapperboard className="mr-1.5 h-4 w-4" />
+                    )}
+                    Import Resolve cut here
                   </Button>
                   {resolveSyncSummary ? (
                     <span className="text-sm text-slate-600">

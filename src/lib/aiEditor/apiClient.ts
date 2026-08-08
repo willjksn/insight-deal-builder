@@ -155,7 +155,8 @@ export async function aiEditorTimelineAction(
       | "restore_version"
       | "apply_finishing"
       | "setup_feature_reels"
-      | "set_active_reel";
+      | "set_active_reel"
+      | "import_resolve_cut";
     ops?: TimelineEditOp[];
     versionId?: string;
     note?: string;
@@ -166,6 +167,7 @@ export async function aiEditorTimelineAction(
     reelMode?: "acts" | "reels";
     runtimeSeconds?: number;
     reelCount?: number;
+    resolveSnapshot?: ResolveSyncSnapshot;
   }
 ) {
   const res = await fetch(`/api/projects/${projectId}/ai-editor/timeline`, {
@@ -184,6 +186,11 @@ export async function aiEditorTimelineAction(
       version: number;
     };
     job: AiEditorJob;
+    importMeta?: {
+      matched: number;
+      unmatchedNames: string[];
+      summary: string;
+    };
   }>(res);
 }
 
