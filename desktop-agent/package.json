@@ -1,0 +1,14 @@
+{
+  "name": "shootspine-desktop-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ShootSpine Desktop Agent — localhost companion for AI Editor (not a separate product)",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "dev": "node --watch src/server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

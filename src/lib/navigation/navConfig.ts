@@ -26,6 +26,7 @@ import {
   IdCard,
   Wallet,
   BarChart3,
+  Clapperboard,
 } from "lucide-react";
 import { AppUser } from "@/lib/types";
 import { Workspace } from "@/lib/workspace/types";
@@ -47,6 +48,7 @@ import {
 } from "@/lib/utils/permissions";
 import { isContentIdeasNavEnabled } from "@/lib/contentIdeas/navFlag";
 import { canAccessHowToUseGuide } from "@/lib/guide/access";
+import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 
 export type NavIcon = typeof LayoutDashboard;
 
@@ -187,6 +189,12 @@ export const NAV_GROUPS: NavGroup[] = [
     scope: "production",
     items: [
       { href: "/projects", label: "Projects", icon: FolderKanban },
+      {
+        href: "/ai-editor",
+        label: "AI Editor",
+        icon: Clapperboard,
+        canAccess: (u) => isAiEditorEnabled() && canUseProductionTools(u),
+      },
       { href: "/script-writer", label: "Script writer", icon: ScrollText, canAccess: canUseProductionTools },
       { href: "/stage", label: "Stage planner", icon: LayoutGrid, canAccess: canUseProductionTools },
       { href: "/reference", label: "Reference guide", icon: BookOpen, canAccess: canUseProductionTools },

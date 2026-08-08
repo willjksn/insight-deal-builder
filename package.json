@@ -9,6 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "agent": "node desktop-agent/src/server.mjs",
+    "agent:start": "node desktop-agent/src/server.mjs",
     "process-brand-logos": "node scripts/process-brand-logos.mjs",
     "create-admin-user": "node scripts/create-admin-user.mjs"
   },

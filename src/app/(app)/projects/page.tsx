@@ -100,12 +100,22 @@ export default function ProjectsPage() {
       ) : (
         <DataTable headers={["Project", "Client", "Type", "Fee", "Status", "Actions"]}>
           {projects.map((p) => (
-            <DataRow key={p.id} href={`/projects/${p.id}`} actionCellIndex={5} cells={[
-              p.projectName, p.clientName || "—", p.projectType,
-              `$${p.totalProjectFee.toLocaleString()}`,
+            <DataRow key={p.id} href={p.aiEditorOnly ? `/projects/${p.id}/ai-editor` : `/projects/${p.id}`} actionCellIndex={5} cells={[
+              <span key="n" className="inline-flex flex-wrap items-center gap-2">
+                {p.projectName}
+                {p.aiEditorOnly ? <Badge variant="info">AI Editor</Badge> : null}
+              </span>,
+              p.aiEditorOnly ? "—" : (p.clientName || "—"),
+              p.aiEditorOnly ? "Footage-only edit" : p.projectType,
+              p.aiEditorOnly ? "—" : `$${p.totalProjectFee.toLocaleString()}`,
               <Badge key="s">{p.status.replace(/_/g, " ")}</Badge>,
               <div key="a" className="flex gap-2">
-                {canManageProjects(appUser) && (
+                {p.aiEditorOnly ? (
+                  <Link href={`/projects/${p.id}/ai-editor`}>
+                    <Button size="sm" variant="outline">Open AI Editor</Button>
+                  </Link>
+                ) : null}
+                {canManageProjects(appUser) && !p.aiEditorOnly && (
                   <>
                     <Link href={`/agreements/new?projectId=${p.id}`}><Button size="sm" variant="outline"><FileText className="h-4 w-4 mr-1" />Agreement</Button></Link>
                     <Button size="sm" variant="outline" onClick={() => { setEditingId(p.id); setForm({ projectName: p.projectName, clientId: p.clientId, clientName: p.clientName, agreementType: p.agreementType, projectType: p.projectType, shootType: p.shootType, totalProjectFee: p.totalProjectFee, shootDate: p.shootDate || "", deliveryDate: p.deliveryDate || "", location: p.location || "", status: p.status }); setShowForm(true); }}>Edit</Button>

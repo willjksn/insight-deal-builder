@@ -1,7 +1,7 @@
 import { FieldValue, Firestore } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
-import { PRODUCTION_BOARDS_COLLECTION } from "@/lib/firebase/productionRepos";
+import { PRODUCTION_BOARDS_COLLECTION } from "@/lib/firebase/productionFirestore";
 import type { ProductionBoard } from "@/lib/production/types";
 import { newActivity } from "@/lib/revenueOpportunities/defaults";
 import { RevenueOpportunityError } from "@/lib/revenueOpportunities/errors";

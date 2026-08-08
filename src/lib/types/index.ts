@@ -181,6 +181,11 @@ export interface Project {
   status: ProjectStatus;
   /** User who created the project — can manage team access without global manageProjects */
   ownerUserId?: string;
+  /**
+   * Footage-only AI Editor workspace (no full production plan required).
+   * Still a ShootSpine project record so media/settings stay consistent.
+   */
+  aiEditorOnly?: boolean;
   /** Created from Weekly Content Idea Engine */
   sourceIdeaEngine?: boolean;
   sourceIdeaSessionId?: string;

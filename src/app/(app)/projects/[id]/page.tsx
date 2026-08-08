@@ -141,6 +141,42 @@ export default function ProjectDetailPage() {
     );
   }
 
+  if (project.aiEditorOnly) {
+    return (
+      <div className="pb-24">
+        <PageHeader
+          title={project.projectName}
+          subtitle="Footage-only AI Editor workspace — no production plan required"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/projects/${project.id}/ai-editor`}>
+                <Button size="touch">Open AI Editor</Button>
+              </Link>
+              <Link href="/ai-editor">
+                <Button size="touch" variant="outline">
+                  All edits
+                </Button>
+              </Link>
+            </div>
+          }
+        />
+        <Card>
+          <CardBody className="space-y-3 text-sm text-slate-600">
+            <p>
+              This workspace is for editing footage that was not planned as a full ShootSpine
+              production. Storage, media IDs, and future rough cuts live here the same way they do
+              on production projects.
+            </p>
+            <p>
+              Need script, coverage, or call sheets later? Create a normal project under Projects —
+              AI Editor also appears on those project spines.
+            </p>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="pb-24">
       <PageHeader
@@ -271,6 +307,7 @@ export default function ProjectDetailPage() {
           agreements={projectAgreements}
           showPrepBoard={showPrepBoard}
           showShots={showShots}
+          showAiEditor={showShots || showPrepBoard}
           showScripts={showScripts}
           canCreateDeal={canCreateDeal}
         />

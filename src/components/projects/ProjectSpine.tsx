@@ -8,12 +8,14 @@ import {
   ArrowRight,
   BookOpen,
   ListOrdered,
+  Clapperboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Badge } from "@/components/ui/Badge";
 import { Agreement } from "@/lib/types";
 import { ProductionBoard } from "@/lib/production/types";
 import { ScriptWriterSession } from "@/lib/scriptWriter/types";
+import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 
 type SpineStep = {
   key: string;
@@ -123,6 +125,8 @@ interface ProjectSpineProps {
   showPrepBoard?: boolean;
   /** Coverage + call sheet (on-set) */
   showShots?: boolean;
+  /** AI Editor (post) — after coverage when production tools available */
+  showAiEditor?: boolean;
   /** @deprecated use showPrepBoard / showShots */
   showProduction?: boolean;
   showScripts: boolean;
@@ -138,6 +142,7 @@ export function ProjectSpine({
   agreements,
   showPrepBoard,
   showShots,
+  showAiEditor,
   showProduction,
   showScripts,
   canCreateDeal,
@@ -146,6 +151,7 @@ export function ProjectSpine({
   const scriptParams = new URLSearchParams({ idea, title: projectName, projectId });
   const prep = showPrepBoard ?? showProduction ?? false;
   const shots = showShots ?? showProduction ?? false;
+  const aiEditor = (showAiEditor ?? shots) && isAiEditorEnabled();
 
   const steps: SpineStep[] = [];
 
@@ -227,6 +233,18 @@ export function ProjectSpine({
       status: "ready",
       summary: "Optional on-set camera / lens lookup",
       detail: "Global guide — not tied to this project’s shots.",
+    });
+  }
+
+  if (aiEditor) {
+    steps.push({
+      key: "ai-editor",
+      label: "AI Editor",
+      icon: Clapperboard,
+      href: `/projects/${projectId}/ai-editor`,
+      status: "empty",
+      summary: "Ingest, organize, and rough-cut footage",
+      detail: "Production-aware post — finish in DaVinci Resolve.",
     });
   }
 

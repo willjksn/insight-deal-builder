@@ -1,0 +1,364 @@
+import { authHeaders } from "@/lib/scriptWriter/apiClient";
+import type { ClipAnalysisBundle } from "@/lib/aiEditor/analysis";
+import type {
+  AgentSession,
+  AiEditorJob,
+  AiEditorProjectSettings,
+  CoverageReport,
+  MediaAsset,
+  PreferredTakeOverride,
+  ProductionContext,
+  StorageLocation,
+  StoragePurpose,
+  StorageType,
+  Timeline,
+  TimelineEditOp,
+  TimelineVersion,
+} from "@/lib/aiEditor/types";
+
+type GetToken = () => Promise<string | null>;
+
+async function parseJson<T>(res: Response): Promise<T> {
+  const data = (await res.json()) as T & { error?: string };
+  if (!res.ok) throw new Error(data.error ?? res.statusText);
+  return data;
+}
+
+export type AiEditorSessionListItem = {
+  id: string;
+  projectName: string;
+  status: string;
+  updatedAt?: unknown;
+  createdAt?: unknown;
+};
+
+export async function aiEditorListSessions(getToken: GetToken) {
+  const res = await fetch("/api/ai-editor/sessions", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ sessions: AiEditorSessionListItem[] }>(res);
+}
+
+export async function aiEditorCreateSession(getToken: GetToken, name: string) {
+  const res = await fetch("/api/ai-editor/sessions", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ name }),
+  });
+  return parseJson<{ ok: true; id: string; projectId: string; projectName: string }>(res);
+}
+
+export async function aiEditorLaunchAgent(
+  getToken: GetToken,
+  opts?: { restart?: boolean }
+) {
+  const res = await fetch("/api/ai-editor/agent/launch", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ restart: Boolean(opts?.restart) }),
+  });
+  return parseJson<{
+    ok: true;
+    alreadyRunning?: boolean;
+    started?: boolean;
+    restarted?: boolean;
+    baseUrl?: string;
+  }>(res);
+}
+
+export async function aiEditorPatchMedia(
+  getToken: GetToken,
+  projectId: string,
+  patches: Array<{ id: string } & Partial<MediaAsset>>
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/media/patch`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ patches }),
+  });
+  return parseJson<{ ok: true; count: number }>(res);
+}
+
+export async function aiEditorGetContext(getToken: GetToken, projectId: string) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/context`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ context: ProductionContext }>(res);
+}
+
+export async function aiEditorGetDashboard(getToken: GetToken, projectId: string) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    settings: AiEditorProjectSettings | null;
+    storage: StorageLocation[];
+    media: MediaAsset[];
+    jobs: AiEditorJob[];
+    context: ProductionContext;
+    analysis: ClipAnalysisBundle[];
+    coverage: CoverageReport | null;
+    timeline: Timeline | null;
+    timelineVersions: TimelineVersion[];
+    timelineSummary: {
+      durationSeconds: number;
+      durationTimecode: string;
+      clipCount: number;
+      version: number;
+    } | null;
+  }>(res);
+}
+
+export async function aiEditorRunMatch(
+  getToken: GetToken,
+  projectId: string,
+  overrides?: PreferredTakeOverride[]
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/match`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ overrides }),
+  });
+  return parseJson<{ ok: true; coverage: CoverageReport; job: AiEditorJob }>(res);
+}
+
+export async function aiEditorGetTimeline(getToken: GetToken, projectId: string) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/timeline`, {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    timeline: Timeline | null;
+    versions: TimelineVersion[];
+    summary: {
+      durationSeconds: number;
+      durationTimecode: string;
+      clipCount: number;
+      version: number;
+    } | null;
+  }>(res);
+}
+
+export async function aiEditorTimelineAction(
+  getToken: GetToken,
+  projectId: string,
+  body: {
+    action: "build_rough_cut" | "apply_ops" | "restore_version";
+    ops?: TimelineEditOp[];
+    versionId?: string;
+    note?: string;
+    name?: string;
+  }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/timeline`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    ok: true;
+    timeline: Timeline;
+    versions: TimelineVersion[];
+    summary: {
+      durationSeconds: number;
+      durationTimecode: string;
+      clipCount: number;
+      version: number;
+    };
+    job: AiEditorJob;
+  }>(res);
+}
+
+export type ChatEditProposalClient = {
+  summary: string;
+  ops: TimelineEditOp[];
+  confidence: number;
+  source: "rules" | "gemini";
+  warnings: string[];
+  action?: "undo";
+};
+
+export async function aiEditorChatEdit(
+  getToken: GetToken,
+  projectId: string,
+  body: { message: string; apply?: boolean }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/chat-edit`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    ok: true;
+    applied?: boolean;
+    proposal: ChatEditProposalClient;
+    descriptions?: string[];
+    validation?: { ok: boolean; errors: string[]; warnings: string[] };
+    timeline?: Timeline;
+    versions?: TimelineVersion[];
+    job?: AiEditorJob;
+  }>(res);
+}
+
+export async function aiEditorExportResolve(getToken: GetToken, projectId: string) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/export-resolve`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({}),
+  });
+  return parseJson<{
+    ok: true;
+    job: AiEditorJob;
+    summary: {
+      clipCount: number;
+      durationTimecode: string;
+      durationSeconds: number;
+      mediaCount: number;
+    };
+    files: Record<string, string>;
+  }>(res);
+}
+
+export async function aiEditorArchiveAction(
+  getToken: GetToken,
+  projectId: string,
+  body:
+    | { action: "plan"; archiveRootPath?: string }
+    | { action: "set_root"; archiveRootPath: string }
+    | {
+        action: "log";
+        type: "archive" | "restore" | "reclaim";
+        message?: string;
+        count?: number;
+        mediaIds?: string[];
+      }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/archive`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    ok: true;
+    settings?: AiEditorProjectSettings;
+    job?: AiEditorJob;
+    summary?: {
+      total: number;
+      withLocalSource: number;
+      archived: number;
+      reclaimable: number;
+      restorable: number;
+    };
+    archiveRootPath?: string | null;
+    projectRootPath?: string | null;
+    archive?: {
+      items: Array<{
+        mediaAssetId: string;
+        filename: string;
+        sourcePath: string;
+        destPath: string;
+        relativeArchivePath: string;
+      }>;
+      skipped: Array<{ mediaAssetId: string; filename: string; reason: string }>;
+    };
+    restore?: {
+      items: Array<{
+        mediaAssetId: string;
+        filename: string;
+        sourcePath: string;
+        destPath: string;
+        relativeArchivePath: string;
+      }>;
+      skipped: Array<{ mediaAssetId: string; filename: string; reason: string }>;
+    };
+  }>(res);
+}
+
+export async function aiEditorSaveAnalysis(
+  getToken: GetToken,
+  projectId: string,
+  results: Array<{
+    mediaAssetId: string;
+    technical?: ClipAnalysisBundle["technical"];
+    shots?: ClipAnalysisBundle["shots"];
+    transcript?: ClipAnalysisBundle["transcript"];
+    error?: string;
+  }>
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/analyze`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ results }),
+  });
+  return parseJson<{ ok: true; analysis: ClipAnalysisBundle[]; job: AiEditorJob }>(res);
+}
+
+export async function aiEditorSaveStorage(
+  getToken: GetToken,
+  projectId: string,
+  body: {
+    name: string;
+    path: string;
+    purpose: StoragePurpose;
+    type?: StorageType;
+    setAsActive?: boolean;
+    projectRootName?: string;
+  }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/storage`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    storage: StorageLocation;
+    settings: AiEditorProjectSettings;
+  }>(res);
+}
+
+export async function aiEditorMintAgentSession(getToken: GetToken, projectId: string) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/agent/session`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({}),
+  });
+  return parseJson<{ session: AgentSession }>(res);
+}
+
+export async function aiEditorIndexMedia(
+  getToken: GetToken,
+  projectId: string,
+  body: {
+    files: Array<{
+      path: string;
+      filename: string;
+      sizeBytes?: number;
+      relativeProjectPath?: string;
+      probe?: Partial<MediaAsset>;
+    }>;
+    ingestMode?: "managed" | "existing_folder" | "in_place";
+  }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/media`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ media: MediaAsset[]; job: AiEditorJob }>(res);
+}
+
+export async function aiEditorCreateFoldersJob(
+  getToken: GetToken,
+  projectId: string,
+  body: { cameraLabels?: string[] }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/jobs`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ type: "create_folders", ...body }),
+  });
+  return parseJson<{
+    job: AiEditorJob;
+    folderPlan: string[];
+    projectRootPath: string;
+  }>(res);
+}

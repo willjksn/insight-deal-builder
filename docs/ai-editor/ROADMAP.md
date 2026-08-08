@@ -1,0 +1,37 @@
+# AI Editor — Roadmap
+
+## Already built in ShootSpine (reuse)
+
+- Project + ProductionBoard + script sessions
+- Shot list / coverage / storyboard frames (planning stills)
+- Firebase Auth, project members, production permissions
+- Gemini cloud AI + monthly usage tracking
+- Firebase Storage for **planning** media (not camera originals)
+
+## Phases
+
+| Phase | Milestone |
+|-------|-----------|
+| **V1A Foundation** | Route, Production Context, storage/media models, agent scaffold, folder create, index + probe stubs, jobs, offline state |
+| **V1B Ingest** | Verified copy, camera assignment, proxies, disk checks |
+| **V1C Local Analysis** | Transcription, shot detection, searchable metadata |
+| **V1D Matching** | Script/shot-list matching, coverage report, preferred takes |
+| **V1E Rough Cut** | Timeline model + engine + preview + versioning |
+| **V1F Edit by Chat** | Structured ops + validate + apply + undo |
+| **V1G Resolve Export** | NLEAdapter + portable handoff (Windows → Mac) |
+| **V1H Archive/Restore/Delete** | Verified archive, reclaim, safe delete |
+
+Later: V1.5 Open in Resolve / Mac companion · post-V1 finishing (transitions / mood looks → Resolve) · V2 Workflow Integration · V3 feedback loop
+
+## Current implementation status
+
+- **V1A Foundation** — landed  
+- **V1B Ingest** — verified copy, disk checks, camera assignment, multi-camera queue, progress UI, media safety banner; card erase never automatic  
+- **V1C Local Analysis (initial)** — technical analysis + FFmpeg shot breaks, optional Whisper transcription (local CLI, CUDA→CPU fallback), transcript search, analysis stored as metadata  
+- **V1D Matching (initial)** — deterministic clip↔planned-shot scoring, coverage report, preferred takes + manual override, script dialogue used when linked  
+- **V1E Rough Cut (initial)** — timeline model + ops (insert/trim/move/rippleDelete/split/reorder), build from coverage, version snapshots + restore, Step 7 UI, local preview stream  
+- **V1F Edit by Chat (initial)** — NL → structured ops (rules + optional Gemini), validate, apply, undo via versions, Step 8 UI  
+- **V1G Resolve Export (initial)** — EDL + handoff JSON + README, media map by MediaAsset.id / relativeProjectPath / checksum, Step 9 download UI  
+- **V1H Archive/Restore/Delete (initial)** — verified archive batch, restore to project, reclaim active copies with typed confirm; camera cards never auto-erased; Step 10 UI  
+- **V1 stabilize** — job APIs return completed status (not stale `queued`); archive unit tests green  
+- Later: V1.5 Open in Resolve / Mac companion · post-V1 finishing (transitions / mood looks → Resolve)
