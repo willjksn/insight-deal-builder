@@ -34,8 +34,9 @@
 | **V9 Board handoff** | Send open checklist items → production board filming notes |
 | **V10 Cross-project insights** | Patterns across looks / coverage / checklists on AI Editor hub |
 | **V11 Look defaults + Mac brief** | Cross-project Look seeding; LOOKS.txt creative brief; Resolve preflight tips |
+| **V12 Dual-drive setup** | Drive labels (SSD/HDD/USB) + guided edit SSD / backup HDD folders |
 
-Later: richer anonymized analytics / recommendations engine
+Later: richer anonymized analytics / recommendations engine; offline remount by volume id
 
 ## Current implementation status
 
@@ -62,4 +63,5 @@ Later: richer anonymized analytics / recommendations engine
 - **V9 Board handoff (initial)** — “Send to production board” merges open checklist into filming notes (marked section, replaceable)  
 - **V10 Cross-project insights (initial)** — hub “Patterns across your edits” from finishing feedback, planning insights, open checklists (metadata only)  
 - **V11 Look defaults + Mac brief (initial)** — seed Look from cross-project patterns when no wrap-up; LOOKS.txt includes look/client notes; “Before you finish” preflight tips  
-- Later: richer anonymized analytics / recommendations engine
+- **V12 Dual-drive setup (initial)** — Desktop Agent lists volume name / SSD·HDD·USB / free space; Step 2 guided edit + backup folders with type detection  
+- Later: richer anonymized analytics / recommendations engine; offline remount by volume id

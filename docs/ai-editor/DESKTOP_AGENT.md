@@ -25,6 +25,10 @@ Supports verified copy, proxies, local AI analysis, media stream, archive/restor
 
 Archive / restore / reclaim batches return **per-file** success/failure so the UI patches only what actually changed on disk.
 
+### Drives (v0.14+)
+
+`GET /v1/fs/drives` on Windows enriches volumes via PowerShell (`Get-Volume` / `Get-Disk`): volume label, free/capacity, bus/media type, and a best-effort `storageType` (`externalSSD` / `externalHDD` / `internal` / `removable` / `network`). The AI Editor Step 2 picker uses this for “Edit on SSD / Backup on HDD” guidance.
+
 ## Scaffold location
 
 `desktop-agent/` — Node TypeScript HTTP service for V1A (lightweight; Tauri shell can wrap later).

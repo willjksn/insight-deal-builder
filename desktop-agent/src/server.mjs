@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.13.0";
+const VERSION = "0.14.0";
 /** Set SHOOTSPINE_AGENT_DEV_OPEN=1 to accept any non-empty Bearer token (local agent testing). */
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN === "1";
 /** Optional: ShootSpine origin for verifying minted tokens (e.g. http://localhost:3000). */
@@ -849,20 +849,124 @@ function redirectWindowsJunction(dirPath) {
   return path.join(home, targetName);
 }
 
-async function listDrives() {
-  const drives = [];
-  if (process.platform === "win32") {
-    for (const letter of "CDEFGHIJKLMNOPQRSTUVWXYZ") {
+async function classifyWinDrive(meta) {
+  const letter = String(meta.letter || "").toUpperCase().replace(":", "");
+  const bus = String(meta.busType || "").toLowerCase();
+  const media = String(meta.mediaType || "").toLowerCase();
+  const driveType = String(meta.driveType || "").toLowerCase();
+  const removable = Boolean(meta.removable) || driveType.includes("removable");
+  const isUsb =
+    removable ||
+    bus.includes("usb") ||
+    bus.includes("thunderbolt") ||
+    bus.includes("file back");
+  if (driveType.includes("network") || bus.includes("file back")) return "network";
+  if (isUsb) {
+    if (media.includes("ssd")) return "externalSSD";
+    if (media.includes("hdd") || media.includes("hard")) return "externalHDD";
+    if (Number(meta.capacityBytes) >= 500 * 1024 ** 3) return "externalHDD";
+    return "removable";
+  }
+  if (letter === "C") return "internal";
+  if (media.includes("ssd")) return "internal";
+  if (media.includes("hdd") || media.includes("hard")) return "externalHDD";
+  return "unknown";
+}
+
+async function listWindowsVolumes() {
+  try {
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execFileAsync = promisify(execFile);
+    const ps = `
+$ErrorActionPreference = 'SilentlyContinue'
+Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
+  $letter = $_.DriveLetter
+  $part = Get-Partition -DriveLetter $letter
+  $disk = if ($part) { Get-Disk -Number $part.DiskNumber } else { $null }
+  [PSCustomObject]@{
+    letter = "$letter"
+    volumeLabel = $_.FileSystemLabel
+    driveType = [string]$_.DriveType
+    availableBytes = [int64]$_.SizeRemaining
+    capacityBytes = [int64]$_.Size
+    busType = if ($disk) { [string]$disk.BusType } else { '' }
+    mediaType = if ($disk) { [string]$disk.MediaType } else { '' }
+    serial = if ($disk) { [string]$disk.SerialNumber } else { '' }
+    removable = ([string]$_.DriveType -match 'Removable')
+  }
+} | ConvertTo-Json -Compress
+`.trim();
+    const { stdout } = await execFileAsync(
+      "powershell",
+      ["-NoProfile", "-Command", ps],
+      { encoding: "utf8", windowsHide: true, timeout: 12000, maxBuffer: 2 * 1024 * 1024 }
+    );
+    const raw = String(stdout || "").trim();
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    const rows = Array.isArray(parsed) ? parsed : [parsed];
+    const out = [];
+    for (const row of rows) {
+      const letter = String(row.letter || "").toUpperCase();
+      if (!letter || letter.length !== 1) continue;
       const root = `${letter}:\\`;
       try {
         await fs.access(root);
-        drives.push({ path: root, label: `${letter}:`, kind: "drive" });
       } catch {
-        /* skip */
+        continue;
+      }
+      const storageType = await classifyWinDrive(row);
+      const volumeLabel = String(row.volumeLabel || "").trim();
+      out.push({
+        path: root,
+        label: volumeLabel || `${letter}:`,
+        kind: "drive",
+        volumeLabel: volumeLabel || undefined,
+        availableBytes: Number.isFinite(Number(row.availableBytes))
+          ? Number(row.availableBytes)
+          : undefined,
+        capacityBytes: Number.isFinite(Number(row.capacityBytes))
+          ? Number(row.capacityBytes)
+          : undefined,
+        driveType: row.driveType || undefined,
+        busType: row.busType || undefined,
+        mediaType: row.mediaType || undefined,
+        removable: Boolean(row.removable),
+        volumeIdentifier: row.serial ? String(row.serial).trim() : undefined,
+        storageType,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+async function listDrives() {
+  const drives = [];
+  if (process.platform === "win32") {
+    const enriched = await listWindowsVolumes();
+    if (enriched.length) {
+      drives.push(...enriched);
+    } else {
+      for (const letter of "CDEFGHIJKLMNOPQRSTUVWXYZ") {
+        const root = `${letter}:\\`;
+        try {
+          await fs.access(root);
+          drives.push({
+            path: root,
+            label: `${letter}:`,
+            kind: "drive",
+            storageType: letter === "C" ? "internal" : "unknown",
+          });
+        } catch {
+          /* skip */
+        }
       }
     }
   } else {
-    drives.push({ path: "/", label: "/", kind: "volume" });
+    drives.push({ path: "/", label: "/", kind: "volume", storageType: "internal" });
     try {
       const vols = await fs.readdir("/Volumes");
       for (const v of vols) {
@@ -870,6 +974,8 @@ async function listDrives() {
           path: path.join("/Volumes", v),
           label: v,
           kind: "volume",
+          volumeLabel: v,
+          storageType: "unknown",
         });
       }
     } catch {
@@ -879,17 +985,17 @@ async function listDrives() {
 
   const home = os.homedir();
   if (home) {
-    drives.push({ path: home, label: "Home", kind: "home" });
+    drives.push({ path: home, label: "Home", kind: "home", storageType: "internal" });
     for (const [name, kind] of [
       ["Desktop", "desktop"],
       ["Documents", "documents"],
       ["Videos", "videos"],
       ["Movies", "videos"],
     ]) {
-      const p = path.join(home, name);
+      const folder = path.join(home, name);
       // Only offer folders Node can actually list (skips broken junctions).
-      if (await canReadDir(p)) {
-        drives.push({ path: p, label: name, kind });
+      if (await canReadDir(folder)) {
+        drives.push({ path: folder, label: name, kind, storageType: "internal" });
       }
     }
   }

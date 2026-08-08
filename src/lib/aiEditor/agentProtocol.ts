@@ -64,10 +64,33 @@ export type AgentThumbnailResponse = {
   dataUrl?: string;
 };
 
+export type AgentDriveStorageType =
+  | "internal"
+  | "externalSSD"
+  | "externalHDD"
+  | "network"
+  | "removable"
+  | "unknown";
+
 export type AgentDriveEntry = {
   path: string;
   label: string;
   kind: "drive" | "volume" | "home" | "desktop" | "documents" | "videos" | "other";
+  /** Volume name from the OS when available */
+  volumeLabel?: string;
+  availableBytes?: number;
+  capacityBytes?: number;
+  /** Fixed / Removable / Network / etc. */
+  driveType?: string;
+  /** USB / NVMe / SATA / Thunderbolt */
+  busType?: string;
+  /** SSD / HDD / Unspecified */
+  mediaType?: string;
+  removable?: boolean;
+  /** Stable-ish id for remount detection */
+  volumeIdentifier?: string;
+  /** Pre-classified by the Desktop Agent when possible */
+  storageType?: AgentDriveStorageType;
 };
 
 export type AgentDrivesResponse = {

@@ -37,6 +37,7 @@ import {
   agentResolveImportEdl,
   agentResolveScriptingProbe,
   agentResolveSyncFromNle,
+  agentListDrives,
   agentRegisterSession,
   agentRevealPath,
   agentSafeDelete,
@@ -46,6 +47,12 @@ import {
   checkAgentHealth,
   playbackPathForAsset,
 } from "@/lib/aiEditor/agentClient";
+import type { AgentDriveEntry } from "@/lib/aiEditor/agentProtocol";
+import {
+  friendlyDriveLabel,
+  inferStorageTypeForPath,
+  storageTypeLabel,
+} from "@/lib/aiEditor/storageDrives";
 import {
   RESOLVE_HANDOFF_REL_DIR,
   resolveHandoffAbsoluteDir,
@@ -182,6 +189,7 @@ export function AiEditorClient({ projectId }: Props) {
   const [agent, setAgent] = useState<AgentStatus>({ connected: false });
   const [storagePath, setStoragePath] = useState("");
   const [indexFolderPath, setIndexFolderPath] = useState("");
+  const [knownDrives, setKnownDrives] = useState<AgentDriveEntry[]>([]);
   const [agentToken, setAgentToken] = useState<string | null>(null);
   const [agentExpiresAt, setAgentExpiresAt] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
@@ -493,17 +501,31 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  async function refreshKnownDrives() {
+    if (!agent.connected) return knownDrives;
+    try {
+      const token = await ensureAgentSession();
+      const res = await agentListDrives(DEFAULT_AGENT_BASE_URL, token);
+      setKnownDrives(res.drives);
+      return res.drives;
+    } catch {
+      return knownDrives;
+    }
+  }
+
   async function onSaveWorkspace() {
     if (!storagePath.trim()) return;
     setBusy("storage");
     setStatusNote(null);
     setError(null);
     try {
+      const drives = await refreshKnownDrives();
+      const storageType = inferStorageTypeForPath(storagePath.trim(), drives);
       const res = await aiEditorSaveStorage(getToken, projectId, {
         name: context?.projectName || "Edit workspace",
         path: storagePath.trim(),
         purpose: "active",
-        type: "internal",
+        type: storageType,
         setAsActive: true,
       });
       setSettings(res.settings);
@@ -533,6 +555,25 @@ export function AiEditorClient({ projectId }: Props) {
         }
       } else {
         setStatusNote("Workspace folder saved. Next: add your footage.");
+      }
+
+      if (archivePath.trim()) {
+        const archiveType = inferStorageTypeForPath(archivePath.trim(), drives);
+        const archiveRes = await aiEditorSaveStorage(getToken, projectId, {
+          name: "Archive storage",
+          path: archivePath.trim(),
+          purpose: "archive",
+          type: archiveType === "unknown" ? "externalHDD" : archiveType,
+          setAsActive: false,
+        });
+        setSettings(archiveRes.settings);
+        setArchivePath(archiveRes.settings.archiveRootPath || archivePath.trim());
+        setStatusNote(
+          "Workspace and backup folders saved. Next: add your footage." +
+            (storageType === "externalSSD"
+              ? " Edit drive looks like an external SSD."
+              : "")
+        );
       }
       await load();
     } catch (e) {
@@ -1688,10 +1729,13 @@ export function AiEditorClient({ projectId }: Props) {
     setBusy("archive-root");
     setError(null);
     try {
+      const drives = await refreshKnownDrives();
+      const storageType = inferStorageTypeForPath(path, drives);
       const res = await aiEditorSaveStorage(getToken, projectId, {
         name: "Archive storage",
         path,
         purpose: "archive",
+        type: storageType === "unknown" ? "externalHDD" : storageType,
         setAsActive: false,
       });
       setSettings(res.settings);
@@ -2218,23 +2262,72 @@ export function AiEditorClient({ projectId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Choose where this edit lives</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Pick a folder for this project’s media. ShootSpine remembers it — files never upload
-                to the cloud.
+                Put the working project on a fast drive (external SSD). Optionally set a backup
+                folder on a larger HDD. Footage stays on your drives — nothing uploads to the cloud.
               </p>
             </div>
           </div>
 
           <div className="pl-10 space-y-4">
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/50 px-4 py-3 text-sm text-slate-700">
+              <p className="font-medium text-slate-900">Recommended setup</p>
+              <ul className="mt-1.5 list-disc space-y-1 pl-5">
+                <li>
+                  <span className="font-medium">Edit folder</span> on your external SSD (fast
+                  copy/proxy/preview)
+                </li>
+                <li>
+                  <span className="font-medium">Backup folder</span> on your external HDD (safe copy
+                  you can reclaim from later)
+                </li>
+              </ul>
+              {knownDrives.some((d) => d.kind === "drive") ? (
+                <p className="mt-2 text-xs text-slate-600">
+                  Connected drives:{" "}
+                  {knownDrives
+                    .filter((d) => d.kind === "drive" && !/^[cC]:\\?$/.test(d.path))
+                    .slice(0, 4)
+                    .map((d) => friendlyDriveLabel(d))
+                    .join(" · ") || "plug in your SSD/HDD, then reopen the picker"}
+                </p>
+              ) : null}
+            </div>
+
             <FolderPicker
-              label="Project folder"
-              hint="Start from Videos, Desktop, or an external drive — not the whole C: drive."
+              label="Edit folder (project)"
+              hint="Best on an external SSD. Camera/audio copies and proxies will live here."
+              purpose="edit"
               value={storagePath}
               onChange={setStoragePath}
+              onDrivesLoaded={setKnownDrives}
               getAgentToken={ensureAgentSession}
               agentConnected={agent.connected}
               disabled={!!busy}
-              placeholder="e.g. D:\\Shoots\\My_Project"
+              placeholder="e.g. E:\\Shoots\\My_Project"
             />
+            {storagePath.trim() ? (
+              <p className="text-xs text-slate-500">
+                Detected: {storageTypeLabel(inferStorageTypeForPath(storagePath, knownDrives))}
+              </p>
+            ) : null}
+
+            <FolderPicker
+              label="Backup folder (optional)"
+              hint="Best on an external HDD. Run the actual backup in Backup & free space below."
+              purpose="archive"
+              value={archivePath}
+              onChange={setArchivePath}
+              onDrivesLoaded={setKnownDrives}
+              getAgentToken={ensureAgentSession}
+              agentConnected={agent.connected}
+              disabled={!!busy}
+              placeholder="e.g. F:\\ShootSpine_Backup"
+            />
+            {archivePath.trim() ? (
+              <p className="text-xs text-slate-500">
+                Detected: {storageTypeLabel(inferStorageTypeForPath(archivePath, knownDrives))}
+              </p>
+            ) : null}
 
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-3 text-sm">
               <input
@@ -2257,7 +2350,7 @@ export function AiEditorClient({ projectId }: Props) {
               onClick={() => void onSaveWorkspace()}
               disabled={!!busy || !storagePath.trim() || !agent.connected}
             >
-              {busy === "storage" || busy === "folders" ? (
+              {busy === "storage" || busy === "folders" || busy === "archive-root" ? (
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
               ) : (
                 <HardDrive className="mr-1.5 h-4 w-4" />
@@ -2267,7 +2360,13 @@ export function AiEditorClient({ projectId }: Props) {
 
             {settings?.projectRootPath ? (
               <p className="text-xs text-emerald-800">
-                Saved: <span className="font-medium">{settings.projectRootPath}</span>
+                Edit folder: <span className="font-medium">{settings.projectRootPath}</span>
+                {settings.archiveRootPath ? (
+                  <>
+                    <br />
+                    Backup: <span className="font-medium">{settings.archiveRootPath}</span>
+                  </>
+                ) : null}
               </p>
             ) : null}
           </div>
@@ -3703,13 +3802,15 @@ export function AiEditorClient({ projectId }: Props) {
               </div>
               <FolderPicker
                 label="Backup folder"
-                hint="Pick a folder on your backup drive."
+                hint="Pick a folder on your backup drive (external HDD preferred)."
+                purpose="archive"
                 value={archivePath}
                 onChange={setArchivePath}
+                onDrivesLoaded={setKnownDrives}
                 getAgentToken={ensureAgentSession}
                 agentConnected={agent.connected}
                 disabled={!!busy}
-                placeholder="e.g. E:\\Backups\\Shoots"
+                placeholder="e.g. F:\\ShootSpine_Backup"
               />
               <Button
                 variant="secondary"

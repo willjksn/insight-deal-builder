@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { DEFAULT_AGENT_BASE_URL } from "@/lib/aiEditor/agentProtocol";
 import { agentListDir, agentListDrives } from "@/lib/aiEditor/agentClient";
 import type { AgentDriveEntry, AgentFsEntry } from "@/lib/aiEditor/agentProtocol";
+import {
+  friendlyDriveLabel,
+  sortDrivesForPurpose,
+} from "@/lib/aiEditor/storageDrives";
 
 const HIDDEN_FOLDER_NAMES = new Set(
   [
@@ -50,10 +54,30 @@ function isWindowsCRoot(path: string): boolean {
 }
 
 /** Starters people actually pick for footage — not the whole C: dump. */
-function usefulStarters(drives: AgentDriveEntry[]): AgentDriveEntry[] {
+function usefulStarters(
+  drives: AgentDriveEntry[],
+  purpose: "edit" | "archive" | "general"
+): AgentDriveEntry[] {
   const preferredKinds = new Set(["videos", "desktop", "documents", "home"]);
   const out: AgentDriveEntry[] = [];
   const seen = new Set<string>();
+
+  const driveRoots = sortDrivesForPurpose(
+    drives.filter((d) => d.kind === "drive" || d.kind === "volume"),
+    purpose === "archive" ? "archive" : "edit"
+  );
+
+  // For edit/archive, lead with external drives
+  if (purpose === "edit" || purpose === "archive") {
+    for (const d of driveRoots) {
+      if (isWindowsCRoot(d.path)) continue;
+      const key = d.path.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(d);
+      }
+    }
+  }
 
   for (const d of drives) {
     if (preferredKinds.has(d.kind)) {
@@ -64,25 +88,19 @@ function usefulStarters(drives: AgentDriveEntry[]): AgentDriveEntry[] {
       }
     }
   }
-  for (const d of drives) {
-    if (d.kind !== "drive") continue;
-    if (isWindowsCRoot(d.path)) continue; // C:\ is confusing — use Videos / Home instead
-    const key = d.path.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      out.push({ ...d, label: d.label.includes(":") ? `Drive ${d.label}` : d.label });
+
+  if (purpose === "general") {
+    for (const d of driveRoots) {
+      if (isWindowsCRoot(d.path)) continue;
+      const key = d.path.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(d);
+      }
     }
   }
-  return out;
-}
 
-function friendlyStarterLabel(d: AgentDriveEntry): string {
-  if (d.kind === "videos") return "Videos";
-  if (d.kind === "desktop") return "Desktop";
-  if (d.kind === "documents") return "Documents";
-  if (d.kind === "home") return "Your user folder";
-  if (d.kind === "drive") return d.label.startsWith("Drive") ? d.label : `Drive ${d.label}`;
-  return d.label;
+  return out;
 }
 
 function filterBrowsableFolders(entries: AgentFsEntry[], parentPath: string): AgentFsEntry[] {
@@ -112,6 +130,10 @@ type Props = {
   placeholder?: string;
   /** Shown under the label */
   hint?: string;
+  /** Biases starter chips toward edit SSD or archive HDD */
+  purpose?: "edit" | "archive" | "general";
+  /** Optional: notify parent of the full drive list (for type inference). */
+  onDrivesLoaded?: (drives: AgentDriveEntry[]) => void;
 };
 
 export function FolderPicker({
@@ -123,6 +145,8 @@ export function FolderPicker({
   disabled,
   placeholder,
   hint,
+  purpose = "general",
+  onDrivesLoaded,
 }: Props) {
   const [drives, setDrives] = useState<AgentDriveEntry[]>([]);
   const [browsePath, setBrowsePath] = useState("");
@@ -133,7 +157,7 @@ export function FolderPicker({
   const [open, setOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const starters = useMemo(() => usefulStarters(drives), [drives]);
+  const starters = useMemo(() => usefulStarters(drives, purpose), [drives, purpose]);
   const folders = useMemo(
     () => filterBrowsableFolders(entries, browsePath),
     [entries, browsePath]
@@ -147,6 +171,7 @@ export function FolderPicker({
       const token = await getAgentToken();
       const res = await agentListDrives(DEFAULT_AGENT_BASE_URL, token);
       setDrives(res.drives);
+      onDrivesLoaded?.(res.drives);
       return res.drives;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not list folders");
@@ -154,7 +179,7 @@ export function FolderPicker({
     } finally {
       setLoading(false);
     }
-  }, [agentConnected, getAgentToken]);
+  }, [agentConnected, getAgentToken, onDrivesLoaded]);
 
   const loadDir = useCallback(
     async (dirPath: string) => {
@@ -188,12 +213,12 @@ export function FolderPicker({
     if (!open || !agentConnected) return;
     void (async () => {
       const list = drives.length ? drives : (await loadDrives()) || [];
-      const useful = usefulStarters(list);
+      const useful = usefulStarters(list, purpose);
       const startFrom =
         value.trim() ||
+        useful[0]?.path ||
         useful.find((d) => d.kind === "videos")?.path ||
-        useful.find((d) => d.kind === "home")?.path ||
-        useful[0]?.path;
+        useful.find((d) => d.kind === "home")?.path;
       if (startFrom && !browsePath) {
         await loadDir(startFrom);
       }
@@ -264,7 +289,11 @@ export function FolderPicker({
 
           <div>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Start here
+              {purpose === "edit"
+                ? "Prefer a fast external SSD"
+                : purpose === "archive"
+                  ? "Prefer a larger backup HDD"
+                  : "Start here"}
             </div>
             <div className="flex flex-wrap gap-2">
               {starters.map((d) => (
@@ -273,9 +302,10 @@ export function FolderPicker({
                   type="button"
                   disabled={disabled || loading}
                   onClick={() => void loadDir(d.path)}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition hover:border-sky-300 hover:text-sky-900 disabled:opacity-50"
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-left text-sm text-slate-700 shadow-sm transition hover:border-sky-300 hover:text-sky-900 disabled:opacity-50"
+                  title={d.path}
                 >
-                  {friendlyStarterLabel(d)}
+                  {friendlyDriveLabel(d)}
                 </button>
               ))}
               {!starters.length && !loading ? (
