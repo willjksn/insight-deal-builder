@@ -91,5 +91,8 @@ describe("crossProjectInsights", () => {
     expect(summary.insights.some((i) => i.id === "top_mood")).toBe(true);
     expect(summary.insights.some((i) => i.id === "missing_coverage")).toBe(true);
     expect(summary.insights.some((i) => i.id === "open_checklist")).toBe(true);
+    expect(summary.lookDefaults?.moodId).toBe("warm");
+    expect(summary.lookDefaults?.weight).toBe(2);
   });
 });
+

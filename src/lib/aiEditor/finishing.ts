@@ -5,7 +5,9 @@
 
 import { secondsToFrames } from "@/lib/aiEditor/frames";
 import { newId } from "@/lib/aiEditor/timeline";
+import { sourceLabel } from "@/lib/aiEditor/editNotes";
 import type {
+  EditNote,
   FinishingMoodId,
   FinishingPlan,
   Timeline,
@@ -189,6 +191,10 @@ export function buildFinishingGuide(input: {
   plan: FinishingPlan;
   timelineName: string;
   clipCount: number;
+  /** Look / client notes from ShootSpine (creative brief for Mac). */
+  editNotes?: EditNote[] | null;
+  /** Optional wrap-up note from finishing feedback. */
+  finishingNote?: string | null;
 }): string {
   const { plan, timelineName, clipCount } = input;
   const lines = [
@@ -222,6 +228,21 @@ export function buildFinishingGuide(input: {
     lines.push(
       `Use short fades through black (~${plan.transitionDurationFrames} frames) at bigger story beats.`
     );
+  }
+
+  const briefNotes = (input.editNotes || []).filter(
+    (n) => n.source === "look" || n.source === "client" || n.source === "general"
+  );
+  if (briefNotes.length) {
+    lines.push("", "Creative brief (from ShootSpine notes)", "------------------------------------");
+    for (const n of briefNotes.slice(0, 12)) {
+      lines.push(`• [${sourceLabel(n.source)}] ${n.text.trim()}`);
+    }
+  }
+
+  const wrapNote = input.finishingNote?.trim();
+  if (wrapNote) {
+    lines.push("", "From last finish", "----------------", wrapNote);
   }
 
   lines.push(

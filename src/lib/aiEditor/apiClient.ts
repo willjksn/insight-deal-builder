@@ -56,6 +56,12 @@ export async function aiEditorCrossProjectInsights(getToken: GetToken) {
     projectCount: number;
     withDataCount: number;
     insights: Array<{ id: string; text: string; weight: number }>;
+    lookDefaults: {
+      moodId: FinishingMoodId;
+      transitionStyle: TransitionStyleId;
+      weight: number;
+      hint: string;
+    } | null;
   }>(res);
 }
 

@@ -4,7 +4,7 @@ import { framesToSeconds, framesToTimecode } from "@/lib/aiEditor/frames";
 import { buildFinishingGuide } from "@/lib/aiEditor/finishing";
 import { timelineDurationFrames } from "@/lib/aiEditor/timeline";
 import type { NleHandoffPackage, NleMediaMapping } from "@/lib/aiEditor/nleAdapter";
-import type { MediaAsset, Timeline, TimelineClip } from "@/lib/aiEditor/types";
+import type { EditNote, MediaAsset, Timeline, TimelineClip } from "@/lib/aiEditor/types";
 
 const MANIFEST_VERSION = "1.0.0";
 
@@ -73,6 +73,8 @@ export function buildResolveHandoff(input: {
   media: MediaAsset[];
   projectRoot?: string;
   timelineVersionId?: string;
+  editNotes?: EditNote[] | null;
+  finishingNote?: string | null;
 }): NleHandoffPackage & {
   edl: string;
   readme: string;
@@ -102,6 +104,8 @@ export function buildResolveHandoff(input: {
         plan: timeline.finishing,
         timelineName: timeline.name,
         clipCount: summary.clipCount,
+        editNotes: input.editNotes,
+        finishingNote: input.finishingNote,
       })
     : undefined;
 

@@ -64,6 +64,8 @@ export async function POST(
       media,
       projectRoot: settings?.projectRootPath,
       timelineVersionId: currentVersion?.id,
+      editNotes: settings?.editNotes,
+      finishingNote: settings?.lastFinishingFeedback?.note,
     });
 
     const manifest = {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildFinishingFeedback,
+  defaultsForLookStep,
   defaultsFromFeedback,
   summarizeFeedback,
 } from "@/lib/aiEditor/feedback";
@@ -49,5 +50,35 @@ describe("feedback", () => {
     });
     expect(summarizeFeedback(f)).toContain("Tweaked");
     expect(summarizeFeedback(f)).toContain("Cool");
+  });
+
+  it("prefers project feedback over cross-project defaults", () => {
+    const f = buildFinishingFeedback({
+      moodId: "cool",
+      transitionStyle: "cuts",
+      outcome: "kept_look",
+    });
+    const d = defaultsForLookStep({
+      feedback: f,
+      crossProject: {
+        moodId: "warm",
+        transitionStyle: "soft_dissolves",
+        hint: "From other edits",
+      },
+    });
+    expect(d.moodId).toBe("cool");
+  });
+
+  it("uses cross-project defaults when no wrap-up", () => {
+    const d = defaultsForLookStep({
+      feedback: null,
+      crossProject: {
+        moodId: "warm",
+        transitionStyle: "soft_dissolves",
+        hint: "From your other edits",
+      },
+    });
+    expect(d.moodId).toBe("warm");
+    expect(d.hint).toMatch(/other edits/i);
   });
 });

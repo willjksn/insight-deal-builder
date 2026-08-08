@@ -59,9 +59,20 @@ describe("finishing", () => {
       plan,
       timelineName: "Cut",
       clipCount: 2,
+      editNotes: [
+        {
+          id: "n1",
+          source: "client",
+          text: "Keep the logo hold longer",
+          createdAt: "",
+        },
+      ],
+      finishingNote: "A bit warmer next time",
     });
     expect(guide).toContain("Cinematic");
     expect(guide).toContain("Color page");
+    expect(guide).toContain("Keep the logo hold longer");
+    expect(guide).toContain("A bit warmer next time");
     expect(guide).not.toContain("EDL");
   });
 

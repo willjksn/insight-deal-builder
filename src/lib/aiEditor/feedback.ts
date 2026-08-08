@@ -82,6 +82,32 @@ export function defaultsFromFeedback(feedback?: FinishingFeedback | null): {
   };
 }
 
+/**
+ * V11 — project wrap-up wins; otherwise soft cross-project pattern defaults.
+ */
+export function defaultsForLookStep(input: {
+  feedback?: FinishingFeedback | null;
+  crossProject?: {
+    moodId: FinishingMoodId;
+    transitionStyle: TransitionStyleId;
+    hint: string;
+  } | null;
+}): {
+  moodId: FinishingMoodId;
+  transitionStyle: TransitionStyleId;
+  hint: string | null;
+} {
+  if (input.feedback) return defaultsFromFeedback(input.feedback);
+  if (input.crossProject) {
+    return {
+      moodId: input.crossProject.moodId,
+      transitionStyle: input.crossProject.transitionStyle,
+      hint: input.crossProject.hint,
+    };
+  }
+  return defaultsFromFeedback(null);
+}
+
 export function summarizeFeedback(feedback?: FinishingFeedback | null): string | null {
   if (!feedback) return null;
   const outcome =

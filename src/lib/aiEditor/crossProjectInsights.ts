@@ -7,7 +7,9 @@ import type {
   AiEditorProjectSettings,
   FinishingFeedbackOutcome,
   FinishingMoodId,
+  TransitionStyleId,
 } from "@/lib/aiEditor/types";
+import { getMoodPreset, getTransitionPreset } from "@/lib/aiEditor/finishing";
 
 export type CrossProjectSource = {
   projectId: string;
@@ -22,10 +24,20 @@ export type CrossProjectInsight = {
   weight: number;
 };
 
+/** Soft Look-step defaults when this project has no wrap-up yet (V11). */
+export type CrossProjectLookDefaults = {
+  moodId: FinishingMoodId;
+  transitionStyle: TransitionStyleId;
+  /** How many projects contributed to the mood tally */
+  weight: number;
+  hint: string;
+};
+
 export type CrossProjectInsightsSummary = {
   projectCount: number;
   withDataCount: number;
   insights: CrossProjectInsight[];
+  lookDefaults: CrossProjectLookDefaults | null;
 };
 
 function topEntry<T extends string>(counts: Map<T, number>): { key: T; n: number } | null {
@@ -54,6 +66,7 @@ export function buildCrossProjectInsights(
   projects: CrossProjectSource[]
 ): CrossProjectInsightsSummary {
   const moodCounts = new Map<FinishingMoodId, number>();
+  const transitionCounts = new Map<TransitionStyleId, number>();
   const outcomeCounts = new Map<FinishingFeedbackOutcome, number>();
   let missingCoverageProjects = 0;
   let preferredDroppedProjects = 0;
@@ -75,6 +88,10 @@ export function buildCrossProjectInsights(
 
     const mood = s.lastFinishingFeedback?.moodId;
     if (mood) moodCounts.set(mood, (moodCounts.get(mood) || 0) + 1);
+    const transition = s.lastFinishingFeedback?.transitionStyle;
+    if (transition) {
+      transitionCounts.set(transition, (transitionCounts.get(transition) || 0) + 1);
+    }
     const outcome = s.lastFinishingFeedback?.outcome;
     if (outcome) outcomeCounts.set(outcome, (outcomeCounts.get(outcome) || 0) + 1);
 
@@ -168,5 +185,25 @@ export function buildCrossProjectInsights(
     projectCount: projects.length,
     withDataCount: withData,
     insights: insights.slice(0, 6),
+    lookDefaults: lookDefaultsFromTallies(moodCounts, transitionCounts),
+  };
+}
+
+/** Prefer a look seen on ≥2 projects; otherwise null (keep Natural). */
+export function lookDefaultsFromTallies(
+  moodCounts: Map<FinishingMoodId, number>,
+  transitionCounts: Map<TransitionStyleId, number>
+): CrossProjectLookDefaults | null {
+  const topMood = topEntry(moodCounts);
+  if (!topMood || topMood.n < 2) return null;
+  const topTransition = topEntry(transitionCounts);
+  const transitionStyle = topTransition?.key || "cuts";
+  const mood = getMoodPreset(topMood.key);
+  const transition = getTransitionPreset(transitionStyle);
+  return {
+    moodId: topMood.key,
+    transitionStyle,
+    weight: topMood.n,
+    hint: `From your other edits: starting with “${mood.label} · ${transition.label}” (${topMood.n} projects). Change anytime.`,
   };
 }

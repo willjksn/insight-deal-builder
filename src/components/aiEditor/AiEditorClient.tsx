@@ -82,6 +82,7 @@ import {
   aiEditorRunMatch,
   aiEditorSaveAnalysis,
   aiEditorBoardHandoff,
+  aiEditorCrossProjectInsights,
   aiEditorNextShootChecklist,
   aiEditorSaveEditNotes,
   aiEditorSaveFeedback,
@@ -99,9 +100,11 @@ import {
 import { summarizeReels } from "@/lib/aiEditor/reels";
 import {
   FEEDBACK_OUTCOMES,
+  defaultsForLookStep,
   defaultsFromFeedback,
   summarizeFeedback,
 } from "@/lib/aiEditor/feedback";
+import { buildResolvePreflightTips } from "@/lib/aiEditor/resolvePreflight";
 import {
   EDIT_NOTE_SOURCES,
   PROPOSE_FROM_NOTES_MESSAGE,
@@ -266,7 +269,29 @@ export function AiEditorClient({ projectId }: Props) {
           setTransitionStyle(dash.timeline.finishing.transitionStyle);
         }
       } else {
-        const defaults = defaultsFromFeedback(dash.settings?.lastFinishingFeedback);
+        let crossProject: {
+          moodId: FinishingMoodId;
+          transitionStyle: TransitionStyleId;
+          hint: string;
+        } | null = null;
+        if (!dash.settings?.lastFinishingFeedback) {
+          try {
+            const insightRes = await aiEditorCrossProjectInsights(getToken);
+            if (insightRes.lookDefaults) {
+              crossProject = {
+                moodId: insightRes.lookDefaults.moodId,
+                transitionStyle: insightRes.lookDefaults.transitionStyle,
+                hint: insightRes.lookDefaults.hint,
+              };
+            }
+          } catch {
+            /* hub patterns are optional */
+          }
+        }
+        const defaults = defaultsForLookStep({
+          feedback: dash.settings?.lastFinishingFeedback,
+          crossProject,
+        });
         setMoodId(defaults.moodId);
         setTransitionStyle(defaults.transitionStyle);
         setFeedbackHint(defaults.hint);
@@ -382,6 +407,17 @@ export function AiEditorClient({ projectId }: Props) {
     summarizePlanningFeedback(settings?.lastPlanningFeedback);
   const checklist = nextShootChecklist || settings?.nextShootChecklist || null;
   const checklistStats = checklistProgress(checklist);
+  const resolvePreflight = useMemo(
+    () =>
+      buildResolvePreflightTips({
+        timeline,
+        finishing: timeline?.finishing,
+        settings,
+        planning: planningFeedback,
+        checklist,
+      }),
+    [timeline, settings, planningFeedback, checklist]
+  );
   const videoTrack = timeline?.tracks.find((t) => t.kind === "video");
   const reelSummaries = useMemo(
     () => (timeline?.reels?.length ? summarizeReels(timeline) : []),
@@ -3209,6 +3245,29 @@ export function AiEditorClient({ projectId }: Props) {
           </div>
 
           <div className="space-y-5 pl-10">
+            {resolvePreflight.length && timeline ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                <p className="text-sm font-semibold text-slate-900">Before you finish</p>
+                <ul className="mt-2 space-y-1.5">
+                  {resolvePreflight.map((tip) => (
+                    <li
+                      key={tip.id}
+                      className={`text-sm ${
+                        tip.level === "action"
+                          ? "text-amber-900"
+                          : tip.level === "ready"
+                            ? "text-emerald-900"
+                            : "text-slate-700"
+                      }`}
+                    >
+                      {tip.level === "ready" ? "✓ " : tip.level === "action" ? "• " : "· "}
+                      {tip.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
