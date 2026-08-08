@@ -16,7 +16,7 @@ import {
   upsertAiEditorProjectSettings,
 } from "@/lib/aiEditor/server";
 import { getAdminDb } from "@/lib/firebase/admin";
-import { PRODUCTION_BOARDS_COLLECTION } from "@/lib/firebase/productionBag";
+import { PRODUCTION_BOARDS_COLLECTION } from "@/lib/firebase/productionFirestore";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import type { ProductionBoard } from "@/lib/production/types";
