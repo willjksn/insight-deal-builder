@@ -9,6 +9,7 @@ import type {
   FinishingFeedbackOutcome,
   FinishingMoodId,
   MediaAsset,
+  EditNote,
   PlanningFeedback,
   ResolveSyncSnapshot,
   PreferredTakeOverride,
@@ -148,13 +149,23 @@ export async function aiEditorTimelineAction(
   getToken: GetToken,
   projectId: string,
   body: {
-    action: "build_rough_cut" | "apply_ops" | "restore_version" | "apply_finishing";
+    action:
+      | "build_rough_cut"
+      | "apply_ops"
+      | "restore_version"
+      | "apply_finishing"
+      | "setup_feature_reels"
+      | "set_active_reel";
     ops?: TimelineEditOp[];
     versionId?: string;
     note?: string;
     name?: string;
     moodId?: FinishingMoodId;
     transitionStyle?: TransitionStyleId;
+    reelId?: string;
+    reelMode?: "acts" | "reels";
+    runtimeSeconds?: number;
+    reelCount?: number;
   }
 ) {
   const res = await fetch(`/api/projects/${projectId}/ai-editor/timeline`, {
@@ -188,7 +199,7 @@ export type ChatEditProposalClient = {
 export async function aiEditorChatEdit(
   getToken: GetToken,
   projectId: string,
-  body: { message: string; apply?: boolean }
+  body: { message: string; apply?: boolean; reelId?: string | null }
 ) {
   const res = await fetch(`/api/projects/${projectId}/ai-editor/chat-edit`, {
     method: "POST",
@@ -246,6 +257,24 @@ export async function aiEditorSaveFeedback(
   return parseJson<{
     ok: true;
     feedback: FinishingFeedback;
+    settings: AiEditorProjectSettings;
+    job: AiEditorJob;
+  }>(res);
+}
+
+export async function aiEditorSaveEditNotes(
+  getToken: GetToken,
+  projectId: string,
+  body: { notes: EditNote[] }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/edit-notes`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    ok: true;
+    notes: EditNote[];
     settings: AiEditorProjectSettings;
     job: AiEditorJob;
   }>(res);

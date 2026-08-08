@@ -28,6 +28,7 @@ export type AiEditorJobType =
   | "match"
   | "rough_cut"
   | "chat_edit"
+  | "edit_notes"
   | "shot_detect"
   | "archive"
   | "restore"
@@ -85,6 +86,8 @@ export interface AiEditorProjectSettings {
   lastResolveSync?: ResolveSyncSnapshot;
   /** V6 — planning notes derived from Resolve cut vs rough cut / coverage. */
   lastPlanningFeedback?: PlanningFeedback;
+  /** Edit notes from set / client / look — fed into Edit by Chat. */
+  editNotes?: EditNote[];
   createdAt: string;
   updatedAt: string;
 }
@@ -266,6 +269,16 @@ export type FinishingMoodId =
   | "cinematic"
   | "high_energy";
 
+/** Where an edit note came from (shoot, client call, look direction, etc.). */
+export type EditNoteSource = "shooting" | "client" | "look" | "general";
+
+export interface EditNote {
+  id: string;
+  text: string;
+  source: EditNoteSource;
+  createdAt: string;
+}
+
 /** V3 — what happened after Resolve, for next-edit defaults. */
 export type FinishingFeedbackOutcome =
   | "kept_look"
@@ -358,8 +371,22 @@ export interface TimelineClip {
   durationFrames: number;
   label?: string;
   plannedShotId?: string;
+  /** Organizational reel/act this clip belongs to (feature-length projects). */
+  reelId?: string;
   /** How this clip should leave into the next (Resolve applies). */
   transitionOut?: ClipTransitionOut;
+}
+
+/** Act / reel / scene group for long-form editing. */
+export type TimelineReelKind = "act" | "reel" | "scene_group";
+
+export interface TimelineReel {
+  id: string;
+  name: string;
+  kind: TimelineReelKind;
+  sortOrder: number;
+  /** Soft target length (e.g. 20 min reel or ~35 min act). */
+  targetDurationSeconds?: number;
 }
 
 export interface TimelineTrack {
@@ -375,6 +402,10 @@ export interface Timeline {
   name: string;
   frameRate: number;
   tracks: TimelineTrack[];
+  /** Acts / reels for feature-length work; optional for short form. */
+  reels?: TimelineReel[];
+  /** Reel Edit by Chat / preview should focus on. */
+  activeReelId?: string;
   /** V1.6 mood + transition suggestions for Resolve finishing. */
   finishing?: FinishingPlan;
   version: number;

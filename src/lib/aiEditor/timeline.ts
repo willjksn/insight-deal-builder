@@ -147,12 +147,35 @@ export function buildRoughCutFromCoverage(input: {
     }
   }
 
+  // Short-form default: one “Full cut” reel (feature projects can add acts later).
+  const reelId = newId("reel");
+  timeline.reels = [
+    { id: reelId, name: "Full cut", kind: "reel", sortOrder: 0 },
+  ];
+  timeline.activeReelId = reelId;
+  for (const track of timeline.tracks) {
+    for (const clip of track.clips) {
+      clip.reelId = reelId;
+    }
+  }
+
   timeline.updatedAt = new Date().toISOString();
   return timeline;
 }
 
 function cloneTimeline(t: Timeline): Timeline {
-  return structuredClone(t);
+  return {
+    ...t,
+    reels: t.reels?.map((r) => ({ ...r })),
+    finishing: t.finishing ? { ...t.finishing } : undefined,
+    tracks: t.tracks.map((track) => ({
+      ...track,
+      clips: track.clips.map((c) => ({
+        ...c,
+        transitionOut: c.transitionOut ? { ...c.transitionOut } : undefined,
+      })),
+    })),
+  };
 }
 
 function findClip(
@@ -200,6 +223,7 @@ export function applyTimelineOp(timeline: Timeline, op: TimelineEditOp): Timelin
         durationFrames: Math.max(1, op.durationFrames),
         label: op.label,
         plannedShotId: op.plannedShotId,
+        reelId: next.activeReelId || next.reels?.[0]?.id,
       });
       track.clips.sort((a, b) => a.timelineStartFrame - b.timelineStartFrame);
       break;

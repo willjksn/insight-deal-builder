@@ -79,6 +79,7 @@ import {
   aiEditorPatchMedia,
   aiEditorRunMatch,
   aiEditorSaveAnalysis,
+  aiEditorSaveEditNotes,
   aiEditorSaveFeedback,
   aiEditorSaveResolveSync,
   aiEditorSaveStorage,
@@ -87,11 +88,19 @@ import {
   aiEditorTimelineAction,
   type ChatEditProposalClient,
 } from "@/lib/aiEditor/apiClient";
+import { FEATURE_DEFAULT_RUNTIME_SECONDS } from "@/lib/aiEditor/limits";
+import { summarizeReels } from "@/lib/aiEditor/reels";
 import {
   FEEDBACK_OUTCOMES,
   defaultsFromFeedback,
   summarizeFeedback,
 } from "@/lib/aiEditor/feedback";
+import {
+  EDIT_NOTE_SOURCES,
+  PROPOSE_FROM_NOTES_MESSAGE,
+  createEditNote,
+  sourceLabel,
+} from "@/lib/aiEditor/editNotes";
 import { summarizePlanningFeedback } from "@/lib/aiEditor/planningFeedback";
 import {
   compareResolveToRoughCut,
@@ -99,7 +108,12 @@ import {
   type ResolveSyncCompare,
 } from "@/lib/aiEditor/resolveSync";
 import { timelineDurationFrames } from "@/lib/aiEditor/timeline";
-import type { FinishingFeedbackOutcome, PlanningFeedback } from "@/lib/aiEditor/types";
+import type {
+  EditNote,
+  EditNoteSource,
+  FinishingFeedbackOutcome,
+  PlanningFeedback,
+} from "@/lib/aiEditor/types";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 import { mockMediaEngine } from "@/lib/aiEditor/mediaEngine";
 import { summarizeMediaSafety } from "@/lib/aiEditor/mediaSafety";
@@ -180,6 +194,9 @@ export function AiEditorClient({ projectId }: Props) {
     validationOk: boolean;
     validationErrors: string[];
   } | null>(null);
+  const [editNotes, setEditNotes] = useState<EditNote[]>([]);
+  const [editNoteDraft, setEditNoteDraft] = useState("");
+  const [editNoteSource, setEditNoteSource] = useState<EditNoteSource>("client");
   const [exportFiles, setExportFiles] = useState<Record<string, string> | null>(null);
   const [handoffDirOnDisk, setHandoffDirOnDisk] = useState<string | null>(null);
   const [finishWhere, setFinishWhere] = useState<"here" | "mac">("here");
@@ -223,6 +240,7 @@ export function AiEditorClient({ projectId }: Props) {
       if (dash.settings?.lastPlanningFeedback) {
         setPlanningFeedback(dash.settings.lastPlanningFeedback);
       }
+      setEditNotes(dash.settings?.editNotes ?? []);
       if (dash.timeline?.finishing?.moodId) {
         setMoodId(dash.timeline.finishing.moodId);
         if (dash.timeline.finishing.transitionStyle) {
@@ -315,6 +333,17 @@ export function AiEditorClient({ projectId }: Props) {
     summarizePlanningFeedback(planningFeedback) ||
     summarizePlanningFeedback(settings?.lastPlanningFeedback);
   const videoTrack = timeline?.tracks.find((t) => t.kind === "video");
+  const reelSummaries = useMemo(
+    () => (timeline?.reels?.length ? summarizeReels(timeline) : []),
+    [timeline]
+  );
+  const activeReelName =
+    timeline?.reels?.find((r) => r.id === timeline.activeReelId)?.name || null;
+  const visibleClips = useMemo(() => {
+    const clips = videoTrack?.clips ?? [];
+    if (!timeline?.activeReelId || !timeline.reels?.length) return clips;
+    return clips.filter((c) => c.reelId === timeline.activeReelId);
+  }, [videoTrack, timeline?.activeReelId, timeline?.reels]);
 
   async function onRecheckAgent() {
     setBusy("recheck");
@@ -904,14 +933,59 @@ export function AiEditorClient({ projectId }: Props) {
     void openPreview(`Rough cut v${timeline.version}`, items);
   }
 
-  async function onChatPropose() {
-    const message = chatMessage.trim();
+  async function persistEditNotes(next: EditNote[]) {
+    const res = await aiEditorSaveEditNotes(getToken, projectId, { notes: next });
+    setEditNotes(res.notes);
+    setSettings(res.settings);
+    setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
+    return res.notes;
+  }
+
+  async function onAddEditNote() {
+    const note = createEditNote({ text: editNoteDraft, source: editNoteSource });
+    if (!note) {
+      setError("Write a note first");
+      return;
+    }
+    setBusy("edit_notes");
+    setError(null);
+    try {
+      await persistEditNotes([note, ...editNotes]);
+      setEditNoteDraft("");
+      setStatusNote("Edit note saved — Edit by chat can use it.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save note");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onRemoveEditNote(id: string) {
+    setBusy("edit_notes");
+    setError(null);
+    try {
+      await persistEditNotes(editNotes.filter((n) => n.id !== id));
+      setStatusNote("Edit note removed.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove note");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onChatPropose(messageOverride?: string) {
+    const message = (messageOverride ?? chatMessage).trim();
     if (!message) return;
+    if (messageOverride) setChatMessage(messageOverride);
     setBusy("chat_edit");
     setError(null);
     setChatProposal(null);
     try {
-      const res = await aiEditorChatEdit(getToken, projectId, { message, apply: false });
+      const res = await aiEditorChatEdit(getToken, projectId, {
+        message,
+        apply: false,
+        reelId: timeline?.activeReelId ?? null,
+      });
       setChatProposal({
         proposal: res.proposal,
         descriptions: res.descriptions ?? [],
@@ -926,13 +1000,65 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  async function onSetupFeatureReels(mode: "acts" | "reels") {
+    setBusy("rough_cut");
+    setError(null);
+    try {
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "setup_feature_reels",
+        reelMode: mode,
+        runtimeSeconds: FEATURE_DEFAULT_RUNTIME_SECONDS,
+        reelCount: mode === "reels" ? 6 : undefined,
+        note:
+          mode === "acts"
+            ? "Feature acts (~1h45)"
+            : "Feature reels (~20 min each)",
+      });
+      setTimeline(res.timeline);
+      setTimelineVersions(res.versions);
+      setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
+      setStatusNote(
+        mode === "acts"
+          ? "Split into Act 1–3 for a ~1h45 feature. Edit by chat focuses on the active act."
+          : "Split into ~20 min reels. Edit by chat focuses on the active reel."
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not set up reels");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onSetActiveReel(reelId: string) {
+    setBusy("rough_cut");
+    setError(null);
+    try {
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "set_active_reel",
+        reelId,
+      });
+      setTimeline(res.timeline);
+      setStatusNote(
+        `Editing focus: ${res.timeline.reels?.find((r) => r.id === reelId)?.name || "reel"}`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not switch reel");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function onChatApply() {
     const message = chatMessage.trim();
     if (!message || !chatProposal) return;
     setBusy("chat_edit");
     setError(null);
     try {
-      const res = await aiEditorChatEdit(getToken, projectId, { message, apply: true });
+      const res = await aiEditorChatEdit(getToken, projectId, {
+        message,
+        apply: true,
+        reelId: timeline?.activeReelId ?? null,
+      });
       if (res.timeline) setTimeline(res.timeline);
       if (res.versions) setTimelineVersions(res.versions);
       if (res.job) setJobs((prev) => [res.job!, ...prev]);
@@ -2269,9 +2395,68 @@ export function AiEditorClient({ projectId }: Props) {
               ) : null}
             </div>
 
-            {videoTrack?.clips?.length ? (
+            {timeline && videoTrack?.clips?.length ? (
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Acts / reels (long form)</p>
+                  <p className="mt-0.5 text-xs text-slate-600">
+                    For a feature (~1h45), split into acts or ~20 min reels. Edit by chat focuses on
+                    the active one so you don’t need to touch code later.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={!!busy}
+                    onClick={() => void onSetupFeatureReels("acts")}
+                  >
+                    Set up for feature (3 acts)
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={!!busy}
+                    onClick={() => void onSetupFeatureReels("reels")}
+                  >
+                    Split into ~20 min reels
+                  </Button>
+                </div>
+                {reelSummaries.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {reelSummaries.map((r) => {
+                      const active = r.id === timeline.activeReelId;
+                      const mins = Math.round(r.durationSeconds / 60);
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          disabled={!!busy}
+                          onClick={() => void onSetActiveReel(r.id)}
+                          className={`rounded-xl border px-3 py-2 text-left text-xs transition ${
+                            active
+                              ? "border-sky-300 bg-sky-50 text-sky-950 shadow-sm"
+                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="font-semibold">{r.name}</div>
+                          <div className="mt-0.5 text-slate-500">
+                            {r.clipCount} clips · ~{mins} min
+                            {r.targetDurationSeconds
+                              ? ` / ~${Math.round(r.targetDurationSeconds / 60)} min target`
+                              : ""}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {visibleClips.length ? (
               <ul className="space-y-2">
-                {videoTrack.clips.map((c) => {
+                {visibleClips.map((c) => {
                   const asset = media.find((m) => m.id === c.mediaAssetId);
                   return (
                     <li
@@ -2309,6 +2494,8 @@ export function AiEditorClient({ projectId }: Props) {
                   );
                 })}
               </ul>
+            ) : videoTrack?.clips?.length ? (
+              <p className="text-sm text-slate-500">No clips in this reel yet — pick another act/reel.</p>
             ) : null}
 
             {timelineVersions.length > 1 ? (
@@ -2347,6 +2534,91 @@ export function AiEditorClient({ projectId }: Props) {
         </CardBody>
       </Card>
 
+      {/* Edit notes — brief for Edit by chat */}
+      <Card>
+        <CardBody className="space-y-5">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Edit notes</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Capture ideas from set, client calls, or look direction. Edit by chat uses these as a
+              creative brief when you propose an edit.
+            </p>
+          </div>
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {EDIT_NOTE_SOURCES.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setEditNoteSource(s.id)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    editNoteSource === s.id
+                      ? "border-sky-300 bg-sky-50 text-sky-900"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                  }`}
+                  title={s.blurb}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="min-h-[72px] w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              placeholder={
+                editNoteSource === "client"
+                  ? "e.g. Client wants a punchier open, keep the hero product shot longer…"
+                  : editNoteSource === "shooting"
+                    ? "e.g. Take 3 of the interview felt strongest; wide of lobby is weak…"
+                    : editNoteSource === "look"
+                      ? "e.g. Faster cuts after the logo; warmer, less dissolve-heavy…"
+                      : "Anything the edit should follow…"
+              }
+              value={editNoteDraft}
+              disabled={!!busy}
+              onChange={(e) => setEditNoteDraft(e.target.value)}
+            />
+            <Button
+              onClick={() => void onAddEditNote()}
+              disabled={!!busy || !editNoteDraft.trim()}
+            >
+              {busy === "edit_notes" ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : null}
+              Save note
+            </Button>
+            {editNotes.length ? (
+              <ul className="space-y-2">
+                {editNotes.map((n) => (
+                  <li
+                    key={n.id}
+                    className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        {sourceLabel(n.source)}
+                      </div>
+                      <p className="mt-0.5 text-sm text-slate-800 whitespace-pre-wrap">{n.text}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs font-medium text-slate-500 underline hover:text-rose-700 disabled:opacity-50"
+                      disabled={!!busy}
+                      onClick={() => void onRemoveEditNote(n.id)}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">
+                No notes yet — add one anytime (even before the rough cut).
+              </p>
+            )}
+          </div>
+        </CardBody>
+      </Card>
+
       {/* Step 8 — V1F */}
       <Card>
         <CardBody className="space-y-5">
@@ -2356,16 +2628,31 @@ export function AiEditorClient({ projectId }: Props) {
               <h2 className="text-lg font-semibold text-slate-900">Edit by chat</h2>
               <p className="mt-1 text-sm text-slate-600">
                 Describe an edit in plain language. ShootSpine proposes structured timeline ops —
-                you review, then apply. Undo restores the previous version.
+                you review, then apply. Saved edit notes are included as the creative brief.
+                {activeReelName
+                  ? ` Focused on “${activeReelName}” (switch acts/reels in Rough cut).`
+                  : ""}
               </p>
             </div>
           </div>
           <div className="space-y-4 pl-10">
+            {activeReelName ? (
+              <p className="rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2 text-sm text-violet-950">
+                Chat scope: <span className="font-medium">{activeReelName}</span> — long features stay
+                manageable reel-by-reel.
+              </p>
+            ) : null}
+            {editNotes.length ? (
+              <p className="rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2 text-sm text-sky-950">
+                {editNotes.length} edit note{editNotes.length === 1 ? "" : "s"} will guide
+                proposals. Or press <span className="font-medium">Propose from notes</span>.
+              </p>
+            ) : null}
             <label className="block space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">What should change?</span>
               <textarea
                 className="min-h-[88px] w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                placeholder='e.g. "remove the first clip", "trim first to 2 seconds", "reverse the order"'
+                placeholder='e.g. "remove the first clip", "trim first to 2 seconds", "use my notes"'
                 value={chatMessage}
                 disabled={!!busy || !timeline}
                 onChange={(e) => setChatMessage(e.target.value)}
@@ -2382,6 +2669,13 @@ export function AiEditorClient({ projectId }: Props) {
                   <Sparkles className="mr-1.5 h-4 w-4" />
                 )}
                 Propose edit
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void onChatPropose(PROPOSE_FROM_NOTES_MESSAGE)}
+                disabled={!!busy || !timeline || editNotes.length === 0}
+              >
+                Propose from notes
               </Button>
               <Button
                 variant="secondary"

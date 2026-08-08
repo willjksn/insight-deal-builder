@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.10.0";
+const VERSION = "0.11.0";
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN !== "0";
 
 const MEDIA_EXTS = new Set([
@@ -992,7 +992,7 @@ async function copyVerified(sourcePath, destPath) {
 async function copyVerifiedBatch(body) {
   const files = Array.isArray(body.files) ? body.files : [];
   if (!files.length) throw new Error("No files to copy");
-  if (files.length > 200) throw new Error("Max 200 files per batch");
+  if (files.length > 500) throw new Error("Max 500 files per batch");
 
   const results = [];
   for (const f of files) {
@@ -1039,7 +1039,7 @@ async function safeDeleteFiles(body) {
 
   const files = Array.isArray(body.files) ? body.files : [];
   if (!files.length) throw new Error("No files to delete");
-  if (files.length > 200) throw new Error("Max 200 files per delete batch");
+  if (files.length > 500) throw new Error("Max 500 files per delete batch");
 
   const results = [];
   for (const f of files) {
@@ -1461,7 +1461,7 @@ async function collectHandoffMediaPaths(handoffDir, projectRoot) {
   }
 
   const seen = new Set();
-  for (const item of media.slice(0, 200)) {
+  for (const item of media.slice(0, 2000)) {
     let candidate = typeof item?.resolvedPath === "string" ? item.resolvedPath.trim() : "";
     if (!candidate && projectRoot && typeof item?.relativeProjectPath === "string") {
       const rel = item.relativeProjectPath.replace(/^[\\/]+/, "").replace(/\\/g, "/");
@@ -1728,7 +1728,7 @@ for i in range(1, vtracks + 1):
         items = timeline.GetItemListInTrack("video", i) or []
         video_clips += len(items)
         for item in items:
-            if len(clip_items) >= 200:
+            if len(clip_items) >= 2000:
                 continue
             try:
                 cname = item.GetName() or ""
@@ -1948,7 +1948,7 @@ async function ingestCopyBatch(body) {
 
   const files = Array.isArray(body.files) ? body.files : [];
   if (!files.length) throw new Error("No files to ingest");
-  if (files.length > 200) throw new Error("Max 200 files per ingest batch");
+  if (files.length > 500) throw new Error("Max 500 files per ingest batch");
 
   // Disk space check
   let required = 0;

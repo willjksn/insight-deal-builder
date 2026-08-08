@@ -27,6 +27,8 @@
 | **V4 Resolve bin + media** | Media Pool “ShootSpine” bin + ImportMedia before EDL |
 | **V5 Reverse sync** | Read open Resolve timeline → snapshot + optional EDL (non-destructive) |
 | **V6 Planning feedback** | Clip-level compare Resolve ↔ rough cut → next-shoot notes |
+| **Edit notes** | Shoot / client / look notes → creative brief for Edit by Chat |
+| **Long-form ready** | Raised soft caps + acts/reels for ~1h45 features |
 
 Later: deeper reverse import into ShootSpine timeline / cross-project analytics
 
@@ -48,4 +50,6 @@ Later: deeper reverse import into ShootSpine timeline / cross-project analytics
 - **V4 Resolve bin + media (initial)** — create/find Media Pool bin, link clips from handoff manifest, then import EDL; companion script matches  
 - **V5 Reverse sync (initial)** — “Check what’s in Resolve” reads timeline metadata + optional `resolve_from_nle.edl`; compares length/clips to rough cut; does not overwrite ShootSpine edit  
 - **V6 Planning feedback (initial)** — Resolve clip names matched to media; dropped/added vs rough cut; missing coverage + preferred-take notes for next shoot  
+- **Edit notes (initial)** — tagged notes (on set / client / look / general); saved on project; injected into Edit by Chat; “Propose from notes”  
+- **Long-form ready** — soft caps raised (5k media, 500/batch, 2k Resolve link/sync); acts/reels on timeline; Edit by chat scoped to active reel/act  
 - Later: deeper reverse import into ShootSpine timeline / cross-project analytics

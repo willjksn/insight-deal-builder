@@ -392,5 +392,8 @@ Rules:
 - Prefer rippleDelete over leaving gaps.
 - durationFrames and atTimelineFrame must be integers.
 - Never invent media paths or ask to upload footage.
+- When Edit notes are provided, treat them as the creative brief (client/on-set/look direction). Map notes onto concrete ops on the current timeline when the user asks to use notes or when the request is open-ended.
+- Context may be scoped to one reel/act of a longer feature — only edit clips listed in the context.
+- Notes about color grade, music, or Resolve finishing that cannot become timeline ops should be mentioned in summary/warnings — do not invent fake ops for them.
 - If the request is undo/revert, return {"action":"undo","summary":"...","ops":[]}.
 - If unclear, return ops:[] with a short summary explaining what you need.`;

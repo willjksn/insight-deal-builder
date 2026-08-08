@@ -19,7 +19,7 @@ export function planResolveMediaImport(input: {
 }): { candidates: string[] } {
   const candidates: string[] = [];
   const seen = new Set<string>();
-  for (const item of input.media.slice(0, 200)) {
+  for (const item of input.media.slice(0, 2000)) {
     let path = item.resolvedPath?.trim() || "";
     if (!path && input.projectRoot?.trim() && item.relativeProjectPath?.trim()) {
       path = joinProjectRelative(input.projectRoot.trim(), item.relativeProjectPath.trim());

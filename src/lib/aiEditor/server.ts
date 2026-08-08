@@ -14,6 +14,11 @@ import {
   AI_EDITOR_TIMELINES_COLLECTION,
   AI_EDITOR_TIMELINE_VERSIONS_COLLECTION,
 } from "@/lib/aiEditor/collections";
+import {
+  MAX_JOBS_LISTED,
+  MAX_MEDIA_ASSETS,
+  MAX_TIMELINE_VERSIONS,
+} from "@/lib/aiEditor/limits";
 import { assertSafeStoragePath } from "@/lib/aiEditor/pathValidation";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import type {
@@ -119,7 +124,7 @@ export async function listMediaAssets(projectId: string): Promise<MediaAsset[]> 
   const snap = await db
     .collection(AI_EDITOR_MEDIA_COLLECTION)
     .where("projectId", "==", projectId)
-    .limit(500)
+    .limit(MAX_MEDIA_ASSETS)
     .get();
   return snap.docs
     .map((d) => serializeDoc<MediaAsset>(d.id, d.data()))
@@ -171,7 +176,7 @@ export async function listJobs(projectId: string): Promise<AiEditorJob[]> {
   const snap = await db
     .collection(AI_EDITOR_JOBS_COLLECTION)
     .where("projectId", "==", projectId)
-    .limit(100)
+    .limit(MAX_JOBS_LISTED)
     .get();
   return snap.docs
     .map((d) => serializeDoc<AiEditorJob>(d.id, d.data()))
@@ -264,7 +269,7 @@ export async function listAnalysisBundles(
   const snap = await db
     .collection(AI_EDITOR_ANALYSIS_COLLECTION)
     .where("projectId", "==", projectId)
-    .limit(500)
+    .limit(MAX_MEDIA_ASSETS)
     .get();
   return snap.docs.map((d) => {
     const data = d.data() as ClipAnalysisBundle & { projectId?: string };
@@ -342,7 +347,7 @@ export async function listTimelineVersions(projectId: string): Promise<TimelineV
   const snap = await db
     .collection(AI_EDITOR_TIMELINE_VERSIONS_COLLECTION)
     .where("projectId", "==", projectId)
-    .limit(50)
+    .limit(MAX_TIMELINE_VERSIONS)
     .get();
   return snap.docs
     .map((d) => serializeDoc<TimelineVersion>(d.id, d.data()))

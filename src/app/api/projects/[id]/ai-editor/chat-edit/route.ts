@@ -10,9 +10,14 @@ import {
   type ChatEditProposal,
 } from "@/lib/aiEditor/editByChat";
 import {
+  formatEditNotesForChat,
+  wantsNotesDrivenEdit,
+} from "@/lib/aiEditor/editNotes";
+import {
   aiEditorErrorResponse,
   requireAiEditorAccess,
 } from "@/lib/aiEditor/routeAccess";
+import { timelineScopedToReel } from "@/lib/aiEditor/reels";
 import {
   applyTimelineOps,
   bumpVersion,
@@ -20,6 +25,7 @@ import {
 } from "@/lib/aiEditor/timeline";
 import {
   createJob,
+  getAiEditorProjectSettings,
   getTimeline,
   listMediaAssets,
   listTimelineVersions,
@@ -27,6 +33,7 @@ import {
   updateJob,
   upsertTimeline,
 } from "@/lib/aiEditor/server";
+import type { EditNote } from "@/lib/aiEditor/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,11 +42,30 @@ export const maxDuration = 60;
 async function proposeFromGemini(
   message: string,
   timeline: NonNullable<Awaited<ReturnType<typeof getTimeline>>>,
-  media: Awaited<ReturnType<typeof listMediaAssets>>
+  media: Awaited<ReturnType<typeof listMediaAssets>>,
+  editNotes?: EditNote[],
+  scope?: { reelName?: string | null; truncated?: boolean; totalInReel?: number }
 ): Promise<ChatEditProposal | null> {
   try {
     const ctx = buildTimelineChatContext(timeline, media);
-    const userPrompt = `Timeline context (metadata only — no media bytes):\n${JSON.stringify(ctx, null, 2)}\n\nUser request:\n${message}`;
+    const notesBlock = formatEditNotesForChat(editNotes);
+    const scopeLine = scope?.reelName
+      ? `\nActive reel/act: ${scope.reelName}` +
+        (scope.truncated
+          ? ` (showing ${timeline.tracks.find((t) => t.kind === "video")?.clips.length ?? 0} of ${scope.totalInReel} clips — work reel-by-reel for long features)`
+          : "")
+      : "";
+    const userPrompt = [
+      "Timeline context (metadata only — no media bytes):",
+      JSON.stringify(ctx, null, 2),
+      scopeLine,
+      notesBlock
+        ? `\nEdit notes (creative brief from shoot / client / look):\n${notesBlock}`
+        : "",
+      `\nUser request:\n${message}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
     const raw = await callGeminiJsonText(EDIT_BY_CHAT_SYSTEM, userPrompt);
     return parseGeminiOpsPayload(raw);
   } catch {
@@ -59,16 +85,19 @@ export async function POST(
     const body = (await request.json()) as {
       message?: string;
       apply?: boolean;
+      /** Scope chat to a reel/act (defaults to timeline.activeReelId). */
+      reelId?: string | null;
     };
     const message = (body.message || "").trim();
     if (!message) {
       return NextResponse.json({ error: "message is required" }, { status: 400 });
     }
 
-    const [timeline, media, versions] = await Promise.all([
+    const [timeline, media, versions, settings] = await Promise.all([
       getTimeline(projectId),
       listMediaAssets(projectId),
       listTimelineVersions(projectId),
+      getAiEditorProjectSettings(projectId),
     ]);
 
     if (!timeline) {
@@ -78,18 +107,45 @@ export async function POST(
       );
     }
 
-    let proposal =
-      parseEditCommandRules(message, timeline, media) ||
-      (await proposeFromGemini(message, timeline, media));
+    const { scoped, reel, truncated, totalInReel } = timelineScopedToReel(
+      timeline,
+      body.reelId !== undefined ? body.reelId : timeline.activeReelId
+    );
+    const chatTimeline = scoped;
+    const scopeMeta = {
+      reelName: reel?.name || null,
+      truncated,
+      totalInReel,
+    };
+
+    const editNotes = settings?.editNotes || [];
+    const notesDriven = wantsNotesDrivenEdit(message) && editNotes.length > 0;
+
+    let proposal: ChatEditProposal | null = null;
+    if (notesDriven) {
+      // Prefer Gemini so client/on-set notes shape the cut; skip brittle rule matches.
+      proposal = await proposeFromGemini(
+        message,
+        chatTimeline,
+        media,
+        editNotes,
+        scopeMeta
+      );
+    } else {
+      proposal =
+        parseEditCommandRules(message, chatTimeline, media) ||
+        (await proposeFromGemini(message, chatTimeline, media, editNotes, scopeMeta));
+    }
 
     if (!proposal) {
       proposal = {
-        summary:
-          "I couldn’t map that to an edit. Try: “remove the first clip”, “trim first to 2 seconds”, “reverse the order”, or “undo”.",
+        summary: notesDriven
+          ? "I couldn’t turn your edit notes into timeline ops yet. Try a more specific ask (e.g. “tighten the open using my notes”) or add clearer notes."
+          : "I couldn’t map that to an edit. Try: “remove the first clip”, “trim first to 2 seconds”, “reverse the order”, “use my notes”, or “undo”.",
         ops: [],
         confidence: 0.2,
         source: "rules",
-        warnings: ["unparsed"],
+        warnings: notesDriven ? ["notes_unparsed"] : ["unparsed"],
       };
     }
 
@@ -139,6 +195,7 @@ export async function POST(
       });
     }
 
+    // Validate/apply against the full timeline (ops use real clip ids from the reel scope).
     const validation = validateTimelineOps(timeline, proposal.ops);
     const descriptions = describeOps(proposal.ops, timeline);
 

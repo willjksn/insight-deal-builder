@@ -21,6 +21,15 @@ Local playback via Desktop Agent `GET /v1/media/stream` (Range + `?token=`). UI 
 
 `editByChat.ts` + `POST .../ai-editor/chat-edit`: propose ops from natural language (deterministic rules first, Gemini JSON fallback), validate against the live timeline, apply with version bump, undo = restore prior version. Never sends camera media — only clip labels/ids/durations.
 
+## Long-form (acts / reels)
+
+- `Timeline.reels` + `clip.reelId` + `activeReelId`
+- Rough cut defaults to one “Full cut” reel
+- UI: **Set up for feature (3 acts)** or **Split into ~20 min reels** (~1h45 runtime)
+- Edit by Chat scopes Gemini/rules context to the active reel (cap in `limits.ts`)
+
+Soft caps live in `src/lib/aiEditor/limits.ts` (raise there, not scattered).
+
 ## Still later
 
 - Scrubbing / waveform / multi-track visual editor

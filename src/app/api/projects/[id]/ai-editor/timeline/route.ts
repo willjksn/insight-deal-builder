@@ -5,6 +5,10 @@ import {
 } from "@/lib/aiEditor/routeAccess";
 import { applyFinishingPlan } from "@/lib/aiEditor/finishing";
 import {
+  setActiveReel,
+  setupFeatureReels,
+} from "@/lib/aiEditor/reels";
+import {
   applyTimelineOps,
   buildRoughCutFromCoverage,
   bumpVersion,
@@ -66,17 +70,33 @@ export async function POST(
     if (access.error) return access.error;
 
     const body = (await request.json()) as {
-      action?: "build_rough_cut" | "apply_ops" | "restore_version" | "apply_finishing";
+      action?:
+        | "build_rough_cut"
+        | "apply_ops"
+        | "restore_version"
+        | "apply_finishing"
+        | "setup_feature_reels"
+        | "set_active_reel";
       ops?: TimelineEditOp[];
       versionId?: string;
       note?: string;
       name?: string;
       moodId?: FinishingMoodId;
       transitionStyle?: TransitionStyleId;
+      reelId?: string;
+      /** acts (default) or reels (~20 min) */
+      reelMode?: "acts" | "reels";
+      runtimeSeconds?: number;
+      reelCount?: number;
     };
     const action = body.action || "build_rough_cut";
 
-    const jobType = action === "apply_finishing" ? "finishing" : "rough_cut";
+    const jobType =
+      action === "apply_finishing"
+        ? "finishing"
+        : action === "setup_feature_reels" || action === "set_active_reel"
+          ? "rough_cut"
+          : "rough_cut";
     const job = await createJob(access.appUser, projectId, jobType, { action });
     await updateJob(job.id, {
       status: "running",
@@ -87,7 +107,36 @@ export async function POST(
 
     let timeline = await getTimeline(projectId);
 
-    if (action === "apply_finishing") {
+    if (action === "setup_feature_reels") {
+      if (!timeline) {
+        return NextResponse.json({ error: "Build a rough cut first" }, { status: 400 });
+      }
+      const structured = setupFeatureReels(timeline, {
+        mode: body.reelMode || "acts",
+        runtimeSeconds: body.runtimeSeconds,
+        reelCount: body.reelCount,
+      });
+      const { timeline: bumped, versionRecord } = bumpVersion(
+        structured,
+        body.note ||
+          (body.reelMode === "reels"
+            ? "Split into reels for long-form"
+            : "Split into acts for feature (~1h45)")
+      );
+      timeline = bumped;
+      await upsertTimeline(timeline);
+      await saveTimelineVersion(versionRecord);
+    } else if (action === "set_active_reel") {
+      if (!timeline) {
+        return NextResponse.json({ error: "Build a rough cut first" }, { status: 400 });
+      }
+      if (!body.reelId) {
+        return NextResponse.json({ error: "reelId required" }, { status: 400 });
+      }
+      // Active reel focus — no version bump (organizational only)
+      timeline = setActiveReel(timeline, body.reelId);
+      await upsertTimeline(timeline);
+    } else if (action === "apply_finishing") {
       if (!timeline) {
         return NextResponse.json({ error: "Build a rough cut first" }, { status: 400 });
       }
