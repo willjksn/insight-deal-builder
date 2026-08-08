@@ -16,6 +16,7 @@ Do not assume Resolve and AI Editor share a machine or OS paths.
 - **V5 (initial)** — Read open Resolve timeline back (metadata + optional EDL snapshot). Non-destructive.
 - **V6 (initial)** — Clip list from Resolve → compare to rough cut / coverage → “For next time” planning notes.
 - **V7 (initial)** — Import Resolve cut into ShootSpine as a new timeline version (prior cut restorable).
+- **V8 (initial)** — Next shoot checklist (missing coverage + Resolve feedback), check-off in AI Editor.
 
 ## Phase plan
 
@@ -27,7 +28,8 @@ Do not assume Resolve and AI Editor share a machine or OS paths.
 6. **V5** — Reverse sync from Resolve — initial landed
 7. **V6** — Planning feedback from final cut — initial landed
 8. **V7** — Reverse import into ShootSpine timeline — initial landed
-9. Later — cross-project analytics
+9. **V8** — Next shoot checklist — initial landed
+10. Later — cross-project analytics / board handoff
 
 Always feature-detect Resolve capabilities. Prefer official developer docs for the installed version.
 

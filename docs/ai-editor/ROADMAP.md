@@ -30,8 +30,9 @@
 | **Edit notes** | Shoot / client / look notes → creative brief for Edit by Chat |
 | **Long-form ready** | Raised soft caps + acts/reels for ~1h45 features |
 | **V7 Reverse import** | Import Resolve cut → new ShootSpine timeline version |
+| **V8 Next shoot checklist** | Checkable pickups from missing coverage + Resolve feedback |
 
-Later: cross-project analytics / richer planning from finals
+Later: cross-project analytics / production-board handoff
 
 ## Current implementation status
 
@@ -54,4 +55,5 @@ Later: cross-project analytics / richer planning from finals
 - **Edit notes (initial)** — tagged notes (on set / client / look / general); saved on project; injected into Edit by Chat; “Propose from notes”  
 - **Long-form ready** — soft caps raised (5k media, 500/batch, 2k Resolve link/sync); acts/reels on timeline; Edit by chat scoped to active reel/act  
 - **V7 Reverse import (initial)** — “Import Resolve cut here” builds a new timeline version from Resolve clip names; prior cut kept in Versions  
-- Later: cross-project analytics / richer planning from finals
+- **V8 Next shoot checklist (initial)** — checkable list from missing coverage + dropped/preferred insights; saved on project; AI Editor only  
+- Later: cross-project analytics / production-board handoff

@@ -10,6 +10,7 @@ import type {
   FinishingMoodId,
   MediaAsset,
   EditNote,
+  NextShootChecklist,
   PlanningFeedback,
   ResolveSyncSnapshot,
   PreferredTakeOverride,
@@ -301,6 +302,28 @@ export async function aiEditorSaveResolveSync(
     ok: true;
     sync: ResolveSyncSnapshot;
     planning: PlanningFeedback;
+    checklist: NextShootChecklist;
+    settings: AiEditorProjectSettings;
+    job: AiEditorJob;
+  }>(res);
+}
+
+export async function aiEditorNextShootChecklist(
+  getToken: GetToken,
+  projectId: string,
+  body: { itemId?: string; done?: boolean; rebuild?: boolean }
+) {
+  const res = await fetch(
+    `/api/projects/${projectId}/ai-editor/next-shoot-checklist`,
+    {
+      method: "POST",
+      headers: await authHeaders(getToken),
+      body: JSON.stringify(body),
+    }
+  );
+  return parseJson<{
+    ok: true;
+    checklist: NextShootChecklist;
     settings: AiEditorProjectSettings;
     job: AiEditorJob;
   }>(res);

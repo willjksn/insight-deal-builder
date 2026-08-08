@@ -79,6 +79,7 @@ import {
   aiEditorPatchMedia,
   aiEditorRunMatch,
   aiEditorSaveAnalysis,
+  aiEditorNextShootChecklist,
   aiEditorSaveEditNotes,
   aiEditorSaveFeedback,
   aiEditorSaveResolveSync,
@@ -101,6 +102,7 @@ import {
   createEditNote,
   sourceLabel,
 } from "@/lib/aiEditor/editNotes";
+import { checklistProgress } from "@/lib/aiEditor/nextShootChecklist";
 import { summarizePlanningFeedback } from "@/lib/aiEditor/planningFeedback";
 import {
   compareResolveToRoughCut,
@@ -112,6 +114,7 @@ import type {
   EditNote,
   EditNoteSource,
   FinishingFeedbackOutcome,
+  NextShootChecklist,
   PlanningFeedback,
 } from "@/lib/aiEditor/types";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
@@ -208,6 +211,9 @@ export function AiEditorClient({ projectId }: Props) {
     null
   );
   const [planningFeedback, setPlanningFeedback] = useState<PlanningFeedback | null>(null);
+  const [nextShootChecklist, setNextShootChecklist] = useState<NextShootChecklist | null>(
+    null
+  );
   const [feedbackOutcome, setFeedbackOutcome] =
     useState<FinishingFeedbackOutcome>("kept_look");
   const [feedbackNote, setFeedbackNote] = useState("");
@@ -240,6 +246,7 @@ export function AiEditorClient({ projectId }: Props) {
       if (dash.settings?.lastPlanningFeedback) {
         setPlanningFeedback(dash.settings.lastPlanningFeedback);
       }
+      setNextShootChecklist(dash.settings?.nextShootChecklist ?? null);
       setEditNotes(dash.settings?.editNotes ?? []);
       if (dash.timeline?.finishing?.moodId) {
         setMoodId(dash.timeline.finishing.moodId);
@@ -332,6 +339,8 @@ export function AiEditorClient({ projectId }: Props) {
   const planningSummary =
     summarizePlanningFeedback(planningFeedback) ||
     summarizePlanningFeedback(settings?.lastPlanningFeedback);
+  const checklist = nextShootChecklist || settings?.nextShootChecklist || null;
+  const checklistStats = checklistProgress(checklist);
   const videoTrack = timeline?.tracks.find((t) => t.kind === "video");
   const reelSummaries = useMemo(
     () => (timeline?.reels?.length ? summarizeReels(timeline) : []),
@@ -1119,6 +1128,44 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  async function onToggleNextShootItem(itemId: string, done: boolean) {
+    setBusy("next_shoot");
+    setError(null);
+    try {
+      const res = await aiEditorNextShootChecklist(getToken, projectId, {
+        itemId,
+        done,
+      });
+      setNextShootChecklist(res.checklist);
+      setSettings(res.settings);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update checklist");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onRebuildNextShootChecklist() {
+    setBusy("next_shoot");
+    setError(null);
+    try {
+      const res = await aiEditorNextShootChecklist(getToken, projectId, {
+        rebuild: true,
+      });
+      setNextShootChecklist(res.checklist);
+      setSettings(res.settings);
+      setStatusNote(
+        res.checklist.items.length
+          ? `Next shoot checklist: ${res.checklist.items.filter((i) => !i.done).length} remaining`
+          : "No next-shoot items yet — sync from Resolve after a cut."
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not rebuild checklist");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function onImportResolveCut() {
     setBusy("rough_cut");
     setError(null);
@@ -1153,6 +1200,7 @@ export function AiEditorClient({ projectId }: Props) {
         });
         setSettings(saved.settings);
         setPlanningFeedback(saved.planning);
+        if (saved.checklist) setNextShootChecklist(saved.checklist);
         snapshot = saved.sync;
       }
 
@@ -1211,6 +1259,7 @@ export function AiEditorClient({ projectId }: Props) {
       });
       setSettings(saved.settings);
       setPlanningFeedback(saved.planning);
+      if (saved.checklist) setNextShootChecklist(saved.checklist);
       setJobs((prev) => [saved.job, ...prev.filter((j) => j.id !== saved.job.id)]);
 
       const compare = compareResolveToRoughCut({
@@ -3192,16 +3241,48 @@ export function AiEditorClient({ projectId }: Props) {
                     <p className="mt-0.5 text-sm text-slate-600">{resolveSyncCompare.detail}</p>
                   </div>
                 ) : null}
-                {(planningFeedback || settings?.lastPlanningFeedback)?.insights?.length ? (
+                {checklist?.items?.length ? (
                   <div className="mt-3 space-y-2">
-                    <p className="text-sm font-medium text-slate-800">For next time</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-slate-800">
+                        Next shoot checklist
+                        {checklistStats.total
+                          ? ` · ${checklistStats.remaining} remaining`
+                          : ""}
+                      </p>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-sky-800 underline disabled:opacity-50"
+                        disabled={!!busy}
+                        onClick={() => void onRebuildNextShootChecklist()}
+                      >
+                        Refresh list
+                      </button>
+                    </div>
                     <ul className="space-y-1.5">
-                      {(planningFeedback || settings?.lastPlanningFeedback)!.insights.map((insight) => (
+                      {checklist.items.map((item) => (
                         <li
-                          key={insight.id}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                          key={item.id}
+                          className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                         >
-                          {insight.text}
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                            checked={item.done}
+                            disabled={!!busy}
+                            onChange={(e) =>
+                              void onToggleNextShootItem(item.id, e.target.checked)
+                            }
+                          />
+                          <span
+                            className={
+                              item.done
+                                ? "text-slate-400 line-through"
+                                : "text-slate-700"
+                            }
+                          >
+                            {item.label}
+                          </span>
                         </li>
                       ))}
                     </ul>

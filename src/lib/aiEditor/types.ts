@@ -38,6 +38,7 @@ export type AiEditorJobType =
   | "resolve_import"
   | "resolve_sync"
   | "planning_feedback"
+  | "next_shoot_checklist"
   | "finishing"
   | "feedback";
 
@@ -86,6 +87,8 @@ export interface AiEditorProjectSettings {
   lastResolveSync?: ResolveSyncSnapshot;
   /** V6 — planning notes derived from Resolve cut vs rough cut / coverage. */
   lastPlanningFeedback?: PlanningFeedback;
+  /** V8 — checkable next-shoot list derived from planning feedback + coverage. */
+  nextShootChecklist?: NextShootChecklist;
   /** Edit notes from set / client / look — fed into Edit by Chat. */
   editNotes?: EditNote[];
   createdAt: string;
@@ -341,6 +344,28 @@ export interface PlanningFeedback {
   insights: PlanningFeedbackInsight[];
   lengthHint?: "rough" | "longer" | "shorter" | "similar" | "unknown";
   updatedAt: string;
+}
+
+/** V8 — actionable next-shoot row (AI Editor checklist). */
+export type NextShootChecklistKind =
+  | "missing_shot"
+  | "preferred_dropped"
+  | "dropped_in_finish"
+  | "insight";
+
+export interface NextShootChecklistItem {
+  id: string;
+  kind: NextShootChecklistKind;
+  severity: PlanningInsightSeverity;
+  label: string;
+  plannedShotId?: string;
+  done: boolean;
+}
+
+export interface NextShootChecklist {
+  items: NextShootChecklistItem[];
+  updatedAt: string;
+  sourceTimelineName?: string;
 }
 
 export interface ClipTransitionOut {
