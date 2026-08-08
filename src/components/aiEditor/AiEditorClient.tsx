@@ -48,6 +48,7 @@ import {
   playbackPathForAsset,
 } from "@/lib/aiEditor/agentClient";
 import type { AgentDriveEntry } from "@/lib/aiEditor/agentProtocol";
+import { driveActionGates } from "@/lib/aiEditor/driveActionGates";
 import { assessDrivePresence } from "@/lib/aiEditor/drivePresence";
 import { buildProjectRecommendations } from "@/lib/aiEditor/recommendations";
 import {
@@ -550,6 +551,19 @@ export function AiEditorClient({ projectId }: Props) {
       archiveDriveOnline,
     ]
   );
+  const diskGates = useMemo(() => driveActionGates(drivePresence), [drivePresence]);
+
+  function requireEditDisk(): boolean {
+    if (diskGates.editDiskReady) return true;
+    setError(diskGates.editBlockReason || "Edit drive is not ready.");
+    return false;
+  }
+
+  function requireArchiveDisk(): boolean {
+    if (diskGates.archiveDiskReady) return true;
+    setError(diskGates.archiveBlockReason || "Backup drive is not ready.");
+    return false;
+  }
   const step11Done = archiveSummary.archived > 0;
   const step12Done = Boolean(settings?.lastFinishingFeedback);
   const finishingSummary = summarizeFinishing(timeline?.finishing);
@@ -936,6 +950,7 @@ export function AiEditorClient({ projectId }: Props) {
   async function onIndexFolder() {
     const folder = indexFolderPath.trim() || settings?.projectRootPath || "";
     if (!folder) return;
+    if (addMode === "copy" && !requireEditDisk()) return;
     setBusy("index");
     setStatusNote(null);
     setDiskNote(null);
@@ -1102,6 +1117,7 @@ export function AiEditorClient({ projectId }: Props) {
 
   async function runIngestQueue() {
     if (!ingestQueue.length) return;
+    if (!requireEditDisk()) return;
     setBusy("index");
     setError(null);
     setStatusNote(null);
@@ -1150,6 +1166,7 @@ export function AiEditorClient({ projectId }: Props) {
       setStatusNote("Add footage first.");
       return;
     }
+    if (!requireEditDisk()) return;
     const capped = eligible.length > targets.length;
     cancelBatchRef.current = false;
     setBusy("analyze");
@@ -1877,6 +1894,7 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onWriteResolveHandoff() {
+    if (!requireEditDisk()) return;
     setBusy("write-handoff");
     setError(null);
     setStatusNote(null);
@@ -1927,6 +1945,7 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onOpenInResolve() {
+    if (!requireEditDisk()) return;
     setBusy("open-resolve");
     setError(null);
     setStatusNote(null);
@@ -1972,6 +1991,7 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onBringIntoResolve() {
+    if (!requireEditDisk()) return;
     setBusy("import-resolve");
     setError(null);
     setStatusNote(null);
@@ -2073,6 +2093,7 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onArchiveMedia() {
+    if (!requireEditDisk() || !requireArchiveDisk()) return;
     setBusy("archive");
     setError(null);
     setStatusNote(null);
@@ -2157,6 +2178,7 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onRestoreMedia() {
+    if (!requireEditDisk() || !requireArchiveDisk()) return;
     setBusy("restore");
     setError(null);
     setStatusNote(null);
@@ -2239,6 +2261,7 @@ export function AiEditorClient({ projectId }: Props) {
       setError(`Type ${SAFE_DELETE_CONFIRM_PHRASE} to reclaim active copies`);
       return;
     }
+    if (!requireEditDisk()) return;
     const projectRoot = settings?.projectRootPath?.trim();
     if (!projectRoot) {
       setError("Set your project folder in step 2 first");
@@ -2326,6 +2349,7 @@ export function AiEditorClient({ projectId }: Props) {
       setStatusNote("All clips are already ready for editing.");
       return;
     }
+    if (!requireEditDisk()) return;
     setBusy("proxy");
     setError(null);
     setStatusNote(null);
@@ -2470,6 +2494,14 @@ export function AiEditorClient({ projectId }: Props) {
                 <li key={i.kind}>{i.message}</li>
               ))}
           </ul>
+          <p className="mt-2 text-xs text-slate-600">
+            {!diskGates.editDiskReady
+              ? "Copy, prepare, analyze, and Resolve write are paused until the edit drive is ready."
+              : null}
+            {!diskGates.archiveDiskReady
+              ? `${!diskGates.editDiskReady ? " " : ""}Backup / restore / free-space are paused until the backup drive is ready.`
+              : null}
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
               variant="secondary"
@@ -2907,7 +2939,8 @@ export function AiEditorClient({ projectId }: Props) {
                   !!busy ||
                   !agent.connected ||
                   !indexFolderPath.trim() ||
-                  (addMode === "copy" && !settings?.projectRootPath)
+                  (addMode === "copy" && !settings?.projectRootPath) ||
+                  (addMode === "copy" && !diskGates.editDiskReady)
                 }
               >
                 {busy === "index" ? (
@@ -2952,7 +2985,11 @@ export function AiEditorClient({ projectId }: Props) {
                     </li>
                   ))}
                 </ul>
-                <Button size="sm" onClick={() => void runIngestQueue()} disabled={!!busy}>
+                <Button
+                  size="sm"
+                  onClick={() => void runIngestQueue()}
+                  disabled={!!busy || !diskGates.editDiskReady}
+                >
                   {busy === "index" ? (
                     <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                   ) : null}
@@ -2998,7 +3035,7 @@ export function AiEditorClient({ projectId }: Props) {
 
             <Button
               onClick={() => void onPrepareClips()}
-              disabled={!!busy || !needsPrepare.length}
+              disabled={!!busy || !needsPrepare.length || !diskGates.editDiskReady}
             >
               {busy === "proxy" ? (
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -3059,7 +3096,9 @@ export function AiEditorClient({ projectId }: Props) {
 
             <Button
               onClick={() => void onAnalyzeFootage()}
-              disabled={!!busy || !media.length || !agent.connected}
+              disabled={
+                !!busy || !media.length || !agent.connected || !diskGates.editDiskReady
+              }
             >
               {busy === "analyze" ? (
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -3873,7 +3912,13 @@ export function AiEditorClient({ projectId }: Props) {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={() => void onBringIntoResolve()}
-                    disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
+                    disabled={
+                      !!busy ||
+                      !timeline ||
+                      !agent.connected ||
+                      !settings?.projectRootPath ||
+                      !diskGates.editDiskReady
+                    }
                   >
                     {busy === "import-resolve" ? (
                       <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -3885,7 +3930,13 @@ export function AiEditorClient({ projectId }: Props) {
                   <Button
                     variant="secondary"
                     onClick={() => void onOpenInResolve()}
-                    disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
+                    disabled={
+                      !!busy ||
+                      !timeline ||
+                      !agent.connected ||
+                      !settings?.projectRootPath ||
+                      !diskGates.editDiskReady
+                    }
                   >
                     {busy === "open-resolve" ? (
                       <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -4008,7 +4059,13 @@ export function AiEditorClient({ projectId }: Props) {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={() => void onWriteResolveHandoff()}
-                    disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
+                    disabled={
+                      !!busy ||
+                      !timeline ||
+                      !agent.connected ||
+                      !settings?.projectRootPath ||
+                      !diskGates.editDiskReady
+                    }
                   >
                     {busy === "write-handoff" ? (
                       <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -4268,7 +4325,9 @@ export function AiEditorClient({ projectId }: Props) {
                     !!busy ||
                     !agent.connected ||
                     media.length === 0 ||
-                    !(archivePath.trim() || settings?.archiveRootPath)
+                    !(archivePath.trim() || settings?.archiveRootPath) ||
+                    !diskGates.editDiskReady ||
+                    !diskGates.archiveDiskReady
                   }
                 >
                   {busy === "archive" ? (
@@ -4281,7 +4340,13 @@ export function AiEditorClient({ projectId }: Props) {
                 <Button
                   variant="secondary"
                   onClick={() => void onRestoreMedia()}
-                  disabled={!!busy || !agent.connected || archiveSummary.restorable === 0}
+                  disabled={
+                    !!busy ||
+                    !agent.connected ||
+                    archiveSummary.restorable === 0 ||
+                    !diskGates.editDiskReady ||
+                    !diskGates.archiveDiskReady
+                  }
                 >
                   {busy === "restore" ? (
                     <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -4335,7 +4400,8 @@ export function AiEditorClient({ projectId }: Props) {
                         disabled={
                           !!busy ||
                           !agent.connected ||
-                          reclaimConfirm.trim() !== SAFE_DELETE_CONFIRM_PHRASE
+                          reclaimConfirm.trim() !== SAFE_DELETE_CONFIRM_PHRASE ||
+                          !diskGates.editDiskReady
                         }
                       >
                         {busy === "reclaim" ? (

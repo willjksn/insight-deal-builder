@@ -39,6 +39,7 @@
 | **V14 Recommendations** | Ranked next steps on hub + project tips (checklists, wrap-up, backup) |
 | **V15 Storage health** | Live edit/backup coaching (internal vs SSD/HDD, same-drive risk, free space) |
 | **V16 Drive presence** | Detect unplugged edit/backup drives; Recheck + Relink banner |
+| **V17 Offline-safe actions** | Pause copy/prepare/Resolve/archive when edit or backup disk isn’t ready |
 
 Later: deeper anonymized analytics across orgs (opt-in)
 
@@ -72,4 +73,5 @@ Later: deeper anonymized analytics across orgs (opt-in)
 - **V14 Recommendations (initial)** — ranked hub “Suggested next steps” with deep links; light project-page tip  
 - **V15 Storage health (initial)** — Step 2 workspace health for edit/backup placement + free space; guidance only  
 - **V16 Drive presence (initial)** — offline vs remount detection; top banner with Recheck; agent `storage/stat` reports `online: false`  
+- **V17 Offline-safe actions (initial)** — soft-gate disk ops (copy, prepare, analyze, Resolve write, archive/restore/reclaim) until Relink or plug-in  
 - Later: deeper anonymized analytics across orgs (opt-in)
