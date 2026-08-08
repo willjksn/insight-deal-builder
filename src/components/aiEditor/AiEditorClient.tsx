@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -61,6 +61,7 @@ import {
 } from "@/lib/aiEditor/finishing";
 import {
   importResultMessage,
+  summarizeResolveProbeFailure,
   summarizeResolveWorkflow,
   type ResolveWorkflowStatus,
 } from "@/lib/aiEditor/resolveWorkflow";
@@ -133,6 +134,8 @@ import type {
   Timeline,
   TimelineVersion,
 } from "@/lib/aiEditor/types";
+
+const AGENT_CONNECT_MSG = "Connect this computer first";
 
 type IngestQueueItem = {
   id: string;
@@ -266,6 +269,11 @@ export function AiEditorClient({ projectId }: Props) {
       if (dash.settings?.lastFinishingFeedback?.note) {
         setFeedbackNote(dash.settings.lastFinishingFeedback.note);
       }
+      setResolveImported(
+        (dash.jobs ?? []).some(
+          (j) => j.type === "resolve_import" && j.status === "completed"
+        )
+      );
       const health = await checkAgentHealth(DEFAULT_AGENT_BASE_URL);
       setAgent(health);
     } catch (e) {
@@ -717,10 +725,10 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const health = await checkAgentHealth();
       setAgent(health);
-      if (!health.connected) throw new Error("Connect this computer first");
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
       if (runTranscription && health.whisperAvailable === false) {
         setStatusNote(
-          "Transcription requested but Whisper isn’t installed — continuing with technical + shot detection only."
+          "Transcription requested but speech-to-text isn’t set up — continuing with technical + shot detection only."
         );
       }
       const token = await ensureAgentSession();
@@ -765,15 +773,25 @@ export function AiEditorClient({ projectId }: Props) {
           });
         }
       }
+      const failedCount = results.filter((r) => "error" in r && r.error).length;
+      const okCount = results.length - failedCount;
       const saved = await aiEditorSaveAnalysis(getToken, projectId, results);
       setAnalysis(saved.analysis);
       setJobs((prev) => [saved.job, ...prev]);
       await load();
-      setStatusNote(
-        `Analyzed ${saved.analysis.length} clip(s): technical checks + shot breaks` +
-          (runTranscription ? " + transcript where available" : "") +
-          "."
-      );
+      if (failedCount > 0) {
+        setStatusNote(
+          `Understood ${okCount} of ${results.length} clip(s)` +
+            (runTranscription ? " (transcript where available)" : "") +
+            `. ${failedCount} couldn’t be analyzed — check those files and try again.`
+        );
+      } else {
+        setStatusNote(
+          `Analyzed ${okCount} clip(s): technical checks + shot breaks` +
+            (runTranscription ? " + transcript where available" : "") +
+            "."
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analysis failed");
     } finally {
@@ -927,10 +945,14 @@ export function AiEditorClient({ projectId }: Props) {
   function previewRoughCut() {
     if (!timeline || !videoTrack?.clips.length) return;
     const items: PreviewItem[] = [];
+    let skipped = 0;
     for (const clip of videoTrack.clips) {
       const asset = media.find((m) => m.id === clip.mediaAssetId);
       const path = asset ? playbackPathForAsset(asset) : null;
-      if (!path) continue;
+      if (!path) {
+        skipped += 1;
+        continue;
+      }
       const startSeconds = framesToSeconds(clip.sourceInFrame, timeline.frameRate);
       const endSeconds = startSeconds + framesToSeconds(clip.durationFrames, timeline.frameRate);
       items.push({
@@ -939,6 +961,17 @@ export function AiEditorClient({ projectId }: Props) {
         startSeconds,
         endSeconds,
       });
+    }
+    if (!items.length) {
+      setStatusNote(
+        "No online clips to preview — reconnect media or prepare proxies, then try again."
+      );
+      return;
+    }
+    if (skipped > 0) {
+      setStatusNote(
+        `Preview skipped ${skipped} offline clip${skipped === 1 ? "" : "s"} — the full cut may be longer.`
+      );
     }
     void openPreview(`Rough cut v${timeline.version}`, items);
   }
@@ -1185,46 +1218,43 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onImportResolveCut() {
-    setBusy("rough_cut");
+    setBusy("resolve-import-cut");
     setError(null);
     setStatusNote(null);
     try {
-      let snapshot = settings?.lastResolveSync;
-      if (!snapshot?.clips?.length) {
-        // Fresh sync if we don’t have clip names yet
-        const health = await checkAgentHealth();
-        setAgent(health);
-        if (!health.connected) throw new Error("Desktop Agent not connected");
-        const projectRoot = settings?.projectRootPath?.trim();
-        if (!projectRoot) throw new Error("Set your project folder in step 2 first");
-        const token = await ensureAgentSession();
-        const probe = await refreshResolveWorkflow(token);
-        if (!probe?.projectOpen) {
-          setStatusNote("Open Resolve with a timeline, then try again.");
-          return;
-        }
-        const handoffDir = handoffDirOnDisk || resolveHandoffAbsoluteDir(projectRoot);
-        const synced = await agentResolveSyncFromNle(DEFAULT_AGENT_BASE_URL, token, {
-          projectRoot,
-          handoffDir,
-          exportEdl: true,
-        });
-        if (!synced.synced || !synced.snapshot) {
-          setStatusNote(synced.message || "Couldn’t read Resolve yet.");
-          return;
-        }
-        const saved = await aiEditorSaveResolveSync(getToken, projectId, {
-          snapshot: synced.snapshot,
-        });
-        setSettings(saved.settings);
-        setPlanningFeedback(saved.planning);
-        if (saved.checklist) setNextShootChecklist(saved.checklist);
-        snapshot = saved.sync;
+      // Always re-read Resolve so we don’t import a stale cut
+      const health = await checkAgentHealth();
+      setAgent(health);
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
+      const projectRoot = settings?.projectRootPath?.trim();
+      if (!projectRoot) throw new Error("Set your project folder in step 2 first");
+      const token = await ensureAgentSession();
+      const probe = await refreshResolveWorkflow(token);
+      if (!probe?.projectOpen) {
+        setStatusNote("Open Resolve with a project and timeline, then try again.");
+        return;
       }
+      const handoffDir = handoffDirOnDisk || resolveHandoffAbsoluteDir(projectRoot);
+      const synced = await agentResolveSyncFromNle(DEFAULT_AGENT_BASE_URL, token, {
+        projectRoot,
+        handoffDir,
+        exportEdl: true,
+      });
+      if (!synced.synced || !synced.snapshot) {
+        setStatusNote(synced.message || "Couldn’t read Resolve yet.");
+        return;
+      }
+      const saved = await aiEditorSaveResolveSync(getToken, projectId, {
+        snapshot: synced.snapshot,
+      });
+      setSettings(saved.settings);
+      setPlanningFeedback(saved.planning);
+      if (saved.checklist) setNextShootChecklist(saved.checklist);
+      setHandoffDirOnDisk(handoffDir);
 
       const res = await aiEditorTimelineAction(getToken, projectId, {
         action: "import_resolve_cut",
-        resolveSnapshot: snapshot,
+        resolveSnapshot: saved.sync,
         note: "Imported cut from Resolve",
       });
       setTimeline(res.timeline);
@@ -1249,12 +1279,12 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const health = await checkAgentHealth();
       setAgent(health);
-      if (!health.connected) throw new Error("Desktop Agent not connected");
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
       const projectRoot = settings?.projectRootPath?.trim();
       if (!projectRoot) throw new Error("Set your project folder in step 2 first");
       const token = await ensureAgentSession();
 
-      let probe = await refreshResolveWorkflow(token);
+      const probe = await refreshResolveWorkflow(token);
       if (!probe?.projectOpen) {
         setStatusNote("Open Resolve with a project and timeline, then try again.");
         return;
@@ -1342,7 +1372,7 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const health = await checkAgentHealth();
       setAgent(health);
-      if (!health.connected) throw new Error("Desktop Agent not connected");
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
       const projectRoot = settings?.projectRootPath?.trim();
       if (!projectRoot) throw new Error("Set a project folder in step 2 first");
       const token = await ensureAgentSession();
@@ -1377,9 +1407,9 @@ export function AiEditorClient({ projectId }: Props) {
       const probe = await agentResolveScriptingProbe(DEFAULT_AGENT_BASE_URL, t);
       setResolveWorkflow(summarizeResolveWorkflow(probe));
       return probe;
-    } catch {
+    } catch (e) {
       setResolveWorkflow(
-        summarizeResolveWorkflow({ installed: false, pythonAvailable: false })
+        summarizeResolveProbeFailure(e instanceof Error ? e.message : undefined)
       );
       return null;
     }
@@ -1393,7 +1423,7 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const health = await checkAgentHealth();
       setAgent(health);
-      if (!health.connected) throw new Error("Desktop Agent not connected");
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
       const projectRoot = settings?.projectRootPath?.trim();
       if (!projectRoot) throw new Error("Set your project folder in step 2 first");
       const token = await ensureAgentSession();
@@ -1438,7 +1468,7 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const health = await checkAgentHealth();
       setAgent(health);
-      if (!health.connected) throw new Error("Desktop Agent not connected");
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
       const projectRoot = settings?.projectRootPath?.trim();
       if (!projectRoot) throw new Error("Set your project folder in step 2 first");
       const token = await ensureAgentSession();
@@ -1532,7 +1562,7 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const health = await checkAgentHealth();
       setAgent(health);
-      if (!health.connected) throw new Error("Desktop Agent not connected");
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
       const token = await ensureAgentSession();
       const plan = await aiEditorArchiveAction(getToken, projectId, {
         action: "plan",
@@ -1602,7 +1632,7 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const health = await checkAgentHealth();
       setAgent(health);
-      if (!health.connected) throw new Error("Desktop Agent not connected");
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
       const token = await ensureAgentSession();
       const plan = await aiEditorArchiveAction(getToken, projectId, { action: "plan" });
       if (!plan.restore?.items.length) {
@@ -1679,7 +1709,7 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const health = await checkAgentHealth();
       setAgent(health);
-      if (!health.connected) throw new Error("Desktop Agent not connected");
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
       const token = await ensureAgentSession();
       const neverDeletePaths = eligible
         .map((m) => m.archivePath?.trim())
@@ -3060,7 +3090,7 @@ export function AiEditorClient({ projectId }: Props) {
                     <p className="font-semibold text-emerald-950">Your rough cut is in Resolve</p>
                     <p className="mt-1 text-sm text-emerald-900/80">
                       Clips are linked in the ShootSpine media bin when possible. Finish color and
-                      sound in Resolve — look tips are in LOOKS.txt in the saved folder.
+                      sound in Resolve — look tips are saved with your project folder.
                     </p>
                   </div>
                 ) : handoffDirOnDisk ? (
@@ -3215,12 +3245,12 @@ export function AiEditorClient({ projectId }: Props) {
               </div>
             )}
 
-            {finishWhere === "here" ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
                 <p className="font-semibold text-slate-900">After you finish in Resolve</p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Read the open timeline back for notes, or import that cut into ShootSpine as a new
-                  version (your previous rough cut stays in Versions → Restore).
+                  {finishWhere === "mac"
+                    ? "When this project folder is back on this computer with Resolve open, read the timeline for notes or import that cut as a new ShootSpine version (your previous rough cut stays in Versions → Restore)."
+                    : "Read the open timeline back for notes, or import that cut into ShootSpine as a new version (your previous rough cut stays in Versions → Restore)."}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <Button
@@ -3239,7 +3269,7 @@ export function AiEditorClient({ projectId }: Props) {
                     onClick={() => void onImportResolveCut()}
                     disabled={!!busy || !agent.connected || !settings?.projectRootPath}
                   >
-                    {busy === "rough_cut" ? (
+                    {busy === "resolve-import-cut" ? (
                       <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                     ) : (
                       <Clapperboard className="mr-1.5 h-4 w-4" />
@@ -3269,14 +3299,16 @@ export function AiEditorClient({ projectId }: Props) {
                           : ""}
                       </p>
                       <div className="flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-sky-800 underline disabled:opacity-50"
-                          disabled={!!busy || checklistStats.remaining === 0}
-                          onClick={() => void onSendChecklistToBoard()}
-                        >
-                          {busy === "board_handoff" ? "Sending…" : "Send to production board"}
-                        </button>
+                        {!context?.aiEditorOnly ? (
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-sky-800 underline disabled:opacity-50"
+                            disabled={!!busy || checklistStats.remaining === 0}
+                            onClick={() => void onSendChecklistToBoard()}
+                          >
+                            {busy === "board_handoff" ? "Sending…" : "Send to production board"}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="text-xs font-medium text-sky-800 underline disabled:opacity-50"
@@ -3325,7 +3357,6 @@ export function AiEditorClient({ projectId }: Props) {
                   <p className="mt-3 text-sm text-slate-600">{planningSummary}</p>
                 ) : null}
               </div>
-            ) : null}
           </div>
         </CardBody>
       </Card>

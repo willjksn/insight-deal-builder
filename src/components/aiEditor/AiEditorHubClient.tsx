@@ -32,24 +32,31 @@ export function AiEditorHubClient() {
     projectCount: number;
     withDataCount: number;
   } | null>(null);
+  const [insightsStatus, setInsightsStatus] = useState<"ok" | "empty" | "error" | null>(
+    null
+  );
   const [name, setName] = useState("");
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     setError(null);
+    setInsightsStatus(null);
     try {
-      const [res, insightRes] = await Promise.all([
-        aiEditorListSessions(getToken),
-        aiEditorCrossProjectInsights(getToken).catch(() => null),
-      ]);
+      const res = await aiEditorListSessions(getToken);
       setSessions(res.sessions);
-      if (insightRes) {
+      try {
+        const insightRes = await aiEditorCrossProjectInsights(getToken);
         setInsights(insightRes.insights);
         setInsightsMeta({
           projectCount: insightRes.projectCount,
           withDataCount: insightRes.withDataCount,
         });
+        setInsightsStatus(insightRes.insights.length ? "ok" : "empty");
+      } catch {
+        setInsights([]);
+        setInsightsMeta(null);
+        setInsightsStatus("error");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load edit sessions");
@@ -101,30 +108,50 @@ export function AiEditorHubClient() {
         </div>
       ) : null}
 
-      {!loading && insights.length ? (
+      {!loading && insightsStatus ? (
         <Card>
           <CardBody className="space-y-3">
             <div className="flex items-center gap-2 font-semibold text-slate-900">
               <Sparkles className="h-4 w-4 text-sky-700" />
               Patterns across your edits
             </div>
-            <p className="text-sm text-slate-600">
-              From looks, Resolve sync, and next-shoot checklists
-              {insightsMeta
-                ? ` · ${insightsMeta.withDataCount} of ${insightsMeta.projectCount} projects with data`
-                : ""}
-              . No footage leaves your drives.
-            </p>
-            <ul className="space-y-2">
-              {insights.map((insight) => (
-                <li
-                  key={insight.id}
-                  className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-800"
+            {insightsStatus === "error" ? (
+              <p className="text-sm text-slate-600">
+                Couldn’t load patterns right now.{" "}
+                <button
+                  type="button"
+                  className="font-medium text-sky-800 underline"
+                  onClick={() => void load()}
                 >
-                  {insight.text}
-                </li>
-              ))}
-            </ul>
+                  Try again
+                </button>
+              </p>
+            ) : insightsStatus === "empty" ? (
+              <p className="text-sm text-slate-600">
+                As you finish edits, sync Resolve, and build next-shoot checklists, patterns will
+                show up here. No footage leaves your drives.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600">
+                  From looks, Resolve sync, and next-shoot checklists
+                  {insightsMeta
+                    ? ` · ${insightsMeta.withDataCount} of ${insightsMeta.projectCount} projects with data`
+                    : ""}
+                  . No footage leaves your drives.
+                </p>
+                <ul className="space-y-2">
+                  {insights.map((insight) => (
+                    <li
+                      key={insight.id}
+                      className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-800"
+                    >
+                      {insight.text}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </CardBody>
         </Card>
       ) : null}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   importResultMessage,
+  summarizeResolveProbeFailure,
   summarizeResolveWorkflow,
 } from "@/lib/aiEditor/resolveWorkflow";
 
@@ -32,6 +33,13 @@ describe("resolveWorkflow", () => {
 
   it("missing when Resolve not installed", () => {
     expect(summarizeResolveWorkflow({ installed: false }).level).toBe("missing");
+  });
+
+  it("probe failure does not claim Resolve is missing", () => {
+    const s = summarizeResolveProbeFailure("fetch failed");
+    expect(s.level).toBe("manual");
+    expect(s.title).not.toMatch(/isn.?t on this computer/i);
+    expect(s.canAutoImport).toBe(false);
   });
 
   it("maps import failure to plain language", () => {

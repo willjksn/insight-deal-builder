@@ -59,6 +59,11 @@ export function buildTimelineFromResolveSync(input: {
   let matched = 0;
   let skippedEmpty = 0;
   let cursor = 0;
+  const timelineOrigin =
+    typeof input.sync.startFrame === "number" ? input.sync.startFrame : 0;
+  const useResolveTiming = clips.some(
+    (c) => typeof c.startFrame === "number" && Number.isFinite(c.startFrame)
+  );
 
   for (const item of clips) {
     const label = (item.name || "").trim();
@@ -81,18 +86,28 @@ export function buildTimelineFromResolveSync(input: {
       durationFrames = Math.max(1, secondsToFrames(fallbackSec, fps));
     }
 
+    let timelineStartFrame = cursor;
+    if (useResolveTiming && typeof item.startFrame === "number") {
+      timelineStartFrame = Math.max(0, Math.round(item.startFrame - timelineOrigin));
+    }
+
+    const sourceInFrame =
+      typeof item.sourceInFrame === "number" && item.sourceInFrame >= 0
+        ? Math.round(item.sourceInFrame)
+        : 0;
+
     const clip = {
       id: newId("clip"),
       mediaAssetId: asset.id,
       trackId: video.id,
-      timelineStartFrame: cursor,
-      sourceInFrame: 0,
+      timelineStartFrame,
+      sourceInFrame,
       durationFrames,
       label: asset.filename || label,
     };
     video.clips.push(clip);
     audio.clips.push({ ...clip, id: newId("clip"), trackId: audio.id });
-    cursor += durationFrames;
+    cursor = Math.max(cursor, timelineStartFrame + durationFrames);
     matched += 1;
   }
 

@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.11.0";
+const VERSION = "0.12.0";
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN !== "0";
 
 const MEDIA_EXTS = new Set([
@@ -1742,11 +1742,16 @@ for i in range(1, vtracks + 1):
                 cstart = safe_int(item.GetStart(), 0)
             except Exception:
                 cstart = 0
+            try:
+                cleft = safe_int(item.GetLeftOffset(), 0)
+            except Exception:
+                cleft = 0
             clip_items.append({
                 "name": cname,
                 "track": i,
                 "startFrame": cstart,
                 "durationFrames": cdur,
+                "sourceInFrame": max(0, cleft),
             })
     except Exception:
         pass

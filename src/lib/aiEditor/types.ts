@@ -305,8 +305,11 @@ export interface FinishingFeedback {
 export interface ResolveSyncClip {
   name?: string;
   track?: number;
+  /** Timeline start frame in Resolve (absolute). */
   startFrame?: number;
   durationFrames?: number;
+  /** Source in-point on the media (Resolve left offset), when available. */
+  sourceInFrame?: number;
 }
 
 /** V5 — read-only snapshot of the open Resolve timeline. */

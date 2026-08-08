@@ -87,6 +87,25 @@ export function summarizeResolveWorkflow(
   };
 }
 
+/** Probe threw (agent down / network) — do not claim Resolve is missing. */
+export function summarizeResolveProbeFailure(message?: string): ResolveWorkflowStatus {
+  const m = (message || "").toLowerCase();
+  const connectHint =
+    m.includes("connect") ||
+    m.includes("agent") ||
+    m.includes("fetch") ||
+    m.includes("network") ||
+    m.includes("econnrefused");
+  return {
+    level: "manual",
+    title: "Couldn’t check Resolve just now",
+    detail: connectHint
+      ? "Connect this computer (step 1), then check again."
+      : "Resolve may still be fine — open it with a project, then check again. If this keeps happening, restart the helper on this computer.",
+    canAutoImport: false,
+  };
+}
+
 export function importResultMessage(result: {
   imported: boolean;
   reason?: string;

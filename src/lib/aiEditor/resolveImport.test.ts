@@ -49,4 +49,35 @@ describe("resolveImport", () => {
     expect(result.timeline.reels?.length).toBe(1);
     expect(resolveImportSummary(result)).toMatch(/2 clips/);
   });
+
+  it("preserves Resolve timeline placement and source in-points", () => {
+    const result = buildTimelineFromResolveSync({
+      projectId: "p1",
+      media: [media("a", "hero_wide.mp4"), media("b", "react_cu.mov")],
+      sync: {
+        startFrame: 86400,
+        frameRate: 24,
+        clips: [
+          {
+            name: "hero_wide",
+            startFrame: 86400,
+            durationFrames: 48,
+            sourceInFrame: 12,
+          },
+          {
+            name: "react_cu.mov",
+            startFrame: 86500,
+            durationFrames: 24,
+            sourceInFrame: 0,
+          },
+        ],
+      },
+    });
+
+    const video = result.timeline.tracks.find((t) => t.kind === "video")!;
+    expect(video.clips[0].timelineStartFrame).toBe(0);
+    expect(video.clips[0].sourceInFrame).toBe(12);
+    expect(video.clips[1].timelineStartFrame).toBe(100);
+    expect(video.clips[1].durationFrames).toBe(24);
+  });
 });
