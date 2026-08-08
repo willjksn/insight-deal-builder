@@ -3042,9 +3042,7 @@ export function AiEditorClient({ projectId }: Props) {
           <div className="pl-10 space-y-4">
             <ManagedIngestReview
               projectName={context?.projectName || "This edit"}
-              clientOrProject={
-                context?.projectName?.replace(/\s+/g, "") || "Project"
-              }
+              clientOrProject={context?.projectName || "Project"}
               shootLabel={ingestShootLabel || "Shoot"}
               sources={detectedSources}
               selectedSourceId={selectedSourceId}
@@ -3057,21 +3055,26 @@ export function AiEditorClient({ projectId }: Props) {
                 (() => {
                   const root = (settings?.projectRootPath || storagePath).trim();
                   if (!root) return null;
-                  // Storage root = drive root of edit folder for naming preview
                   const m = root.match(/^([A-Za-z]:)([\\/]|$)/);
                   return m ? `${m[1]}\\` : root;
                 })()
               }
-              destinationLabel={
-                settings?.projectRootPath
-                  ? friendlyDriveLabel(
-                      driveForPath(settings.projectRootPath, knownDrives) || {
-                        path: settings.projectRootPath,
-                        label: settings.projectRootPath,
-                        kind: "drive",
-                      }
-                    )
-                  : null
+              destinationDriveName={
+                (() => {
+                  const root = (settings?.projectRootPath || storagePath).trim();
+                  if (!root) return null;
+                  const drive = driveForPath(root, knownDrives);
+                  if (drive) {
+                    const letter = drive.path.match(/^([A-Za-z]:)/)?.[1]?.toUpperCase();
+                    const name = (drive.volumeLabel || drive.label || "").trim();
+                    const type = storageTypeLabel(inferStorageTypeForPath(root, knownDrives));
+                    if (name && letter) return `${name} (${letter}) · ${type}`;
+                    if (letter) return `${letter} · ${type}`;
+                    return type;
+                  }
+                  const letter = root.match(/^([A-Za-z]:)/)?.[1]?.toUpperCase();
+                  return letter ? `${letter} · This PC` : "Edit drive";
+                })()
               }
               freeBytes={ingestDestFreeBytes}
               options={ingestOptions}
@@ -3090,7 +3093,7 @@ export function AiEditorClient({ projectId }: Props) {
                 }
                 setPrepareWhileCopying(ingestOptions.generateProxies);
                 setStatusNote(
-                  `Source set to ${src.probableCameraModel || "camera media"} — use Copy into project folders below. One-click Ingest arrives in Phase B.`
+                  `Source folder set to the selected drive. Next: click “Find clips” or “Copy into project folders” below.`
                 );
               }}
               disabled={!!busy || !agent.connected}
