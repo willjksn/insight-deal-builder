@@ -46,6 +46,19 @@ export type CrossProjectInsightsSummary = {
   lookDefaults: CrossProjectLookDefaults | null;
 };
 
+export type OrgInsightsSummary = {
+  enabled: boolean;
+  /** Caller has company + opted in */
+  optedIn: boolean;
+  company: string | null;
+  contributorCount: number;
+  projectCount: number;
+  withDataCount: number;
+  insights: CrossProjectInsight[];
+};
+
+export type InsightsVoice = "personal" | "org";
+
 function topEntry<T extends string>(counts: Map<T, number>): { key: T; n: number } | null {
   let best: { key: T; n: number } | null = null;
   for (const [key, n] of counts) {
@@ -69,8 +82,11 @@ const OUTCOME_LABELS: Record<FinishingFeedbackOutcome, string> = {
 };
 
 export function buildCrossProjectInsights(
-  projects: CrossProjectSource[]
+  projects: CrossProjectSource[],
+  opts?: { voice?: InsightsVoice; includeRecommendations?: boolean }
 ): CrossProjectInsightsSummary {
+  const voice = opts?.voice ?? "personal";
+  const includeRecommendations = opts?.includeRecommendations ?? voice === "personal";
   const moodCounts = new Map<FinishingMoodId, number>();
   const transitionCounts = new Map<TransitionStyleId, number>();
   const outcomeCounts = new Map<FinishingFeedbackOutcome, number>();
@@ -125,7 +141,9 @@ export function buildCrossProjectInsights(
   if (topMood && topMood.n >= 2) {
     push(
       "top_mood",
-      `Across ${topMood.n} recent finishes, “${MOOD_LABELS[topMood.key]}” was your most common look.`,
+      voice === "org"
+        ? `Across ${topMood.n} finishes in your organization, “${MOOD_LABELS[topMood.key]}” was the most common look.`
+        : `Across ${topMood.n} recent finishes, “${MOOD_LABELS[topMood.key]}” was your most common look.`,
       topMood.n
     );
   }
@@ -134,7 +152,9 @@ export function buildCrossProjectInsights(
   if (topOutcome && topOutcome.n >= 2) {
     push(
       "top_outcome",
-      `You usually ${OUTCOME_LABELS[topOutcome.key]} (${topOutcome.n} projects).`,
+      voice === "org"
+        ? `Editors usually ${OUTCOME_LABELS[topOutcome.key]} (${topOutcome.n} projects).`
+        : `You usually ${OUTCOME_LABELS[topOutcome.key]} (${topOutcome.n} projects).`,
       topOutcome.n
     );
   }
@@ -142,7 +162,9 @@ export function buildCrossProjectInsights(
   if (missingCoverageProjects >= 2) {
     push(
       "missing_coverage",
-      `Missing planned coverage showed up on ${missingCoverageProjects} projects — worth locking inserts/reactions before wrap.`,
+      voice === "org"
+        ? `Missing planned coverage showed up on ${missingCoverageProjects} projects across the org — worth locking inserts/reactions before wrap.`
+        : `Missing planned coverage showed up on ${missingCoverageProjects} projects — worth locking inserts/reactions before wrap.`,
       missingCoverageProjects
     );
   }
@@ -150,7 +172,9 @@ export function buildCrossProjectInsights(
   if (preferredDroppedProjects >= 2) {
     push(
       "preferred_dropped",
-      `Preferred takes were cut in finishing on ${preferredDroppedProjects} projects — double-check selects before Resolve.`,
+      voice === "org"
+        ? `Preferred takes were cut in finishing on ${preferredDroppedProjects} projects across the org — double-check selects before Resolve.`
+        : `Preferred takes were cut in finishing on ${preferredDroppedProjects} projects — double-check selects before Resolve.`,
       preferredDroppedProjects
     );
   }
@@ -158,7 +182,9 @@ export function buildCrossProjectInsights(
   if (droppedInFinishProjects >= 2) {
     push(
       "dropped_in_finish",
-      `Rough-cut clips were dropped in Resolve on ${droppedInFinishProjects} projects — your AI rough cuts may be running long.`,
+      voice === "org"
+        ? `Rough-cut clips were dropped in Resolve on ${droppedInFinishProjects} projects — AI rough cuts may be running long.`
+        : `Rough-cut clips were dropped in Resolve on ${droppedInFinishProjects} projects — your AI rough cuts may be running long.`,
       droppedInFinishProjects
     );
   }
@@ -166,7 +192,9 @@ export function buildCrossProjectInsights(
   if (openChecklistProjects >= 1) {
     push(
       "open_checklist",
-      `${openChecklistProjects} project${openChecklistProjects === 1 ? "" : "s"} still ${openChecklistProjects === 1 ? "has" : "have"} open next-shoot items (${openChecklistItems} total).`,
+      voice === "org"
+        ? `${openChecklistProjects} project${openChecklistProjects === 1 ? "" : "s"} across the org still ${openChecklistProjects === 1 ? "has" : "have"} open next-shoot items (${openChecklistItems} total).`
+        : `${openChecklistProjects} project${openChecklistProjects === 1 ? "" : "s"} still ${openChecklistProjects === 1 ? "has" : "have"} open next-shoot items (${openChecklistItems} total).`,
       openChecklistProjects
     );
   }
@@ -174,7 +202,9 @@ export function buildCrossProjectInsights(
   if (insights.length === 0 && withData > 0) {
     push(
       "baseline",
-      `You’ve synced or finished ${withData} project${withData === 1 ? "" : "s"} — patterns will show once a few share the same look or coverage gaps.`,
+      voice === "org"
+        ? `${withData} project${withData === 1 ? "" : "s"} from opted-in teammates have sync/finish data — patterns will show once a few share the same look or coverage gaps.`
+        : `You’ve synced or finished ${withData} project${withData === 1 ? "" : "s"} — patterns will show once a few share the same look or coverage gaps.`,
       withData
     );
   }
@@ -182,7 +212,9 @@ export function buildCrossProjectInsights(
   if (insights.length === 0) {
     push(
       "empty",
-      "Finish a cut in Resolve and sync a few projects — patterns across your edits will show up here.",
+      voice === "org"
+        ? "When teammates opt in and finish a few edits, organization patterns will show up here."
+        : "Finish a cut in Resolve and sync a few projects — patterns across your edits will show up here.",
       0
     );
   }
@@ -191,8 +223,9 @@ export function buildCrossProjectInsights(
     projectCount: projects.length,
     withDataCount: withData,
     insights: insights.slice(0, 6),
-    recommendations: buildRecommendations(projects),
-    lookDefaults: lookDefaultsFromTallies(moodCounts, transitionCounts),
+    recommendations: includeRecommendations ? buildRecommendations(projects) : [],
+    lookDefaults:
+      voice === "personal" ? lookDefaultsFromTallies(moodCounts, transitionCounts) : null,
   };
 }
 

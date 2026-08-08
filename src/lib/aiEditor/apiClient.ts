@@ -58,6 +58,16 @@ export type AiEditorRecommendation = {
   projectName?: string;
 };
 
+export type AiEditorOrgInsights = {
+  enabled: boolean;
+  optedIn: boolean;
+  company: string | null;
+  contributorCount: number;
+  projectCount: number;
+  withDataCount: number;
+  insights: Array<{ id: string; text: string; weight: number }>;
+};
+
 export async function aiEditorCrossProjectInsights(getToken: GetToken) {
   const res = await fetch("/api/ai-editor/insights", {
     headers: await authHeaders(getToken),
@@ -74,6 +84,24 @@ export async function aiEditorCrossProjectInsights(getToken: GetToken) {
       weight: number;
       hint: string;
     } | null;
+    org: AiEditorOrgInsights;
+  }>(res);
+}
+
+export async function aiEditorSetOrgAnalyticsOptIn(
+  getToken: GetToken,
+  enabled: boolean
+) {
+  const res = await fetch("/api/ai-editor/org-analytics", {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ enabled }),
+  });
+  return parseJson<{
+    ok: true;
+    enabled: boolean;
+    company: string | null;
+    at: string;
   }>(res);
 }
 

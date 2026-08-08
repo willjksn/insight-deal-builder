@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -32,18 +32,24 @@ import {
   Clapperboard,
   Camera,
   Lightbulb,
+  Sparkles,
 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { aiEditorSetOrgAnalyticsOptIn } from "@/lib/aiEditor/apiClient";
+import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 
 function formatPermissionLabel(key: string): string {
   return key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 }
 
 export default function SettingsPage() {
-  const { appUser, signOut, isConfigured } = useAuth();
+  const { user, appUser, signOut, isConfigured } = useAuth();
   const { data: servicePackages, loading: packagesLoading, fromFirestore } = useServicePackages();
   const [repairing, setRepairing] = useState(false);
   const [repairMessage, setRepairMessage] = useState("");
+  const [orgAnalyticsSaving, setOrgAnalyticsSaving] = useState(false);
+  const [orgAnalyticsError, setOrgAnalyticsError] = useState<string | null>(null);
+  const [orgAnalyticsLocal, setOrgAnalyticsLocal] = useState<boolean | null>(null);
   const {
     pushStatus,
     pushSupportMessage,
@@ -63,6 +69,29 @@ export default function SettingsPage() {
   const activePermissions = permissions
     ? Object.entries(permissions).filter(([, v]) => v).map(([k]) => k)
     : [];
+  const orgAnalyticsEnabled =
+    orgAnalyticsLocal ?? Boolean(appUser?.aiEditorShareOrgAnalytics);
+
+  const getToken = useCallback(
+    async () => (user ? user.getIdToken() : null),
+    [user]
+  );
+
+  async function onToggleOrgAnalytics(enabled: boolean) {
+    setOrgAnalyticsSaving(true);
+    setOrgAnalyticsError(null);
+    setOrgAnalyticsLocal(enabled);
+    try {
+      await aiEditorSetOrgAnalyticsOptIn(getToken, enabled);
+    } catch (err) {
+      setOrgAnalyticsLocal(null);
+      setOrgAnalyticsError(
+        err instanceof Error ? err.message : "Could not update preference"
+      );
+    } finally {
+      setOrgAnalyticsSaving(false);
+    }
+  }
 
   const handleRepairAccess = async () => {
     setRepairing(true);
@@ -219,6 +248,42 @@ export default function SettingsPage() {
             </InfoCallout>
           </div>
         </PageSection>
+
+        {isAiEditorEnabled() && canUseProductionTools(appUser) ? (
+          <PageSection
+            icon={Sparkles}
+            accent="sky"
+            title="AI Editor patterns"
+            description="Optional studio learning from edit metadata — never footage"
+          >
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={orgAnalyticsEnabled}
+                  disabled={orgAnalyticsSaving || !appUser?.company?.trim()}
+                  onChange={(e) => void onToggleOrgAnalytics(e.target.checked)}
+                  className="mt-0.5 h-5 w-5 rounded"
+                />
+                <span>
+                  Share anonymized AI Editor patterns with my organization
+                  <span className="mt-1 block text-xs font-normal text-slate-500">
+                    Counts looks, Resolve wrap-up outcomes, and coverage gaps across opted-in
+                    teammates. No clip files, paths, or project names are shared. Off by default.
+                  </span>
+                </span>
+              </label>
+              {!appUser?.company?.trim() ? (
+                <InfoCallout variant="sky">
+                  An organization must be assigned on your account before you can share patterns.
+                </InfoCallout>
+              ) : null}
+              {orgAnalyticsError ? (
+                <p className="text-sm text-red-600">{orgAnalyticsError}</p>
+              ) : null}
+            </div>
+          </PageSection>
+        ) : null}
 
         {isInsightOrgUser(appUser) && canAccessReports(appUser) && (
           <PageSection

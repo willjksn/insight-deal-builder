@@ -56,6 +56,13 @@ export interface UserProfile {
   notifyEmail?: boolean;
   /** Browser push alerts (default true) */
   notifyPush?: boolean;
+  /**
+   * V19 — opt-in to include this user’s AI Editor metadata in org pattern rollups.
+   * Default off / absent. Never shares footage paths or media bytes.
+   */
+  aiEditorShareOrgAnalytics?: boolean;
+  /** ISO timestamp when org analytics opt-in last changed */
+  aiEditorShareOrgAnalyticsAt?: string;
   /** False until an admin assigns company and permissions */
   approved?: boolean;
   /** Set when a partner is offboarded — login blocked until restored and re-approved */

@@ -41,8 +41,7 @@
 | **V16 Drive presence** | Detect unplugged edit/backup drives; Recheck + Relink banner |
 | **V17 Offline-safe actions** | Pause copy/prepare/Resolve/archive when edit or backup disk isn’t ready |
 | **V18 Continue / next step** | Hub resume card + in-project “Continue · Step N” coach with anchors |
-
-Later: deeper anonymized analytics across orgs (opt-in)
+| **V19 Org analytics (opt-in)** | Anonymized studio patterns from opted-in teammates (metadata only) |
 
 ## Current implementation status
 
@@ -76,4 +75,4 @@ Later: deeper anonymized analytics across orgs (opt-in)
 - **V16 Drive presence (initial)** — offline vs remount detection; top banner with Recheck; agent `storage/stat` reports `online: false`  
 - **V17 Offline-safe actions (initial)** — soft-gate disk ops (copy, prepare, analyze, Resolve write, archive/restore/reclaim) until Relink or plug-in  
 - **V18 Continue / next step (initial)** — local resume bookmark on hub; project Continue strip scrolls to next incomplete step  
-- Later: deeper anonymized analytics across orgs (opt-in)
+- **V19 Org analytics (initial)** — opt-in user preference; org hub card from same-company contributors; counts only (no names/paths/media)

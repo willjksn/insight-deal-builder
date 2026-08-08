@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
+  Building2,
   Clapperboard,
   FolderKanban,
   ListChecks,
@@ -22,6 +23,7 @@ import {
   aiEditorCreateSession,
   aiEditorCrossProjectInsights,
   aiEditorListSessions,
+  type AiEditorOrgInsights,
   type AiEditorRecommendation,
   type AiEditorSessionListItem,
 } from "@/lib/aiEditor/apiClient";
@@ -51,6 +53,7 @@ export function AiEditorHubClient() {
   const [recommendations, setRecommendations] = useState<AiEditorRecommendation[]>(
     []
   );
+  const [orgInsights, setOrgInsights] = useState<AiEditorOrgInsights | null>(null);
   const [insightsMeta, setInsightsMeta] = useState<{
     projectCount: number;
     withDataCount: number;
@@ -73,6 +76,7 @@ export function AiEditorHubClient() {
         const insightRes = await aiEditorCrossProjectInsights(getToken);
         setInsights(insightRes.insights);
         setRecommendations(insightRes.recommendations ?? []);
+        setOrgInsights(insightRes.org ?? null);
         setInsightsMeta({
           projectCount: insightRes.projectCount,
           withDataCount: insightRes.withDataCount,
@@ -85,6 +89,7 @@ export function AiEditorHubClient() {
       } catch {
         setInsights([]);
         setRecommendations([]);
+        setOrgInsights(null);
         setInsightsMeta(null);
         setInsightsStatus("error");
       }
@@ -265,6 +270,54 @@ export function AiEditorHubClient() {
                 </ul>
               </>
             )}
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {!loading && orgInsights ? (
+        <Card>
+          <CardBody className="space-y-3">
+            <div className="flex items-center gap-2 font-semibold text-slate-900">
+              <Building2 className="h-4 w-4 text-sky-700" />
+              Patterns across your organization
+            </div>
+            {!orgInsights.optedIn ? (
+              <p className="text-sm text-slate-600">
+                Opt in under Settings → AI Editor patterns to see anonymized studio trends (looks,
+                Resolve wrap-ups, coverage gaps). Footage never leaves your drives.
+                {orgInsights.company ? null : " An organization must be assigned on your account first."}
+              </p>
+            ) : orgInsights.insights.length === 0 ? (
+              <p className="text-sm text-slate-600">
+                You’re opted in. Patterns appear once opted-in teammates finish a few edits.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600">
+                  From opted-in teammates
+                  {orgInsights.company ? ` at ${orgInsights.company}` : ""}
+                  {` · ${orgInsights.contributorCount} contributor${orgInsights.contributorCount === 1 ? "" : "s"} · ${orgInsights.withDataCount} of ${orgInsights.projectCount} projects with data`}
+                  . Counts only — no project names or footage.
+                </p>
+                <ul className="space-y-2">
+                  {orgInsights.insights.map((insight) => (
+                    <li
+                      key={`org-${insight.id}`}
+                      className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-800"
+                    >
+                      {insight.text}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {!orgInsights.optedIn ? (
+              <Link href="/settings">
+                <Button size="sm" variant="secondary">
+                  Open settings
+                </Button>
+              </Link>
+            ) : null}
           </CardBody>
         </Card>
       ) : null}

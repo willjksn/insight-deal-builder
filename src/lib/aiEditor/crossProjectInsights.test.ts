@@ -95,5 +95,47 @@ describe("crossProjectInsights", () => {
     expect(summary.lookDefaults?.weight).toBe(2);
     expect(summary.recommendations.some((r) => r.id === "checklist-3")).toBe(true);
   });
+
+  it("uses org voice without personal recommendations", () => {
+    const summary = buildCrossProjectInsights(
+      [
+        {
+          projectId: "1",
+          projectName: "Secret Client",
+          settings: settings({
+            lastFinishingFeedback: {
+              moodId: "warm",
+              moodLabel: "Warm",
+              transitionStyle: "cuts",
+              transitionLabel: "Cuts",
+              outcome: "kept_look",
+              updatedAt: "",
+            },
+          }),
+        },
+        {
+          projectId: "2",
+          projectName: "Other",
+          settings: settings({
+            lastFinishingFeedback: {
+              moodId: "warm",
+              moodLabel: "Warm",
+              transitionStyle: "cuts",
+              transitionLabel: "Cuts",
+              outcome: "kept_look",
+              updatedAt: "",
+            },
+          }),
+        },
+      ],
+      { voice: "org", includeRecommendations: false }
+    );
+    expect(summary.recommendations).toHaveLength(0);
+    expect(summary.lookDefaults).toBeNull();
+    expect(summary.insights.find((i) => i.id === "top_mood")?.text).toMatch(
+      /organization/
+    );
+    expect(JSON.stringify(summary.insights)).not.toMatch(/Secret Client/);
+  });
 });
 

@@ -10,6 +10,7 @@ import {
   type CrossProjectSource,
 } from "@/lib/aiEditor/crossProjectInsights";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
+import { loadOrgInsightsSummary } from "@/lib/aiEditor/orgInsights";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { serializeDoc } from "@/lib/revenueOpportunities/server/serialize";
 import type { AiEditorProjectSettings } from "@/lib/aiEditor/types";
@@ -18,7 +19,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * V10/V14 — patterns + actionable recommendations across AI Editor projects
+ * V10/V14/V19 — personal patterns + recommendations, plus opt-in org patterns
  * (settings metadata only; no media bytes).
  */
 export async function GET(request: NextRequest) {
@@ -70,7 +71,8 @@ export async function GET(request: NextRequest) {
     }
 
     const summary = buildCrossProjectInsights(sources);
-    return NextResponse.json({ ok: true, ...summary });
+    const org = await loadOrgInsightsSummary(db, appUser);
+    return NextResponse.json({ ok: true, ...summary, org });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load insights";
     return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
