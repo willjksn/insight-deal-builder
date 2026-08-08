@@ -42,6 +42,28 @@ describe("detectMediaSource", () => {
     expect(d!.confidence).toBeGreaterThan(0.5);
   });
 
+  it("detects ProGrade CF-A style cards with top-level M4ROOT (empty PRIVATE)", () => {
+    const d = detectMediaSource(
+      probe({
+        mountPath: "E:\\",
+        topLevelDirs: ["SONY", "PRIVATE", "M4ROOT"],
+        mediaRoot: "E:\\M4ROOT",
+        volumeLabel: "FX3",
+        busType: "USB",
+        files: [
+          {
+            path: "E:\\M4ROOT\\CLIP\\C0042.MP4",
+            filename: "C0042.MP4",
+            sizeBytes: 2_000_000_000,
+          },
+        ],
+      })
+    );
+    expect(d?.sourceType).toBe("cameraCard");
+    expect(d?.probableCameraModel).toMatch(/FX3/i);
+    expect(d?.mediaRoot.toUpperCase()).toContain("M4ROOT");
+  });
+
   it("detects Zoom-style audio folders", () => {
     const d = detectMediaSource(
       probe({

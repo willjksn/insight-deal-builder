@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.17.0";
+const VERSION = "0.17.1";
 /** Set SHOOTSPINE_AGENT_DEV_OPEN=1 to accept any non-empty Bearer token (local agent testing). */
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN === "1";
 /** Optional: ShootSpine origin for verifying minted tokens (e.g. http://localhost:3000). */
@@ -328,8 +328,13 @@ async function detectMediaSourceProbes(body = {}) {
   const drives = await listDrives();
   const candidates = drives.filter((d) => {
     if (d.kind && d.kind !== "drive" && d.kind !== "volume") return false;
+    const letter = String(d.path || "")
+      .replace(/\\/g, "")
+      .toUpperCase()
+      .replace(":", "");
+    // Always skip the system volume unless explicitly requested
+    if (!includeInternal && (letter === "C" || d.storageType === "internal")) return false;
     if (includeInternal) return true;
-    if (d.storageType === "internal") return false;
     if (d.removable) return true;
     if (
       d.storageType === "externalSSD" ||
@@ -339,7 +344,7 @@ async function detectMediaSourceProbes(body = {}) {
     ) {
       return true;
     }
-    // Removable bus types often mis-labeled
+    // ProGrade / CFexpress readers: often Fixed (not Removable) on USB/Thunderbolt
     const bus = String(d.busType || "").toUpperCase();
     return bus.includes("USB") || bus.includes("SD") || bus.includes("THUNDERBOLT");
   });
@@ -365,34 +370,50 @@ async function detectMediaSourceProbes(body = {}) {
       continue;
     }
 
-    // Prefer known camera roots when present
+    // Prefer known camera roots. Sony CFexpress often has top-level M4ROOT
+    // *and* an empty PRIVATE folder — never prefer empty PRIVATE over M4ROOT.
     let mediaRoot = mountPath;
     const upper = new Map(topLevelDirs.map((n) => [n.toUpperCase(), n]));
-    if (upper.has("PRIVATE")) {
-      const priv = path.join(mountPath, upper.get("PRIVATE"));
-      try {
-        const sub = await fs.readdir(priv, { withFileTypes: true });
-        const m4 = sub.find((e) => e.isDirectory() && e.name.toUpperCase() === "M4ROOT");
-        mediaRoot = m4 ? path.join(priv, m4.name) : priv;
-      } catch {
-        mediaRoot = priv;
+    const pickRoot = async () => {
+      for (const key of ["M4ROOT", "XDROOT", "AVCHD", "BPAV", "DCIM", "ZOOM", "CLIP"]) {
+        if (upper.has(key)) return path.join(mountPath, upper.get(key));
       }
-    } else {
-      for (const key of ["M4ROOT", "XDROOT", "AVCHD", "BPAV", "DCIM", "ZOOM"]) {
-        if (upper.has(key)) {
-          mediaRoot = path.join(mountPath, upper.get(key));
-          break;
+      if (upper.has("PRIVATE")) {
+        const priv = path.join(mountPath, upper.get("PRIVATE"));
+        try {
+          const sub = await fs.readdir(priv, { withFileTypes: true });
+          const m4 = sub.find((e) => e.isDirectory() && e.name.toUpperCase() === "M4ROOT");
+          if (m4) return path.join(priv, m4.name);
+          const xd = sub.find((e) => e.isDirectory() && e.name.toUpperCase() === "XDROOT");
+          if (xd) return path.join(priv, xd.name);
+        } catch {
+          /* fall through */
         }
+        return priv;
       }
-    }
+      if (upper.has("SONY")) return path.join(mountPath, upper.get("SONY"));
+      return mountPath;
+    };
+    mediaRoot = await pickRoot();
 
-    const layoutHit = topLevelDirs.some((d) => CAMERA_LAYOUT_DIRS.has(d.toUpperCase()));
+    const layoutHit =
+      topLevelDirs.some((d) => CAMERA_LAYOUT_DIRS.has(d.toUpperCase()) || d.toUpperCase() === "SONY") ||
+      /FX\d|A7|FX3|FX30/i.test(String(drive.volumeLabel || drive.label || ""));
     const files = [];
     try {
       await walkMedia(mediaRoot, true, files);
     } catch {
       /* unreadable — skip */
       continue;
+    }
+    // If preferred root was empty (e.g. empty PRIVATE), fall back to whole volume
+    if (files.length === 0 && mediaRoot !== mountPath) {
+      try {
+        await walkMedia(mountPath, true, files);
+        if (files.length) mediaRoot = mountPath;
+      } catch {
+        /* keep empty */
+      }
     }
     if (files.length > maxFiles) files.length = maxFiles;
     if (!layoutHit && files.length === 0) continue;
@@ -990,14 +1011,21 @@ async function classifyWinDrive(meta) {
     bus.includes("thunderbolt") ||
     bus.includes("file back");
   if (driveType.includes("network") || bus.includes("file back")) return "network";
+  // CFexpress / ProGrade readers often appear as Fixed + USB (not Removable).
   if (isUsb) {
-    if (media.includes("ssd")) return "externalSSD";
+    if (media.includes("ssd") && Number(meta.capacityBytes) >= 500 * 1024 ** 3) {
+      return "externalSSD";
+    }
     if (media.includes("hdd") || media.includes("hard")) return "externalHDD";
     if (Number(meta.capacityBytes) >= 500 * 1024 ** 3) return "externalHDD";
-    return "removable";
+    // Camera cards / portable SSDs under ~500GB
+    return removable || Number(meta.capacityBytes) < 500 * 1024 ** 3
+      ? "removable"
+      : "externalSSD";
   }
   if (letter === "C") return "internal";
-  if (media.includes("ssd")) return "internal";
+  // Do NOT treat non-C "SSD" as internal — CF cards and readers are often Fixed+SSD.
+  if (media.includes("ssd")) return "unknown";
   if (media.includes("hdd") || media.includes("hard")) return "externalHDD";
   return "unknown";
 }

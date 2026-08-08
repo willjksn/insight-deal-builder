@@ -22,17 +22,23 @@ export function scoreSonyMedia(probe: MediaSourceProbe): DetectedMediaSource | n
   let mediaRoot = probe.mediaRoot || probe.mountPath;
   let model: string | undefined;
 
-  if (dirs.has("PRIVATE") || hasPathHint(probe, "M4ROOT")) {
-    score += 0.45;
-    reasons.push("Sony PRIVATE / M4ROOT layout");
-    if (hasPathHint(probe, "M4ROOT")) {
-      // Prefer M4ROOT as media root when present under PRIVATE
-      const m4 = probe.files.find((f) => /M4ROOT/i.test(f.path));
-      if (m4) {
-        const idx = m4.path.toUpperCase().indexOf("M4ROOT");
-        if (idx >= 0) mediaRoot = m4.path.slice(0, idx + "M4ROOT".length);
-      }
+  if (dirs.has("M4ROOT") || hasPathHint(probe, "M4ROOT")) {
+    score += 0.5;
+    reasons.push("Sony M4ROOT layout");
+    const m4 = probe.files.find((f) => /M4ROOT/i.test(f.path));
+    if (m4) {
+      const idx = m4.path.toUpperCase().indexOf("M4ROOT");
+      if (idx >= 0) mediaRoot = m4.path.slice(0, idx + "M4ROOT".length);
+    } else if (dirs.has("M4ROOT")) {
+      mediaRoot = probe.mountPath.replace(/[/\\]$/, "") + "\\M4ROOT";
     }
+  } else if (dirs.has("PRIVATE") || hasPathHint(probe, "PRIVATE")) {
+    score += 0.35;
+    reasons.push("Sony PRIVATE folder");
+  }
+  if (dirs.has("SONY")) {
+    score += 0.1;
+    reasons.push("SONY folder");
   }
   if (dirs.has("XDROOT") || hasPathHint(probe, "XDROOT")) {
     score += 0.4;
