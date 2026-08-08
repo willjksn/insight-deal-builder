@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -169,6 +169,7 @@ export function AiEditorClient({ projectId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const cancelBatchRef = useRef(false);
   const [context, setContext] = useState<ProductionContext | null>(null);
   const [settings, setSettings] = useState<AiEditorProjectSettings | null>(null);
   const [storage, setStorage] = useState<StorageLocation[]>([]);
@@ -306,7 +307,8 @@ export function AiEditorClient({ projectId }: Props) {
   }, [agentToken, getToken, projectId]);
 
   const needsPrepare = useMemo(
-    () => media.filter((m) => m.needsProxy && !m.proxyPath && m.currentPath),
+    () =>
+      media.filter((m) => m.needsProxy && !m.proxyPath && playbackPathForAsset(m)),
     [media]
   );
   const preparedCount = useMemo(
@@ -726,13 +728,16 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onAnalyzeFootage() {
-    const eligible = media.filter((m) => m.currentPath);
+    const eligible = media
+      .map((m) => ({ m, path: playbackPathForAsset(m) }))
+      .filter((x): x is { m: MediaAsset; path: string } => Boolean(x.path));
     const targets = eligible.slice(0, 40);
     if (!targets.length) {
       setStatusNote("Add footage first.");
       return;
     }
     const capped = eligible.length > targets.length;
+    cancelBatchRef.current = false;
     setBusy("analyze");
     setError(null);
     setStatusNote(
@@ -752,13 +757,14 @@ export function AiEditorClient({ projectId }: Props) {
       const token = await ensureAgentSession();
       const results = [];
       for (let i = 0; i < targets.length; i++) {
-        const m = targets[i];
+        if (cancelBatchRef.current) break;
+        const { m, path } = targets[i];
         setProgress({
           pct: Math.round(((i + 1) / targets.length) * 100),
           label: `Understanding clip ${i + 1}/${targets.length}: ${m.filename}`,
         });
         try {
-          const analyzed = await agentAnalyze(DEFAULT_AGENT_BASE_URL, token, m.currentPath!, {
+          const analyzed = await agentAnalyze(DEFAULT_AGENT_BASE_URL, token, path, {
             transcribe: runTranscription && health.whisperAvailable !== false,
           });
           results.push({
@@ -791,28 +797,36 @@ export function AiEditorClient({ projectId }: Props) {
           });
         }
       }
+      if (!results.length) {
+        setStatusNote("Analysis stopped before any clips finished.");
+        return;
+      }
       const failedCount = results.filter((r) => "error" in r && r.error).length;
       const okCount = results.length - failedCount;
       const saved = await aiEditorSaveAnalysis(getToken, projectId, results);
       setAnalysis(saved.analysis);
       setJobs((prev) => [saved.job, ...prev]);
       await load();
+      const stopped = cancelBatchRef.current;
       const capNote = capped
         ? ` First ${targets.length} of ${eligible.length} this pass — run again for the rest.`
         : "";
+      const stopNote = stopped ? " Stopped early — saved what finished." : "";
       if (failedCount > 0) {
         setStatusNote(
           `Understood ${okCount} of ${results.length} clip(s)` +
             (runTranscription ? " (transcript where available)" : "") +
             `. ${failedCount} couldn’t be analyzed — check those files and try again.` +
-            capNote
+            capNote +
+            stopNote
         );
       } else {
         setStatusNote(
           `Analyzed ${okCount} clip(s): technical checks + shot breaks` +
             (runTranscription ? " + transcript where available" : "") +
             "." +
-            capNote
+            capNote +
+            stopNote
         );
       }
     } catch (e) {
@@ -1140,15 +1154,15 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onChatApply() {
-    const message = chatMessage.trim();
-    if (!message || !chatProposal) return;
+    if (!chatProposal) return;
     setBusy("chat_edit");
     setError(null);
     try {
       const res = await aiEditorChatEdit(getToken, projectId, {
-        message,
+        message: chatMessage.trim() || chatProposal.proposal.summary,
         apply: true,
         reelId: timeline?.activeReelId ?? null,
+        proposal: chatProposal.proposal,
       });
       if (res.timeline) {
         setTimeline(res.timeline);
@@ -1276,6 +1290,16 @@ export function AiEditorClient({ projectId }: Props) {
   }
 
   async function onImportResolveCut() {
+    const hasCut = Boolean(videoTrack?.clips?.length);
+    const multiReels = (timeline?.reels?.length ?? 0) > 1;
+    if (hasCut) {
+      const ok = window.confirm(
+        multiReels
+          ? "Import replaces your current ShootSpine cut and act/reel layout with what’s open in Resolve. Earlier versions stay under Versions → Restore. Continue?"
+          : "Import replaces your current ShootSpine rough cut with what’s open in Resolve. Earlier versions stay under Versions → Restore. Continue?"
+      );
+      if (!ok) return;
+    }
     setBusy("resolve-import-cut");
     setError(null);
     setStatusNote(null);
@@ -1844,19 +1868,26 @@ export function AiEditorClient({ projectId }: Props) {
       let failed = 0;
       const list = needsPrepare.slice(0, 40);
       const capped = needsPrepare.length > list.length;
+      cancelBatchRef.current = false;
       if (capped) {
         setStatusNote(
           `Preparing the first ${list.length} of ${needsPrepare.length} clips this pass…`
         );
       }
       for (let i = 0; i < list.length; i++) {
+        if (cancelBatchRef.current) break;
         const m = list[i];
         setProgress({
           pct: Math.round(((i + 1) / list.length) * 100),
           label: `Preparing preview ${i + 1}/${list.length}: ${m.filename}`,
         });
+        const sourcePath = playbackPathForAsset(m);
+        if (!sourcePath) {
+          failed += 1;
+          continue;
+        }
         try {
-          const res = await agentCreateProxy(DEFAULT_AGENT_BASE_URL, token, m.currentPath!, {
+          const res = await agentCreateProxy(DEFAULT_AGENT_BASE_URL, token, sourcePath, {
             profile: "ai_720p",
           });
           patches.push({ id: m.id, proxyPath: res.proxyPath, needsProxy: true });
@@ -1879,7 +1910,8 @@ export function AiEditorClient({ projectId }: Props) {
           ". Your original camera files were not changed." +
           (capped
             ? ` First ${list.length} of ${needsPrepare.length} this pass — run again for the rest.`
-            : "")
+            : "") +
+          (cancelBatchRef.current ? " Stopped early — saved what finished." : "")
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not prepare clips");
@@ -1961,9 +1993,22 @@ export function AiEditorClient({ projectId }: Props) {
 
       {progress ? (
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <div className="mb-1 flex justify-between text-xs text-slate-600">
-            <span>{progress.label}</span>
-            <span>{progress.pct}%</span>
+          <div className="mb-1 flex items-center justify-between gap-3 text-xs text-slate-600">
+            <span className="min-w-0 truncate">{progress.label}</span>
+            <span className="flex shrink-0 items-center gap-2">
+              <span>{progress.pct}%</span>
+              {busy === "analyze" || busy === "proxy" ? (
+                <button
+                  type="button"
+                  className="font-medium text-sky-800 underline"
+                  onClick={() => {
+                    cancelBatchRef.current = true;
+                  }}
+                >
+                  Stop
+                </button>
+              ) : null}
+            </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-slate-100">
             <div
@@ -2402,15 +2447,38 @@ export function AiEditorClient({ projectId }: Props) {
                 <ul className="space-y-2 text-sm">
                   {transcriptHits.map((h, i) => {
                     const clip = media.find((m) => m.id === h.mediaAssetId);
+                    const path = clip ? playbackPathForAsset(clip) : null;
                     return (
                       <li
                         key={`${h.mediaAssetId}_${i}`}
                         className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
                       >
-                        <div className="text-xs text-slate-500">
-                          {clip?.filename || h.mediaAssetId} · {h.startSeconds.toFixed(1)}s
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-xs text-slate-500">
+                              {clip?.filename || h.mediaAssetId} · {h.startSeconds.toFixed(1)}s
+                            </div>
+                            <div className="text-slate-800">{h.text}</div>
+                          </div>
+                          {path ? (
+                            <button
+                              type="button"
+                              className="shrink-0 text-xs font-medium text-sky-800 underline disabled:opacity-50"
+                              disabled={!!busy || !agent.connected}
+                              onClick={() =>
+                                void openPreview(clip?.filename || "Transcript hit", [
+                                  {
+                                    path,
+                                    label: clip?.filename || h.mediaAssetId,
+                                    startSeconds: h.startSeconds,
+                                  },
+                                ])
+                              }
+                            >
+                              Play
+                            </button>
+                          ) : null}
                         </div>
-                        <div className="text-slate-800">{h.text}</div>
                       </li>
                     );
                   })}

@@ -66,4 +66,47 @@ describe("resolveExport", () => {
     expect(pack.media[0].relativeProjectPath).toContain("CAMERA_A");
     expect(pack.readme).toContain("Import EDL");
   });
+
+  it("emits EDL events in timeline order even if clips are unsorted", () => {
+    const timeline = buildRoughCutFromCoverage({
+      projectId: "p1",
+      coverage: {
+        projectId: "p1",
+        updatedAt: "",
+        plannedShotCount: 0,
+        coveredCount: 0,
+        partialCount: 0,
+        missingCount: 0,
+        unmatchedMediaIds: [],
+        overrides: [],
+        shots: [],
+      },
+      media: [media("m1", "a.mp4"), media("m2", "b.mp4")],
+      frameRate: 24,
+    });
+    const video = timeline.tracks.find((t) => t.kind === "video")!;
+    // Reverse clip order in the track array (timelineStartFrame still ascending originally)
+    video.clips = [
+      {
+        ...video.clips[0],
+        id: "later",
+        mediaAssetId: "m2",
+        timelineStartFrame: 48,
+        durationFrames: 24,
+      },
+      {
+        ...video.clips[0],
+        id: "earlier",
+        mediaAssetId: "m1",
+        timelineStartFrame: 0,
+        durationFrames: 24,
+      },
+    ];
+    const edl = buildEdl(timeline, [media("m1", "a.mp4"), media("m2", "b.mp4")]);
+    const m1 = edl.indexOf("SHOOTSPINE_MEDIA_ID: m1");
+    const m2 = edl.indexOf("SHOOTSPINE_MEDIA_ID: m2");
+    expect(m1).toBeGreaterThan(-1);
+    expect(m2).toBeGreaterThan(-1);
+    expect(m1).toBeLessThan(m2);
+  });
 });

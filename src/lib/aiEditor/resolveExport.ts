@@ -9,7 +9,9 @@ import type { MediaAsset, Timeline, TimelineClip } from "@/lib/aiEditor/types";
 const MANIFEST_VERSION = "1.0.0";
 
 function videoClips(timeline: Timeline): TimelineClip[] {
-  return timeline.tracks.find((t) => t.kind === "video")?.clips.slice() ?? [];
+  const clips = timeline.tracks.find((t) => t.kind === "video")?.clips.slice() ?? [];
+  clips.sort((a, b) => a.timelineStartFrame - b.timelineStartFrame);
+  return clips;
 }
 
 /** CMX 3600–style EDL (Resolve-friendly). Timecodes are non-drop at timeline fps. */

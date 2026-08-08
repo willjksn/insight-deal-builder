@@ -219,7 +219,13 @@ export type ChatEditProposalClient = {
 export async function aiEditorChatEdit(
   getToken: GetToken,
   projectId: string,
-  body: { message: string; apply?: boolean; reelId?: string | null }
+  body: {
+    message?: string;
+    apply?: boolean;
+    reelId?: string | null;
+    /** Approved proposal — apply these ops without re-proposing. */
+    proposal?: ChatEditProposalClient;
+  }
 ) {
   const res = await fetch(`/api/projects/${projectId}/ai-editor/chat-edit`, {
     method: "POST",

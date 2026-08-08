@@ -87,9 +87,15 @@ export async function POST(
       apply?: boolean;
       /** Scope chat to a reel/act (defaults to timeline.activeReelId). */
       reelId?: string | null;
+      /** When applying, send the approved proposal so we don’t re-run Gemini/rules. */
+      proposal?: ChatEditProposal;
     };
-    const message = (body.message || "").trim();
-    if (!message) {
+    const storedProposal =
+      body.apply && body.proposal && Array.isArray(body.proposal.ops)
+        ? body.proposal
+        : null;
+    const message = (body.message || storedProposal?.summary || "").trim();
+    if (!message && !storedProposal) {
       return NextResponse.json({ error: "message is required" }, { status: 400 });
     }
 
@@ -118,42 +124,54 @@ export async function POST(
       totalInReel,
     };
 
-    const editNotes = settings?.editNotes || [];
-    const notesDriven = wantsNotesDrivenEdit(message) && editNotes.length > 0;
-
     let proposal: ChatEditProposal | null = null;
-    if (notesDriven) {
-      // Prefer Gemini so client/on-set notes shape the cut; skip brittle rule matches.
-      proposal = await proposeFromGemini(
-        message,
-        chatTimeline,
-        media,
-        editNotes,
-        scopeMeta
-      );
+    if (storedProposal) {
+      proposal = {
+        summary: storedProposal.summary || "Applied edit",
+        ops: storedProposal.ops,
+        confidence:
+          typeof storedProposal.confidence === "number" ? storedProposal.confidence : 1,
+        source: storedProposal.source === "gemini" ? "gemini" : "rules",
+        warnings: Array.isArray(storedProposal.warnings) ? storedProposal.warnings : [],
+        action: storedProposal.action,
+      };
     } else {
-      proposal =
-        parseEditCommandRules(message, chatTimeline, media) ||
-        (await proposeFromGemini(message, chatTimeline, media, editNotes, scopeMeta));
-    }
+      const editNotes = settings?.editNotes || [];
+      const notesDriven = wantsNotesDrivenEdit(message) && editNotes.length > 0;
 
-    if (!proposal) {
-      proposal = {
-        summary: notesDriven
-          ? "I couldn’t turn your edit notes into timeline ops yet. Try a more specific ask (e.g. “tighten the open using my notes”) or add clearer notes."
-          : "I couldn’t map that to an edit. Try: “remove the first clip”, “trim first to 2 seconds”, “reverse the order”, “use my notes”, or “undo”.",
-        ops: [],
-        confidence: 0.2,
-        source: "rules",
-        warnings: notesDriven ? ["notes_unparsed"] : ["unparsed"],
-      };
-    }
+      if (notesDriven) {
+        // Prefer Gemini so client/on-set notes shape the cut; skip brittle rule matches.
+        proposal = await proposeFromGemini(
+          message,
+          chatTimeline,
+          media,
+          editNotes,
+          scopeMeta
+        );
+      } else {
+        proposal =
+          parseEditCommandRules(message, chatTimeline, media) ||
+          (await proposeFromGemini(message, chatTimeline, media, editNotes, scopeMeta));
+      }
 
-    if (truncated && !(proposal.warnings || []).includes("reel_truncated")) {
-      proposal = {
-        ...proposal,
-        warnings: [...(proposal.warnings || []), "reel_truncated"],
-      };
+      if (!proposal) {
+        proposal = {
+          summary: notesDriven
+            ? "I couldn’t turn your edit notes into timeline ops yet. Try a more specific ask (e.g. “tighten the open using my notes”) or add clearer notes."
+            : "I couldn’t map that to an edit. Try: “remove the first clip”, “trim first to 2 seconds”, “reverse the order”, “use my notes”, or “undo”.",
+          ops: [],
+          confidence: 0.2,
+          source: "rules",
+          warnings: notesDriven ? ["notes_unparsed"] : ["unparsed"],
+        };
+      }
+
+      if (truncated && !(proposal.warnings || []).includes("reel_truncated")) {
+        proposal = {
+          ...proposal,
+          warnings: [...(proposal.warnings || []), "reel_truncated"],
+        };
+      }
     }
 
     if (proposal.action === "undo") {

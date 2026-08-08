@@ -22,6 +22,7 @@ type Props = {
 
 export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const advancingRef = useRef(false);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +34,20 @@ export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
     setIndex(0);
     setError(null);
     setLoading(true);
+    advancingRef.current = false;
   }, [items]);
+
+  useEffect(() => {
+    advancingRef.current = false;
+  }, [index, src]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -58,12 +72,23 @@ export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
       }
     };
 
+    const stuckTimer = window.setTimeout(() => setLoading(false), 8000);
     el.addEventListener("loadedmetadata", seekAndPlay);
     el.load();
     return () => {
+      window.clearTimeout(stuckTimer);
       el.removeEventListener("loadedmetadata", seekAndPlay);
     };
   }, [src, item]);
+
+  function advance() {
+    if (advancingRef.current) return;
+    if (index >= items.length - 1) return;
+    advancingRef.current = true;
+    const el = videoRef.current;
+    if (el) el.pause();
+    setIndex((i) => i + 1);
+  }
 
   if (!item) return null;
 
@@ -94,7 +119,7 @@ export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
         ) : null}
         <video
           ref={videoRef}
-          key={src}
+          key={`${src}_${index}`}
           className="h-full w-full"
           controls
           playsInline
@@ -108,24 +133,19 @@ export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
               "Couldn’t play this file in the browser. Prepare a preview copy, or open it in Resolve."
             );
           }}
-          onEnded={() => {
-            if (index < items.length - 1) {
-              setIndex((i) => i + 1);
-            }
-          }}
+          onEnded={() => advance()}
           onTimeUpdate={() => {
             const el = videoRef.current;
-            if (!el || item.endSeconds == null) return;
+            if (!el || item.endSeconds == null || advancingRef.current) return;
             if (el.currentTime >= item.endSeconds - 0.05) {
-              el.pause();
-              if (index < items.length - 1) setIndex((i) => i + 1);
+              advance();
             }
           }}
         />
       </div>
       {error ? <p className="px-3 py-2 text-xs text-amber-200">{error}</p> : null}
       <p className="px-3 py-2 text-[11px] text-slate-400">
-        Playing from this computer — nothing uploads to the cloud.
+        Playing from this computer — nothing uploads to the cloud. Esc to close.
       </p>
     </div>
   );
