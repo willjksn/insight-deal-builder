@@ -2401,7 +2401,7 @@ export function AiEditorClient({ projectId }: Props) {
                   <p className="text-sm font-semibold text-slate-900">Acts / reels (long form)</p>
                   <p className="mt-0.5 text-xs text-slate-600">
                     For a feature (~1h45), split into acts or ~20 min reels. Edit by chat focuses on
-                    the active one so you don’t need to touch code later.
+                    the active one.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
