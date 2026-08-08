@@ -48,6 +48,7 @@ import {
   playbackPathForAsset,
 } from "@/lib/aiEditor/agentClient";
 import type { AgentDriveEntry } from "@/lib/aiEditor/agentProtocol";
+import { assessDrivePresence } from "@/lib/aiEditor/drivePresence";
 import { buildProjectRecommendations } from "@/lib/aiEditor/recommendations";
 import {
   findRemountCandidates,
@@ -200,6 +201,8 @@ export function AiEditorClient({ projectId }: Props) {
   const [indexFolderPath, setIndexFolderPath] = useState("");
   const [knownDrives, setKnownDrives] = useState<AgentDriveEntry[]>([]);
   const [remountCandidates, setRemountCandidates] = useState<RemountCandidate[]>([]);
+  const [editDriveOnline, setEditDriveOnline] = useState<boolean | null>(null);
+  const [archiveDriveOnline, setArchiveDriveOnline] = useState<boolean | null>(null);
   const [agentToken, setAgentToken] = useState<string | null>(null);
   const [agentExpiresAt, setAgentExpiresAt] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
@@ -372,18 +375,47 @@ export function AiEditorClient({ projectId }: Props) {
   useEffect(() => {
     if (!agent.connected || !settings?.projectRootPath) return;
     let cancelled = false;
-    void (async () => {
+
+    async function checkPresence() {
       try {
         const token = await ensureAgentSession();
         const res = await agentListDrives(DEFAULT_AGENT_BASE_URL, token);
         if (cancelled) return;
         setKnownDrives(res.drives);
+
+        const editPath = settings?.projectRootPath?.trim();
+        if (editPath) {
+          try {
+            const stat = await agentStorageStat(DEFAULT_AGENT_BASE_URL, token, editPath);
+            if (!cancelled) setEditDriveOnline(stat.online !== false);
+          } catch {
+            if (!cancelled) setEditDriveOnline(null);
+          }
+        }
+        const archive = settings?.archiveRootPath?.trim();
+        if (archive) {
+          try {
+            const stat = await agentStorageStat(DEFAULT_AGENT_BASE_URL, token, archive);
+            if (!cancelled) setArchiveDriveOnline(stat.online !== false);
+          } catch {
+            if (!cancelled) setArchiveDriveOnline(null);
+          }
+        } else if (!cancelled) {
+          setArchiveDriveOnline(null);
+        }
       } catch {
-        /* remount detection is best-effort */
+        /* presence check is best-effort */
       }
-    })();
+    }
+
+    void checkPresence();
+    const interval = window.setInterval(() => void checkPresence(), 45000);
+    const onFocus = () => void checkPresence();
+    window.addEventListener("focus", onFocus);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
     };
   }, [
     agent.connected,
@@ -491,6 +523,31 @@ export function AiEditorClient({ projectId }: Props) {
       settings?.projectRootPath,
       settings?.archiveRootPath,
       knownDrives,
+    ]
+  );
+  const drivePresence = useMemo(
+    () =>
+      assessDrivePresence({
+        projectRootPath: settings?.projectRootPath || storagePath.trim(),
+        archiveRootPath: settings?.archiveRootPath || archivePath.trim(),
+        projectRootVolumeId: settings?.projectRootVolumeId,
+        archiveRootVolumeId: settings?.archiveRootVolumeId,
+        storage,
+        drives: knownDrives,
+        editAgentOnline: editDriveOnline,
+        archiveAgentOnline: archiveDriveOnline,
+      }),
+    [
+      settings?.projectRootPath,
+      settings?.archiveRootPath,
+      settings?.projectRootVolumeId,
+      settings?.archiveRootVolumeId,
+      storagePath,
+      archivePath,
+      storage,
+      knownDrives,
+      editDriveOnline,
+      archiveDriveOnline,
     ]
   );
   const step11Done = archiveSummary.archived > 0;
@@ -616,6 +673,75 @@ export function AiEditorClient({ projectId }: Props) {
     });
     setRemountCandidates(found);
     return found;
+  }
+
+  async function refreshDrivePresence(opts?: { quiet?: boolean }) {
+    if (!agent.connected) return;
+    if (!opts?.quiet) {
+      setBusy("drives");
+      setError(null);
+    }
+    try {
+      const drives = await refreshKnownDrives();
+      detectRemount(drives);
+      const editPath = (settings?.projectRootPath || storagePath).trim();
+      const archive = (settings?.archiveRootPath || archivePath).trim();
+      const token = await ensureAgentSession();
+      let editOnline: boolean | null = null;
+      let archiveOnline: boolean | null = null;
+      if (editPath) {
+        try {
+          const stat = await agentStorageStat(DEFAULT_AGENT_BASE_URL, token, editPath);
+          editOnline = stat.online !== false;
+        } catch {
+          editOnline = letterMounted(editPath, drives) ? null : false;
+        }
+      }
+      if (archive) {
+        try {
+          const stat = await agentStorageStat(DEFAULT_AGENT_BASE_URL, token, archive);
+          archiveOnline = stat.online !== false;
+        } catch {
+          archiveOnline = letterMounted(archive, drives) ? null : false;
+        }
+      }
+      setEditDriveOnline(editOnline);
+      setArchiveDriveOnline(archiveOnline);
+      if (!opts?.quiet) {
+        const snap = assessDrivePresence({
+          projectRootPath: editPath || settings?.projectRootPath,
+          archiveRootPath: archive || settings?.archiveRootPath,
+          projectRootVolumeId: settings?.projectRootVolumeId,
+          archiveRootVolumeId: settings?.archiveRootVolumeId,
+          storage,
+          drives,
+          editAgentOnline: editOnline,
+          archiveAgentOnline: archiveOnline,
+        });
+        setStatusNote(
+          snap.needsAttention
+            ? "Checked drives — still need attention (plug in or Relink)."
+            : "Checked drives — edit folder is reachable."
+        );
+      }
+    } catch (e) {
+      if (!opts?.quiet) {
+        setError(e instanceof Error ? e.message : "Could not check drives");
+      }
+    } finally {
+      if (!opts?.quiet) setBusy(null);
+    }
+  }
+
+  function letterMounted(pathStr: string, drives: AgentDriveEntry[]) {
+    const m = pathStr.replace(/\//g, "\\").match(/^([A-Za-z]:)/);
+    if (!m) return true;
+    const letter = `${m[1].toUpperCase()}\\`;
+    return drives.some((d) => {
+      if (d.kind !== "drive" && d.kind !== "volume") return false;
+      const root = d.path.replace(/\//g, "\\").toUpperCase();
+      return root === letter || root === letter.replace(/\\$/, "");
+    });
   }
 
   async function onSaveWorkspace() {
@@ -2321,6 +2447,53 @@ export function AiEditorClient({ projectId }: Props) {
       {statusNote ? (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
           {statusNote}
+        </div>
+      ) : null}
+
+      {drivePresence.needsAttention ? (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            drivePresence.items.some((i) => i.status === "offline")
+              ? "border-red-200 bg-red-50/80 text-slate-800"
+              : "border-amber-200 bg-amber-50/70 text-slate-800"
+          }`}
+        >
+          <p className="font-medium text-slate-900">
+            {drivePresence.items.some((i) => i.status === "offline")
+              ? "Drive offline"
+              : "Drive letter changed"}
+          </p>
+          <ul className="mt-1.5 list-disc space-y-1 pl-5 text-slate-700">
+            {drivePresence.items
+              .filter((i) => i.status === "offline" || i.status === "remount")
+              .map((i) => (
+                <li key={i.kind}>{i.message}</li>
+              ))}
+          </ul>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void refreshDrivePresence()}
+              disabled={!!busy || !agent.connected}
+            >
+              {busy === "drives" ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-4 w-4" />
+              )}
+              Recheck drives
+            </Button>
+            {remountCandidates.length > 0 ? (
+              <Button
+                size="sm"
+                onClick={() => void onRelinkVolumes()}
+                disabled={!!busy || !agent.connected}
+              >
+                Relink paths
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

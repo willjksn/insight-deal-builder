@@ -132,6 +132,9 @@ export type AgentStorageStatResponse = {
   capacityBytes?: number;
   online?: boolean;
   writable?: boolean;
+  /** False when the path itself is missing (drive may still be online). */
+  exists?: boolean;
+  reason?: string;
 };
 
 export type AgentCopyVerifiedResponse = {

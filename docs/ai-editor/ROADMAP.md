@@ -38,6 +38,7 @@
 | **V13 Offline remount** | Remember volume id; relink edit/backup paths when drive letter changes |
 | **V14 Recommendations** | Ranked next steps on hub + project tips (checklists, wrap-up, backup) |
 | **V15 Storage health** | Live edit/backup coaching (internal vs SSD/HDD, same-drive risk, free space) |
+| **V16 Drive presence** | Detect unplugged edit/backup drives; Recheck + Relink banner |
 
 Later: deeper anonymized analytics across orgs (opt-in)
 
@@ -70,4 +71,5 @@ Later: deeper anonymized analytics across orgs (opt-in)
 - **V13 Offline remount (initial)** — persist volume serial on save; detect letter change; Relink paths for edit/backup + media  
 - **V14 Recommendations (initial)** — ranked hub “Suggested next steps” with deep links; light project-page tip  
 - **V15 Storage health (initial)** — Step 2 workspace health for edit/backup placement + free space; guidance only  
+- **V16 Drive presence (initial)** — offline vs remount detection; top banner with Recheck; agent `storage/stat` reports `online: false`  
 - Later: deeper anonymized analytics across orgs (opt-in)

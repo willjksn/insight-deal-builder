@@ -29,6 +29,10 @@ Archive / restore / reclaim batches return **per-file** success/failure so the U
 
 `GET /v1/fs/drives` on Windows enriches volumes via PowerShell (`Get-Volume` / `Get-Disk`): volume label, free/capacity, bus/media type, and a best-effort `storageType` (`externalSSD` / `externalHDD` / `internal` / `removable` / `network`). The AI Editor Step 2 picker uses this for “Edit on SSD / Backup on HDD” guidance.
 
+### Storage presence (v0.15+)
+
+`POST /v1/storage/stat` returns `online: false` (and `reason: "drive_offline"`) when the Windows drive root is not accessible — used by AI Editor to show an “Edit drive offline” banner instead of failing mid-copy.
+
 ## Scaffold location
 
 `desktop-agent/` — Node TypeScript HTTP service for V1A (lightweight; Tauri shell can wrap later).

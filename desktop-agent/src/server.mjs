@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.14.0";
+const VERSION = "0.15.0";
 /** Set SHOOTSPINE_AGENT_DEV_OPEN=1 to accept any non-empty Bearer token (local agent testing). */
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN === "1";
 /** Optional: ShootSpine origin for verifying minted tokens (e.g. http://localhost:3000). */
@@ -1073,13 +1073,42 @@ function sha256File(filePath) {
 async function storageStat(targetPath) {
   assertSafePath(targetPath);
   const resolved = path.resolve(targetPath);
-  // Ensure path exists or use parent for free-space check
+  /** Windows drive root like E:\ — used to detect unplugged volumes (V16). */
+  const driveRoot =
+    process.platform === "win32" && /^[A-Za-z]:/.test(resolved)
+      ? `${resolved.slice(0, 2)}\\`
+      : null;
+
+  if (driveRoot) {
+    try {
+      await fs.access(driveRoot);
+    } catch {
+      return {
+        path: resolved,
+        online: false,
+        writable: false,
+        exists: false,
+        reason: "drive_offline",
+      };
+    }
+  }
+
+  let exists = true;
   let checkPath = resolved;
   try {
     await fs.access(resolved);
   } catch {
+    exists = false;
     checkPath = path.dirname(resolved);
+    if (driveRoot) {
+      try {
+        await fs.access(checkPath);
+      } catch {
+        checkPath = driveRoot;
+      }
+    }
   }
+
   try {
     const st = await fs.statfs(checkPath);
     const availableBytes = Number(st.bavail) * Number(st.bsize);
@@ -1090,6 +1119,7 @@ async function storageStat(targetPath) {
       capacityBytes,
       online: true,
       writable: true,
+      exists,
     };
   } catch {
     // Older Node / Windows fallback via PowerShell
@@ -1112,12 +1142,19 @@ async function storageStat(targetPath) {
             Number.isFinite(free) && Number.isFinite(used) ? free + used : undefined,
           online: true,
           writable: true,
+          exists,
         };
       } catch {
-        /* fall through */
+        return {
+          path: resolved,
+          online: false,
+          writable: false,
+          exists: false,
+          reason: "drive_offline",
+        };
       }
     }
-    return { path: resolved, online: true, writable: true };
+    return { path: resolved, online: true, writable: true, exists };
   }
 }
 
