@@ -42,6 +42,7 @@
 | **V17 Offline-safe actions** | Pause copy/prepare/Resolve/archive when edit or backup disk isn’t ready |
 | **V18 Continue / next step** | Hub resume card + in-project “Continue · Step N” coach with anchors |
 | **V19 Org analytics (opt-in)** | Anonymized studio patterns from opted-in teammates (metadata only) |
+| **V20 Agent version check** | Warn + soft-block Step 1 when Desktop Agent &lt; 0.15 (drive features) |
 
 ## Current implementation status
 
@@ -76,3 +77,4 @@
 - **V17 Offline-safe actions (initial)** — soft-gate disk ops (copy, prepare, analyze, Resolve write, archive/restore/reclaim) until Relink or plug-in  
 - **V18 Continue / next step (initial)** — local resume bookmark on hub; project Continue strip scrolls to next incomplete step  
 - **V19 Org analytics (initial)** — opt-in user preference; org hub card from same-company contributors; counts only (no names/paths/media)
+- **V20 Agent version check (initial)** — Step 1 requires Desktop Agent 0.15+; amber banner + Restart guidance when outdated/missing version

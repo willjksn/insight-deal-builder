@@ -65,6 +65,10 @@ import {
 } from "@/lib/aiEditor/storageDrives";
 import { assessStorageHealth } from "@/lib/aiEditor/storageHealth";
 import {
+  assessAgentVersion,
+  MIN_DESKTOP_AGENT_VERSION,
+} from "@/lib/aiEditor/agentVersion";
+import {
   getWorkflowNextStep,
   writeResumeBookmark,
 } from "@/lib/aiEditor/workflowNextStep";
@@ -492,7 +496,14 @@ export function AiEditorClient({ projectId }: Props) {
     return hits.slice(0, 20);
   }, [analysis, transcriptQuery]);
 
-  const step1Done = agent.connected && agent.ffmpegAvailable !== false;
+  const agentVersionStatus = useMemo(
+    () => (agent.connected ? assessAgentVersion(agent.version) : null),
+    [agent.connected, agent.version]
+  );
+  const step1Done =
+    agent.connected &&
+    agent.ffmpegAvailable !== false &&
+    (agentVersionStatus?.ok ?? false);
   const step2Done = Boolean(settings?.projectRootPath);
   const step3Done = media.length > 0;
   const step4Done = media.length > 0 && needsPrepare.length === 0;
@@ -2685,14 +2696,26 @@ export function AiEditorClient({ projectId }: Props) {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-lg font-semibold text-slate-900">Connect this computer</h2>
-                <Badge variant={agent.connected ? "success" : "warning"}>
-                  {agent.connected ? (
+                <Badge
+                  variant={
+                    !agent.connected
+                      ? "warning"
+                      : agentVersionStatus && !agentVersionStatus.ok
+                        ? "warning"
+                        : "success"
+                  }
+                >
+                  {!agent.connected ? (
                     <span className="inline-flex items-center gap-1">
-                      <Wifi className="h-3 w-3" /> Ready
+                      <WifiOff className="h-3 w-3" /> Not connected
+                    </span>
+                  ) : agentVersionStatus && !agentVersionStatus.ok ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Wifi className="h-3 w-3" /> Update needed
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1">
-                      <WifiOff className="h-3 w-3" /> Not connected
+                      <Wifi className="h-3 w-3" /> Ready
                     </span>
                   )}
                 </Badge>
@@ -2741,6 +2764,22 @@ export function AiEditorClient({ projectId }: Props) {
               Check again
             </Button>
           </div>
+          {agent.connected && agentVersionStatus && !agentVersionStatus.ok ? (
+            <div className="ml-10 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
+              <p className="font-medium">Desktop Agent needs an update</p>
+              <p className="mt-1 text-xs leading-relaxed opacity-90">
+                {agentVersionStatus.message}
+              </p>
+              <p className="mt-2 text-xs text-amber-900/80">
+                Need {MIN_DESKTOP_AGENT_VERSION}+. Use Restart above after stopping any old helper
+                window.
+              </p>
+            </div>
+          ) : agent.connected && agentVersionStatus?.ok ? (
+            <p className="ml-10 text-xs text-slate-500">
+              Desktop Agent {agentVersionStatus.version} — drive labels and offline checks ready.
+            </p>
+          ) : null}
         </CardBody>
       </Card>
 
