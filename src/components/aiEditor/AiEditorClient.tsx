@@ -715,53 +715,67 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
-  const scanDetectedSources = useCallback(async () => {
-    if (!agent.connected) {
-      setDetectedSources([]);
-      return;
-    }
-    setDetectScanning(true);
-    try {
-      const token = await ensureAgentSession();
-      const res = await agentDetectSources(DEFAULT_AGENT_BASE_URL, token, { maxFiles: 800 });
-      const sources = detectMediaSources(res.probes || []);
-      setDetectedSources(sources);
-      setSelectedSourceId((prev) => {
-        if (prev && sources.some((s) => s.id === prev)) return prev;
-        return sources[0]?.id ?? null;
-      });
-      if (sources[0]?.suggestedCameraAssignment) {
-        setCameraLabel((prev) =>
-          prev === "CAMERA_A" || !prev ? sources[0]!.suggestedCameraAssignment! : prev
-        );
+  const detectScanInFlight = useRef(false);
+  const scanDetectedSources = useCallback(
+    async (opts?: { quiet?: boolean }) => {
+      if (!agent.connected) {
+        setDetectedSources([]);
+        return;
       }
-      const dest = (settings?.projectRootPath || storagePath).trim();
-      if (dest) {
-        try {
-          const st = await agentStorageStat(DEFAULT_AGENT_BASE_URL, token, dest);
-          setIngestDestFreeBytes(
-            typeof st.availableBytes === "number" ? st.availableBytes : null
+      if (detectScanInFlight.current) return;
+      detectScanInFlight.current = true;
+      const quiet = opts?.quiet === true;
+      if (!quiet) setDetectScanning(true);
+      try {
+        const token = await ensureAgentSession();
+        const res = await agentDetectSources(DEFAULT_AGENT_BASE_URL, token, {
+          maxFiles: 800,
+        });
+        const sources = detectMediaSources(res.probes || []);
+        setDetectedSources(sources);
+        setSelectedSourceId((prev) => {
+          if (prev && sources.some((s) => s.id === prev)) return prev;
+          return sources[0]?.id ?? null;
+        });
+        // Only suggest camera on a visible (non-quiet) scan so background polls don't yank the dropdown
+        if (!quiet && sources[0]?.suggestedCameraAssignment) {
+          setCameraLabel((prev) =>
+            prev === "CAMERA_A" || !prev ? sources[0]!.suggestedCameraAssignment! : prev
           );
-        } catch {
-          setIngestDestFreeBytes(null);
         }
+        const dest = (settings?.projectRootPath || storagePath).trim();
+        if (dest) {
+          try {
+            const st = await agentStorageStat(DEFAULT_AGENT_BASE_URL, token, dest);
+            setIngestDestFreeBytes(
+              typeof st.availableBytes === "number" ? st.availableBytes : null
+            );
+          } catch {
+            setIngestDestFreeBytes(null);
+          }
+        }
+      } catch {
+        /* card scan is best-effort */
+      } finally {
+        detectScanInFlight.current = false;
+        if (!quiet) setDetectScanning(false);
       }
-    } catch {
-      /* card scan is best-effort */
-    } finally {
-      setDetectScanning(false);
-    }
-  }, [agent.connected, ensureAgentSession, settings?.projectRootPath, storagePath]);
+    },
+    [agent.connected, ensureAgentSession, settings?.projectRootPath, storagePath]
+  );
 
+  // Initial scan when agent connects; quiet poll later (no spinner) so the card doesn't flicker.
   useEffect(() => {
     if (!agent.connected) {
       setDetectedSources([]);
       return;
     }
-    void scanDetectedSources();
-    const t = window.setInterval(() => void scanDetectedSources(), 12000);
+    void scanDetectedSources({ quiet: false });
+    const t = window.setInterval(() => void scanDetectedSources({ quiet: true }), 45000);
     return () => window.clearInterval(t);
-  }, [agent.connected, scanDetectedSources]);
+    // Intentionally only re-run when connection flips — not when scan callback identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- poll must not restart every render
+  }, [agent.connected]);
 
   async function onStartAgent(restart = false) {
     setBusy(restart ? "restart" : "agent");
@@ -3080,7 +3094,7 @@ export function AiEditorClient({ projectId }: Props) {
               options={ingestOptions}
               onOptionsChange={setIngestOptions}
               scanning={detectScanning}
-              onRescan={() => void scanDetectedSources()}
+              onRescan={() => void scanDetectedSources({ quiet: false })}
               onUseSourceFolder={() => {
                 const src =
                   detectedSources.find((s) => s.id === selectedSourceId) ||
