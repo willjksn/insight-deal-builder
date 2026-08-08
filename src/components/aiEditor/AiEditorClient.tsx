@@ -592,15 +592,6 @@ export function AiEditorClient({ projectId }: Props) {
     return found;
   }
 
-  async function refreshRemountDetection() {
-    if (!agent.connected || !settings?.projectRootPath) {
-      setRemountCandidates([]);
-      return;
-    }
-    const drives = await refreshKnownDrives();
-    detectRemount(drives);
-  }
-
   async function onSaveWorkspace() {
     if (!storagePath.trim()) return;
     setBusy("storage");
