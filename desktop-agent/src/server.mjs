@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.15.0";
+const VERSION = "0.16.0";
 /** Set SHOOTSPINE_AGENT_DEV_OPEN=1 to accept any non-empty Bearer token (local agent testing). */
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN === "1";
 /** Optional: ShootSpine origin for verifying minted tokens (e.g. http://localhost:3000). */
@@ -1773,6 +1773,7 @@ async function importEdlIntoResolve(body) {
 
   const timelineName = String(body.timelineName || "ShootSpine Rough Cut").slice(0, 120);
   const binName = String(body.binName || RESOLVE_MEDIA_BIN).slice(0, 80);
+  const editPlanPath = path.join(handoffDir, "shootspine_edit_plan.json");
   const python = await findPythonLauncher();
   if (!python) {
     return {
@@ -1789,10 +1790,12 @@ async function importEdlIntoResolve(body) {
   const code = `
 ${resolveScriptEnvPrelude()}
 from pathlib import Path
+import json
 edl = Path(${JSON.stringify(edlPath)})
 name = ${JSON.stringify(timelineName)}
 bin_name = ${JSON.stringify(binName)}
 media_paths = ${JSON.stringify(existing)}
+plan_path = Path(${JSON.stringify(editPlanPath)})
 try:
     import DaVinciResolveScript as dvr
 except Exception:
@@ -1842,7 +1845,27 @@ try:
     project.SetCurrentTimeline(imported)
 except Exception:
     pass
-print(f"IMPORTED media={media_count} requested={len(media_paths)}")
+markers_ok = 0
+markers_planned = 0
+if plan_path.is_file():
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        markers = plan.get("markers") or []
+        markers_planned = len(markers)
+        for m in markers:
+            try:
+                frame = int(m.get("frame") or 0)
+                color = str(m.get("color") or "Blue")
+                mname = str(m.get("name") or "Marker")[:64]
+                note = str(m.get("note") or "")[:256]
+                dur = max(1, int(m.get("durationFrames") or 1))
+                if imported.AddMarker(frame, color, mname, note, dur):
+                    markers_ok += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+print(f"IMPORTED media={media_count} requested={len(media_paths)} markers={markers_ok}/{markers_planned}")
 raise SystemExit(0)
 `;
 
@@ -1854,8 +1877,11 @@ raise SystemExit(0)
   );
   const out = (result.stdout || "").trim();
   const mediaMatch = out.match(/media=(\d+)\s+requested=(\d+)/);
+  const markerMatch = out.match(/markers=(\d+)\/(\d+)/);
   const mediaImported = mediaMatch ? Number(mediaMatch[1]) : 0;
   const mediaRequested = mediaMatch ? Number(mediaMatch[2]) : existing.length;
+  const markersApplied = markerMatch ? Number(markerMatch[1]) : 0;
+  const markersPlanned = markerMatch ? Number(markerMatch[2]) : 0;
 
   if (out.includes("IMPORTED")) {
     const parts = ["Timeline imported into the open Resolve project"];
@@ -1863,6 +1889,9 @@ raise SystemExit(0)
       parts.push(`${mediaImported} clip(s) linked in the “${binName}” bin`);
     } else if (requested.length > 0) {
       parts.push("Media files weren’t linked — relink from your project media folder if clips are offline");
+    }
+    if (markersApplied > 0) {
+      parts.push(`${markersApplied} timeline marker(s) added`);
     }
     return {
       ok: true,
@@ -1874,6 +1903,8 @@ raise SystemExit(0)
       mediaRequested: requested.length,
       mediaMissing: requested.length - existing.length,
       binName,
+      markersApplied,
+      markersPlanned,
     };
   }
   return {
@@ -1886,6 +1917,8 @@ raise SystemExit(0)
     mediaRequested: requested.length,
     mediaMissing: requested.length - existing.length,
     binName,
+    markersApplied,
+    markersPlanned,
   };
 }
 

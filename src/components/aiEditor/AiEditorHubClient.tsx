@@ -137,8 +137,8 @@ function HowItWorksGuideContent() {
             (won’t block finishing).
           </li>
           <li>
-            <span className="font-medium">Set the look</span> — mood + transition tips written into
-            the Resolve package (grade still happens in Resolve).
+            <span className="font-medium">Set the look</span> — soft blends go into the EDL; markers
+            mark acts/fades. Mood notes guide Color — nothing is baked into footage.
           </li>
           <li>
             <span className="font-medium">Finish in Resolve</span> — write a handoff package, open
@@ -163,8 +163,8 @@ function HowItWorksGuideContent() {
         <h3 className="font-semibold text-slate-900">Resolve &amp; next shoot</h3>
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
-            Handoff includes EDL, media map, LOOKS notes, and (when scripting is ready) import into
-            a ShootSpine bin.
+            Handoff includes EDL (with soft blends when chosen), media map, LOOKS notes, timeline
+            markers, and (when scripting is ready) import into a ShootSpine bin.
           </li>
           <li>
             After finishing, check what’s in Resolve, build a{" "}

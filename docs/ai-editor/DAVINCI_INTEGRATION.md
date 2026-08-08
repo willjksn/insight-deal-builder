@@ -18,6 +18,7 @@ Do not assume Resolve and AI Editor share a machine or OS paths.
 - **V7 (initial)** — Import Resolve cut into ShootSpine as a new timeline version (prior cut restorable).
 - **V8 (initial)** — Next shoot checklist (missing coverage + Resolve feedback), check-off in AI Editor.
 - **V9 (initial)** — Send open checklist to production board **filming notes** (marked, replaceable section).
+- **V21 (initial)** — Soft-blend dissolves in EDL + timeline markers (acts/reels/transition cues) after import. **No baked grades.**
 
 ## Phase plan
 
@@ -61,7 +62,7 @@ Unchanged: prepare on Windows → copy project folder → import on Mac (script 
 |----------|---------|
 | `POST /v1/resolve/detect` | Install + scripting modules on disk |
 | `POST /v1/resolve/scripting-probe` | Live scripting reachability + project open |
-| `POST /v1/resolve/import-edl` | Media Pool bin + `ImportMedia` + `ImportTimelineFromFile` |
+| `POST /v1/resolve/import-edl` | Media Pool bin + `ImportMedia` + `ImportTimelineFromFile` + markers from `shootspine_edit_plan.json` |
 | `POST /v1/resolve/sync-from-nle` | Read open timeline + clip names + optional EDL (V5/V6) |
 | `POST /v1/resolve/write-handoff` | Write text package under project root |
 | `POST /v1/resolve/open` | Launch Resolve (allowlisted path) |

@@ -91,10 +91,12 @@ export async function POST(
         {
           ...manifest,
           finishing: handoff.finishing ?? null,
+          editPlanSummary: handoff.editPlan.summary,
         },
         null,
         2
       ),
+      editPlanJson: JSON.stringify(handoff.editPlan, null, 2),
       readme: handoff.readme,
       looksGuide: handoff.looksGuide,
     });

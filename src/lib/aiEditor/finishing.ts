@@ -222,11 +222,11 @@ export function buildFinishingGuide(input: {
     lines.push("Keep hard cuts between clips.");
   } else if (plan.transitionType === "dissolve") {
     lines.push(
-      `Add short dissolves (~${plan.transitionDurationFrames} frames) between clips where it feels natural.`
+      `Soft blends (~${plan.transitionDurationFrames} frames) are written into the EDL as dissolves when you bring the edit into Resolve (best-effort). Markers also mark each blend.`
     );
   } else {
     lines.push(
-      `Use short fades through black (~${plan.transitionDurationFrames} frames) at bigger story beats.`
+      `Fade-through-black beats (~${plan.transitionDurationFrames} frames) are marked on the Resolve timeline — apply fades on the Edit page if Resolve didn’t create them.`
     );
   }
 
@@ -247,7 +247,8 @@ export function buildFinishingGuide(input: {
 
   lines.push(
     "",
-    "Tip: After you import the rough cut, add transitions on the Edit page, then grade on Color."
+    "Tip: Timeline markers (acts/reels + transition cues) are added after import when scripting is available.",
+    "Grade only on Resolve’s Color page — ShootSpine never bakes a look into your media."
   );
   return lines.join("\n");
 }

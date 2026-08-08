@@ -73,7 +73,7 @@ describe("finishing", () => {
     expect(guide).toContain("Color page");
     expect(guide).toContain("Keep the logo hold longer");
     expect(guide).toContain("A bit warmer next time");
-    expect(guide).not.toContain("EDL");
+    expect(guide.toLowerCase()).toContain("never bakes");
   });
 
   it("summarizes finishing for UI", () => {

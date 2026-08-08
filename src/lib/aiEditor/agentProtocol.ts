@@ -236,6 +236,9 @@ export type AgentResolveImportEdlResponse = {
   mediaRequested?: number;
   mediaMissing?: number;
   binName?: string;
+  /** V21 — timeline markers applied from shootspine_edit_plan.json */
+  markersApplied?: number;
+  markersPlanned?: number;
 };
 
 export type AgentResolveSyncFromNleResponse = {

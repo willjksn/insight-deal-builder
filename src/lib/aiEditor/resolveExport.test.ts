@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { applyFinishingPlan } from "@/lib/aiEditor/finishing";
 import { buildEdl, buildResolveHandoff } from "@/lib/aiEditor/resolveExport";
 import { buildRoughCutFromCoverage } from "@/lib/aiEditor/timeline";
 import type { CoverageReport, MediaAsset } from "@/lib/aiEditor/types";
@@ -108,5 +109,54 @@ describe("resolveExport", () => {
     expect(m1).toBeGreaterThan(-1);
     expect(m2).toBeGreaterThan(-1);
     expect(m1).toBeLessThan(m2);
+  });
+
+  it("emits dissolve events when finishing plan uses soft blends", () => {
+    const coverage: CoverageReport = {
+      projectId: "p1",
+      updatedAt: "",
+      plannedShotCount: 2,
+      coveredCount: 2,
+      partialCount: 0,
+      missingCount: 0,
+      unmatchedMediaIds: [],
+      overrides: [],
+      shots: [
+        {
+          plannedShotId: "s1",
+          shotName: "A",
+          status: "covered",
+          candidates: [],
+          preferredMediaAssetId: "m1",
+        },
+        {
+          plannedShotId: "s2",
+          shotName: "B",
+          status: "covered",
+          candidates: [],
+          preferredMediaAssetId: "m2",
+        },
+      ],
+    };
+    const base = buildRoughCutFromCoverage({
+      projectId: "p1",
+      coverage,
+      media: [media("m1", "a.mp4"), media("m2", "b.mp4")],
+      frameRate: 24,
+    });
+    const { timeline } = applyFinishingPlan(base, {
+      moodId: "natural",
+      transitionStyle: "soft_dissolves",
+    });
+    const edl = buildEdl(timeline, [media("m1", "a.mp4"), media("m2", "b.mp4")]);
+    expect(edl).toMatch(/V\s+D\s+\d{3}/);
+    expect(edl).toContain("SHOOTSPINE_TRANSITION: dissolve");
+    const pack = buildResolveHandoff({
+      projectId: "p1",
+      timeline,
+      media: [media("m1", "a.mp4"), media("m2", "b.mp4")],
+    });
+    expect(pack.editPlan.summary.dissolveInEdl).toBeGreaterThan(0);
+    expect(pack.summary.markerCount).toBeGreaterThan(0);
   });
 });

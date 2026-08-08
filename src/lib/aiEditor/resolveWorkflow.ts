@@ -112,26 +112,32 @@ export function importResultMessage(result: {
   mediaImported?: number;
   mediaRequested?: number;
   binName?: string;
+  markersApplied?: number;
 }): { title: string; detail: string } {
   const bin = result.binName || "ShootSpine";
+  const markers = result.markersApplied ?? 0;
+  const markerBit =
+    markers > 0
+      ? ` ${markers} marker${markers === 1 ? "" : "s"} added (acts/reels + transitions).`
+      : "";
   if (result.imported) {
     const linked = result.mediaImported ?? 0;
     const requested = result.mediaRequested ?? 0;
     if (linked > 0) {
       return {
         title: "Your rough cut is in Resolve",
-        detail: `${linked} clip${linked === 1 ? "" : "s"} linked in the “${bin}” media bin. Finish color and sound there.`,
+        detail: `${linked} clip${linked === 1 ? "" : "s"} linked in the “${bin}” media bin.${markerBit} Finish color on the Color page — nothing is baked.`,
       };
     }
     if (requested > 0) {
       return {
         title: "Your rough cut is in Resolve",
-        detail: `Timeline imported. If clips are offline, relink from your project media folder (bin “${bin}”).`,
+        detail: `Timeline imported.${markerBit} If clips are offline, relink from your project media folder (bin “${bin}”).`,
       };
     }
     return {
       title: "Your rough cut is in Resolve",
-      detail: "If clips look missing, point Resolve at your project’s media folder.",
+      detail: `${markerBit.trim() || "If clips look missing, point Resolve at your project’s media folder."}${markerBit ? " Finish color in Resolve — nothing is baked." : ""}`,
     };
   }
   const reason = (result.reason || "").toLowerCase();

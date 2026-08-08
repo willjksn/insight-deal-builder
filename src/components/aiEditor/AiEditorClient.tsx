@@ -1728,7 +1728,7 @@ export function AiEditorClient({ projectId }: Props) {
       setTimelineVersions(res.versions);
       if (res.job) setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
       setStatusNote(
-        `Saved: ${res.timeline.finishing?.moodLabel} look with ${res.timeline.finishing?.transitionLabel.toLowerCase()}. Resolve will use these as notes.`
+        `Saved: ${res.timeline.finishing?.moodLabel} look with ${res.timeline.finishing?.transitionLabel.toLowerCase()}. Soft blends go into the EDL; markers mark acts/fades. Color stays in Resolve.`
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save look");
@@ -3844,8 +3844,8 @@ export function AiEditorClient({ projectId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Look &amp; transitions</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Choose a feel and how clips connect. Resolve does the real color - we save clear
-                notes with your edit.
+                Soft blends go into the Resolve timeline (EDL + markers). Mood notes guide Color —
+                we never bake a grade into your footage.
               </p>
             </div>
           </div>

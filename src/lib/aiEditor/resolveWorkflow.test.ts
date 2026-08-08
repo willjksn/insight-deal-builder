@@ -53,8 +53,11 @@ describe("resolveWorkflow", () => {
       mediaImported: 4,
       mediaRequested: 4,
       binName: "ShootSpine",
+      markersApplied: 3,
     });
     expect(m.detail).toMatch(/4 clips/i);
     expect(m.detail).toMatch(/ShootSpine/);
+    expect(m.detail).toMatch(/3 markers/i);
+    expect(m.detail.toLowerCase()).toMatch(/bake/);
   });
 });

@@ -11,6 +11,7 @@ export const RESOLVE_HANDOFF_REL_DIR = "03_PROJECT_FILES/shootspine_resolve";
 export const RESOLVE_HANDOFF_FILES = {
   edl: "shootspine_rough_cut.edl",
   manifest: "shootspine_handoff.json",
+  editPlan: "shootspine_edit_plan.json",
   readme: "README_RESOLVE.txt",
   looks: "LOOKS.txt",
   companionPy: "import_shootspine_edl.py",
@@ -31,7 +32,7 @@ export function resolveHandoffAbsoluteDir(projectRoot: string): string {
   return joinProjectRelative(projectRoot.trim(), RESOLVE_HANDOFF_REL_DIR);
 }
 
-/** Python companion: Media Pool bin + media link + EDL (V4). */
+/** Python companion: Media Pool bin + media link + EDL + markers (V4/V21). */
 export function buildResolveCompanionPython(input: {
   edlFilename?: string;
   timelineName?: string;
@@ -42,11 +43,12 @@ export function buildResolveCompanionPython(input: {
   const bin = (input.binName || "ShootSpine").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `#!/usr/bin/env python3
 """
-ShootSpine → DaVinci Resolve companion (V4)
+ShootSpine → DaVinci Resolve companion (V4/V21)
 
 1) Creates/finds a Media Pool bin
 2) Imports media from shootspine_handoff.json
-3) Imports the rough-cut EDL
+3) Imports the rough-cut EDL (dissolves when present)
+4) Applies timeline markers from shootspine_edit_plan.json
 
 Requires DaVinci Resolve running with External Scripting enabled
 (Preferences → System → General → External scripting using).
@@ -66,6 +68,7 @@ EDL_NAME = ${JSON.stringify(edl)}
 TIMELINE_NAME = "${name}"
 BIN_NAME = "${bin}"
 MANIFEST_NAME = "shootspine_handoff.json"
+EDIT_PLAN_NAME = "shootspine_edit_plan.json"
 
 
 def setup_env() -> None:
@@ -198,8 +201,28 @@ def main() -> int:
     except Exception:
         pass
 
+    markers_ok = 0
+    plan_path = handoff_dir / EDIT_PLAN_NAME
+    if plan_path.is_file():
+        try:
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            for m in plan.get("markers") or []:
+                try:
+                    frame = int(m.get("frame") or 0)
+                    color = str(m.get("color") or "Blue")
+                    name = str(m.get("name") or "Marker")[:64]
+                    note = str(m.get("note") or "")[:256]
+                    dur = max(1, int(m.get("durationFrames") or 1))
+                    if imported.AddMarker(frame, color, name, note, dur):
+                        markers_ok += 1
+                except Exception:
+                    pass
+        except Exception as exc:
+            print(f"Marker plan warning: {exc}")
+
     print(f"Imported timeline from {edl_path.name}")
     print(f"Linked {media_count} media file(s) into bin '{BIN_NAME}'.")
+    print(f"Applied {markers_ok} timeline marker(s).")
     if media_count == 0:
         print("If clips are offline, relink using paths in shootspine_handoff.json.")
     return 0
@@ -247,6 +270,7 @@ export function buildHandoffFileMap(input: {
   manifestJson: string;
   readme: string;
   looksGuide?: string;
+  editPlanJson?: string;
   timelineName?: string;
   projectId: string;
 }): Record<string, string> {
@@ -262,6 +286,9 @@ export function buildHandoffFileMap(input: {
       timelineName: input.timelineName,
     }),
   };
+  if (input.editPlanJson?.trim()) {
+    files[RESOLVE_HANDOFF_FILES.editPlan] = input.editPlanJson;
+  }
   if (input.looksGuide?.trim()) {
     files[RESOLVE_HANDOFF_FILES.looks] = input.looksGuide;
   }

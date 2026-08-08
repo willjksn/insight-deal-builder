@@ -43,6 +43,7 @@
 | **V18 Continue / next step** | Hub resume card + in-project “Continue · Step N” coach with anchors |
 | **V19 Org analytics (opt-in)** | Anonymized studio patterns from opted-in teammates (metadata only) |
 | **V20 Agent version check** | Warn + soft-block Step 1 when Desktop Agent &lt; 0.15 (drive features) |
+| **V21 Resolve edit control** | EDL dissolves + timeline markers (acts/reels/transitions); no baked grades |
 
 ## Current implementation status
 
@@ -78,3 +79,4 @@
 - **V18 Continue / next step (initial)** — local resume bookmark on hub; project Continue strip scrolls to next incomplete step  
 - **V19 Org analytics (initial)** — opt-in user preference; org hub card from same-company contributors; counts only (no names/paths/media)
 - **V20 Agent version check (initial)** — Step 1 requires Desktop Agent 0.15+; amber banner + Restart guidance when outdated/missing version
+- **V21 Resolve edit control (initial)** — soft blends in EDL; markers for acts/reels + dissolves/fades after import (agent 0.16+); LOOKS remains grade guidance only

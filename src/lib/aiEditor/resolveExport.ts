@@ -1,12 +1,17 @@
-/** V1G/V1.6 — portable Resolve handoff (EDL + media manifest + look notes). No camera bytes uploaded. */
+/** V1G/V1.6/V21 — portable Resolve handoff (EDL + media manifest + look notes + edit plan). No camera bytes uploaded. */
 
 import { framesToSeconds, framesToTimecode } from "@/lib/aiEditor/frames";
 import { buildFinishingGuide } from "@/lib/aiEditor/finishing";
+import {
+  buildResolveEditPlan,
+  summarizeEditPlanForReadme,
+  type ResolveEditPlan,
+} from "@/lib/aiEditor/resolveEditPlan";
 import { timelineDurationFrames } from "@/lib/aiEditor/timeline";
 import type { NleHandoffPackage, NleMediaMapping } from "@/lib/aiEditor/nleAdapter";
 import type { EditNote, MediaAsset, Timeline, TimelineClip } from "@/lib/aiEditor/types";
 
-const MANIFEST_VERSION = "1.0.0";
+const MANIFEST_VERSION = "1.1.0";
 
 function videoClips(timeline: Timeline): TimelineClip[] {
   const clips = timeline.tracks.find((t) => t.kind === "video")?.clips.slice() ?? [];
@@ -14,7 +19,25 @@ function videoClips(timeline: Timeline): TimelineClip[] {
   return clips;
 }
 
-/** CMX 3600–style EDL (Resolve-friendly). Timecodes are non-drop at timeline fps. */
+function reelName(asset: MediaAsset | undefined, clip: TimelineClip): string {
+  return (asset?.reelName || asset?.filename || clip.mediaAssetId)
+    .replace(/[^\w.-]+/g, "_")
+    .slice(0, 32);
+}
+
+function clampDissolveFrames(prev: TimelineClip, next: TimelineClip, requested: number): number {
+  const req = Math.max(1, Math.floor(requested || 1));
+  return Math.max(
+    1,
+    Math.min(
+      req,
+      Math.max(1, Math.floor(prev.durationFrames / 2)),
+      Math.max(1, Math.floor(next.durationFrames / 2))
+    )
+  );
+}
+
+/** CMX 3600–style EDL (Resolve-friendly). Dissolves when transitionOut is dissolve. */
 export function buildEdl(timeline: Timeline, media: MediaAsset[]): string {
   const fps = timeline.frameRate || 24;
   const byId = new Map(media.map((m) => [m.id, m]));
@@ -27,21 +50,55 @@ export function buildEdl(timeline: Timeline, media: MediaAsset[]): string {
 
   clips.forEach((clip, i) => {
     const asset = byId.get(clip.mediaAssetId);
-    const reel = (asset?.reelName || asset?.filename || clip.mediaAssetId)
-      .replace(/[^\w.-]+/g, "_")
-      .slice(0, 32);
+    const reel = reelName(asset, clip);
     const event = String(i + 1).padStart(3, "0");
-    const srcIn = framesToTimecode(clip.sourceInFrame, fps);
-    const srcOut = framesToTimecode(clip.sourceInFrame + clip.durationFrames, fps);
-    const recIn = framesToTimecode(clip.timelineStartFrame, fps);
-    const recOut = framesToTimecode(clip.timelineStartFrame + clip.durationFrames, fps);
-    lines.push(`${event}  ${reel.padEnd(8).slice(0, 8)} V     C        ${srcIn} ${srcOut} ${recIn} ${recOut}`);
+    const prev = i > 0 ? clips[i - 1] : null;
+    const dissolveFromPrev =
+      prev?.transitionOut?.type === "dissolve" && (prev.transitionOut.durationFrames || 0) > 0
+        ? clampDissolveFrames(prev, clip, prev.transitionOut.durationFrames)
+        : 0;
+
+    let srcInFrame = clip.sourceInFrame;
+    let srcOutFrame = clip.sourceInFrame + clip.durationFrames;
+    let recInFrame = clip.timelineStartFrame;
+    let recOutFrame = clip.timelineStartFrame + clip.durationFrames;
+    let editKind: "C" | "D" = "C";
+    let dissolvePad = "";
+
+    if (dissolveFromPrev > 0) {
+      editKind = "D";
+      dissolvePad = String(dissolveFromPrev).padStart(3, "0");
+      // Overlap record in by dissolve length (CMX dissolve into this event)
+      recInFrame = Math.max(0, clip.timelineStartFrame - dissolveFromPrev);
+      // Prefer source handle before in-point when available
+      srcInFrame = Math.max(0, clip.sourceInFrame - dissolveFromPrev);
+    }
+
+    const srcIn = framesToTimecode(srcInFrame, fps);
+    const srcOut = framesToTimecode(srcOutFrame, fps);
+    const recIn = framesToTimecode(recInFrame, fps);
+    const recOut = framesToTimecode(recOutFrame, fps);
+    const reelField = reel.padEnd(8).slice(0, 8);
+    if (editKind === "D") {
+      lines.push(
+        `${event}  ${reelField} V     D    ${dissolvePad} ${srcIn} ${srcOut} ${recIn} ${recOut}`
+      );
+    } else {
+      lines.push(`${event}  ${reelField} V     C        ${srcIn} ${srcOut} ${recIn} ${recOut}`);
+    }
     if (clip.label || asset?.filename) {
       lines.push(`* FROM CLIP NAME: ${clip.label || asset?.filename}`);
     }
     lines.push(`* SHOOTSPINE_MEDIA_ID: ${clip.mediaAssetId}`);
     if (asset?.relativeProjectPath) {
       lines.push(`* SHOOTSPINE_REL_PATH: ${asset.relativeProjectPath}`);
+    }
+    if (dissolveFromPrev > 0) {
+      lines.push(`* SHOOTSPINE_TRANSITION: dissolve ${dissolveFromPrev}f`);
+    } else if (clip.transitionOut && clip.transitionOut.type !== "cut") {
+      lines.push(
+        `* SHOOTSPINE_TRANSITION_OUT: ${clip.transitionOut.type} ${clip.transitionOut.durationFrames}f`
+      );
     }
   });
 
@@ -79,17 +136,21 @@ export function buildResolveHandoff(input: {
   edl: string;
   readme: string;
   looksGuide?: string;
+  editPlan: ResolveEditPlan;
   finishing?: Timeline["finishing"];
   summary: {
     clipCount: number;
     durationTimecode: string;
     durationSeconds: number;
     mediaCount: number;
+    markerCount: number;
+    dissolveCount: number;
   };
 } {
   const { projectId, timeline, media, projectRoot, timelineVersionId } = input;
   const edl = buildEdl(timeline, media);
   const mappings = buildMediaMappings(timeline, media);
+  const editPlan = buildResolveEditPlan(timeline);
   const frames = timelineDurationFrames(timeline);
   const clips = videoClips(timeline);
   const summary = {
@@ -97,6 +158,8 @@ export function buildResolveHandoff(input: {
     durationTimecode: framesToTimecode(frames, timeline.frameRate),
     durationSeconds: framesToSeconds(frames, timeline.frameRate),
     mediaCount: mappings.length,
+    markerCount: editPlan.summary.markerCount,
+    dissolveCount: editPlan.summary.dissolveInEdl,
   };
 
   const looksGuide = timeline.finishing
@@ -115,12 +178,14 @@ export function buildResolveHandoff(input: {
     "",
     "1. Copy/sync the project media folder to the Mac (or mount the same volume).",
     "2. Prefer: python3 import_shootspine_edl.py (Resolve open, External scripting on).",
-    "   Links media into a ShootSpine bin, then imports the EDL.",
+    "   Links media into a ShootSpine bin, then imports the EDL and timeline markers.",
     "   Or: File → Import → Timeline → Import EDL… → shootspine_rough_cut.edl",
     "3. If clips are offline, relink via shootspine_handoff.json",
     "   (MediaAsset.id + relativeProjectPath + checksum).",
-    looksGuide ? "4. Read LOOKS.txt for mood / transition suggestions (apply in Resolve)." : "",
+    looksGuide ? "4. Read LOOKS.txt for mood notes (apply grade in Resolve — nothing is baked)." : "",
     "5. See OPEN_ON_MAC.txt for the cross-machine checklist.",
+    "",
+    ...summarizeEditPlanForReadme(editPlan),
     "",
     `Project: ${projectId}`,
     `Timeline: ${timeline.name} v${timeline.version}`,
@@ -148,6 +213,7 @@ export function buildResolveHandoff(input: {
     edl,
     readme,
     looksGuide,
+    editPlan,
     finishing: timeline.finishing,
     summary,
   };
