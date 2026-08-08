@@ -10,8 +10,12 @@ import {
   type AgentAnalyzeResponse,
   type AgentCopyVerifiedBatchFile,
   type AgentCopyVerifiedBatchResponse,
+  type AgentFsRevealResponse,
   type AgentIngestCopyRequest,
   type AgentIngestCopyResponse,
+  type AgentResolveDetectResponse,
+  type AgentResolveOpenResponse,
+  type AgentResolveWriteHandoffResponse,
   type AgentSafeDeleteFile,
   type AgentSafeDeleteResponse,
   type AgentProxyResponse,
@@ -193,6 +197,47 @@ export async function agentSafeDelete(
   return agentFetch<AgentSafeDeleteResponse>(baseUrl, token, "/media/safe-delete", {
     method: "POST",
     body: JSON.stringify(body),
+  });
+}
+
+export async function agentResolveDetect(baseUrl: string, token: string) {
+  return agentFetch<AgentResolveDetectResponse>(baseUrl, token, "/resolve/detect", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function agentWriteResolveHandoff(
+  baseUrl: string,
+  token: string,
+  body: { projectRoot: string; files: Record<string, string>; relativeDir?: string }
+) {
+  return agentFetch<AgentResolveWriteHandoffResponse>(
+    baseUrl,
+    token,
+    "/resolve/write-handoff",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function agentOpenResolve(
+  baseUrl: string,
+  token: string,
+  body?: { projectRoot?: string; handoffDir?: string; launch?: boolean }
+) {
+  return agentFetch<AgentResolveOpenResponse>(baseUrl, token, "/resolve/open", {
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+export async function agentRevealPath(baseUrl: string, token: string, dirPath: string) {
+  return agentFetch<AgentFsRevealResponse>(baseUrl, token, "/fs/reveal", {
+    method: "POST",
+    body: JSON.stringify({ path: dirPath }),
   });
 }
 

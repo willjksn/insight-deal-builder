@@ -1,12 +1,12 @@
 # AI Editor — Desktop Agent
 
-Companion process (not a separate product). Windows-first; macOS Resolve Bridge later.
+Companion process (not a separate product). Windows-first; macOS Resolve companion via handoff scripts (V1.5).
 
 ## Responsibilities (staged)
 
 V1A: localhost HTTP API, session auth, storage root validation, create project folders, index folder, FFprobe stub/mock, thumbnail stub, job progress events.
 
-Supports verified copy, proxies, local AI analysis, media stream, archive/restore batch, and safe-delete (project-root only).
+Supports verified copy, proxies, local AI analysis, media stream, archive/restore batch, safe-delete (project-root only), and Resolve detect / write-handoff / open (allowlisted launch only).
 
 ## Communication
 

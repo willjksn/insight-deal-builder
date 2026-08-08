@@ -42,7 +42,25 @@ export async function POST(
     const body = (await request.json()) as {
       type: AiEditorJobType;
       cameraLabels?: string[];
+      message?: string;
+      launched?: boolean;
+      handoffDir?: string;
     };
+
+    if (body.type === "resolve_open") {
+      const created = await createJob(access.appUser, projectId, "resolve_open", {
+        launched: body.launched,
+        handoffDir: body.handoffDir,
+      });
+      const job = await updateJob(created.id, {
+        status: "completed",
+        progress: 100,
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        message: body.message || "Resolve open / handoff write",
+      });
+      return NextResponse.json({ ok: true, job });
+    }
 
     if (body.type === "create_folders") {
       const settings = await getAiEditorProjectSettings(projectId);

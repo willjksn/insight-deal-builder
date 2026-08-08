@@ -32,7 +32,8 @@ export type AiEditorJobType =
   | "archive"
   | "restore"
   | "reclaim"
-  | "resolve_export";
+  | "resolve_export"
+  | "resolve_open";
 
 export type AiEditorJobStatus =
   | "queued"

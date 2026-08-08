@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.5.0";
+const VERSION = "0.6.0";
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN !== "0";
 
 const MEDIA_EXTS = new Set([
@@ -996,6 +996,225 @@ async function safeDeleteFiles(body) {
   return { ok: true, count: results.length, results };
 }
 
+const RESOLVE_HANDOFF_REL = path.join("03_PROJECT_FILES", "shootspine_resolve");
+
+async function pathExists(p) {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Feature-detect local DaVinci Resolve install + scripting modules.
+ * Never assumes Resolve shares a machine with the AI Editor.
+ */
+async function detectResolveInstall() {
+  const platform = os.platform();
+  let appPath;
+  let scriptingApiPath;
+  let scriptingLibPath;
+
+  if (platform === "win32") {
+    const pf = process.env.PROGRAMFILES || "C:\\Program Files";
+    const pd = process.env.PROGRAMDATA || "C:\\ProgramData";
+    const candidates = [
+      path.join(pf, "Blackmagic Design", "DaVinci Resolve", "Resolve.exe"),
+      path.join(pf, "Blackmagic Design", "DaVinci Resolve", "DaVinci Resolve.exe"),
+    ];
+    for (const c of candidates) {
+      if (await pathExists(c)) {
+        appPath = c;
+        break;
+      }
+    }
+    scriptingApiPath = path.join(
+      pd,
+      "Blackmagic Design",
+      "DaVinci Resolve",
+      "Support",
+      "Developer",
+      "Scripting"
+    );
+    scriptingLibPath = path.join(pf, "Blackmagic Design", "DaVinci Resolve", "fusionscript.dll");
+  } else if (platform === "darwin") {
+    appPath = "/Applications/DaVinci Resolve/DaVinci Resolve.app";
+    if (!(await pathExists(appPath))) appPath = undefined;
+    scriptingApiPath =
+      "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting";
+    scriptingLibPath =
+      "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so";
+  } else {
+    appPath = (await pathExists("/opt/resolve/bin/resolve")) ? "/opt/resolve/bin/resolve" : undefined;
+    scriptingApiPath = "/opt/resolve/Developer/Scripting";
+    scriptingLibPath = "/opt/resolve/libs/Fusion/fusionscript.so";
+  }
+
+  const scriptingAvailable =
+    Boolean(scriptingApiPath && scriptingLibPath) &&
+    (await pathExists(scriptingApiPath)) &&
+    (await pathExists(scriptingLibPath));
+
+  const installed = Boolean(appPath);
+  let note;
+  if (installed && scriptingAvailable) {
+    note = "Resolve found with scripting modules — Open in Resolve can launch the app.";
+  } else if (installed) {
+    note =
+      "Resolve found. Scripting modules missing or free edition — launch works; use EDL import or Mac companion.";
+  } else {
+    note =
+      "Resolve not on this machine. Write the handoff package and sync to the Mac (see OPEN_ON_MAC.txt).";
+  }
+
+  return {
+    installed,
+    platform: platform === "win32" || platform === "darwin" || platform === "linux" ? platform : "unknown",
+    appPath,
+    scriptingAvailable,
+    scriptingApiPath: scriptingApiPath && (await pathExists(scriptingApiPath)) ? scriptingApiPath : undefined,
+    scriptingLibPath: scriptingLibPath && (await pathExists(scriptingLibPath)) ? scriptingLibPath : undefined,
+    note,
+  };
+}
+
+/**
+ * Write text handoff files under projectRoot/03_PROJECT_FILES/shootspine_resolve.
+ * Text only — never copies camera media.
+ */
+async function writeResolveHandoff(body) {
+  const projectRoot = path.resolve(body.projectRoot || "");
+  assertSafePath(projectRoot);
+  if (!(await pathExists(projectRoot))) throw new Error("projectRoot does not exist");
+
+  const relDir = String(body.relativeDir || RESOLVE_HANDOFF_REL).replace(/\\/g, "/");
+  if (relDir.includes("..")) throw new Error("Invalid relativeDir");
+  const destDir = path.resolve(projectRoot, ...relDir.split("/").filter(Boolean));
+  const relCheck = path.relative(projectRoot, destDir);
+  if (relCheck.startsWith("..") || path.isAbsolute(relCheck)) {
+    throw new Error("Refusing to write handoff outside project root");
+  }
+
+  const files = body.files && typeof body.files === "object" ? body.files : {};
+  const names = Object.keys(files);
+  if (!names.length) throw new Error("No files to write");
+  if (names.length > 40) throw new Error("Max 40 handoff files");
+
+  await fs.mkdir(destDir, { recursive: true });
+  const written = [];
+  for (const name of names) {
+    const base = path.basename(String(name));
+    if (!base || base !== name.replace(/\\/g, "/").split("/").pop()) {
+      throw new Error(`Invalid handoff filename: ${name}`);
+    }
+    if (!/\.(edl|json|txt|py|md)$/i.test(base)) {
+      throw new Error(`Unsupported handoff file type: ${base}`);
+    }
+    const content = String(files[name] ?? "");
+    if (content.length > 5_000_000) throw new Error(`File too large: ${base}`);
+    const dest = path.join(destDir, base);
+    await fs.writeFile(dest, content, "utf8");
+    written.push(base);
+  }
+
+  return {
+    ok: true,
+    handoffDir: destDir,
+    relativeDir: relDir,
+    written,
+  };
+}
+
+function revealInFileManager(targetPath) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      assertSafePath(targetPath);
+      const abs = path.resolve(targetPath);
+      if (!(await pathExists(abs))) throw new Error("Path not found");
+      const platform = os.platform();
+      if (platform === "win32") {
+        const child = spawn("explorer", [abs], { windowsHide: true, detached: true, stdio: "ignore" });
+        child.unref();
+        resolve({ ok: true, revealed: abs, method: "explorer" });
+      } else if (platform === "darwin") {
+        const child = spawn("open", [abs], { detached: true, stdio: "ignore" });
+        child.unref();
+        resolve({ ok: true, revealed: abs, method: "open" });
+      } else {
+        const child = spawn("xdg-open", [abs], { detached: true, stdio: "ignore" });
+        child.unref();
+        resolve({ ok: true, revealed: abs, method: "xdg-open" });
+      }
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+/**
+ * Launch Resolve from allowlisted detected path only — no arbitrary shell.
+ */
+async function openResolve(body) {
+  const detect = await detectResolveInstall();
+  const actions = [];
+  let launched = false;
+  let revealed = false;
+
+  if (body.handoffDir || body.projectRoot) {
+    let handoffDir = body.handoffDir ? path.resolve(body.handoffDir) : null;
+    if (!handoffDir && body.projectRoot) {
+      handoffDir = path.resolve(body.projectRoot, RESOLVE_HANDOFF_REL);
+    }
+    if (handoffDir && (await pathExists(handoffDir))) {
+      await revealInFileManager(handoffDir);
+      revealed = true;
+      actions.push("revealed_handoff_folder");
+    }
+  }
+
+  if (body.launch !== false && detect.installed && detect.appPath) {
+    const platform = os.platform();
+    if (platform === "win32") {
+      const child = spawn(detect.appPath, [], {
+        windowsHide: false,
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+      launched = true;
+      actions.push("launched_resolve");
+    } else if (platform === "darwin") {
+      const child = spawn("open", ["-a", "DaVinci Resolve"], {
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+      launched = true;
+      actions.push("launched_resolve");
+    } else if (detect.appPath) {
+      const child = spawn(detect.appPath, [], { detached: true, stdio: "ignore" });
+      child.unref();
+      launched = true;
+      actions.push("launched_resolve");
+    }
+  } else if (!detect.installed) {
+    actions.push("resolve_not_installed_use_mac_companion");
+  }
+
+  return {
+    ok: true,
+    detect,
+    launched,
+    revealed,
+    actions,
+    message: launched
+      ? "Resolve launch requested. Import shootspine_rough_cut.edl (or run import_shootspine_edl.py with scripting on)."
+      : detect.note,
+  };
+}
+
 async function ingestCopyBatch(body) {
   const projectRoot = path.resolve(body.projectRoot);
   const cameraLabel = sanitizeCameraLabel(body.cameraLabel || "CAMERA_A");
@@ -1215,6 +1434,29 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const listed = await listDirectory(body.path);
       return json(res, 200, { ok: true, ...listed });
+    }
+
+    if (req.method === "POST" && pathname === "/v1/fs/reveal") {
+      const body = await readBody(req);
+      const revealed = await revealInFileManager(body.path);
+      return json(res, 200, revealed);
+    }
+
+    if (req.method === "POST" && pathname === "/v1/resolve/detect") {
+      const detected = await detectResolveInstall();
+      return json(res, 200, { ok: true, ...detected });
+    }
+
+    if (req.method === "POST" && pathname === "/v1/resolve/write-handoff") {
+      const body = await readBody(req);
+      const written = await writeResolveHandoff(body);
+      return json(res, 200, written);
+    }
+
+    if (req.method === "POST" && pathname === "/v1/resolve/open") {
+      const body = await readBody(req);
+      const opened = await openResolve(body);
+      return json(res, 200, opened);
     }
 
     if (req.method === "POST" && pathname === "/v1/shutdown") {

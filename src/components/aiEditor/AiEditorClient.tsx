@@ -31,13 +31,17 @@ import {
   agentIndexFolder,
   agentIngestCopy,
   agentMediaStreamUrl,
+  agentOpenResolve,
   agentProbe,
+  agentResolveDetect,
   agentSafeDelete,
   agentStorageStat,
   agentThumbnail,
+  agentWriteResolveHandoff,
   checkAgentHealth,
   playbackPathForAsset,
 } from "@/lib/aiEditor/agentClient";
+import { RESOLVE_HANDOFF_REL_DIR } from "@/lib/aiEditor/resolveBridge";
 import {
   canReclaimActiveCopy,
   SAFE_DELETE_CONFIRM_PHRASE,
@@ -52,6 +56,7 @@ import {
   aiEditorGetDashboard,
   aiEditorIndexMedia,
   aiEditorLaunchAgent,
+  aiEditorLogResolveOpen,
   aiEditorMintAgentSession,
   aiEditorPatchMedia,
   aiEditorRunMatch,
@@ -143,6 +148,8 @@ export function AiEditorClient({ projectId }: Props) {
     validationErrors: string[];
   } | null>(null);
   const [exportFiles, setExportFiles] = useState<Record<string, string> | null>(null);
+  const [handoffDirOnDisk, setHandoffDirOnDisk] = useState<string | null>(null);
+  const [resolveDetectNote, setResolveDetectNote] = useState<string | null>(null);
   const [archivePath, setArchivePath] = useState("");
   const [reclaimConfirm, setReclaimConfirm] = useState("");
 
@@ -228,7 +235,9 @@ export function AiEditorClient({ projectId }: Props) {
   const step6Done = Boolean(coverage && coverage.updatedAt);
   const step7Done = Boolean(timeline && timeline.tracks.some((t) => t.clips.length));
   const step8Done = Boolean(timeline && timeline.version > 1);
-  const step9Done = Boolean(exportFiles && Object.keys(exportFiles).length);
+  const step9Done = Boolean(
+    (exportFiles && Object.keys(exportFiles).length) || handoffDirOnDisk
+  );
   const archiveSummary = useMemo(
     () => summarizeArchiveState(media, settings?.projectRootPath),
     [media, settings?.projectRootPath]
@@ -905,10 +914,101 @@ export function AiEditorClient({ projectId }: Props) {
       setExportFiles(res.files);
       setJobs((prev) => [res.job, ...prev]);
       setStatusNote(
-        `Resolve package ready: ${res.summary.clipCount} clip(s), ${res.summary.durationTimecode}. Download EDL + handoff JSON for the Mac.`
+        `Resolve package ready: ${res.summary.clipCount} clip(s), ${res.summary.durationTimecode}. Download, write to project, or Open in Resolve.`
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function ensureExportFiles(): Promise<{
+    files: Record<string, string>;
+    projectRootPath?: string | null;
+  }> {
+    if (exportFiles && Object.keys(exportFiles).length) {
+      return { files: exportFiles, projectRootPath: settings?.projectRootPath };
+    }
+    const res = await aiEditorExportResolve(getToken, projectId);
+    setExportFiles(res.files);
+    setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
+    return { files: res.files, projectRootPath: res.projectRootPath };
+  }
+
+  async function onWriteResolveHandoff() {
+    setBusy("write-handoff");
+    setError(null);
+    setStatusNote(null);
+    try {
+      const health = await checkAgentHealth();
+      setAgent(health);
+      if (!health.connected) throw new Error("Desktop Agent not connected");
+      const projectRoot = settings?.projectRootPath?.trim();
+      if (!projectRoot) throw new Error("Set a project folder in step 2 first");
+      const token = await ensureAgentSession();
+      const { files } = await ensureExportFiles();
+      const written = await agentWriteResolveHandoff(DEFAULT_AGENT_BASE_URL, token, {
+        projectRoot,
+        files,
+        relativeDir: RESOLVE_HANDOFF_REL_DIR,
+      });
+      setHandoffDirOnDisk(written.handoffDir);
+      const detect = await agentResolveDetect(DEFAULT_AGENT_BASE_URL, token);
+      setResolveDetectNote(detect.note);
+      const log = await aiEditorLogResolveOpen(getToken, projectId, {
+        message: `Wrote Resolve handoff → ${written.handoffDir}`,
+        launched: false,
+        handoffDir: written.handoffDir,
+      });
+      setJobs((prev) => [log.job, ...prev.filter((j) => j.id !== log.job.id)]);
+      setStatusNote(
+        `Wrote ${written.written.length} file(s) to ${written.handoffDir}. ${detect.note}`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Write handoff failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onOpenInResolve() {
+    setBusy("open-resolve");
+    setError(null);
+    setStatusNote(null);
+    try {
+      const health = await checkAgentHealth();
+      setAgent(health);
+      if (!health.connected) throw new Error("Desktop Agent not connected");
+      const projectRoot = settings?.projectRootPath?.trim();
+      if (!projectRoot) throw new Error("Set a project folder in step 2 first");
+      const token = await ensureAgentSession();
+      const { files } = await ensureExportFiles();
+      const written = await agentWriteResolveHandoff(DEFAULT_AGENT_BASE_URL, token, {
+        projectRoot,
+        files,
+        relativeDir: RESOLVE_HANDOFF_REL_DIR,
+      });
+      setHandoffDirOnDisk(written.handoffDir);
+      const opened = await agentOpenResolve(DEFAULT_AGENT_BASE_URL, token, {
+        projectRoot,
+        handoffDir: written.handoffDir,
+        launch: true,
+      });
+      setResolveDetectNote(opened.detect.note);
+      const log = await aiEditorLogResolveOpen(getToken, projectId, {
+        message: opened.message,
+        launched: opened.launched,
+        handoffDir: written.handoffDir,
+      });
+      setJobs((prev) => [log.job, ...prev.filter((j) => j.id !== log.job.id)]);
+      setStatusNote(
+        opened.launched
+          ? `Resolve launch requested. Handoff folder opened: ${written.handoffDir}. Import the EDL or run import_shootspine_edl.py (External scripting on).`
+          : `Handoff written to ${written.handoffDir}. ${opened.message}`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Open in Resolve failed");
     } finally {
       setBusy(null);
     }
@@ -2101,7 +2201,7 @@ export function AiEditorClient({ projectId }: Props) {
         </CardBody>
       </Card>
 
-      {/* Step 9 — V1G */}
+      {/* Step 9 — V1G + V1.5 */}
       <Card>
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
@@ -2109,20 +2209,55 @@ export function AiEditorClient({ projectId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Export for DaVinci Resolve</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Download a portable handoff (EDL + media map). Sync the project folder to the Mac,
-                import the EDL, and relink — camera files never go through the cloud.
+                Portable handoff (EDL + media map + Mac companion). Same-machine: write &amp; open
+                Resolve. Cross-machine: sync the project folder and use{" "}
+                <code className="text-xs">OPEN_ON_MAC.txt</code> — camera files never go through the
+                cloud.
               </p>
             </div>
           </div>
           <div className="space-y-4 pl-10">
-            <Button onClick={() => void onExportResolve()} disabled={!!busy || !timeline}>
-              {busy === "export" ? (
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-              ) : (
-                <HardDrive className="mr-1.5 h-4 w-4" />
-              )}
-              Build Resolve package
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => void onExportResolve()} disabled={!!busy || !timeline}>
+                {busy === "export" ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <HardDrive className="mr-1.5 h-4 w-4" />
+                )}
+                Build package
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void onWriteResolveHandoff()}
+                disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
+              >
+                {busy === "write-handoff" ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <FolderOpen className="mr-1.5 h-4 w-4" />
+                )}
+                Write to project folder
+              </Button>
+              <Button
+                onClick={() => void onOpenInResolve()}
+                disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
+              >
+                {busy === "open-resolve" ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Clapperboard className="mr-1.5 h-4 w-4" />
+                )}
+                Open in Resolve
+              </Button>
+            </div>
+            {handoffDirOnDisk ? (
+              <p className="text-xs text-slate-600">
+                On disk: <span className="font-medium">{handoffDirOnDisk}</span>
+              </p>
+            ) : null}
+            {resolveDetectNote ? (
+              <p className="text-xs text-slate-500">{resolveDetectNote}</p>
+            ) : null}
             {exportFiles ? (
               <ul className="space-y-2 text-sm">
                 {Object.keys(exportFiles).map((name) => (
@@ -2143,7 +2278,8 @@ export function AiEditorClient({ projectId }: Props) {
               </ul>
             ) : (
               <p className="text-xs text-slate-500">
-                Needs a rough cut first. You’ll get an EDL, handoff JSON, and a short README.
+                Needs a rough cut first. Package includes EDL, handoff JSON, README, and Mac
+                companion script.
               </p>
             )}
           </div>

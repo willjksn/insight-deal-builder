@@ -215,7 +215,25 @@ export async function aiEditorExportResolve(getToken: GetToken, projectId: strin
       mediaCount: number;
     };
     files: Record<string, string>;
+    projectRootPath?: string | null;
+    handoffRelativeDir?: string;
   }>(res);
+}
+
+export async function aiEditorLogResolveOpen(
+  getToken: GetToken,
+  projectId: string,
+  body: { message: string; launched?: boolean; handoffDir?: string }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/jobs`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({
+      type: "resolve_open",
+      ...body,
+    }),
+  });
+  return parseJson<{ ok: true; job: AiEditorJob }>(res);
 }
 
 export async function aiEditorArchiveAction(

@@ -160,6 +160,39 @@ export type AgentIngestCopyResponse = {
   results: AgentIngestCopyResult[];
 };
 
+export type AgentResolveDetectResponse = {
+  ok: true;
+  installed: boolean;
+  platform: "win32" | "darwin" | "linux" | "unknown";
+  appPath?: string;
+  scriptingAvailable: boolean;
+  scriptingApiPath?: string;
+  scriptingLibPath?: string;
+  note: string;
+};
+
+export type AgentResolveWriteHandoffResponse = {
+  ok: true;
+  handoffDir: string;
+  relativeDir: string;
+  written: string[];
+};
+
+export type AgentResolveOpenResponse = {
+  ok: true;
+  detect: Omit<AgentResolveDetectResponse, "ok">;
+  launched: boolean;
+  revealed: boolean;
+  actions: string[];
+  message: string;
+};
+
+export type AgentFsRevealResponse = {
+  ok: true;
+  revealed: string;
+  method: string;
+};
+
 export type AgentCopyVerifiedBatchFile = {
   id?: string;
   sourcePath: string;

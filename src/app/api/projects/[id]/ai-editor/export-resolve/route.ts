@@ -3,6 +3,10 @@ import {
   aiEditorErrorResponse,
   requireAiEditorAccess,
 } from "@/lib/aiEditor/routeAccess";
+import {
+  RESOLVE_HANDOFF_REL_DIR,
+  buildHandoffFileMap,
+} from "@/lib/aiEditor/resolveBridge";
 import { buildResolveHandoff } from "@/lib/aiEditor/resolveExport";
 import {
   createJob,
@@ -17,8 +21,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * V1G — portable Resolve handoff (EDL + JSON manifest + readme).
- * Does not upload camera media.
+ * V1G/V1.5 — portable Resolve handoff (EDL + JSON + companion scripts).
+ * Does not upload camera media. Disk write / Open via Desktop Agent.
  */
 export async function POST(
   request: NextRequest,
@@ -77,6 +81,14 @@ export async function POST(
       createdAt: new Date().toISOString(),
     };
 
+    const files = buildHandoffFileMap({
+      projectId,
+      timelineName: timeline.name,
+      edl: handoff.edl,
+      manifestJson: JSON.stringify(manifest, null, 2),
+      readme: handoff.readme,
+    });
+
     const completedJob = await updateJob(job.id, {
       status: "completed",
       progress: 100,
@@ -88,11 +100,9 @@ export async function POST(
       ok: true,
       job: completedJob,
       summary: handoff.summary,
-      files: {
-        "shootspine_rough_cut.edl": handoff.edl,
-        "shootspine_handoff.json": JSON.stringify(manifest, null, 2),
-        "README_RESOLVE.txt": handoff.readme,
-      },
+      files,
+      projectRootPath: settings?.projectRootPath ?? null,
+      handoffRelativeDir: RESOLVE_HANDOFF_REL_DIR,
       handoff: {
         ...handoff,
         edl: undefined,
