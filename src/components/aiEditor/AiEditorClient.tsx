@@ -61,6 +61,7 @@ import {
   inferStorageTypeForPath,
   storageTypeLabel,
 } from "@/lib/aiEditor/storageDrives";
+import { assessStorageHealth } from "@/lib/aiEditor/storageHealth";
 import {
   RESOLVE_HANDOFF_REL_DIR,
   resolveHandoffAbsoluteDir,
@@ -476,6 +477,21 @@ export function AiEditorClient({ projectId }: Props) {
         settings
       ),
     [projectId, context?.projectName, settings]
+  );
+  const storageHealth = useMemo(
+    () =>
+      assessStorageHealth({
+        projectRootPath: storagePath.trim() || settings?.projectRootPath,
+        archiveRootPath: archivePath.trim() || settings?.archiveRootPath,
+        drives: knownDrives,
+      }),
+    [
+      storagePath,
+      archivePath,
+      settings?.projectRootPath,
+      settings?.archiveRootPath,
+      knownDrives,
+    ]
   );
   const step11Done = archiveSummary.archived > 0;
   const step12Done = Boolean(settings?.lastFinishingFeedback);
@@ -2512,6 +2528,31 @@ export function AiEditorClient({ projectId }: Props) {
               <p className="text-xs text-slate-500">
                 Detected: {storageTypeLabel(inferStorageTypeForPath(archivePath, knownDrives))}
               </p>
+            ) : null}
+
+            {storageHealth ? (
+              <div
+                className={`rounded-2xl border px-4 py-3 text-sm ${
+                  storageHealth.level === "good"
+                    ? "border-emerald-200 bg-emerald-50/60 text-slate-800"
+                    : storageHealth.level === "risk"
+                      ? "border-red-200 bg-red-50/70 text-slate-800"
+                      : storageHealth.level === "warn"
+                        ? "border-amber-200 bg-amber-50/70 text-slate-800"
+                        : "border-slate-200 bg-slate-50/80 text-slate-800"
+                }`}
+              >
+                <p className="font-medium text-slate-900">Workspace health</p>
+                <p className="mt-0.5 text-xs text-slate-600">{storageHealth.headline}</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-700">
+                  {storageHealth.items.map((item) => (
+                    <li key={item.id}>{item.text}</li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-slate-500">
+                  Guidance only — AI Editor still works if you keep footage on This PC.
+                </p>
+              </div>
             ) : null}
 
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-3 text-sm">

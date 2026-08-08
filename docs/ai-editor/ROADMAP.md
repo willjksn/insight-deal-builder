@@ -37,6 +37,7 @@
 | **V12 Dual-drive setup** | Drive labels (SSD/HDD/USB) + guided edit SSD / backup HDD folders |
 | **V13 Offline remount** | Remember volume id; relink edit/backup paths when drive letter changes |
 | **V14 Recommendations** | Ranked next steps on hub + project tips (checklists, wrap-up, backup) |
+| **V15 Storage health** | Live edit/backup coaching (internal vs SSD/HDD, same-drive risk, free space) |
 
 Later: deeper anonymized analytics across orgs (opt-in)
 
@@ -68,4 +69,5 @@ Later: deeper anonymized analytics across orgs (opt-in)
 - **V12 Dual-drive setup (initial)** — Desktop Agent lists volume name / SSD·HDD·USB / free space; Step 2 guided edit + backup folders with type detection  
 - **V13 Offline remount (initial)** — persist volume serial on save; detect letter change; Relink paths for edit/backup + media  
 - **V14 Recommendations (initial)** — ranked hub “Suggested next steps” with deep links; light project-page tip  
+- **V15 Storage health (initial)** — Step 2 workspace health for edit/backup placement + free space; guidance only  
 - Later: deeper anonymized analytics across orgs (opt-in)
