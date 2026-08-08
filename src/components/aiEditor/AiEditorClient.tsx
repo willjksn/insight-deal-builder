@@ -370,7 +370,7 @@ export function AiEditorClient({ projectId }: Props) {
         await register(agentToken, agentExpiresAt);
         return agentToken;
       } catch {
-        // Agent may have restarted or token expired � mint a fresh one.
+        // Agent may have restarted or token expired - mint a fresh one.
       }
     }
 
@@ -530,7 +530,7 @@ export function AiEditorClient({ projectId }: Props) {
       analyzeDone: !step3Done || step5Done,
       matchDone: skipMatch || step6Done,
       roughCutDone: step7Done,
-      // Chat is optional � don't block Look / Resolve if they skipped it
+      // Chat is optional - don't block Look / Resolve if they skipped it
       chatDone: step8Done || step9Done || step10Done,
       lookDone: step9Done,
       resolveDone: step10Done,
@@ -707,7 +707,7 @@ export function AiEditorClient({ projectId }: Props) {
           return;
         }
       } else {
-        setStatusNote("Restarting connection�");
+        setStatusNote("Restarting connection...");
         setAgentToken(null);
         setAgentExpiresAt(null);
       }
@@ -806,8 +806,8 @@ export function AiEditorClient({ projectId }: Props) {
         });
         setStatusNote(
           snap.needsAttention
-            ? "Checked drives � still need attention (plug in or Relink)."
-            : "Checked drives � edit folder is reachable."
+            ? "Checked drives - still need attention (plug in or Relink)."
+            : "Checked drives - edit folder is reachable."
         );
       }
     } catch (e) {
@@ -1093,7 +1093,7 @@ export function AiEditorClient({ projectId }: Props) {
       const space = await agentStorageStat(DEFAULT_AGENT_BASE_URL, opts.token, projectRoot);
       if (space.availableBytes != null) {
         setDiskNote(
-          `${formatBytes(requiredBytes)} to copy � ${formatBytes(space.availableBytes)} free on destination`
+          `${formatBytes(requiredBytes)} to copy - ${formatBytes(space.availableBytes)} free on destination`
         );
       }
     } catch {
@@ -1114,7 +1114,7 @@ export function AiEditorClient({ projectId }: Props) {
       const pct = Math.round(((i + slice.length) / batch.length) * 100);
       setProgress({
         pct,
-        label: `Copying & verifying ${i + 1}�${Math.min(i + slice.length, batch.length)} of ${batch.length} ? ${opts.camera.replace(/_/g, " ")}`,
+        label: `Copying & verifying ${i + 1}-${Math.min(i + slice.length, batch.length)} of ${batch.length} ? ${opts.camera.replace(/_/g, " ")}`,
       });
       const copied = await agentIngestCopy(DEFAULT_AGENT_BASE_URL, opts.token, {
         projectRoot,
@@ -1154,7 +1154,7 @@ export function AiEditorClient({ projectId }: Props) {
       }
     }
 
-    setProgress({ pct: 100, label: "Saving clip records�" });
+    setProgress({ pct: 100, label: "Saving clip records..." });
     const res = await aiEditorIndexMedia(getToken, projectId, {
       files: allResults,
       ingestMode: "managed",
@@ -1245,7 +1245,7 @@ export function AiEditorClient({ projectId }: Props) {
     setError(null);
     setStatusNote(
       capped
-        ? `Analyzing the first ${targets.length} of ${eligible.length} clips this pass�`
+        ? `Analyzing the first ${targets.length} of ${eligible.length} clips this pass-`
         : null
     );
     try {
@@ -1254,7 +1254,7 @@ export function AiEditorClient({ projectId }: Props) {
       if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
       if (runTranscription && health.whisperAvailable === false) {
         setStatusNote(
-          "Transcription requested but speech-to-text isn�t set up � continuing with technical + shot detection only."
+          "Transcription requested but speech-to-text isn't set up - continuing with technical + shot detection only."
         );
       }
       const token = await ensureAgentSession();
@@ -1312,14 +1312,14 @@ export function AiEditorClient({ projectId }: Props) {
       await load();
       const stopped = cancelBatchRef.current;
       const capNote = capped
-        ? ` First ${targets.length} of ${eligible.length} this pass � run again for the rest.`
+        ? ` First ${targets.length} of ${eligible.length} this pass - run again for the rest.`
         : "";
-      const stopNote = stopped ? " Stopped early � saved what finished." : "";
+      const stopNote = stopped ? " Stopped early - saved what finished." : "";
       if (failedCount > 0) {
         setStatusNote(
           `Understood ${okCount} of ${results.length} clip(s)` +
             (runTranscription ? " (transcript where available)" : "") +
-            `. ${failedCount} couldn�t be analyzed � check those files and try again.` +
+            `. ${failedCount} couldn't be analyzed - check those files and try again.` +
             capNote +
             stopNote
         );
@@ -1351,7 +1351,7 @@ export function AiEditorClient({ projectId }: Props) {
       setStatusNote(
         res.coverage.plannedShotCount
           ? `Coverage: ${res.coverage.coveredCount} covered, ${res.coverage.partialCount} partial, ${res.coverage.missingCount} missing.`
-          : "No planned shots on the board yet � matching saved for when coverage exists."
+          : "No planned shots on the board yet - matching saved for when coverage exists."
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Matching failed");
@@ -1384,8 +1384,8 @@ export function AiEditorClient({ projectId }: Props) {
     if (hasCut) {
       const ok = window.confirm(
         multiReels
-          ? "Rebuild replaces your current cut and act/reel layout with a new assembly from preferred takes. Earlier versions stay under Versions ? Restore. Continue?"
-          : "Rebuild replaces your current rough cut with a new assembly from preferred takes. Earlier versions stay under Versions ? Restore. Continue?"
+          ? "Rebuild replaces your current cut and act/reel layout with a new assembly from preferred takes. Earlier versions stay under Versions / Restore. Continue?"
+          : "Rebuild replaces your current rough cut with a new assembly from preferred takes. Earlier versions stay under Versions / Restore. Continue?"
       );
       if (!ok) return;
     }
@@ -1403,7 +1403,7 @@ export function AiEditorClient({ projectId }: Props) {
       setTimelineVersions(res.versions);
       setJobs((prev) => [res.job, ...prev]);
       setStatusNote(
-        `Rough cut v${res.summary.version}: ${res.summary.clipCount} clip placements � ${res.summary.durationTimecode}`
+        `Rough cut v${res.summary.version}: ${res.summary.clipCount} clip placements - ${res.summary.durationTimecode}`
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not build rough cut");
@@ -1454,7 +1454,7 @@ export function AiEditorClient({ projectId }: Props) {
 
   async function openPreview(title: string, items: PreviewItem[]) {
     if (!items.length) {
-      setError("Nothing to play � clip has no local path on this PC.");
+      setError("Nothing to play - clip has no local path on this PC.");
       return;
     }
     try {
@@ -1483,7 +1483,7 @@ export function AiEditorClient({ projectId }: Props) {
     const asset = clip ? media.find((m) => m.id === clip.mediaAssetId) : undefined;
     const path = asset ? playbackPathForAsset(asset) : null;
     if (!clip || !path) {
-      setError("Clip media isn�t available on this PC.");
+      setError("Clip media isn't available on this PC.");
       return;
     }
     const startSeconds = framesToSeconds(clip.sourceInFrame, timeline.frameRate);
@@ -1520,17 +1520,17 @@ export function AiEditorClient({ projectId }: Props) {
     }
     if (!items.length) {
       setStatusNote(
-        "No online clips to preview � reconnect media or prepare proxies, then try again."
+        "No online clips to preview - reconnect media or prepare proxies, then try again."
       );
       return;
     }
     if (skipped > 0) {
       setStatusNote(
-        `Preview skipped ${skipped} offline clip${skipped === 1 ? "" : "s"} � the full cut may be longer.`
+        `Preview skipped ${skipped} offline clip${skipped === 1 ? "" : "s"} - the full cut may be longer.`
       );
     }
     const title = activeReelName
-      ? `${activeReelName} � rough cut v${timeline.version}`
+      ? `${activeReelName} - rough cut v${timeline.version}`
       : `Rough cut v${timeline.version}`;
     void openPreview(title, items);
   }
@@ -1554,7 +1554,7 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       await persistEditNotes([note, ...editNotes]);
       setEditNoteDraft("");
-      setStatusNote("Edit note saved � Edit by chat can use it.");
+      setStatusNote("Edit note saved - Edit by chat can use it.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save note");
     } finally {
@@ -1596,7 +1596,7 @@ export function AiEditorClient({ projectId }: Props) {
       });
       const truncNote =
         res.scope?.truncated && res.scope.totalInReel
-          ? ` (using first ${MAX_CHAT_CONTEXT_CLIPS} of ${res.scope.totalInReel} clips in this reel � switch acts/reels for the rest)`
+          ? ` (using first ${MAX_CHAT_CONTEXT_CLIPS} of ${res.scope.totalInReel} clips in this reel - switch acts/reels for the rest)`
           : "";
       setStatusNote(res.proposal.summary + truncNote);
     } catch (e) {
@@ -1627,7 +1627,7 @@ export function AiEditorClient({ projectId }: Props) {
       setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
       setStatusNote(
         mode === "acts"
-          ? "Split into Act 1�3 for a ~1h45 feature. Edit by chat focuses on the active act."
+          ? "Split into Act 1-3 for a ~1h45 feature. Edit by chat focuses on the active act."
           : "Split into ~20 min reels. Edit by chat focuses on the active reel."
       );
     } catch (e) {
@@ -1676,7 +1676,7 @@ export function AiEditorClient({ projectId }: Props) {
       if (res.job) setJobs((prev) => [res.job!, ...prev]);
       setChatProposal(null);
       setChatMessage("");
-      setStatusNote(res.proposal.summary + (res.timeline ? ` � now v${res.timeline.version}` : ""));
+      setStatusNote(res.proposal.summary + (res.timeline ? ` - now v${res.timeline.version}` : ""));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not apply edit");
     } finally {
@@ -1700,7 +1700,7 @@ export function AiEditorClient({ projectId }: Props) {
       if (res.versions) setTimelineVersions(res.versions);
       if (res.job) setJobs((prev) => [res.job!, ...prev]);
       setChatProposal(null);
-      setStatusNote(res.proposal.summary + (res.timeline ? ` � now v${res.timeline.version}` : ""));
+      setStatusNote(res.proposal.summary + (res.timeline ? ` - now v${res.timeline.version}` : ""));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Nothing to undo");
     } finally {
@@ -1766,7 +1766,7 @@ export function AiEditorClient({ projectId }: Props) {
       setStatusNote(
         res.checklist.items.length
           ? `Next shoot checklist: ${res.checklist.items.filter((i) => !i.done).length} remaining`
-          : "No next-shoot items yet � sync from Resolve after a cut."
+          : "No next-shoot items yet - sync from Resolve after a cut."
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not rebuild checklist");
@@ -1798,8 +1798,8 @@ export function AiEditorClient({ projectId }: Props) {
     if (hasCut) {
       const ok = window.confirm(
         multiReels
-          ? "Import replaces your current ShootSpine cut and act/reel layout with what�s open in Resolve. Earlier versions stay under Versions ? Restore. Continue?"
-          : "Import replaces your current ShootSpine rough cut with what�s open in Resolve. Earlier versions stay under Versions ? Restore. Continue?"
+          ? "Import replaces your current ShootSpine cut and act/reel layout with what's open in Resolve. Earlier versions stay under Versions / Restore. Continue?"
+          : "Import replaces your current ShootSpine rough cut with what's open in Resolve. Earlier versions stay under Versions / Restore. Continue?"
       );
       if (!ok) return;
     }
@@ -1807,7 +1807,7 @@ export function AiEditorClient({ projectId }: Props) {
     setError(null);
     setStatusNote(null);
     try {
-      // Always re-read Resolve so we don�t import a stale cut
+      // Always re-read Resolve so we don't import a stale cut
       const health = await checkAgentHealth();
       setAgent(health);
       if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
@@ -1826,7 +1826,7 @@ export function AiEditorClient({ projectId }: Props) {
         exportEdl: true,
       });
       if (!synced.synced || !synced.snapshot) {
-        setStatusNote(synced.message || "Couldn�t read Resolve yet.");
+        setStatusNote(synced.message || "Couldn't read Resolve yet.");
         return;
       }
       const saved = await aiEditorSaveResolveSync(getToken, projectId, {
@@ -1849,11 +1849,11 @@ export function AiEditorClient({ projectId }: Props) {
       setExportStamp(null);
       const unmatched = res.importMeta?.unmatchedNames ?? [];
       const unmatchedNote = unmatched.length
-        ? ` Unmatched: ${unmatched.slice(0, 8).join(", ")}${unmatched.length > 8 ? "�" : ""}`
+        ? ` Unmatched: ${unmatched.slice(0, 8).join(", ")}${unmatched.length > 8 ? "-" : ""}`
         : "";
       setStatusNote(
         (res.importMeta?.summary || "Imported from Resolve") +
-          (res.summary ? ` � ${res.summary.durationTimecode}` : "") +
+          (res.summary ? ` - ${res.summary.durationTimecode}` : "") +
           unmatchedNote
       );
     } catch (e) {
@@ -1890,7 +1890,7 @@ export function AiEditorClient({ projectId }: Props) {
         exportEdl: true,
       });
       if (!result.synced || !result.snapshot) {
-        setStatusNote(result.message || "Couldn�t read Resolve yet.");
+        setStatusNote(result.message || "Couldn't read Resolve yet.");
         return;
       }
 
@@ -1936,7 +1936,7 @@ export function AiEditorClient({ projectId }: Props) {
       setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
       const defaults = defaultsFromFeedback(res.feedback);
       setFeedbackHint(defaults.hint);
-      setStatusNote("Saved for next time � Look & transitions will remember this.");
+      setStatusNote("Saved for next time - Look & transitions will remember this.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save feedback");
     } finally {
@@ -1993,7 +1993,7 @@ export function AiEditorClient({ projectId }: Props) {
       setStatusNote(
         finishWhere === "mac"
           ? "Saved. Copy your project folder to the Mac, then open Resolve there."
-          : "Saved with your project. Open Resolve when you�re ready."
+          : "Saved with your project. Open Resolve when you're ready."
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Write handoff failed");
@@ -2051,9 +2051,9 @@ export function AiEditorClient({ projectId }: Props) {
       setStatusNote(
         opened.launched
           ? opened.alreadyRunning
-            ? "Resolve is already open � check your taskbar if you don�t see the window."
-            : "Resolve is starting. It can take a minute � check your taskbar."
-          : "Your edit is saved. Open Resolve from the Start menu if it didn�t appear."
+            ? "Resolve is already open - check your taskbar if you don't see the window."
+            : "Resolve is starting. It can take a minute - check your taskbar."
+          : "Your edit is saved. Open Resolve from the Start menu if it didn't appear."
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open Resolve");
@@ -2090,7 +2090,7 @@ export function AiEditorClient({ projectId }: Props) {
           launch: true,
           reveal: false,
         });
-        setStatusNote("Starting Resolve� open a project, then we�ll try again.");
+        setStatusNote("Starting Resolve- open a project, then we'll try again.");
         await new Promise((r) => setTimeout(r, 2500));
         probe = await refreshResolveWorkflow(token);
       }
@@ -2169,7 +2169,7 @@ export function AiEditorClient({ projectId }: Props) {
     setBusy("archive");
     setError(null);
     setStatusNote(null);
-    setProgress({ pct: 5, label: "Planning archive�" });
+    setProgress({ pct: 5, label: "Planning archive..." });
     try {
       const health = await checkAgentHealth();
       setAgent(health);
@@ -2182,12 +2182,12 @@ export function AiEditorClient({ projectId }: Props) {
       if (!plan.archive?.items.length) {
         setStatusNote(
           plan.archive?.skipped.length
-            ? "Nothing new to back up � these clips may already be backed up."
+            ? "Nothing new to back up - these clips may already be backed up."
             : "Pick a backup folder and add clips first."
         );
         return;
       }
-      setProgress({ pct: 20, label: `Copying ${plan.archive.items.length} file(s)�` });
+      setProgress({ pct: 20, label: `Copying ${plan.archive.items.length} file(s)-` });
       const batch = await agentCopyVerifiedBatch(
         DEFAULT_AGENT_BASE_URL,
         token,
@@ -2231,13 +2231,13 @@ export function AiEditorClient({ projectId }: Props) {
       if (!patches.length) {
         setError(
           failedCount
-            ? `Backup didn�t finish for any clips (${failedCount} failed). Check disk space and paths.`
-            : "Backup didn�t finish for any clips."
+            ? `Backup didn't finish for any clips (${failedCount} failed). Check disk space and paths.`
+            : "Backup didn't finish for any clips."
         );
       } else {
         setStatusNote(
           `Backed up ${patches.length} clip${patches.length === 1 ? "" : "s"}. Camera cards were not touched.` +
-            (failedCount ? ` ${failedCount} couldn�t be copied � try again for those.` : "")
+            (failedCount ? ` ${failedCount} couldn't be copied - try again for those.` : "")
         );
       }
       await load();
@@ -2254,7 +2254,7 @@ export function AiEditorClient({ projectId }: Props) {
     setBusy("restore");
     setError(null);
     setStatusNote(null);
-    setProgress({ pct: 5, label: "Planning restore�" });
+    setProgress({ pct: 5, label: "Planning restore..." });
     try {
       const health = await checkAgentHealth();
       setAgent(health);
@@ -2262,10 +2262,10 @@ export function AiEditorClient({ projectId }: Props) {
       const token = await ensureAgentSession();
       const plan = await aiEditorArchiveAction(getToken, projectId, { action: "plan" });
       if (!plan.restore?.items.length) {
-        setStatusNote("Nothing to bring back � the files may already be on this PC.");
+        setStatusNote("Nothing to bring back - the files may already be on this PC.");
         return;
       }
-      setProgress({ pct: 20, label: `Restoring ${plan.restore.items.length} file(s)�` });
+      setProgress({ pct: 20, label: `Restoring ${plan.restore.items.length} file(s)-` });
       const batch = await agentCopyVerifiedBatch(
         DEFAULT_AGENT_BASE_URL,
         token,
@@ -2310,13 +2310,13 @@ export function AiEditorClient({ projectId }: Props) {
       if (!patches.length) {
         setError(
           failedCount
-            ? `Restore didn�t finish for any clips (${failedCount} failed).`
-            : "Restore didn�t finish for any clips."
+            ? `Restore didn't finish for any clips (${failedCount} failed).`
+            : "Restore didn't finish for any clips."
         );
       } else {
         setStatusNote(
           `Brought back ${patches.length} clip${patches.length === 1 ? "" : "s"} to this PC.` +
-            (failedCount ? ` ${failedCount} couldn�t be restored � try again for those.` : "")
+            (failedCount ? ` ${failedCount} couldn't be restored - try again for those.` : "")
         );
       }
       await load();
@@ -2341,13 +2341,13 @@ export function AiEditorClient({ projectId }: Props) {
     }
     const eligible = media.filter((m) => canReclaimActiveCopy(m, projectRoot).ok);
     if (!eligible.length) {
-      setStatusNote("Nothing to free yet � back up clips first.");
+      setStatusNote("Nothing to free yet - back up clips first.");
       return;
     }
     setBusy("reclaim");
     setError(null);
     setStatusNote(null);
-    setProgress({ pct: 10, label: `Freeing space for ${eligible.length} clip(s)�` });
+    setProgress({ pct: 10, label: `Freeing space for ${eligible.length} clip(s)-` });
     try {
       const health = await checkAgentHealth();
       setAgent(health);
@@ -2396,14 +2396,14 @@ export function AiEditorClient({ projectId }: Props) {
       if (!patches.length) {
         setError(
           failedCount
-            ? `Couldn�t free space for any clips (${failedCount} failed). Active copies left as-is.`
-            : "Couldn�t free space for any clips."
+            ? `Couldn't free space for any clips (${failedCount} failed). Active copies left as-is.`
+            : "Couldn't free space for any clips."
         );
       } else {
         setStatusNote(
           `Freed space for ${patches.length} clip${patches.length === 1 ? "" : "s"}. Backup copies kept. Camera cards never erased.` +
             (failedCount
-              ? ` ${failedCount} still on this PC � check those files and try again.`
+              ? ` ${failedCount} still on this PC - check those files and try again.`
               : "")
         );
       }
@@ -2440,7 +2440,7 @@ export function AiEditorClient({ projectId }: Props) {
       cancelBatchRef.current = false;
       if (capped) {
         setStatusNote(
-          `Preparing the first ${list.length} of ${needsPrepare.length} clips this pass�`
+          `Preparing the first ${list.length} of ${needsPrepare.length} clips this pass-`
         );
       }
       for (let i = 0; i < list.length; i++) {
@@ -2475,12 +2475,12 @@ export function AiEditorClient({ projectId }: Props) {
       }
       setStatusNote(
         `Prepared ${patches.length} clip(s) for smooth editing` +
-          (failed ? ` (${failed} couldn�t convert)` : "") +
+          (failed ? ` (${failed} couldn't convert)` : "") +
           ". Your original camera files were not changed." +
           (capped
-            ? ` First ${list.length} of ${needsPrepare.length} this pass � run again for the rest.`
+            ? ` First ${list.length} of ${needsPrepare.length} this pass - run again for the rest.`
             : "") +
-          (cancelBatchRef.current ? " Stopped early � saved what finished." : "")
+          (cancelBatchRef.current ? " Stopped early - saved what finished." : "")
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not prepare clips");
@@ -2511,8 +2511,8 @@ export function AiEditorClient({ projectId }: Props) {
           context
             ? `${context.projectName}${
                 context.aiEditorOnly
-                  ? " � bring in footage and get a strong first edit"
-                  : " � from your ShootSpine plan to a rough cut"
+                  ? " - bring in footage and get a strong first edit"
+                  : " - from your ShootSpine plan to a rough cut"
               }`
             : "Bring in footage and get a strong first edit"
         }
@@ -2529,8 +2529,8 @@ export function AiEditorClient({ projectId }: Props) {
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 text-sm text-slate-600">
           <Clapperboard className="h-4 w-4 text-sky-600" />
           <span>
-            Linked plan: {context.scenes.length} scenes � {context.shotCount} shots
-            {context.scriptTitle ? ` � ${context.scriptTitle}` : ""}
+            Linked plan: {context.scenes.length} scenes - {context.shotCount} shots
+            {context.scriptTitle ? ` - ${context.scriptTitle}` : ""}
           </span>
         </div>
       ) : null}
@@ -2605,7 +2605,7 @@ export function AiEditorClient({ projectId }: Props) {
         <div className="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">
-              Continue � Step {workflowNext.n}
+              Continue - Step {workflowNext.n}
             </p>
             <p className="font-medium text-slate-900">{workflowNext.title}</p>
             <p className="text-xs text-slate-600">{workflowNext.detail}</p>
@@ -2792,7 +2792,7 @@ export function AiEditorClient({ projectId }: Props) {
               <h2 className="text-lg font-semibold text-slate-900">Choose where this edit lives</h2>
               <p className="mt-1 text-sm text-slate-600">
                 Put the working project on a fast drive (external SSD). Optionally set a backup
-                folder on a larger HDD. Footage stays on your drives � nothing uploads to the cloud.
+                folder on a larger HDD. Footage stays on your drives - nothing uploads to the cloud.
               </p>
             </div>
           </div>
@@ -2817,7 +2817,7 @@ export function AiEditorClient({ projectId }: Props) {
                     .filter((d) => d.kind === "drive" && !/^[cC]:\\?$/.test(d.path))
                     .slice(0, 4)
                     .map((d) => friendlyDriveLabel(d))
-                    .join(" � ") || "plug in your SSD/HDD, then reopen the picker"}
+                    .join(" - ") || "plug in your SSD/HDD, then reopen the picker"}
                 </p>
               ) : null}
             </div>
@@ -2878,7 +2878,7 @@ export function AiEditorClient({ projectId }: Props) {
                   ))}
                 </ul>
                 <p className="mt-2 text-xs text-slate-500">
-                  Guidance only � AI Editor still works if you keep footage on This PC.
+                  Guidance only - AI Editor still works if you keep footage on This PC.
                 </p>
               </div>
             ) : null}
@@ -2894,7 +2894,7 @@ export function AiEditorClient({ projectId }: Props) {
               <span>
                 <span className="font-medium text-slate-800">Create organized folders</span>
                 <span className="mt-0.5 block text-slate-500">
-                  Camera media, audio, exports, and cache � so you don�t have to build the structure
+                  Camera media, audio, exports, and cache - so you don't have to build the structure
                   by hand.
                 </span>
               </span>
@@ -2984,7 +2984,7 @@ export function AiEditorClient({ projectId }: Props) {
               >
                 <div className="font-medium text-slate-900">Use files where they are</div>
                 <div className="mt-1 text-xs text-slate-500">
-                  Fast catalog only � good when footage is already on your edit drive.
+                  Fast catalog only - good when footage is already on your edit drive.
                 </div>
               </button>
               <button
@@ -2999,7 +2999,7 @@ export function AiEditorClient({ projectId }: Props) {
               >
                 <div className="font-medium text-slate-900">Copy into project folders</div>
                 <div className="mt-1 text-xs text-slate-500">
-                  Safe verified copy into Camera A/B� then optional prep for editing.
+                  Safe verified copy into Camera A/B, then optional prep for editing.
                 </div>
               </button>
             </div>
@@ -3135,7 +3135,7 @@ export function AiEditorClient({ projectId }: Props) {
               </h2>
               <p className="mt-1 text-sm text-slate-600">
                 Some camera formats are hard for Windows to play. ShootSpine makes lighter preview
-                copies for editing � your originals stay untouched for DaVinci Resolve.
+                copies for editing - your originals stay untouched for DaVinci Resolve.
               </p>
             </div>
           </div>
@@ -3254,7 +3254,7 @@ export function AiEditorClient({ projectId }: Props) {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="text-xs text-slate-500">
-                              {clip?.filename || h.mediaAssetId} � {h.startSeconds.toFixed(1)}s
+                              {clip?.filename || h.mediaAssetId} - {h.startSeconds.toFixed(1)}s
                             </div>
                             <div className="text-slate-800">{h.text}</div>
                           </div>
@@ -3363,15 +3363,15 @@ export function AiEditorClient({ projectId }: Props) {
                           <div className="font-medium text-slate-900">
                             {[row.scene, row.shotName || row.shotType || "Shot"]
                               .filter(Boolean)
-                              .join(" � ")}
+                              .join(" - ")}
                           </div>
                           <div className="text-xs text-slate-500">
                             Preferred:{" "}
                             {preferred?.filename ||
-                              (row.preferredMediaAssetId ? row.preferredMediaAssetId : "�")}
+                              (row.preferredMediaAssetId ? row.preferredMediaAssetId : "-")}
                             {row.preferredManual ? " (manual)" : ""}
                             {typeof row.preferredScore === "number"
-                              ? ` � score ${(row.preferredScore * 100).toFixed(0)}%`
+                              ? ` - score ${(row.preferredScore * 100).toFixed(0)}%`
                               : ""}
                           </div>
                         </div>
@@ -3395,8 +3395,8 @@ export function AiEditorClient({ projectId }: Props) {
                               className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600"
                             >
                               <span className="truncate">
-                                {c.filename} � {(c.score * 100).toFixed(0)}%
-                                {c.reasons[0] ? ` � ${c.reasons[0]}` : ""}
+                                {c.filename} - {(c.score * 100).toFixed(0)}%
+                                {c.reasons[0] ? ` - ${c.reasons[0]}` : ""}
                               </span>
                               {row.preferredMediaAssetId !== c.mediaAssetId ? (
                                 <button
@@ -3466,7 +3466,7 @@ export function AiEditorClient({ projectId }: Props) {
               </div>
             ) : (
               <p className="text-sm text-slate-500">
-                After matching, build a first assembly from preferred takes (or all clips if there�s
+                After matching, build a first assembly from preferred takes (or all clips if there's
                 no shot list).
               </p>
             )}
@@ -3541,7 +3541,7 @@ export function AiEditorClient({ projectId }: Props) {
                         >
                           <div className="font-semibold">{r.name}</div>
                           <div className="mt-0.5 text-slate-500">
-                            {r.clipCount} clips � ~{mins} min
+                            {r.clipCount} clips - ~{mins} min
                             {r.targetDurationSeconds
                               ? ` / ~${Math.round(r.targetDurationSeconds / 60)} min target`
                               : ""}
@@ -3568,7 +3568,7 @@ export function AiEditorClient({ projectId }: Props) {
                           {c.label || asset?.filename || c.mediaAssetId}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {framesToTimecode(c.timelineStartFrame, timeline!.frameRate)} �{" "}
+                          {framesToTimecode(c.timelineStartFrame, timeline!.frameRate)} -{" "}
                           {framesToTimecode(c.durationFrames, timeline!.frameRate)} dur
                         </div>
                       </div>
@@ -3595,7 +3595,7 @@ export function AiEditorClient({ projectId }: Props) {
                 })}
               </ul>
             ) : videoTrack?.clips?.length ? (
-              <p className="text-sm text-slate-500">No clips in this reel yet � pick another act/reel.</p>
+              <p className="text-sm text-slate-500">No clips in this reel yet - pick another act/reel.</p>
             ) : null}
 
             {timelineVersions.length > 1 ? (
@@ -3611,7 +3611,7 @@ export function AiEditorClient({ projectId }: Props) {
                     >
                       <span>
                         v{v.version}
-                        {v.note ? ` � ${v.note}` : ""}
+                        {v.note ? ` - ${v.note}` : ""}
                       </span>
                       {v.version !== timeline?.version ? (
                         <button
@@ -3634,7 +3634,7 @@ export function AiEditorClient({ projectId }: Props) {
         </CardBody>
       </Card>
 
-      {/* Edit notes � brief for Edit by chat */}
+      {/* Edit notes - brief for Edit by chat */}
       <Card>
         <CardBody className="space-y-5">
           <div>
@@ -3666,12 +3666,12 @@ export function AiEditorClient({ projectId }: Props) {
               className="min-h-[72px] w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               placeholder={
                 editNoteSource === "client"
-                  ? "e.g. Client wants a punchier open, keep the hero product shot longer�"
+                  ? "e.g. Client wants a punchier open, keep the hero product shot longer..."
                   : editNoteSource === "shooting"
-                    ? "e.g. Take 3 of the interview felt strongest; wide of lobby is weak�"
+                    ? "e.g. Take 3 of the interview felt strongest; wide of lobby is weak..."
                     : editNoteSource === "look"
-                      ? "e.g. Faster cuts after the logo; warmer, less dissolve-heavy�"
-                      : "Anything the edit should follow�"
+                      ? "e.g. Faster cuts after the logo; warmer, less dissolve-heavy..."
+                      : "Anything the edit should follow..."
               }
               value={editNoteDraft}
               disabled={!!busy}
@@ -3712,7 +3712,7 @@ export function AiEditorClient({ projectId }: Props) {
               </ul>
             ) : (
               <p className="text-sm text-slate-500">
-                No notes yet � add one anytime (even before the rough cut).
+                No notes yet - add one anytime (even before the rough cut).
               </p>
             )}
           </div>
@@ -3727,10 +3727,10 @@ export function AiEditorClient({ projectId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Edit by chat</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Describe an edit in plain language. ShootSpine proposes clear edit steps �
+                Describe an edit in plain language. ShootSpine proposes clear edit steps -
                 you review, then apply. Saved edit notes are included as the creative brief.
                 {activeReelName
-                  ? ` Focused on �${activeReelName}� (switch acts/reels in Rough cut).`
+                  ? ` Focused on -${activeReelName}- (switch acts/reels in Rough cut).`
                   : ""}
               </p>
             </div>
@@ -3738,7 +3738,7 @@ export function AiEditorClient({ projectId }: Props) {
           <div className="space-y-4 pl-10">
             {activeReelName ? (
               <p className="rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2 text-sm text-violet-950">
-                Chat scope: <span className="font-medium">{activeReelName}</span> � long features stay
+                Chat scope: <span className="font-medium">{activeReelName}</span> - long features stay
                 manageable reel-by-reel.
               </p>
             ) : null}
@@ -3806,10 +3806,10 @@ export function AiEditorClient({ projectId }: Props) {
                     ? "Suggested with AI"
                     : "Suggested from your wording"}
                   {typeof chatProposal.proposal.confidence === "number"
-                    ? ` � ${Math.round(chatProposal.proposal.confidence * 100)}% confidence`
+                    ? ` - ${Math.round(chatProposal.proposal.confidence * 100)}% confidence`
                     : ""}
                   {chatProposal.proposal.warnings?.includes("reel_truncated")
-                    ? " � long reel � only the first part was considered"
+                    ? " - long reel - only the first part was considered"
                     : ""}
                 </div>
                 {chatProposal.descriptions.length ? (
@@ -3821,14 +3821,14 @@ export function AiEditorClient({ projectId }: Props) {
                 ) : null}
                 {chatProposal.validationErrors.length ? (
                   <p className="mt-2 text-xs text-rose-700">
-                    {chatProposal.validationErrors.join(" � ")}
+                    {chatProposal.validationErrors.join(" - ")}
                   </p>
                 ) : null}
               </div>
             ) : (
               <p className="text-xs text-slate-500">
                 Common: remove first/last, trim to N seconds, reverse order, swap first two, undo.
-                Harder requests use Gemini when configured (timeline metadata only � never camera
+                Harder requests use Gemini when configured (timeline metadata only - never camera
                 files).
               </p>
             )}
@@ -3844,7 +3844,7 @@ export function AiEditorClient({ projectId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Look &amp; transitions</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Choose a feel and how clips connect. Resolve does the real color � we save clear
+                Choose a feel and how clips connect. Resolve does the real color - we save clear
                 notes with your edit.
               </p>
             </div>
@@ -3912,7 +3912,7 @@ export function AiEditorClient({ projectId }: Props) {
                   Saved: <span className="font-medium text-slate-800">{finishingSummary}</span>
                 </span>
               ) : (
-                <span className="text-sm text-slate-500">Optional � you can skip and go to Resolve.</span>
+                <span className="text-sm text-slate-500">Optional - you can skip and go to Resolve.</span>
               )}
             </div>
           </div>
@@ -3927,7 +3927,7 @@ export function AiEditorClient({ projectId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Finish in DaVinci Resolve</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Color and polish happen in Resolve. Pick where you�ll finish � we�ll keep the steps
+                Color and polish happen in Resolve. Pick where you'll finish - we'll keep the steps
                 simple.
               </p>
             </div>
@@ -3949,7 +3949,7 @@ export function AiEditorClient({ projectId }: Props) {
                             : "text-slate-700"
                       }`}
                     >
-                      {tip.level === "ready" ? "? " : tip.level === "action" ? "� " : "� "}
+                      {tip.level === "ready" ? "? " : tip.level === "action" ? "- " : "- "}
                       {tip.text}
                     </li>
                   ))}
@@ -3972,7 +3972,7 @@ export function AiEditorClient({ projectId }: Props) {
                   <span className="font-semibold">On this computer</span>
                 </div>
                 <p className="mt-2 text-sm text-slate-600">
-                  Resolve is installed here. We�ll save your edit and open it.
+                  Resolve is installed here. We'll save your edit and open it.
                 </p>
               </button>
               <button
@@ -3989,7 +3989,7 @@ export function AiEditorClient({ projectId }: Props) {
                   <span className="font-semibold">On a Mac</span>
                 </div>
                 <p className="mt-2 text-sm text-slate-600">
-                  You�ll move the project over, then open Resolve on the Mac.
+                  You'll move the project over, then open Resolve on the Mac.
                 </p>
               </button>
             </div>
@@ -4077,7 +4077,7 @@ export function AiEditorClient({ projectId }: Props) {
                     <p className="font-semibold text-emerald-950">Your rough cut is in Resolve</p>
                     <p className="mt-1 text-sm text-emerald-900/80">
                       Clips are linked in the ShootSpine media bin when possible. Finish color and
-                      sound in Resolve � look tips are saved with your project folder.
+                      sound in Resolve - look tips are saved with your project folder.
                     </p>
                   </div>
                 ) : handoffDirOnDisk ? (
@@ -4088,7 +4088,7 @@ export function AiEditorClient({ projectId }: Props) {
                       </span>
                       <div className="space-y-3">
                         <div>
-                          <p className="font-semibold text-slate-900">Edit saved � almost there</p>
+                          <p className="font-semibold text-slate-900">Edit saved - almost there</p>
                           <p className="mt-1 text-sm text-slate-600">
                             Open a project in Resolve, then press{" "}
                             <span className="font-medium">Bring edit into Resolve</span>. Or import
@@ -4098,7 +4098,7 @@ export function AiEditorClient({ projectId }: Props) {
                         <ol className="space-y-2 text-sm text-slate-700">
                           <li className="flex gap-2">
                             <span className="font-semibold text-sky-700">1.</span>
-                            <span>In Resolve: File ? Import ? Timeline</span>
+                            <span>In Resolve: File → Import → Timeline</span>
                           </li>
                           <li className="flex gap-2">
                             <span className="font-semibold text-sky-700">2.</span>
@@ -4159,7 +4159,7 @@ export function AiEditorClient({ projectId }: Props) {
                     <div>
                       <p className="font-medium text-slate-900">Copy the project to the Mac</p>
                       <p className="mt-0.5 text-slate-600">
-                        Use a drive, NAS, or your usual sync. Move the whole project folder � footage
+                        Use a drive, NAS, or your usual sync. Move the whole project folder - footage
                         and edit travel together.
                       </p>
                     </div>
@@ -4172,7 +4172,7 @@ export function AiEditorClient({ projectId }: Props) {
                       <p className="font-medium text-slate-900">Open Resolve on the Mac</p>
                       <p className="mt-0.5 text-slate-600">
                         Start a project, then{" "}
-                        <span className="font-medium">File ? Import ? Timeline</span> and pick the
+                        <span className="font-medium">File → Import → Timeline</span> and pick the
                         rough-cut file from the folder we prepared.
                       </p>
                     </div>
@@ -4229,7 +4229,7 @@ export function AiEditorClient({ projectId }: Props) {
                     <p className="font-medium text-emerald-950">Ready to move</p>
                     <p className="mt-1 text-sm text-emerald-900/80">
                       Copy your full project folder to the Mac, then follow step 3 in Resolve there.
-                      You don�t need to download anything from the browser.
+                      You don't need to download anything from the browser.
                     </p>
                   </div>
                 ) : !timeline ? (
@@ -4242,8 +4242,8 @@ export function AiEditorClient({ projectId }: Props) {
                 <p className="font-semibold text-slate-900">After you finish in Resolve</p>
                 <p className="mt-1 text-sm text-slate-600">
                   {finishWhere === "mac"
-                    ? "When this project folder is back on this computer with Resolve open, read the timeline for notes or import that cut as a new ShootSpine version (your previous rough cut stays in Versions ? Restore)."
-                    : "Read the open timeline back for notes, or import that cut into ShootSpine as a new version (your previous rough cut stays in Versions ? Restore)."}
+                    ? "When this project folder is back on this computer with Resolve open, read the timeline for notes or import that cut as a new ShootSpine version (your previous rough cut stays in Versions / Restore)."
+                    : "Read the open timeline back for notes, or import that cut into ShootSpine as a new version (your previous rough cut stays in Versions / Restore)."}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <Button
@@ -4256,7 +4256,7 @@ export function AiEditorClient({ projectId }: Props) {
                     ) : (
                       <RefreshCw className="mr-1.5 h-4 w-4" />
                     )}
-                    Check what�s in Resolve
+                    Check what's in Resolve
                   </Button>
                   <Button
                     onClick={() => void onImportResolveCut()}
@@ -4288,7 +4288,7 @@ export function AiEditorClient({ projectId }: Props) {
                       <p className="text-sm font-medium text-slate-800">
                         Next shoot checklist
                         {checklistStats.total
-                          ? ` � ${checklistStats.remaining} remaining`
+                          ? ` - ${checklistStats.remaining} remaining`
                           : ""}
                       </p>
                       <div className="flex flex-wrap gap-3">
@@ -4299,7 +4299,7 @@ export function AiEditorClient({ projectId }: Props) {
                             disabled={!!busy || checklistStats.remaining === 0}
                             onClick={() => void onSendChecklistToBoard()}
                           >
-                            {busy === "board_handoff" ? "Sending�" : "Send to production board"}
+                            {busy === "board_handoff" ? "Sending..." : "Send to production board"}
                           </button>
                         ) : null}
                         <button
@@ -4383,7 +4383,7 @@ export function AiEditorClient({ projectId }: Props) {
                   <span className="font-semibold text-slate-900">No backup yet</span>
                   <span className="text-slate-600">
                     {" "}
-                    � {media.length} clip{media.length === 1 ? "" : "s"} in the project.
+                    - {media.length} clip{media.length === 1 ? "" : "s"} in the project.
                   </span>
                 </p>
               ) : (
@@ -4394,7 +4394,7 @@ export function AiEditorClient({ projectId }: Props) {
                   {archiveSummary.reclaimable > 0 ? (
                     <span className="text-slate-600">
                       {" "}
-                      � you can free space on this PC for {archiveSummary.reclaimable}
+                      - you can free space on this PC for {archiveSummary.reclaimable}
                     </span>
                   ) : null}
                 </p>
@@ -4405,7 +4405,7 @@ export function AiEditorClient({ projectId }: Props) {
               <div>
                 <p className="text-sm font-medium text-slate-800">1. Choose your backup drive</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  External hard drive or NAS folder � not your camera card.
+                  External hard drive or NAS folder - not your camera card.
                 </p>
               </div>
               <FolderPicker
@@ -4497,8 +4497,8 @@ export function AiEditorClient({ projectId }: Props) {
                   </p>
                   {archiveSummary.reclaimable === 0 ? (
                     <p className="text-xs text-amber-900/70">
-                      Nothing to free right now � either everything is already only on backup, or
-                      backup isn�t finished.
+                      Nothing to free right now - either everything is already only on backup, or
+                      backup isn't finished.
                     </p>
                   ) : (
                     <>
@@ -4572,9 +4572,9 @@ export function AiEditorClient({ projectId }: Props) {
               ))}
             </div>
             <p className="text-sm text-slate-600">
-              We�ll remember the look selected above:{" "}
+              We'll remember the look selected above:{" "}
               <span className="font-medium text-slate-800">
-                {MOOD_PRESETS.find((m) => m.id === moodId)?.label} �{" "}
+                {MOOD_PRESETS.find((m) => m.id === moodId)?.label} -{" "}
                 {TRANSITION_PRESETS.find((t) => t.id === transitionStyle)?.label}
               </span>
             </p>
@@ -4588,7 +4588,7 @@ export function AiEditorClient({ projectId }: Props) {
                 rows={2}
                 value={feedbackNote}
                 onChange={(e) => setFeedbackNote(e.target.value)}
-                placeholder="e.g. Keep it warmer next time, fewer dissolves�"
+                placeholder="e.g. Keep it warmer next time, fewer dissolves..."
                 disabled={!!busy}
               />
             </div>
@@ -4606,7 +4606,7 @@ export function AiEditorClient({ projectId }: Props) {
                   Last saved: <span className="font-medium text-slate-800">{feedbackSummary}</span>
                 </span>
               ) : (
-                <span className="text-sm text-slate-500">Optional � skip if you�re not done yet.</span>
+                <span className="text-sm text-slate-500">Optional - skip if you're not done yet.</span>
               )}
             </div>
           </div>
@@ -4626,7 +4626,7 @@ export function AiEditorClient({ projectId }: Props) {
 
           {media.length === 0 ? (
             <p className="text-sm text-slate-500">
-              Nothing here yet � finish steps 1�3 to bring clips in.
+              Nothing here yet - finish steps 1-3 to bring clips in.
             </p>
           ) : (
             <ul className="divide-y divide-slate-100">
@@ -4671,7 +4671,7 @@ export function AiEditorClient({ projectId }: Props) {
                           m.frameRate ? `${Math.round(m.frameRate)} fps` : null,
                         ]
                           .filter(Boolean)
-                          .join(" � ") || m.mediaType}
+                          .join(" - ") || m.mediaType}
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
@@ -4717,7 +4717,7 @@ export function AiEditorClient({ projectId }: Props) {
         <Link href={`/projects/${projectId}`} className="underline">
           Back to project
         </Link>
-        {storage[0] ? ` � Workspace on this PC` : null}
+        {storage[0] ? ` - Workspace on this PC` : null}
       </p>
     </div>
   );
