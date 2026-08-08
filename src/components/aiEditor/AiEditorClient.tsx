@@ -49,6 +49,13 @@ import {
 } from "@/lib/aiEditor/agentClient";
 import type { AgentDriveEntry } from "@/lib/aiEditor/agentProtocol";
 import {
+  findRemountCandidates,
+  planMediaRemount,
+  volumeIdForPath,
+  type RemountCandidate,
+} from "@/lib/aiEditor/remountPaths";
+import {
+  driveForPath,
   friendlyDriveLabel,
   inferStorageTypeForPath,
   storageTypeLabel,
@@ -190,6 +197,7 @@ export function AiEditorClient({ projectId }: Props) {
   const [storagePath, setStoragePath] = useState("");
   const [indexFolderPath, setIndexFolderPath] = useState("");
   const [knownDrives, setKnownDrives] = useState<AgentDriveEntry[]>([]);
+  const [remountCandidates, setRemountCandidates] = useState<RemountCandidate[]>([]);
   const [agentToken, setAgentToken] = useState<string | null>(null);
   const [agentExpiresAt, setAgentExpiresAt] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
@@ -359,6 +367,60 @@ export function AiEditorClient({ projectId }: Props) {
     return session.token;
   }, [agentExpiresAt, agentToken, getToken, projectId]);
 
+  useEffect(() => {
+    if (!agent.connected || !settings?.projectRootPath) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await ensureAgentSession();
+        const res = await agentListDrives(DEFAULT_AGENT_BASE_URL, token);
+        if (cancelled) return;
+        setKnownDrives(res.drives);
+      } catch {
+        /* remount detection is best-effort */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    agent.connected,
+    ensureAgentSession,
+    settings?.projectRootPath,
+    settings?.projectRootVolumeId,
+    settings?.archiveRootPath,
+    settings?.archiveRootVolumeId,
+  ]);
+
+  useEffect(() => {
+    if (!settings || !knownDrives.length) {
+      setRemountCandidates([]);
+      return;
+    }
+    const found = findRemountCandidates({
+      projectRootPath: settings.projectRootPath,
+      archiveRootPath: settings.archiveRootPath,
+      projectRootVolumeId: settings.projectRootVolumeId,
+      archiveRootVolumeId: settings.archiveRootVolumeId,
+      storage,
+      drives: knownDrives,
+    });
+    setRemountCandidates((prev) => {
+      if (
+        prev.length === found.length &&
+        prev.every(
+          (p, i) =>
+            p.kind === found[i].kind &&
+            p.oldPath === found[i].oldPath &&
+            p.newPath === found[i].newPath
+        )
+      ) {
+        return prev;
+      }
+      return found;
+    });
+  }, [knownDrives, settings, storage]);
+
   const needsPrepare = useMemo(
     () =>
       media.filter((m) => m.needsProxy && !m.proxyPath && playbackPathForAsset(m)),
@@ -513,6 +575,32 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  function detectRemount(drives: AgentDriveEntry[], nextSettings = settings, nextStorage = storage) {
+    if (!nextSettings) {
+      setRemountCandidates([]);
+      return [];
+    }
+    const found = findRemountCandidates({
+      projectRootPath: nextSettings.projectRootPath,
+      archiveRootPath: nextSettings.archiveRootPath,
+      projectRootVolumeId: nextSettings.projectRootVolumeId,
+      archiveRootVolumeId: nextSettings.archiveRootVolumeId,
+      storage: nextStorage,
+      drives,
+    });
+    setRemountCandidates(found);
+    return found;
+  }
+
+  async function refreshRemountDetection() {
+    if (!agent.connected || !settings?.projectRootPath) {
+      setRemountCandidates([]);
+      return;
+    }
+    const drives = await refreshKnownDrives();
+    detectRemount(drives);
+  }
+
   async function onSaveWorkspace() {
     if (!storagePath.trim()) return;
     setBusy("storage");
@@ -521,12 +609,16 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const drives = await refreshKnownDrives();
       const storageType = inferStorageTypeForPath(storagePath.trim(), drives);
+      const editDrive = driveForPath(storagePath.trim(), drives);
       const res = await aiEditorSaveStorage(getToken, projectId, {
         name: context?.projectName || "Edit workspace",
         path: storagePath.trim(),
         purpose: "active",
         type: storageType,
         setAsActive: true,
+        volumeIdentifier: volumeIdForPath(storagePath.trim(), drives),
+        capacityBytes: editDrive?.capacityBytes,
+        availableBytes: editDrive?.availableBytes,
       });
       setSettings(res.settings);
       setStorage((prev) => {
@@ -559,12 +651,16 @@ export function AiEditorClient({ projectId }: Props) {
 
       if (archivePath.trim()) {
         const archiveType = inferStorageTypeForPath(archivePath.trim(), drives);
+        const archiveDrive = driveForPath(archivePath.trim(), drives);
         const archiveRes = await aiEditorSaveStorage(getToken, projectId, {
           name: "Archive storage",
           path: archivePath.trim(),
           purpose: "archive",
           type: archiveType === "unknown" ? "externalHDD" : archiveType,
           setAsActive: false,
+          volumeIdentifier: volumeIdForPath(archivePath.trim(), drives),
+          capacityBytes: archiveDrive?.capacityBytes,
+          availableBytes: archiveDrive?.availableBytes,
         });
         setSettings(archiveRes.settings);
         setArchivePath(archiveRes.settings.archiveRootPath || archivePath.trim());
@@ -576,8 +672,84 @@ export function AiEditorClient({ projectId }: Props) {
         );
       }
       await load();
+      detectRemount(drives);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save workspace");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onRelinkVolumes() {
+    if (!remountCandidates.length) return;
+    setBusy("remount");
+    setError(null);
+    setStatusNote(null);
+    try {
+      let nextSettings = settings;
+      let nextStorage = storage;
+      let nextMedia = media;
+      let clipCount = 0;
+
+      for (const candidate of remountCandidates) {
+        const purpose = candidate.kind === "edit" ? "active" : "archive";
+        const drives = await refreshKnownDrives();
+        const inferred = inferStorageTypeForPath(candidate.newPath, drives);
+        const res = await aiEditorSaveStorage(getToken, projectId, {
+          name: candidate.kind === "edit" ? context?.projectName || "Edit workspace" : "Archive storage",
+          path: candidate.newPath,
+          purpose,
+          type:
+            inferred !== "unknown"
+              ? inferred
+              : candidate.kind === "edit"
+                ? "externalSSD"
+                : "externalHDD",
+          setAsActive: candidate.kind === "edit",
+          volumeIdentifier: candidate.volumeIdentifier,
+        });
+        nextSettings = res.settings;
+        nextStorage = [...nextStorage.filter((s) => s.id !== res.storage.id), res.storage];
+
+        const patches = planMediaRemount(
+          nextMedia,
+          candidate.oldPath,
+          candidate.newPath,
+          { volumeIdentifier: candidate.volumeIdentifier, mode: candidate.kind }
+        );
+        for (let i = 0; i < patches.length; i += 200) {
+          const chunk = patches.slice(i, i + 200);
+          await aiEditorPatchMedia(getToken, projectId, chunk);
+        }
+        if (patches.length) {
+          const byId = new Map(patches.map((p) => [p.id, p]));
+          nextMedia = nextMedia.map((m) => {
+            const p = byId.get(m.id);
+            return p ? { ...m, ...p } : m;
+          });
+          clipCount += patches.length;
+        }
+
+        if (candidate.kind === "edit") {
+          setStoragePath(candidate.newPath);
+          setIndexFolderPath(candidate.newPath);
+        } else {
+          setArchivePath(candidate.newPath);
+        }
+      }
+
+      setSettings(nextSettings);
+      setStorage(nextStorage);
+      setMedia(nextMedia);
+      setRemountCandidates([]);
+      setStatusNote(
+        clipCount
+          ? `Relinked drive paths (${clipCount} clip${clipCount === 1 ? "" : "s"} updated).`
+          : "Relinked drive folders to the new letter."
+      );
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not relink drive paths");
     } finally {
       setBusy(null);
     }
@@ -1731,12 +1903,16 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const drives = await refreshKnownDrives();
       const storageType = inferStorageTypeForPath(path, drives);
+      const archiveDrive = driveForPath(path, drives);
       const res = await aiEditorSaveStorage(getToken, projectId, {
         name: "Archive storage",
         path,
         purpose: "archive",
         type: storageType === "unknown" ? "externalHDD" : storageType,
         setAsActive: false,
+        volumeIdentifier: volumeIdForPath(path, drives),
+        capacityBytes: archiveDrive?.capacityBytes,
+        availableBytes: archiveDrive?.availableBytes,
       });
       setSettings(res.settings);
       setStorage((prev) => {
@@ -1745,6 +1921,7 @@ export function AiEditorClient({ projectId }: Props) {
       });
       setArchivePath(res.settings.archiveRootPath || path);
       setStatusNote("Backup folder remembered.");
+      detectRemount(drives, res.settings, [res.storage, ...storage]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save backup folder");
     } finally {
@@ -2368,6 +2545,35 @@ export function AiEditorClient({ projectId }: Props) {
                   </>
                 ) : null}
               </p>
+            ) : null}
+
+            {remountCandidates.length > 0 ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-slate-800">
+                <p className="font-medium text-amber-950">Drive letter changed</p>
+                <ul className="mt-1.5 list-disc space-y-1 pl-5 text-slate-700">
+                  {remountCandidates.map((c) => (
+                    <li key={`${c.kind}-${c.volumeIdentifier}`}>
+                      {c.kind === "edit" ? "Edit" : "Backup"} folder was{" "}
+                      <span className="font-medium">{c.oldPath}</span>, now on{" "}
+                      <span className="font-medium">{c.driveLabel}</span> →{" "}
+                      <span className="font-medium">{c.newPath}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  className="mt-3"
+                  variant="secondary"
+                  onClick={() => void onRelinkVolumes()}
+                  disabled={!!busy || !agent.connected}
+                >
+                  {busy === "remount" ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-1.5 h-4 w-4" />
+                  )}
+                  Relink paths
+                </Button>
+              </div>
             ) : null}
           </div>
         </CardBody>

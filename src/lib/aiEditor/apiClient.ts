@@ -485,6 +485,9 @@ export async function aiEditorSaveStorage(
     type?: StorageType;
     setAsActive?: boolean;
     projectRootName?: string;
+    volumeIdentifier?: string;
+    capacityBytes?: number;
+    availableBytes?: number;
   }
 ) {
   const res = await fetch(`/api/projects/${projectId}/ai-editor/storage`, {

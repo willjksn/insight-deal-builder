@@ -884,6 +884,8 @@ Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
   $letter = $_.DriveLetter
   $part = Get-Partition -DriveLetter $letter
   $disk = if ($part) { Get-Disk -Number $part.DiskNumber } else { $null }
+  $serial = if ($disk -and $disk.SerialNumber) { [string]$disk.SerialNumber } else { '' }
+  $unique = if ($_.UniqueId) { [string]$_.UniqueId } else { '' }
   [PSCustomObject]@{
     letter = "$letter"
     volumeLabel = $_.FileSystemLabel
@@ -892,7 +894,7 @@ Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
     capacityBytes = [int64]$_.Size
     busType = if ($disk) { [string]$disk.BusType } else { '' }
     mediaType = if ($disk) { [string]$disk.MediaType } else { '' }
-    serial = if ($disk) { [string]$disk.SerialNumber } else { '' }
+    serial = if ($serial) { $serial } else { $unique }
     removable = ([string]$_.DriveType -match 'Removable')
   }
 } | ConvertTo-Json -Compress

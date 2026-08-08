@@ -77,8 +77,12 @@ export interface AiEditorProjectSettings {
   activeStorageLocationId?: string;
   projectRootPath?: string;
   projectRootRelativeName?: string;
+  /** Disk serial / volume id for the edit drive (V13 remount). */
+  projectRootVolumeId?: string;
   /** User-authorized archive root (external HDD / NAS). Never hard-coded. */
   archiveRootPath?: string;
+  /** Disk serial / volume id for the backup drive (V13 remount). */
+  archiveRootVolumeId?: string;
   ingestMode?: "managed" | "existing_folder" | "in_place";
   cameraLabels?: string[];
   agentLastSeenAt?: string;

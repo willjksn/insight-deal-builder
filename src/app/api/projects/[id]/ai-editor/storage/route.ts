@@ -23,6 +23,9 @@ type Body = {
   type?: StorageType;
   setAsActive?: boolean;
   projectRootName?: string;
+  volumeIdentifier?: string;
+  capacityBytes?: number;
+  availableBytes?: number;
 };
 
 export async function POST(
@@ -44,6 +47,9 @@ export async function POST(
       path: body.path.trim(),
       purpose: body.purpose,
       type: body.type,
+      volumeIdentifier: body.volumeIdentifier,
+      capacityBytes: body.capacityBytes,
+      availableBytes: body.availableBytes,
     });
 
     let settings = await upsertAiEditorProjectSettings(projectId, {
@@ -64,6 +70,7 @@ export async function POST(
         activeStorageLocationId: storage.id,
         projectRootPath,
         projectRootRelativeName: rootName,
+        projectRootVolumeId: body.volumeIdentifier?.trim() || undefined,
         ingestMode: "managed",
       });
     }
@@ -71,6 +78,7 @@ export async function POST(
     if (body.purpose === "archive") {
       settings = await upsertAiEditorProjectSettings(projectId, {
         archiveRootPath: storage.path.replace(/[\\\/]+$/, ""),
+        archiveRootVolumeId: body.volumeIdentifier?.trim() || undefined,
       });
     }
 

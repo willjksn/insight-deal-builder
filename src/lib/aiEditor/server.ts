@@ -96,6 +96,9 @@ export async function createStorageLocation(
     path: string;
     purpose: StoragePurpose;
     type?: StorageType;
+    volumeIdentifier?: string;
+    capacityBytes?: number;
+    availableBytes?: number;
   }
 ): Promise<StorageLocation> {
   assertSafeStoragePath(input.path);
@@ -110,6 +113,9 @@ export async function createStorageLocation(
     type: input.type ?? "unknown",
     purpose: input.purpose,
     path: input.path.trim(),
+    volumeIdentifier: input.volumeIdentifier?.trim() || undefined,
+    capacityBytes: input.capacityBytes,
+    availableBytes: input.availableBytes,
     online: true,
     writable: true,
     createdAt: now,

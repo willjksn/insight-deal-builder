@@ -35,8 +35,9 @@
 | **V10 Cross-project insights** | Patterns across looks / coverage / checklists on AI Editor hub |
 | **V11 Look defaults + Mac brief** | Cross-project Look seeding; LOOKS.txt creative brief; Resolve preflight tips |
 | **V12 Dual-drive setup** | Drive labels (SSD/HDD/USB) + guided edit SSD / backup HDD folders |
+| **V13 Offline remount** | Remember volume id; relink edit/backup paths when drive letter changes |
 
-Later: richer anonymized analytics / recommendations engine; offline remount by volume id
+Later: richer anonymized analytics / recommendations engine
 
 ## Current implementation status
 
@@ -64,4 +65,5 @@ Later: richer anonymized analytics / recommendations engine; offline remount by 
 - **V10 Cross-project insights (initial)** — hub “Patterns across your edits” from finishing feedback, planning insights, open checklists (metadata only)  
 - **V11 Look defaults + Mac brief (initial)** — seed Look from cross-project patterns when no wrap-up; LOOKS.txt includes look/client notes; “Before you finish” preflight tips  
 - **V12 Dual-drive setup (initial)** — Desktop Agent lists volume name / SSD·HDD·USB / free space; Step 2 guided edit + backup folders with type detection  
-- Later: richer anonymized analytics / recommendations engine; offline remount by volume id
+- **V13 Offline remount (initial)** — persist volume serial on save; detect letter change; Relink paths for edit/backup + media  
+- Later: richer anonymized analytics / recommendations engine
