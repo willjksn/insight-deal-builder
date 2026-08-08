@@ -15,9 +15,10 @@ export const maxDuration = 60;
 
 async function agentHealthy(baseUrl = DEFAULT_AGENT_BASE_URL): Promise<boolean> {
   try {
+    // Keep generous: older agents blocked /health on Whisper CLI cold-start.
     const res = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/health`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(1500),
+      signal: AbortSignal.timeout(5000),
     });
     return res.ok;
   } catch {
@@ -119,14 +120,34 @@ async function waitForStopped(ms = 8000): Promise<void> {
 
 function spawnAgent(entry: string) {
   const cwd = path.dirname(path.dirname(entry));
+  const logDir = path.join(cwd, "..", ".tmp-smoke");
+  try {
+    fs.mkdirSync(logDir, { recursive: true });
+  } catch {
+    /* ignore */
+  }
+  const outLog = path.join(logDir, "agent-launch-stdout.log");
+  const errLog = path.join(logDir, "agent-launch-stderr.log");
+  const outFd = fs.openSync(outLog, "a");
+  const errFd = fs.openSync(errLog, "a");
+  fs.writeSync(
+    errFd,
+    `\n--- spawn ${new Date().toISOString()} node=${process.execPath} entry=${entry}\n`
+  );
   const child = spawn(process.execPath, [entry], {
     cwd,
     detached: true,
-    stdio: "ignore",
+    stdio: ["ignore", outFd, errFd],
     windowsHide: true,
     env: refreshedEnv(),
   });
   child.unref();
+  try {
+    fs.closeSync(outFd);
+    fs.closeSync(errFd);
+  } catch {
+    /* child keeps fds on Windows; ignore close errors */
+  }
 }
 
 /**
@@ -173,14 +194,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    spawnAgent(entry);
+    // If something is already listening (stale agent), don't double-spawn — wait for it.
+    if (!(await agentHealthy())) {
+      spawnAgent(entry);
+    }
 
-    const healthy = await waitForHealthy();
+    const healthy = await waitForHealthy(15000);
     if (!healthy) {
       return NextResponse.json(
         {
           error:
-            "Agent process was started but did not become healthy. Check that Node can run desktop-agent/src/server.mjs and port 17865 is free.",
+            "Agent process was started but did not become healthy. Check that Node can run desktop-agent/src/server.mjs, port 17865 is free, and .tmp-smoke/agent-launch-stderr.log for startup errors. Or run: npm run agent",
           code: "AGENT_START_TIMEOUT",
           baseUrl: DEFAULT_AGENT_BASE_URL,
         },

@@ -8,6 +8,7 @@ import {
   FolderOpen,
   HardDrive,
   Loader2,
+  Monitor,
   Play,
   RefreshCw,
   Sparkles,
@@ -33,7 +34,7 @@ import {
   agentMediaStreamUrl,
   agentOpenResolve,
   agentProbe,
-  agentResolveDetect,
+  agentRevealPath,
   agentSafeDelete,
   agentStorageStat,
   agentThumbnail,
@@ -47,6 +48,12 @@ import {
   SAFE_DELETE_CONFIRM_PHRASE,
   summarizeArchiveState,
 } from "@/lib/aiEditor/archive";
+import {
+  MOOD_PRESETS,
+  TRANSITION_PRESETS,
+  summarizeFinishing,
+} from "@/lib/aiEditor/finishing";
+import type { FinishingMoodId, TransitionStyleId } from "@/lib/aiEditor/types";
 import { framesToSeconds } from "@/lib/aiEditor/frames";
 import type { ClipAnalysisBundle } from "@/lib/aiEditor/analysis";
 import { formatBytes } from "@/lib/aiEditor/checksum";
@@ -149,7 +156,9 @@ export function AiEditorClient({ projectId }: Props) {
   } | null>(null);
   const [exportFiles, setExportFiles] = useState<Record<string, string> | null>(null);
   const [handoffDirOnDisk, setHandoffDirOnDisk] = useState<string | null>(null);
-  const [resolveDetectNote, setResolveDetectNote] = useState<string | null>(null);
+  const [finishWhere, setFinishWhere] = useState<"here" | "mac">("here");
+  const [moodId, setMoodId] = useState<FinishingMoodId>("natural");
+  const [transitionStyle, setTransitionStyle] = useState<TransitionStyleId>("cuts");
   const [archivePath, setArchivePath] = useState("");
   const [reclaimConfirm, setReclaimConfirm] = useState("");
 
@@ -174,6 +183,12 @@ export function AiEditorClient({ projectId }: Props) {
       }
       if (dash.settings?.archiveRootPath) {
         setArchivePath(dash.settings.archiveRootPath);
+      }
+      if (dash.timeline?.finishing?.moodId) {
+        setMoodId(dash.timeline.finishing.moodId);
+      }
+      if (dash.timeline?.finishing?.transitionStyle) {
+        setTransitionStyle(dash.timeline.finishing.transitionStyle);
       }
       const health = await checkAgentHealth(DEFAULT_AGENT_BASE_URL);
       setAgent(health);
@@ -235,14 +250,14 @@ export function AiEditorClient({ projectId }: Props) {
   const step6Done = Boolean(coverage && coverage.updatedAt);
   const step7Done = Boolean(timeline && timeline.tracks.some((t) => t.clips.length));
   const step8Done = Boolean(timeline && timeline.version > 1);
-  const step9Done = Boolean(
-    (exportFiles && Object.keys(exportFiles).length) || handoffDirOnDisk
-  );
+  const step9Done = Boolean(timeline?.finishing);
+  const step10Done = Boolean(handoffDirOnDisk);
   const archiveSummary = useMemo(
     () => summarizeArchiveState(media, settings?.projectRootPath),
     [media, settings?.projectRootPath]
   );
-  const step10Done = archiveSummary.archived > 0;
+  const step11Done = archiveSummary.archived > 0;
+  const finishingSummary = summarizeFinishing(timeline?.finishing);
   const videoTrack = timeline?.tracks.find((t) => t.kind === "video");
 
   async function onRecheckAgent() {
@@ -895,29 +910,28 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
-  function downloadTextFile(filename: string, content: string) {
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function onExportResolve() {
-    setBusy("export");
+  async function onApplyFinishing() {
+    if (!timeline) {
+      setError("Build a rough cut first");
+      return;
+    }
+    setBusy("finishing");
     setError(null);
     setStatusNote(null);
     try {
-      const res = await aiEditorExportResolve(getToken, projectId);
-      setExportFiles(res.files);
-      setJobs((prev) => [res.job, ...prev]);
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "apply_finishing",
+        moodId,
+        transitionStyle,
+      });
+      setTimeline(res.timeline);
+      setTimelineVersions(res.versions);
+      if (res.job) setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
       setStatusNote(
-        `Resolve package ready: ${res.summary.clipCount} clip(s), ${res.summary.durationTimecode}. Download, write to project, or Open in Resolve.`
+        `Saved: ${res.timeline.finishing?.moodLabel} look with ${res.timeline.finishing?.transitionLabel.toLowerCase()}. Resolve will use these as notes.`
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Export failed");
+      setError(e instanceof Error ? e.message : "Could not save look");
     } finally {
       setBusy(null);
     }
@@ -954,8 +968,6 @@ export function AiEditorClient({ projectId }: Props) {
         relativeDir: RESOLVE_HANDOFF_REL_DIR,
       });
       setHandoffDirOnDisk(written.handoffDir);
-      const detect = await agentResolveDetect(DEFAULT_AGENT_BASE_URL, token);
-      setResolveDetectNote(detect.note);
       const log = await aiEditorLogResolveOpen(getToken, projectId, {
         message: `Wrote Resolve handoff → ${written.handoffDir}`,
         launched: false,
@@ -963,7 +975,9 @@ export function AiEditorClient({ projectId }: Props) {
       });
       setJobs((prev) => [log.job, ...prev.filter((j) => j.id !== log.job.id)]);
       setStatusNote(
-        `Wrote ${written.written.length} file(s) to ${written.handoffDir}. ${detect.note}`
+        finishWhere === "mac"
+          ? "Saved. Copy your project folder to the Mac, then open Resolve there."
+          : "Saved with your project. Open Resolve when you’re ready."
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Write handoff failed");
@@ -994,8 +1008,8 @@ export function AiEditorClient({ projectId }: Props) {
         projectRoot,
         handoffDir: written.handoffDir,
         launch: true,
+        reveal: false,
       });
-      setResolveDetectNote(opened.detect.note);
       const log = await aiEditorLogResolveOpen(getToken, projectId, {
         message: opened.message,
         launched: opened.launched,
@@ -1004,8 +1018,10 @@ export function AiEditorClient({ projectId }: Props) {
       setJobs((prev) => [log.job, ...prev.filter((j) => j.id !== log.job.id)]);
       setStatusNote(
         opened.launched
-          ? `Resolve launch requested. Handoff folder opened: ${written.handoffDir}. Import the EDL or run import_shootspine_edl.py (External scripting on).`
-          : `Handoff written to ${written.handoffDir}. ${opened.message}`
+          ? opened.alreadyRunning
+            ? "Resolve is already open — check your taskbar if you don’t see the window."
+            : "Resolve is starting. It can take a minute — check your taskbar."
+          : "Your edit is saved. Open Resolve from the Start menu if it didn’t appear."
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Open in Resolve failed");
@@ -2201,96 +2217,319 @@ export function AiEditorClient({ projectId }: Props) {
         </CardBody>
       </Card>
 
-      {/* Step 9 — V1G + V1.5 */}
+      {/* Step 9 — look & transitions */}
       <Card>
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
             <StepBadge n={9} done={step9Done} />
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Export for DaVinci Resolve</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Look &amp; transitions</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Portable handoff (EDL + media map + Mac companion). Same-machine: write &amp; open
-                Resolve. Cross-machine: sync the project folder and use{" "}
-                <code className="text-xs">OPEN_ON_MAC.txt</code> — camera files never go through the
-                cloud.
+                Choose a feel and how clips connect. Resolve does the real color — we save clear
+                notes with your edit.
               </p>
             </div>
           </div>
-          <div className="space-y-4 pl-10">
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => void onExportResolve()} disabled={!!busy || !timeline}>
-                {busy === "export" ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                ) : (
-                  <HardDrive className="mr-1.5 h-4 w-4" />
-                )}
-                Build package
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => void onWriteResolveHandoff()}
-                disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
-              >
-                {busy === "write-handoff" ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                ) : (
-                  <FolderOpen className="mr-1.5 h-4 w-4" />
-                )}
-                Write to project folder
-              </Button>
-              <Button
-                onClick={() => void onOpenInResolve()}
-                disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
-              >
-                {busy === "open-resolve" ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                ) : (
-                  <Clapperboard className="mr-1.5 h-4 w-4" />
-                )}
-                Open in Resolve
-              </Button>
-            </div>
-            {handoffDirOnDisk ? (
-              <p className="text-xs text-slate-600">
-                On disk: <span className="font-medium">{handoffDirOnDisk}</span>
-              </p>
-            ) : null}
-            {resolveDetectNote ? (
-              <p className="text-xs text-slate-500">{resolveDetectNote}</p>
-            ) : null}
-            {exportFiles ? (
-              <ul className="space-y-2 text-sm">
-                {Object.keys(exportFiles).map((name) => (
-                  <li
-                    key={name}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
+          <div className="space-y-5 pl-10">
+            <div>
+              <p className="text-sm font-medium text-slate-800">How should it feel?</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {MOOD_PRESETS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setMoodId(m.id)}
+                    className={`rounded-2xl border px-3 py-3 text-left transition ${
+                      moodId === m.id
+                        ? "border-sky-300 bg-sky-50 shadow-sm"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
                   >
-                    <span className="truncate font-medium text-slate-800">{name}</span>
-                    <button
-                      type="button"
-                      className="shrink-0 text-sky-800 underline"
-                      onClick={() => downloadTextFile(name, exportFiles[name])}
-                    >
-                      Download
-                    </button>
-                  </li>
+                    <div className="font-semibold text-slate-900">{m.label}</div>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">{m.blurb}</p>
+                  </button>
                 ))}
-              </ul>
-            ) : (
-              <p className="text-xs text-slate-500">
-                Needs a rough cut first. Package includes EDL, handoff JSON, README, and Mac
-                companion script.
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-800">Between clips</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {TRANSITION_PRESETS.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTransitionStyle(t.id)}
+                    className={`rounded-2xl border px-3 py-3 text-left transition ${
+                      transitionStyle === t.id
+                        ? "border-sky-300 bg-sky-50 shadow-sm"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="font-semibold text-slate-900">{t.label}</div>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">{t.blurb}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                onClick={() => void onApplyFinishing()}
+                disabled={!!busy || !timeline}
+              >
+                {busy === "finishing" ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1.5 h-4 w-4" />
+                )}
+                Save look
+              </Button>
+              {finishingSummary ? (
+                <span className="text-sm text-slate-600">
+                  Saved: <span className="font-medium text-slate-800">{finishingSummary}</span>
+                </span>
+              ) : (
+                <span className="text-sm text-slate-500">Optional — you can skip and go to Resolve.</span>
+              )}
+            </div>
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Step 10 — finish in Resolve */}
+      <Card>
+        <CardBody className="space-y-5">
+          <div className="flex items-start gap-3">
+            <StepBadge n={10} done={step10Done} />
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Finish in DaVinci Resolve</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Color and polish happen in Resolve. Pick where you’ll finish — we’ll keep the steps
+                simple.
               </p>
+            </div>
+          </div>
+
+          <div className="space-y-5 pl-10">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setFinishWhere("here")}
+                className={`rounded-2xl border px-4 py-4 text-left transition ${
+                  finishWhere === "here"
+                    ? "border-sky-300 bg-sky-50 shadow-sm shadow-sky-100"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-2 text-slate-900">
+                  <Monitor className="h-5 w-5 text-sky-600" />
+                  <span className="font-semibold">On this computer</span>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">
+                  Resolve is installed here. We’ll save your edit and open it.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFinishWhere("mac")}
+                className={`rounded-2xl border px-4 py-4 text-left transition ${
+                  finishWhere === "mac"
+                    ? "border-sky-300 bg-sky-50 shadow-sm shadow-sky-100"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-2 text-slate-900">
+                  <HardDrive className="h-5 w-5 text-sky-600" />
+                  <span className="font-semibold">On a Mac</span>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">
+                  You’ll move the project over, then open Resolve on the Mac.
+                </p>
+              </button>
+            </div>
+
+            {finishWhere === "here" ? (
+              <div className="space-y-4">
+                <Button
+                  onClick={() => void onOpenInResolve()}
+                  disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
+                >
+                  {busy === "open-resolve" ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Clapperboard className="mr-1.5 h-4 w-4" />
+                  )}
+                  Save edit &amp; open Resolve
+                </Button>
+
+                {!timeline ? (
+                  <p className="text-sm text-slate-500">Build a rough cut above first.</p>
+                ) : null}
+
+                {handoffDirOnDisk ? (
+                  <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-white px-4 py-4 shadow-sm shadow-sky-100/50">
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </span>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">You’re set — next in Resolve</p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            Give Resolve a minute to open. If you don’t see it, check the taskbar.
+                          </p>
+                        </div>
+                        <ol className="space-y-2 text-sm text-slate-700">
+                          <li className="flex gap-2">
+                            <span className="font-semibold text-sky-700">1.</span>
+                            <span>Start or open a project in Resolve.</span>
+                          </li>
+                          <li className="flex gap-2">
+                            <span className="font-semibold text-sky-700">2.</span>
+                            <span>
+                              Bring in your rough cut:{" "}
+                              <span className="font-medium">File → Import → Timeline</span>, then
+                              choose the timeline file in the folder we saved.
+                            </span>
+                          </li>
+                          <li className="flex gap-2">
+                            <span className="font-semibold text-sky-700">3.</span>
+                            <span>
+                              If clips look blank or missing, point Resolve at your project’s media
+                              folder.
+                            </span>
+                          </li>
+                        </ol>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={!!busy || !agent.connected}
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                const token = await ensureAgentSession();
+                                await agentRevealPath(
+                                  DEFAULT_AGENT_BASE_URL,
+                                  token,
+                                  handoffDirOnDisk
+                                );
+                              } catch (e) {
+                                setError(
+                                  e instanceof Error ? e.message : "Could not open the folder"
+                                );
+                              }
+                            })();
+                          }}
+                        >
+                          <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+                          Show me the folder
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <ol className="space-y-3 text-sm text-slate-700">
+                  <li className="flex gap-3">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
+                      1
+                    </span>
+                    <div>
+                      <p className="font-medium text-slate-900">Prepare the edit on this PC</p>
+                      <p className="mt-0.5 text-slate-600">
+                        Saves your rough cut into the project folder (with your footage).
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
+                      2
+                    </span>
+                    <div>
+                      <p className="font-medium text-slate-900">Copy the project to the Mac</p>
+                      <p className="mt-0.5 text-slate-600">
+                        Use a drive, NAS, or your usual sync. Move the whole project folder — footage
+                        and edit travel together.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
+                      3
+                    </span>
+                    <div>
+                      <p className="font-medium text-slate-900">Open Resolve on the Mac</p>
+                      <p className="mt-0.5 text-slate-600">
+                        Start a project, then{" "}
+                        <span className="font-medium">File → Import → Timeline</span> and pick the
+                        rough-cut file from the folder we prepared.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => void onWriteResolveHandoff()}
+                    disabled={!!busy || !timeline || !agent.connected || !settings?.projectRootPath}
+                  >
+                    {busy === "write-handoff" ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FolderOpen className="mr-1.5 h-4 w-4" />
+                    )}
+                    Prepare for Mac
+                  </Button>
+                  {handoffDirOnDisk ? (
+                    <Button
+                      variant="secondary"
+                      disabled={!!busy || !agent.connected}
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            const token = await ensureAgentSession();
+                            await agentRevealPath(
+                              DEFAULT_AGENT_BASE_URL,
+                              token,
+                              handoffDirOnDisk
+                            );
+                          } catch (e) {
+                            setError(
+                              e instanceof Error ? e.message : "Could not open the folder"
+                            );
+                          }
+                        })();
+                      }}
+                    >
+                      <FolderOpen className="mr-1.5 h-4 w-4" />
+                      Show project folder
+                    </Button>
+                  ) : null}
+                </div>
+
+                {handoffDirOnDisk ? (
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
+                    <p className="font-medium text-emerald-950">Ready to move</p>
+                    <p className="mt-1 text-sm text-emerald-900/80">
+                      Copy your full project folder to the Mac, then follow step 3 in Resolve there.
+                      You don’t need to download anything from the browser.
+                    </p>
+                  </div>
+                ) : !timeline ? (
+                  <p className="text-sm text-slate-500">Build a rough cut above first.</p>
+                ) : null}
+              </div>
             )}
           </div>
         </CardBody>
       </Card>
 
-      {/* Step 10 — V1H */}
+      {/* Step 11 — V1H */}
       <Card>
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={10} done={step10Done} />
+            <StepBadge n={11} done={step11Done} />
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Archive, restore & reclaim</h2>
               <p className="mt-1 text-sm text-slate-600">

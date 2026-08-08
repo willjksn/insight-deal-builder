@@ -85,8 +85,16 @@ export async function POST(
       projectId,
       timelineName: timeline.name,
       edl: handoff.edl,
-      manifestJson: JSON.stringify(manifest, null, 2),
+      manifestJson: JSON.stringify(
+        {
+          ...manifest,
+          finishing: handoff.finishing ?? null,
+        },
+        null,
+        2
+      ),
       readme: handoff.readme,
+      looksGuide: handoff.looksGuide,
     });
 
     const completedJob = await updateJob(job.id, {

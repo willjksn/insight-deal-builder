@@ -21,8 +21,9 @@
 | **V1G Resolve Export** | NLEAdapter + portable handoff (Windows → Mac) |
 | **V1H Archive/Restore/Delete** | Verified archive, reclaim, safe delete |
 | **V1.5 Open in Resolve** | Write handoff to disk, detect/launch Resolve, Mac companion |
+| **V1.6 Finishing suggestions** | Mood/look notes + transition style → Resolve LOOKS.txt |
 
-Later: post-V1 finishing (transitions / mood looks → Resolve) · V2 Workflow Integration · V3 feedback loop
+Later: V2 Workflow Integration · V3 feedback loop
 
 ## Current implementation status
 
@@ -35,5 +36,6 @@ Later: post-V1 finishing (transitions / mood looks → Resolve) · V2 Workflow I
 - **V1G Resolve Export (initial)** — EDL + handoff JSON + README, media map by MediaAsset.id / relativeProjectPath / checksum, Step 9 download UI  
 - **V1H Archive/Restore/Delete (initial)** — verified archive batch, restore to project, reclaim active copies with typed confirm; camera cards never auto-erased; Step 10 UI  
 - **V1 stabilize** — job APIs return completed status (not stale `queued`); archive unit tests green  
-- **V1.5 Open in Resolve (initial)** — write package to `03_PROJECT_FILES/shootspine_resolve`, detect/launch Resolve, Mac companion script + OPEN_ON_MAC.txt  
-- Later: post-V1 finishing (transitions / mood looks → Resolve)
+- **V1.5 Open in Resolve (initial)** — write package to `03_PROJECT_FILES/shootspine_resolve`, detect/launch Resolve, Mac companion script + OPEN_ON_MAC.txt; plain-language finish-here vs finish-on-Mac UI  
+- **V1.6 Finishing suggestions (initial)** — mood presets + transition style on timeline; LOOKS.txt in Resolve package; Step 9 UI (suggestions only — grade in Resolve)  
+- Later: V2 Workflow Integration · V3 feedback loop

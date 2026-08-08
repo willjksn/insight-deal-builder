@@ -3,6 +3,7 @@ import {
   aiEditorErrorResponse,
   requireAiEditorAccess,
 } from "@/lib/aiEditor/routeAccess";
+import { applyFinishingPlan } from "@/lib/aiEditor/finishing";
 import {
   applyTimelineOps,
   buildRoughCutFromCoverage,
@@ -20,7 +21,11 @@ import {
   updateJob,
   upsertTimeline,
 } from "@/lib/aiEditor/server";
-import type { TimelineEditOp } from "@/lib/aiEditor/types";
+import type {
+  FinishingMoodId,
+  TimelineEditOp,
+  TransitionStyleId,
+} from "@/lib/aiEditor/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,15 +66,18 @@ export async function POST(
     if (access.error) return access.error;
 
     const body = (await request.json()) as {
-      action?: "build_rough_cut" | "apply_ops" | "restore_version";
+      action?: "build_rough_cut" | "apply_ops" | "restore_version" | "apply_finishing";
       ops?: TimelineEditOp[];
       versionId?: string;
       note?: string;
       name?: string;
+      moodId?: FinishingMoodId;
+      transitionStyle?: TransitionStyleId;
     };
     const action = body.action || "build_rough_cut";
 
-    const job = await createJob(access.appUser, projectId, "rough_cut", { action });
+    const jobType = action === "apply_finishing" ? "finishing" : "rough_cut";
+    const job = await createJob(access.appUser, projectId, jobType, { action });
     await updateJob(job.id, {
       status: "running",
       progress: 15,
@@ -79,7 +87,28 @@ export async function POST(
 
     let timeline = await getTimeline(projectId);
 
-    if (action === "build_rough_cut") {
+    if (action === "apply_finishing") {
+      if (!timeline) {
+        return NextResponse.json({ error: "Build a rough cut first" }, { status: 400 });
+      }
+      if (!body.moodId || !body.transitionStyle) {
+        return NextResponse.json(
+          { error: "Choose a look and how clips should connect" },
+          { status: 400 }
+        );
+      }
+      const applied = applyFinishingPlan(timeline, {
+        moodId: body.moodId,
+        transitionStyle: body.transitionStyle,
+      });
+      const { timeline: bumped, versionRecord } = bumpVersion(
+        applied.timeline,
+        body.note || `Look: ${applied.plan.moodLabel} · ${applied.plan.transitionLabel}`
+      );
+      timeline = bumped;
+      await upsertTimeline(timeline);
+      await saveTimelineVersion(versionRecord);
+    } else if (action === "build_rough_cut") {
       const [coverage, media] = await Promise.all([
         getCoverageReport(projectId),
         listMediaAssets(projectId),
@@ -166,7 +195,10 @@ export async function POST(
       status: "completed",
       progress: 100,
       completedAt: new Date().toISOString(),
-      message: `Timeline v${timeline.version} saved`,
+      message:
+        action === "apply_finishing" && timeline.finishing
+          ? `${timeline.finishing.moodLabel} · ${timeline.finishing.transitionLabel} (v${timeline.version})`
+          : `Timeline v${timeline.version} saved`,
     });
 
     const versions = await listTimelineVersions(projectId);

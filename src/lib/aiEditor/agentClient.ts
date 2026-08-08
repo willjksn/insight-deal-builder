@@ -226,7 +226,13 @@ export async function agentWriteResolveHandoff(
 export async function agentOpenResolve(
   baseUrl: string,
   token: string,
-  body?: { projectRoot?: string; handoffDir?: string; launch?: boolean }
+  body?: {
+    projectRoot?: string;
+    handoffDir?: string;
+    launch?: boolean;
+    /** Open Explorer/Finder on the handoff folder (off by default — steals focus while Resolve loads). */
+    reveal?: boolean;
+  }
 ) {
   return agentFetch<AgentResolveOpenResponse>(baseUrl, token, "/resolve/open", {
     method: "POST",

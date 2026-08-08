@@ -33,7 +33,8 @@ export type AiEditorJobType =
   | "restore"
   | "reclaim"
   | "resolve_export"
-  | "resolve_open";
+  | "resolve_open"
+  | "finishing";
 
 export type AiEditorJobStatus =
   | "queued"
@@ -243,6 +244,35 @@ export interface CoverageReport {
 /** V1E — internal timeline (not Resolve’s model) */
 export type TimelineTrackKind = "video" | "audio";
 
+/** V1.6 — outgoing transition after this clip (suggestions for Resolve). */
+export type TransitionType = "cut" | "dissolve" | "fade";
+
+export type TransitionStyleId = "cuts" | "soft_dissolves" | "fade_between";
+
+export type FinishingMoodId =
+  | "natural"
+  | "warm"
+  | "cool"
+  | "cinematic"
+  | "high_energy";
+
+export interface ClipTransitionOut {
+  type: TransitionType;
+  durationFrames: number;
+}
+
+export interface FinishingPlan {
+  moodId: FinishingMoodId;
+  moodLabel: string;
+  lookNotes: string[];
+  resolveHint: string;
+  transitionStyle: TransitionStyleId;
+  transitionLabel: string;
+  transitionType: TransitionType;
+  transitionDurationFrames: number;
+  updatedAt: string;
+}
+
 export interface TimelineClip {
   id: string;
   mediaAssetId: string;
@@ -254,6 +284,8 @@ export interface TimelineClip {
   durationFrames: number;
   label?: string;
   plannedShotId?: string;
+  /** How this clip should leave into the next (Resolve applies). */
+  transitionOut?: ClipTransitionOut;
 }
 
 export interface TimelineTrack {
@@ -269,6 +301,8 @@ export interface Timeline {
   name: string;
   frameRate: number;
   tracks: TimelineTrack[];
+  /** V1.6 mood + transition suggestions for Resolve finishing. */
+  finishing?: FinishingPlan;
   version: number;
   createdAt: string;
   updatedAt: string;

@@ -12,6 +12,7 @@ export const RESOLVE_HANDOFF_FILES = {
   edl: "shootspine_rough_cut.edl",
   manifest: "shootspine_handoff.json",
   readme: "README_RESOLVE.txt",
+  looks: "LOOKS.txt",
   companionPy: "import_shootspine_edl.py",
   openMac: "OPEN_ON_MAC.txt",
 } as const;
@@ -167,10 +168,11 @@ export function buildHandoffFileMap(input: {
   edl: string;
   manifestJson: string;
   readme: string;
+  looksGuide?: string;
   timelineName?: string;
   projectId: string;
 }): Record<string, string> {
-  return {
+  const files: Record<string, string> = {
     [RESOLVE_HANDOFF_FILES.edl]: input.edl,
     [RESOLVE_HANDOFF_FILES.manifest]: input.manifestJson,
     [RESOLVE_HANDOFF_FILES.readme]: input.readme,
@@ -182,4 +184,8 @@ export function buildHandoffFileMap(input: {
       timelineName: input.timelineName,
     }),
   };
+  if (input.looksGuide?.trim()) {
+    files[RESOLVE_HANDOFF_FILES.looks] = input.looksGuide;
+  }
+  return files;
 }

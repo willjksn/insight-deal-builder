@@ -182,6 +182,7 @@ export type AgentResolveOpenResponse = {
   ok: true;
   detect: Omit<AgentResolveDetectResponse, "ok">;
   launched: boolean;
+  alreadyRunning?: boolean;
   revealed: boolean;
   actions: string[];
   message: string;

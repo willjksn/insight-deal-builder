@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.6.0";
+const VERSION = "0.6.1";
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN !== "0";
 
 const MEDIA_EXTS = new Set([
@@ -358,25 +358,99 @@ function mapProbe(filePath, raw) {
   };
 }
 
-function toolAvailable(bin) {
+/** Cache tool probes — Whisper cold-start can take many seconds and must not block /health. */
+const toolProbeCache = {
+  ffmpeg: undefined,
+  ffprobe: undefined,
+  whisper: undefined,
+  checkedAt: 0,
+};
+
+function spawnWithTimeout(bin, args, opts = {}, timeoutMs = 2500) {
   return new Promise((resolve) => {
-    const child = spawn(bin, ["-version"], { windowsHide: true });
-    child.on("error", () => resolve(false));
-    child.on("close", (code) => resolve(code === 0));
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      try {
+        child.kill();
+      } catch {
+        /* ignore */
+      }
+      resolve(value);
+    };
+    const child = spawn(bin, args, { windowsHide: true, ...opts });
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    child.on("error", () => {
+      clearTimeout(timer);
+      finish(false);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      finish(code === 0);
+    });
   });
 }
 
-/** Whisper CLI has no `-version`; missing-audio exit means the binary is present. */
+function toolAvailable(bin) {
+  return spawnWithTimeout(bin, ["-version"], {}, 2500);
+}
+
+/**
+ * Whisper CLI has no `-version`; a quick spawn that errors (missing args) still proves the binary exists.
+ * Hard-timeout so /health never stalls on CUDA/torch import.
+ */
 function whisperCliAvailable(bin) {
   return new Promise((resolve) => {
-    const child = spawn(bin, [], {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      try {
+        child.kill();
+      } catch {
+        /* ignore */
+      }
+      resolve(value);
+    };
+    const child = spawn(bin, ["--help"], {
       windowsHide: true,
       env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
     });
-    child.on("error", () => resolve(false));
-    child.on("close", () => resolve(true));
+    const timer = setTimeout(() => finish(true), 2000); // process started = available
+    child.on("error", () => {
+      clearTimeout(timer);
+      finish(false);
+    });
+    child.on("close", () => {
+      clearTimeout(timer);
+      finish(true);
+    });
   });
 }
+
+async function probeTools(force = false) {
+  const now = Date.now();
+  if (!force && now - toolProbeCache.checkedAt < 60_000 && toolProbeCache.ffmpeg !== undefined) {
+    return toolProbeCache;
+  }
+  const ffprobeBin = process.env.FFPROBE_PATH || "ffprobe";
+  const ffmpegBin = process.env.FFMPEG_PATH || "ffmpeg";
+  const whisperBin = process.env.WHISPER_PATH || "whisper";
+  const [ffprobeAvailable, ffmpegAvailable, whisperAvailable] = await Promise.all([
+    toolAvailable(ffprobeBin),
+    toolAvailable(ffmpegBin),
+    whisperCliAvailable(whisperBin),
+  ]);
+  toolProbeCache.ffprobe = ffprobeAvailable;
+  toolProbeCache.ffmpeg = ffmpegAvailable;
+  toolProbeCache.whisper = whisperAvailable;
+  toolProbeCache.checkedAt = Date.now();
+  return toolProbeCache;
+}
+
+/** Fire-and-forget warm cache so first /health after boot is still fast enough for launch wait. */
+void probeTools(true);
 
 function runFfmpegSceneTimes(filePath) {
   return new Promise((resolve) => {
@@ -1135,7 +1209,12 @@ function revealInFileManager(targetPath) {
       if (!(await pathExists(abs))) throw new Error("Path not found");
       const platform = os.platform();
       if (platform === "win32") {
-        const child = spawn("explorer", [abs], { windowsHide: true, detached: true, stdio: "ignore" });
+        // explorer with a folder path opens it; avoid /select quirks
+        const child = spawn("explorer.exe", [abs], {
+          detached: true,
+          stdio: "ignore",
+          windowsHide: true,
+        });
         child.unref();
         resolve({ ok: true, revealed: abs, method: "explorer" });
       } else if (platform === "darwin") {
@@ -1153,16 +1232,68 @@ function revealInFileManager(targetPath) {
   });
 }
 
+function isResolveProcessRunning() {
+  return new Promise((resolve) => {
+    if (os.platform() !== "win32") {
+      resolve(false);
+      return;
+    }
+    const child = spawn(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        "if (Get-Process -Name Resolve -ErrorAction SilentlyContinue) { '1' } else { '0' }",
+      ],
+      { windowsHide: true }
+    );
+    let out = "";
+    child.stdout?.on("data", (d) => {
+      out += String(d);
+    });
+    child.on("error", () => resolve(false));
+    child.on("close", () => resolve(out.trim() === "1"));
+  });
+}
+
 /**
- * Launch Resolve from allowlisted detected path only — no arbitrary shell.
+ * Launch a GUI app via Windows ShellExecute (`start`).
+ * Direct spawn(Resolve.exe) from a Node service often leaves Resolve stuck on splash.
+ */
+function launchWindowsGuiApp(exePath) {
+  return new Promise((resolve, reject) => {
+    const abs = path.resolve(exePath);
+    const child = spawn(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        `Start-Process -FilePath ${JSON.stringify(abs)} -WorkingDirectory ${JSON.stringify(path.dirname(abs))}`,
+      ],
+      { detached: true, stdio: "ignore", windowsHide: true }
+    );
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0 || code === null) resolve(true);
+      else reject(new Error(`Start-Process exited ${code}`));
+    });
+    child.unref();
+  });
+}
+
+/**
+ * Launch Resolve from allowlisted detected path only — no arbitrary user shell.
+ * Does not auto-open Explorer (steals focus while Resolve is loading).
  */
 async function openResolve(body) {
   const detect = await detectResolveInstall();
   const actions = [];
   let launched = false;
+  let alreadyRunning = false;
   let revealed = false;
 
-  if (body.handoffDir || body.projectRoot) {
+  const revealNow = body.reveal === true;
+  if (revealNow && (body.handoffDir || body.projectRoot)) {
     let handoffDir = body.handoffDir ? path.resolve(body.handoffDir) : null;
     if (!handoffDir && body.projectRoot) {
       handoffDir = path.resolve(body.projectRoot, RESOLVE_HANDOFF_REL);
@@ -1176,13 +1307,26 @@ async function openResolve(body) {
 
   if (body.launch !== false && detect.installed && detect.appPath) {
     const platform = os.platform();
-    if (platform === "win32") {
-      const child = spawn(detect.appPath, [], {
-        windowsHide: false,
-        detached: true,
-        stdio: "ignore",
-      });
-      child.unref();
+    alreadyRunning = await isResolveProcessRunning();
+
+    if (alreadyRunning) {
+      actions.push("resolve_already_running");
+      // Still nudge a Start-Process — Windows usually focuses the existing instance.
+      if (platform === "win32") {
+        try {
+          await launchWindowsGuiApp(detect.appPath);
+          launched = true;
+          actions.push("focused_resolve");
+        } catch {
+          launched = false;
+        }
+      } else if (platform === "darwin") {
+        spawn("open", ["-a", "DaVinci Resolve"], { detached: true, stdio: "ignore" }).unref();
+        launched = true;
+        actions.push("focused_resolve");
+      }
+    } else if (platform === "win32") {
+      await launchWindowsGuiApp(detect.appPath);
       launched = true;
       actions.push("launched_resolve");
     } else if (platform === "darwin") {
@@ -1207,10 +1351,13 @@ async function openResolve(body) {
     ok: true,
     detect,
     launched,
+    alreadyRunning,
     revealed,
     actions,
     message: launched
-      ? "Resolve launch requested. Import shootspine_rough_cut.edl (or run import_shootspine_edl.py with scripting on)."
+      ? alreadyRunning
+        ? "Resolve was already running — brought it forward. Give it a moment if the project picker is still loading."
+        : "Resolve is starting. The splash can take a minute — use Show saved folder when you’re ready to import."
       : detect.note,
   };
 }
@@ -1316,11 +1463,20 @@ const server = http.createServer(async (req, res) => {
     const pathname = url.pathname;
 
     if (req.method === "GET" && pathname === "/v1/health") {
-      const ffprobeBin = process.env.FFPROBE_PATH || "ffprobe";
-      const ffmpegBin = process.env.FFMPEG_PATH || "ffmpeg";
-      const [ffprobeAvailable, ffmpegAvailable] = await Promise.all([
-        toolAvailable(ffprobeBin),
-        toolAvailable(ffmpegBin),
+      // Prefer cached probes so launch/health never waits on Whisper cold start.
+      const tools = await Promise.race([
+        probeTools(false),
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                ffmpeg: toolProbeCache.ffmpeg,
+                ffprobe: toolProbeCache.ffprobe,
+                whisper: toolProbeCache.whisper,
+              }),
+            800
+          )
+        ),
       ]);
       return json(res, 200, {
         ok: true,
@@ -1330,9 +1486,9 @@ const server = http.createServer(async (req, res) => {
         vramGb: process.env.SHOOTSPINE_VRAM_GB
           ? Number(process.env.SHOOTSPINE_VRAM_GB)
           : undefined,
-        ffprobeAvailable,
-        ffmpegAvailable,
-        whisperAvailable: await whisperCliAvailable(process.env.WHISPER_PATH || "whisper"),
+        ffprobeAvailable: tools.ffprobe,
+        ffmpegAvailable: tools.ffmpeg,
+        whisperAvailable: tools.whisper,
       });
     }
 

@@ -5,6 +5,7 @@ import type {
   AiEditorJob,
   AiEditorProjectSettings,
   CoverageReport,
+  FinishingMoodId,
   MediaAsset,
   PreferredTakeOverride,
   ProductionContext,
@@ -14,6 +15,7 @@ import type {
   Timeline,
   TimelineEditOp,
   TimelineVersion,
+  TransitionStyleId,
 } from "@/lib/aiEditor/types";
 
 type GetToken = () => Promise<string | null>;
@@ -142,11 +144,13 @@ export async function aiEditorTimelineAction(
   getToken: GetToken,
   projectId: string,
   body: {
-    action: "build_rough_cut" | "apply_ops" | "restore_version";
+    action: "build_rough_cut" | "apply_ops" | "restore_version" | "apply_finishing";
     ops?: TimelineEditOp[];
     versionId?: string;
     note?: string;
     name?: string;
+    moodId?: FinishingMoodId;
+    transitionStyle?: TransitionStyleId;
   }
 ) {
   const res = await fetch(`/api/projects/${projectId}/ai-editor/timeline`, {

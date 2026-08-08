@@ -1,6 +1,7 @@
-/** V1G — portable Resolve handoff (EDL + media manifest). No camera bytes uploaded. */
+/** V1G/V1.6 — portable Resolve handoff (EDL + media manifest + look notes). No camera bytes uploaded. */
 
 import { framesToSeconds, framesToTimecode } from "@/lib/aiEditor/frames";
+import { buildFinishingGuide } from "@/lib/aiEditor/finishing";
 import { timelineDurationFrames } from "@/lib/aiEditor/timeline";
 import type { NleHandoffPackage, NleMediaMapping } from "@/lib/aiEditor/nleAdapter";
 import type { MediaAsset, Timeline, TimelineClip } from "@/lib/aiEditor/types";
@@ -73,6 +74,8 @@ export function buildResolveHandoff(input: {
 }): NleHandoffPackage & {
   edl: string;
   readme: string;
+  looksGuide?: string;
+  finishing?: Timeline["finishing"];
   summary: {
     clipCount: number;
     durationTimecode: string;
@@ -84,12 +87,21 @@ export function buildResolveHandoff(input: {
   const edl = buildEdl(timeline, media);
   const mappings = buildMediaMappings(timeline, media);
   const frames = timelineDurationFrames(timeline);
+  const clips = videoClips(timeline);
   const summary = {
-    clipCount: videoClips(timeline).length,
+    clipCount: clips.length,
     durationTimecode: framesToTimecode(frames, timeline.frameRate),
     durationSeconds: framesToSeconds(frames, timeline.frameRate),
     mediaCount: mappings.length,
   };
+
+  const looksGuide = timeline.finishing
+    ? buildFinishingGuide({
+        plan: timeline.finishing,
+        timelineName: timeline.name,
+        clipCount: summary.clipCount,
+      })
+    : undefined;
 
   const readme = [
     "ShootSpine → DaVinci Resolve handoff",
@@ -100,12 +112,16 @@ export function buildResolveHandoff(input: {
     "   Or: File → Import → Timeline → Import EDL… → shootspine_rough_cut.edl",
     "3. Relink media using relative paths in shootspine_handoff.json",
     "   (MediaAsset.id + relativeProjectPath + checksum).",
-    "4. See OPEN_ON_MAC.txt for the cross-machine checklist.",
+    looksGuide ? "4. Read LOOKS.txt for mood / transition suggestions (apply in Resolve)." : "",
+    "5. See OPEN_ON_MAC.txt for the cross-machine checklist.",
     "",
     `Project: ${projectId}`,
     `Timeline: ${timeline.name} v${timeline.version}`,
     `Duration: ${summary.durationTimecode} @ ${timeline.frameRate} fps`,
     `Clips: ${summary.clipCount}`,
+    timeline.finishing
+      ? `Look: ${timeline.finishing.moodLabel} · ${timeline.finishing.transitionLabel}`
+      : "",
     projectRoot ? `Windows project root (source): ${projectRoot}` : "",
     "",
     "Camera originals are never uploaded by ShootSpine.",
@@ -124,6 +140,8 @@ export function buildResolveHandoff(input: {
     interchange: { format: "edl", contentOrPath: "shootspine_rough_cut.edl" },
     edl,
     readme,
+    looksGuide,
+    finishing: timeline.finishing,
     summary,
   };
 }
