@@ -92,13 +92,14 @@ import {
   defaultsFromFeedback,
   summarizeFeedback,
 } from "@/lib/aiEditor/feedback";
+import { summarizePlanningFeedback } from "@/lib/aiEditor/planningFeedback";
 import {
   compareResolveToRoughCut,
   summarizeResolveSync,
   type ResolveSyncCompare,
 } from "@/lib/aiEditor/resolveSync";
 import { timelineDurationFrames } from "@/lib/aiEditor/timeline";
-import type { FinishingFeedbackOutcome } from "@/lib/aiEditor/types";
+import type { FinishingFeedbackOutcome, PlanningFeedback } from "@/lib/aiEditor/types";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 import { mockMediaEngine } from "@/lib/aiEditor/mediaEngine";
 import { summarizeMediaSafety } from "@/lib/aiEditor/mediaSafety";
@@ -189,6 +190,7 @@ export function AiEditorClient({ projectId }: Props) {
   const [resolveSyncCompare, setResolveSyncCompare] = useState<ResolveSyncCompare | null>(
     null
   );
+  const [planningFeedback, setPlanningFeedback] = useState<PlanningFeedback | null>(null);
   const [feedbackOutcome, setFeedbackOutcome] =
     useState<FinishingFeedbackOutcome>("kept_look");
   const [feedbackNote, setFeedbackNote] = useState("");
@@ -217,6 +219,9 @@ export function AiEditorClient({ projectId }: Props) {
       }
       if (dash.settings?.archiveRootPath) {
         setArchivePath(dash.settings.archiveRootPath);
+      }
+      if (dash.settings?.lastPlanningFeedback) {
+        setPlanningFeedback(dash.settings.lastPlanningFeedback);
       }
       if (dash.timeline?.finishing?.moodId) {
         setMoodId(dash.timeline.finishing.moodId);
@@ -306,6 +311,9 @@ export function AiEditorClient({ projectId }: Props) {
   const finishingSummary = summarizeFinishing(timeline?.finishing);
   const feedbackSummary = summarizeFeedback(settings?.lastFinishingFeedback);
   const resolveSyncSummary = summarizeResolveSync(settings?.lastResolveSync);
+  const planningSummary =
+    summarizePlanningFeedback(planningFeedback) ||
+    summarizePlanningFeedback(settings?.lastPlanningFeedback);
   const videoTrack = timeline?.tracks.find((t) => t.kind === "video");
 
   async function onRecheckAgent() {
@@ -1020,6 +1028,7 @@ export function AiEditorClient({ projectId }: Props) {
         snapshot: result.snapshot,
       });
       setSettings(saved.settings);
+      setPlanningFeedback(saved.planning);
       setJobs((prev) => [saved.job, ...prev.filter((j) => j.id !== saved.job.id)]);
 
       const compare = compareResolveToRoughCut({
@@ -1030,7 +1039,10 @@ export function AiEditorClient({ projectId }: Props) {
       });
       setResolveSyncCompare(compare);
       setHandoffDirOnDisk(handoffDir);
-      setStatusNote(`${compare.title} ${compare.detail}`);
+      const tip = saved.planning.insights[0]?.text;
+      setStatusNote(
+        tip ? `${compare.title} ${tip}` : `${compare.title} ${compare.detail}`
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not sync from Resolve");
     } finally {
@@ -2790,8 +2802,8 @@ export function AiEditorClient({ projectId }: Props) {
               <div className="rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
                 <p className="font-semibold text-slate-900">After you finish in Resolve</p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Read the open timeline back into ShootSpine (clip count, length, optional EDL
-                  snapshot). Your rough cut here is not overwritten.
+                  Read the open timeline back (clips + length). We’ll compare it to your rough cut
+                  and note ideas for the next shoot. Your edit here is not overwritten.
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <Button
@@ -2818,6 +2830,23 @@ export function AiEditorClient({ projectId }: Props) {
                     <p className="text-sm font-medium text-slate-900">{resolveSyncCompare.title}</p>
                     <p className="mt-0.5 text-sm text-slate-600">{resolveSyncCompare.detail}</p>
                   </div>
+                ) : null}
+                {(planningFeedback || settings?.lastPlanningFeedback)?.insights?.length ? (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium text-slate-800">For next time</p>
+                    <ul className="space-y-1.5">
+                      {(planningFeedback || settings?.lastPlanningFeedback)!.insights.map((insight) => (
+                        <li
+                          key={insight.id}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                        >
+                          {insight.text}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : planningSummary ? (
+                  <p className="mt-3 text-sm text-slate-600">{planningSummary}</p>
                 ) : null}
               </div>
             ) : null}

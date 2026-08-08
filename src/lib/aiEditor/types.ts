@@ -36,6 +36,7 @@ export type AiEditorJobType =
   | "resolve_open"
   | "resolve_import"
   | "resolve_sync"
+  | "planning_feedback"
   | "finishing"
   | "feedback";
 
@@ -82,6 +83,8 @@ export interface AiEditorProjectSettings {
   lastFinishingFeedback?: FinishingFeedback;
   /** V5 — last read-only snapshot from the open Resolve timeline. */
   lastResolveSync?: ResolveSyncSnapshot;
+  /** V6 — planning notes derived from Resolve cut vs rough cut / coverage. */
+  lastPlanningFeedback?: PlanningFeedback;
   createdAt: string;
   updatedAt: string;
 }
@@ -279,6 +282,14 @@ export interface FinishingFeedback {
   updatedAt: string;
 }
 
+/** V5/V6 — clip entry from the open Resolve timeline. */
+export interface ResolveSyncClip {
+  name?: string;
+  track?: number;
+  startFrame?: number;
+  durationFrames?: number;
+}
+
 /** V5 — read-only snapshot of the open Resolve timeline. */
 export interface ResolveSyncSnapshot {
   projectName?: string;
@@ -291,9 +302,32 @@ export interface ResolveSyncSnapshot {
   videoTrackCount?: number;
   audioTrackCount?: number;
   videoClipCount?: number;
+  /** V6 — up to 200 video items from Resolve (names for matching). */
+  clips?: ResolveSyncClip[];
   edlExported?: boolean;
   edlPath?: string | null;
   syncedAt?: string;
+}
+
+/** V6 — next-shoot / finishing insights from Resolve vs rough cut. */
+export type PlanningInsightSeverity = "info" | "suggest" | "action";
+
+export interface PlanningFeedbackInsight {
+  id: string;
+  severity: PlanningInsightSeverity;
+  text: string;
+}
+
+export interface PlanningFeedback {
+  timelineName?: string;
+  keptCount: number;
+  droppedCount: number;
+  onlyInResolveCount: number;
+  droppedLabels: string[];
+  onlyInResolveLabels: string[];
+  insights: PlanningFeedbackInsight[];
+  lengthHint?: "rough" | "longer" | "shorter" | "similar" | "unknown";
+  updatedAt: string;
 }
 
 export interface ClipTransitionOut {

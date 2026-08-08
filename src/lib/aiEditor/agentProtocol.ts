@@ -228,6 +228,12 @@ export type AgentResolveSyncFromNleResponse = {
     videoTrackCount?: number;
     audioTrackCount?: number;
     videoClipCount?: number;
+    clips?: Array<{
+      name?: string;
+      track?: number;
+      startFrame?: number;
+      durationFrames?: number;
+    }>;
     edlExported?: boolean;
     edlPath?: string | null;
   };

@@ -9,6 +9,7 @@ import type {
   FinishingFeedbackOutcome,
   FinishingMoodId,
   MediaAsset,
+  PlanningFeedback,
   ResolveSyncSnapshot,
   PreferredTakeOverride,
   ProductionContext,
@@ -263,6 +264,7 @@ export async function aiEditorSaveResolveSync(
   return parseJson<{
     ok: true;
     sync: ResolveSyncSnapshot;
+    planning: PlanningFeedback;
     settings: AiEditorProjectSettings;
     job: AiEditorJob;
   }>(res);

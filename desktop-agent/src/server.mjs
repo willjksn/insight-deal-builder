@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.9.0";
+const VERSION = "0.10.0";
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN !== "0";
 
 const MEDIA_EXTS = new Set([
@@ -1721,11 +1721,33 @@ fps_raw = project.GetSetting("timelineFrameRate") or timeline.GetSetting("timeli
 fps = safe_float(fps_raw, 24.0)
 vtracks = safe_int(timeline.GetTrackCount("video"), 0)
 atracks = safe_int(timeline.GetTrackCount("audio"), 0)
+clip_items = []
 video_clips = 0
 for i in range(1, vtracks + 1):
     try:
         items = timeline.GetItemListInTrack("video", i) or []
         video_clips += len(items)
+        for item in items:
+            if len(clip_items) >= 200:
+                continue
+            try:
+                cname = item.GetName() or ""
+            except Exception:
+                cname = ""
+            try:
+                cdur = safe_int(item.GetDuration(), 0)
+            except Exception:
+                cdur = 0
+            try:
+                cstart = safe_int(item.GetStart(), 0)
+            except Exception:
+                cstart = 0
+            clip_items.append({
+                "name": cname,
+                "track": i,
+                "startFrame": cstart,
+                "durationFrames": cdur,
+            })
     except Exception:
         pass
 duration_frames = max(0, end - start)
@@ -1753,6 +1775,7 @@ payload = {
     "videoTrackCount": vtracks,
     "audioTrackCount": atracks,
     "videoClipCount": video_clips,
+    "clips": clip_items,
     "edlExported": edl_exported,
     "edlPath": edl_path or None,
 }
@@ -1770,8 +1793,16 @@ if summary_out:
             f"Audio tracks: {atracks}",
             f"EDL snapshot: {'yes — resolve_from_nle.edl' if edl_exported else 'not exported'}",
             "",
-            "This is a read-only snapshot. Your ShootSpine rough cut was not changed.",
+            "Clips (first 20):",
         ]
+        for c in clip_items[:20]:
+            lines.append(f"  - {c.get('name') or '(unnamed)'}")
+        if len(clip_items) > 20:
+            lines.append(f"  … +{len(clip_items) - 20} more")
+        lines.extend([
+            "",
+            "This is a read-only snapshot. Your ShootSpine rough cut was not changed.",
+        ])
         Path(summary_out).write_text("\\n".join(lines) + "\\n", encoding="utf-8")
     except Exception:
         pass

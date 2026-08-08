@@ -26,8 +26,9 @@
 | **V3 Feedback loop** | Wrap-up after Resolve → remember look defaults next time |
 | **V4 Resolve bin + media** | Media Pool “ShootSpine” bin + ImportMedia before EDL |
 | **V5 Reverse sync** | Read open Resolve timeline → snapshot + optional EDL (non-destructive) |
+| **V6 Planning feedback** | Clip-level compare Resolve ↔ rough cut → next-shoot notes |
 
-Later: deeper clip-level reverse import / planning feedback from final cuts
+Later: deeper reverse import into ShootSpine timeline / cross-project analytics
 
 ## Current implementation status
 
@@ -46,4 +47,5 @@ Later: deeper clip-level reverse import / planning feedback from final cuts
 - **V3 Feedback loop (initial)** — “How did finishing go?” wrap-up; stores last look preference; Look step pre-fills from feedback  
 - **V4 Resolve bin + media (initial)** — create/find Media Pool bin, link clips from handoff manifest, then import EDL; companion script matches  
 - **V5 Reverse sync (initial)** — “Check what’s in Resolve” reads timeline metadata + optional `resolve_from_nle.edl`; compares length/clips to rough cut; does not overwrite ShootSpine edit  
-- Later: deeper clip-level reverse import / planning feedback from final cuts
+- **V6 Planning feedback (initial)** — Resolve clip names matched to media; dropped/added vs rough cut; missing coverage + preferred-take notes for next shoot  
+- Later: deeper reverse import into ShootSpine timeline / cross-project analytics
