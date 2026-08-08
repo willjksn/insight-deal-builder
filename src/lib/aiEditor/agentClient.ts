@@ -2,6 +2,7 @@ import {
   AGENT_API_PREFIX,
   DEFAULT_AGENT_BASE_URL,
   type AgentCreateFoldersResponse,
+  type AgentDetectSourcesResponse,
   type AgentDrivesResponse,
   type AgentHealthResponse,
   type AgentIndexFolderResponse,
@@ -167,6 +168,18 @@ export async function agentStorageStat(baseUrl: string, token: string, dirPath: 
   return agentFetch<AgentStorageStatResponse>(baseUrl, token, "/storage/stat", {
     method: "POST",
     body: JSON.stringify({ path: dirPath }),
+  });
+}
+
+/** Phase A — scan removable/external volumes for camera/audio layouts (read-only). */
+export async function agentDetectSources(
+  baseUrl: string,
+  token: string,
+  body?: { includeInternal?: boolean; maxFiles?: number }
+) {
+  return agentFetch<AgentDetectSourcesResponse>(baseUrl, token, "/media/detect-sources", {
+    method: "POST",
+    body: JSON.stringify(body || {}),
   });
 }
 

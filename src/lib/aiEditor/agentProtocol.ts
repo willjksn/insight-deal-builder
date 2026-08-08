@@ -137,6 +137,32 @@ export type AgentStorageStatResponse = {
   reason?: string;
 };
 
+/** Phase A — raw volume probe before detector classification. */
+export type AgentMediaSourceProbe = {
+  mountPath: string;
+  label?: string;
+  volumeLabel?: string;
+  volumeIdentifier?: string;
+  removable?: boolean;
+  storageType?: string;
+  busType?: string;
+  mediaType?: string;
+  driveType?: string;
+  availableBytes?: number;
+  capacityBytes?: number;
+  topLevelDirs: string[];
+  mediaRoot: string;
+  files: Array<{ path: string; filename: string; sizeBytes: number; mtimeMs?: number }>;
+  clipCount?: number;
+  totalBytes?: number;
+};
+
+export type AgentDetectSourcesResponse = {
+  ok: true;
+  probes: AgentMediaSourceProbe[];
+  scannedDrives: number;
+};
+
 export type AgentCopyVerifiedResponse = {
   ok: true;
   sourcePath: string;

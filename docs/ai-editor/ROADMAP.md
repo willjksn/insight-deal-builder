@@ -44,6 +44,7 @@
 | **V19 Org analytics (opt-in)** | Anonymized studio patterns from opted-in teammates (metadata only) |
 | **V20 Agent version check** | Warn + soft-block Step 1 when Desktop Agent &lt; 0.15 (drive features) |
 | **V21 Resolve edit control** | EDL dissolves + timeline markers (acts/reels/transitions); no baked grades |
+| **Managed Ingest A** | Detect camera/audio cards + ingest review UI (no auto-copy yet) |
 
 ## Current implementation status
 
@@ -80,3 +81,4 @@
 - **V19 Org analytics (initial)** — opt-in user preference; org hub card from same-company contributors; counts only (no names/paths/media)
 - **V20 Agent version check (initial)** — Step 1 requires Desktop Agent 0.15+; amber banner + Restart guidance when outdated/missing version
 - **V21 Resolve edit control (initial)** — soft blends in EDL; markers for acts/reels + dissolves/fades after import (agent 0.16+); LOOKS remains grade guidance only
+- **Managed Ingest Phase A (initial)** — Desktop Agent `detect-sources` + Sony/Zoom/generic detectors; Step 3 review card with destination folder preview; manual folder flow unchanged. See `docs/ai-editor/MANAGED_INGEST.md`

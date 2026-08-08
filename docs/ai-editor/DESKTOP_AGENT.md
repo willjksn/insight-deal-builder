@@ -37,6 +37,10 @@ Archive / restore / reclaim batches return **per-file** success/failure so the U
 
 `POST /v1/resolve/import-edl` applies timeline markers from `shootspine_edit_plan.json` after `ImportTimelineFromFile` (acts/reels + dissolve/fade cues). Soft blends are also written into the EDL as dissolves when the finishing plan uses them. Grades are never applied by the agent.
 
+### Media source detection (v0.17+)
+
+`POST /v1/media/detect-sources` read-only scans removable/external volumes for camera/audio layouts (e.g. Sony `PRIVATE/M4ROOT`, Zoom `FOLDER##`). Returns filesystem probes; classification runs in the web app. Never modifies card contents.
+
 ## Scaffold location
 
 `desktop-agent/` — Node TypeScript HTTP service for V1A (lightweight; Tauri shell can wrap later).

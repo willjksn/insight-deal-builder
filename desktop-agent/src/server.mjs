@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.16.0";
+const VERSION = "0.17.0";
 /** Set SHOOTSPINE_AGENT_DEV_OPEN=1 to accept any non-empty Bearer token (local agent testing). */
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN === "1";
 /** Optional: ShootSpine origin for verifying minted tokens (e.g. http://localhost:3000). */
@@ -29,9 +29,12 @@ const MEDIA_EXTS = new Set([
   ".mxf",
   ".mkv",
   ".avi",
+  ".mts",
+  ".m2ts",
   ".r3d",
   ".braw",
   ".wav",
+  ".bwf",
   ".aiff",
   ".aif",
   ".mp3",
@@ -40,6 +43,8 @@ const MEDIA_EXTS = new Set([
   ".jpg",
   ".jpeg",
   ".png",
+  ".tif",
+  ".tiff",
 ]);
 
 const MANAGED_ROOT = [
@@ -275,9 +280,20 @@ async function walkMedia(folderPath, recursive, out, depth = 0) {
   for (const ent of entries) {
     const full = path.join(folderPath, ent.name);
     if (ent.isDirectory()) {
+      const name = ent.name.toUpperCase();
+      // Skip OS / card junk that is never production media
+      if (
+        name === "SYSTEM VOLUME INFORMATION" ||
+        name === "$RECYCLE.BIN" ||
+        name === "TRASH" ||
+        name.startsWith(".")
+      ) {
+        continue;
+      }
       if (recursive && depth < 12) await walkMedia(full, true, out, depth + 1);
       continue;
     }
+    if (ent.name.startsWith(".")) continue;
     const ext = path.extname(ent.name).toLowerCase();
     if (!MEDIA_EXTS.has(ext)) continue;
     const st = await fs.stat(full);
@@ -289,6 +305,119 @@ async function walkMedia(folderPath, recursive, out, depth = 0) {
     });
     if (out.length >= 2000) return;
   }
+}
+
+const CAMERA_LAYOUT_DIRS = new Set([
+  "PRIVATE",
+  "M4ROOT",
+  "XDROOT",
+  "AVCHD",
+  "BPAV",
+  "DCIM",
+  "CLIP",
+  "ZOOM",
+]);
+
+/**
+ * Phase A — probe mounted volumes for camera/audio card layouts (read-only).
+ * Classification (Sony/Zoom/generic) runs in the web app detectors.
+ */
+async function detectMediaSourceProbes(body = {}) {
+  const includeInternal = body.includeInternal === true;
+  const maxFiles = Math.min(2000, Math.max(1, Number(body.maxFiles) || 500));
+  const drives = await listDrives();
+  const candidates = drives.filter((d) => {
+    if (d.kind && d.kind !== "drive" && d.kind !== "volume") return false;
+    if (includeInternal) return true;
+    if (d.storageType === "internal") return false;
+    if (d.removable) return true;
+    if (
+      d.storageType === "externalSSD" ||
+      d.storageType === "externalHDD" ||
+      d.storageType === "removable" ||
+      d.storageType === "unknown"
+    ) {
+      return true;
+    }
+    // Removable bus types often mis-labeled
+    const bus = String(d.busType || "").toUpperCase();
+    return bus.includes("USB") || bus.includes("SD") || bus.includes("THUNDERBOLT");
+  });
+
+  const probes = [];
+  for (const drive of candidates.slice(0, 16)) {
+    const mountPath = path.resolve(drive.path);
+    try {
+      assertSafePath(mountPath);
+      await fs.access(mountPath);
+    } catch {
+      continue;
+    }
+
+    let topLevelDirs = [];
+    try {
+      const entries = await fs.readdir(mountPath, { withFileTypes: true });
+      topLevelDirs = entries
+        .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+        .map((e) => e.name)
+        .slice(0, 80);
+    } catch {
+      continue;
+    }
+
+    // Prefer known camera roots when present
+    let mediaRoot = mountPath;
+    const upper = new Map(topLevelDirs.map((n) => [n.toUpperCase(), n]));
+    if (upper.has("PRIVATE")) {
+      const priv = path.join(mountPath, upper.get("PRIVATE"));
+      try {
+        const sub = await fs.readdir(priv, { withFileTypes: true });
+        const m4 = sub.find((e) => e.isDirectory() && e.name.toUpperCase() === "M4ROOT");
+        mediaRoot = m4 ? path.join(priv, m4.name) : priv;
+      } catch {
+        mediaRoot = priv;
+      }
+    } else {
+      for (const key of ["M4ROOT", "XDROOT", "AVCHD", "BPAV", "DCIM", "ZOOM"]) {
+        if (upper.has(key)) {
+          mediaRoot = path.join(mountPath, upper.get(key));
+          break;
+        }
+      }
+    }
+
+    const layoutHit = topLevelDirs.some((d) => CAMERA_LAYOUT_DIRS.has(d.toUpperCase()));
+    const files = [];
+    try {
+      await walkMedia(mediaRoot, true, files);
+    } catch {
+      /* unreadable — skip */
+      continue;
+    }
+    if (files.length > maxFiles) files.length = maxFiles;
+    if (!layoutHit && files.length === 0) continue;
+
+    probes.push({
+      mountPath,
+      label: drive.label,
+      volumeLabel: drive.volumeLabel,
+      volumeIdentifier: drive.volumeIdentifier,
+      removable: drive.removable,
+      storageType: drive.storageType,
+      busType: drive.busType,
+      mediaType: drive.mediaType,
+      driveType: drive.driveType,
+      availableBytes: drive.availableBytes,
+      capacityBytes: drive.capacityBytes,
+      topLevelDirs,
+      mediaRoot,
+      files,
+      clipCount: files.length,
+      totalBytes: files.reduce((s, f) => s + (f.sizeBytes || 0), 0),
+    });
+  }
+
+  return { probes, scannedDrives: candidates.length };
 }
 
 function runFfprobe(filePath) {
@@ -2397,6 +2526,12 @@ const server = http.createServer(async (req, res) => {
       const files = [];
       await walkMedia(body.folderPath, body.recursive !== false, files);
       return json(res, 200, { ok: true, files });
+    }
+
+    if (req.method === "POST" && pathname === "/v1/media/detect-sources") {
+      const body = await readBody(req);
+      const result = await detectMediaSourceProbes(body || {});
+      return json(res, 200, { ok: true, ...result });
     }
 
     if (req.method === "POST" && pathname === "/v1/media/probe") {

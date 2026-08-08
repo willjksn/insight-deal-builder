@@ -16,6 +16,10 @@ import {
   WifiOff,
 } from "lucide-react";
 import { FolderPicker } from "@/components/aiEditor/FolderPicker";
+import {
+  ManagedIngestReview,
+  type ManagedIngestOptions,
+} from "@/components/aiEditor/ManagedIngestReview";
 import { MediaPreview, type PreviewItem } from "@/components/aiEditor/MediaPreview";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -29,6 +33,7 @@ import {
   agentCopyVerifiedBatch,
   agentCreateFolders,
   agentCreateProxy,
+  agentDetectSources,
   agentIndexFolder,
   agentIngestCopy,
   agentMediaStreamUrl,
@@ -68,6 +73,10 @@ import {
   assessAgentVersion,
   MIN_DESKTOP_AGENT_VERSION,
 } from "@/lib/aiEditor/agentVersion";
+import {
+  detectMediaSources,
+  type DetectedMediaSource,
+} from "@/lib/aiEditor/cameraDetectors/detectMediaSource";
 import {
   getWorkflowNextStep,
   writeResumeBookmark,
@@ -219,6 +228,18 @@ export function AiEditorClient({ projectId }: Props) {
   const [addMode, setAddMode] = useState<"in_place" | "copy">("in_place");
   const [cameraLabel, setCameraLabel] = useState("CAMERA_A");
   const [prepareWhileCopying, setPrepareWhileCopying] = useState(true);
+  const [detectedSources, setDetectedSources] = useState<DetectedMediaSource[]>([]);
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [detectScanning, setDetectScanning] = useState(false);
+  const [ingestShootLabel, setIngestShootLabel] = useState("");
+  const [ingestOptions, setIngestOptions] = useState<ManagedIngestOptions>({
+    verifyCopy: true,
+    generateProxies: true,
+    generateThumbnails: true,
+    extractMetadata: true,
+    analyzeDuringIngest: true,
+  });
+  const [ingestDestFreeBytes, setIngestDestFreeBytes] = useState<number | null>(null);
   const [diskNote, setDiskNote] = useState<string | null>(null);
   const [ingestQueue, setIngestQueue] = useState<IngestQueueItem[]>([]);
   const [progress, setProgress] = useState<{ pct: number; label: string } | null>(null);
@@ -693,6 +714,54 @@ export function AiEditorClient({ projectId }: Props) {
       setBusy(null);
     }
   }
+
+  const scanDetectedSources = useCallback(async () => {
+    if (!agent.connected) {
+      setDetectedSources([]);
+      return;
+    }
+    setDetectScanning(true);
+    try {
+      const token = await ensureAgentSession();
+      const res = await agentDetectSources(DEFAULT_AGENT_BASE_URL, token, { maxFiles: 800 });
+      const sources = detectMediaSources(res.probes || []);
+      setDetectedSources(sources);
+      setSelectedSourceId((prev) => {
+        if (prev && sources.some((s) => s.id === prev)) return prev;
+        return sources[0]?.id ?? null;
+      });
+      if (sources[0]?.suggestedCameraAssignment) {
+        setCameraLabel((prev) =>
+          prev === "CAMERA_A" || !prev ? sources[0]!.suggestedCameraAssignment! : prev
+        );
+      }
+      const dest = (settings?.projectRootPath || storagePath).trim();
+      if (dest) {
+        try {
+          const st = await agentStorageStat(DEFAULT_AGENT_BASE_URL, token, dest);
+          setIngestDestFreeBytes(
+            typeof st.availableBytes === "number" ? st.availableBytes : null
+          );
+        } catch {
+          setIngestDestFreeBytes(null);
+        }
+      }
+    } catch {
+      /* card scan is best-effort */
+    } finally {
+      setDetectScanning(false);
+    }
+  }, [agent.connected, ensureAgentSession, settings?.projectRootPath, storagePath]);
+
+  useEffect(() => {
+    if (!agent.connected) {
+      setDetectedSources([]);
+      return;
+    }
+    void scanDetectedSources();
+    const t = window.setInterval(() => void scanDetectedSources(), 12000);
+    return () => window.clearInterval(t);
+  }, [agent.connected, scanDetectedSources]);
 
   async function onStartAgent(restart = false) {
     setBusy(restart ? "restart" : "agent");
@@ -2971,6 +3040,62 @@ export function AiEditorClient({ projectId }: Props) {
           </div>
 
           <div className="pl-10 space-y-4">
+            <ManagedIngestReview
+              projectName={context?.projectName || "This edit"}
+              clientOrProject={
+                context?.projectName?.replace(/\s+/g, "") || "Project"
+              }
+              shootLabel={ingestShootLabel || "Shoot"}
+              sources={detectedSources}
+              selectedSourceId={selectedSourceId}
+              onSelectSource={setSelectedSourceId}
+              cameraAssignment={cameraLabel}
+              onCameraAssignmentChange={setCameraLabel}
+              shootLabelEdit={ingestShootLabel}
+              onShootLabelChange={setIngestShootLabel}
+              destinationRoot={
+                (() => {
+                  const root = (settings?.projectRootPath || storagePath).trim();
+                  if (!root) return null;
+                  // Storage root = drive root of edit folder for naming preview
+                  const m = root.match(/^([A-Za-z]:)([\\/]|$)/);
+                  return m ? `${m[1]}\\` : root;
+                })()
+              }
+              destinationLabel={
+                settings?.projectRootPath
+                  ? friendlyDriveLabel(
+                      driveForPath(settings.projectRootPath, knownDrives) || {
+                        path: settings.projectRootPath,
+                        label: settings.projectRootPath,
+                        kind: "drive",
+                      }
+                    )
+                  : null
+              }
+              freeBytes={ingestDestFreeBytes}
+              options={ingestOptions}
+              onOptionsChange={setIngestOptions}
+              scanning={detectScanning}
+              onRescan={() => void scanDetectedSources()}
+              onUseSourceFolder={() => {
+                const src =
+                  detectedSources.find((s) => s.id === selectedSourceId) ||
+                  detectedSources[0];
+                if (!src) return;
+                setAddMode("copy");
+                setIndexFolderPath(src.mediaRoot);
+                if (src.suggestedCameraAssignment) {
+                  setCameraLabel(src.suggestedCameraAssignment);
+                }
+                setPrepareWhileCopying(ingestOptions.generateProxies);
+                setStatusNote(
+                  `Source set to ${src.probableCameraModel || "camera media"} — use Copy into project folders below. One-click Ingest arrives in Phase B.`
+                );
+              }}
+              disabled={!!busy || !agent.connected}
+            />
+
             <div className="grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
@@ -3008,7 +3133,7 @@ export function AiEditorClient({ projectId }: Props) {
               label={addMode === "copy" ? "Source footage folder" : "Footage folder"}
               hint={
                 addMode === "copy"
-                  ? "Camera card copy or SSD folder to copy from."
+                  ? "Camera card, reader path, or SSD folder to copy from."
                   : "Folder that already has your clips."
               }
               value={indexFolderPath}
