@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,6 +13,7 @@ import {
   Loader2,
   Plus,
   Sparkles,
+  X,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -40,176 +41,249 @@ function priorityBadge(priority: AiEditorRecommendation["priority"]) {
   return <Badge variant="default">Tip</Badge>;
 }
 
-function HowItWorksPanel() {
+function HowItWorksGuideContent() {
   return (
-    <Card>
-      <CardBody className="space-y-4">
-        <details className="group">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+    <div className="space-y-6 text-sm leading-relaxed text-slate-700">
+      <section className="space-y-2">
+        <h3 className="font-semibold text-slate-900">What AI Editor is</h3>
+        <p>
+          AI Editor helps you turn camera footage into a strong first cut on this Windows
+          workstation, then hand off to DaVinci Resolve (here or on a Mac) for finishing. Footage
+          stays on <span className="font-medium">your drives</span> — ShootSpine does not upload
+          camera originals to the cloud.
+        </p>
+        <p>
+          You can open it from a full ShootSpine production (script, coverage, board) or start a{" "}
+          <span className="font-medium">footage-only</span> edit with no prep board.
+        </p>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="font-semibold text-slate-900">What you need on this PC</h3>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <span className="font-medium">Desktop Agent</span> — a small local helper that reads
+            folders, copies files, builds proxies, and talks to Resolve. Connect it in Step 1 of any
+            edit (restart after updates; current drive features need{" "}
+            <span className="font-medium">0.15+</span>).
+          </li>
+          <li>
+            <span className="font-medium">FFmpeg</span> — for probe, proxies, and analysis.
+          </li>
+          <li>
+            Optional: <span className="font-medium">Whisper</span> for local speech-to-text.
+          </li>
+        </ul>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="font-semibold text-slate-900">Recommended drive setup</h3>
+        <p>Best production layout (guidance — not a hard requirement):</p>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <span className="font-medium">Edit folder on an external SSD</span> — working project,
+            copies, proxies, and preview live here.
+          </li>
+          <li>
+            <span className="font-medium">Backup folder on an external HDD</span> — verified archive
+            you can restore from and reclaim space against later.
+          </li>
+          <li>
+            <span className="font-medium">Internal SSD (This PC)</span> — Windows and apps only. Fine
+            for tests; not ideal as the main media drive.
+          </li>
+        </ul>
+        <p>
+          Step 2 shows <span className="font-medium">Workspace health</span> (SSD/HDD detection,
+          same-drive risk, free space). If Windows remounts a drive under a new letter, use{" "}
+          <span className="font-medium">Relink paths</span>. If a drive is unplugged, disk actions
+          pause until you Recheck or Relink.
+        </p>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="font-semibold text-slate-900">The edit flow (steps)</h3>
+        <ol className="list-decimal space-y-2 pl-5">
+          <li>
+            <span className="font-medium">Connect this computer</span> — start/reconnect the Desktop
+            Agent.
+          </li>
+          <li>
+            <span className="font-medium">Choose where this edit lives</span> — set edit + optional
+            backup folders; optionally create organized project folders.
+          </li>
+          <li>
+            <span className="font-medium">Add footage</span> — catalog in place or copy into the
+            project (camera cards are never auto-erased).
+          </li>
+          <li>
+            <span className="font-medium">Prepare clips</span> — light H.264 proxies for tough formats
+            so scrubbing stays smooth; originals stay for Resolve.
+          </li>
+          <li>
+            <span className="font-medium">Understand footage</span> — local technical analysis, shot
+            breaks, optional transcription + search.
+          </li>
+          <li>
+            <span className="font-medium">Match to the plan</span> — when you have planned shots,
+            score coverage and preferred takes (skipped for pure footage-only).
+          </li>
+          <li>
+            <span className="font-medium">Build a rough cut</span> — assemble a first timeline with
+            versions you can restore.
+          </li>
+          <li>
+            <span className="font-medium">Edit by chat</span> — optional plain-language trims/moves
+            (won’t block finishing).
+          </li>
+          <li>
+            <span className="font-medium">Set the look</span> — mood + transition tips written into
+            the Resolve package (grade still happens in Resolve).
+          </li>
+          <li>
+            <span className="font-medium">Finish in Resolve</span> — write a handoff package, open
+            Resolve here, or prepare for Mac; sync back / import the Resolve cut when useful.
+          </li>
+          <li>
+            <span className="font-medium">Backup &amp; free space</span> — verified archive to your
+            HDD, restore, then reclaim active copies with typed confirm.
+          </li>
+          <li>
+            <span className="font-medium">How did finishing go?</span> — short wrap-up so the next
+            edit can start with a better look default.
+          </li>
+        </ol>
+        <p>
+          Inside a project, use <span className="font-medium">Continue · Step N</span> to jump to
+          what’s next. This hub remembers your last edit on this PC.
+        </p>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="font-semibold text-slate-900">Resolve &amp; next shoot</h3>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            Handoff includes EDL, media map, LOOKS notes, and (when scripting is ready) import into
+            a ShootSpine bin.
+          </li>
+          <li>
+            After finishing, check what’s in Resolve, build a{" "}
+            <span className="font-medium">next-shoot checklist</span>, and optionally send open
+            items to the production board filming notes.
+          </li>
+        </ul>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="font-semibold text-slate-900">Patterns &amp; privacy</h3>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <span className="font-medium">Your edits</span> — looks, Resolve sync, and checklist
+            patterns from projects you own (metadata only).
+          </li>
+          <li>
+            <span className="font-medium">Organization</span> — optional. Opt in under Settings → AI
+            Editor patterns to share anonymized counts with same-company teammates. No clip files,
+            paths, or project names.
+          </li>
+        </ul>
+      </section>
+
+      <section className="rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-3 text-xs text-slate-600">
+        Tip: plug in your SSD/HDD, wait until Windows shows drive letters, Connect the agent, then
+        pick folders in Step 2. Save the workspace once so remount/relink can remember the volume.
+      </section>
+    </div>
+  );
+}
+
+function HowItWorksPanel() {
+  const [open, setOpen] = useState(false);
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <Card>
+        <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <div className="flex items-center gap-2 font-semibold text-slate-900">
               <HardDrive className="h-4 w-4 text-sky-700" />
               How it works
             </div>
-            <span className="text-xs font-medium text-sky-800 group-open:hidden">Show full guide</span>
-            <span className="hidden text-xs font-medium text-sky-800 group-open:inline">Hide</span>
-          </summary>
-
-          <div className="mt-4 space-y-6 text-sm leading-relaxed text-slate-700">
-            <section className="space-y-2">
-              <h3 className="font-semibold text-slate-900">What AI Editor is</h3>
-              <p>
-                AI Editor helps you turn camera footage into a strong first cut on this Windows
-                workstation, then hand off to DaVinci Resolve (here or on a Mac) for finishing.
-                Footage stays on <span className="font-medium">your drives</span> — ShootSpine does
-                not upload camera originals to the cloud.
-              </p>
-              <p>
-                You can open it from a full ShootSpine production (script, coverage, board) or start
-                a <span className="font-medium">footage-only</span> edit with no prep board.
-              </p>
-            </section>
-
-            <section className="space-y-2">
-              <h3 className="font-semibold text-slate-900">What you need on this PC</h3>
-              <ul className="list-disc space-y-1.5 pl-5">
-                <li>
-                  <span className="font-medium">Desktop Agent</span> — a small local helper that
-                  reads folders, copies files, builds proxies, and talks to Resolve. Connect it in
-                  Step 1 of any edit (restart after updates; current drive features need{" "}
-                  <span className="font-medium">0.15+</span>).
-                </li>
-                <li>
-                  <span className="font-medium">FFmpeg</span> — for probe, proxies, and analysis.
-                </li>
-                <li>
-                  Optional: <span className="font-medium">Whisper</span> for local speech-to-text.
-                </li>
-              </ul>
-            </section>
-
-            <section className="space-y-2">
-              <h3 className="font-semibold text-slate-900">Recommended drive setup</h3>
-              <p>Best production layout (guidance — not a hard requirement):</p>
-              <ul className="list-disc space-y-1.5 pl-5">
-                <li>
-                  <span className="font-medium">Edit folder on an external SSD</span> — working
-                  project, copies, proxies, and preview live here.
-                </li>
-                <li>
-                  <span className="font-medium">Backup folder on an external HDD</span> — verified
-                  archive you can restore from and reclaim space against later.
-                </li>
-                <li>
-                  <span className="font-medium">Internal SSD (This PC)</span> — Windows and apps
-                  only. Fine for tests; not ideal as the main media drive.
-                </li>
-              </ul>
-              <p>
-                Step 2 shows <span className="font-medium">Workspace health</span> (SSD/HDD
-                detection, same-drive risk, free space). If Windows remounts a drive under a new
-                letter, use <span className="font-medium">Relink paths</span>. If a drive is
-                unplugged, disk actions pause until you Recheck or Relink.
-              </p>
-            </section>
-
-            <section className="space-y-2">
-              <h3 className="font-semibold text-slate-900">The edit flow (steps)</h3>
-              <ol className="list-decimal space-y-2 pl-5">
-                <li>
-                  <span className="font-medium">Connect this computer</span> — start/reconnect the
-                  Desktop Agent.
-                </li>
-                <li>
-                  <span className="font-medium">Choose where this edit lives</span> — set edit +
-                  optional backup folders; optionally create organized project folders.
-                </li>
-                <li>
-                  <span className="font-medium">Add footage</span> — catalog in place or copy into
-                  the project (camera cards are never auto-erased).
-                </li>
-                <li>
-                  <span className="font-medium">Prepare clips</span> — light H.264 proxies for tough
-                  formats so scrubbing stays smooth; originals stay for Resolve.
-                </li>
-                <li>
-                  <span className="font-medium">Understand footage</span> — local technical analysis,
-                  shot breaks, optional transcription + search.
-                </li>
-                <li>
-                  <span className="font-medium">Match to the plan</span> — when you have planned
-                  shots, score coverage and preferred takes (skipped for pure footage-only).
-                </li>
-                <li>
-                  <span className="font-medium">Build a rough cut</span> — assemble a first timeline
-                  with versions you can restore.
-                </li>
-                <li>
-                  <span className="font-medium">Edit by chat</span> — optional plain-language
-                  trims/moves (optional; won’t block finishing).
-                </li>
-                <li>
-                  <span className="font-medium">Set the look</span> — mood + transition tips written
-                  into the Resolve package (grade still happens in Resolve).
-                </li>
-                <li>
-                  <span className="font-medium">Finish in Resolve</span> — write a handoff package,
-                  open Resolve here, or prepare for Mac; sync back / import the Resolve cut when
-                  useful.
-                </li>
-                <li>
-                  <span className="font-medium">Backup &amp; free space</span> — verified archive to
-                  your HDD, restore, then reclaim active copies with typed confirm.
-                </li>
-                <li>
-                  <span className="font-medium">How did finishing go?</span> — short wrap-up so the
-                  next edit can start with a better look default.
-                </li>
-              </ol>
-              <p>
-                Inside a project, use <span className="font-medium">Continue · Step N</span> to jump
-                to what’s next. This hub remembers your last edit on this PC.
-              </p>
-            </section>
-
-            <section className="space-y-2">
-              <h3 className="font-semibold text-slate-900">Resolve &amp; next shoot</h3>
-              <ul className="list-disc space-y-1.5 pl-5">
-                <li>
-                  Handoff includes EDL, media map, LOOKS notes, and (when scripting is ready)
-                  import into a ShootSpine bin.
-                </li>
-                <li>
-                  After finishing, check what’s in Resolve, build a{" "}
-                  <span className="font-medium">next-shoot checklist</span>, and optionally send
-                  open items to the production board filming notes.
-                </li>
-              </ul>
-            </section>
-
-            <section className="space-y-2">
-              <h3 className="font-semibold text-slate-900">Patterns &amp; privacy</h3>
-              <ul className="list-disc space-y-1.5 pl-5">
-                <li>
-                  <span className="font-medium">Your edits</span> — looks, Resolve sync, and
-                  checklist patterns from projects you own (metadata only).
-                </li>
-                <li>
-                  <span className="font-medium">Organization</span> — optional. Opt in under
-                  Settings → AI Editor patterns to share anonymized counts with same-company
-                  teammates. No clip files, paths, or project names.
-                </li>
-              </ul>
-            </section>
-
-            <section className="rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-3 text-xs text-slate-600">
-              Tip: plug in your SSD/HDD, wait until Windows shows drive letters, Connect the agent,
-              then pick folders in Step 2. Save the workspace once so remount/relink can remember
-              the volume.
-            </section>
+            <p className="mt-1 text-sm text-slate-600">
+              Full guide: drives, Desktop Agent, edit steps, Resolve, and privacy.
+            </p>
           </div>
-        </details>
-      </CardBody>
-    </Card>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setOpen(true)}
+          >
+            Open guide
+          </Button>
+        </CardBody>
+      </Card>
+
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-900/45 backdrop-blur-[1px]"
+            onClick={() => setOpen(false)}
+            aria-label="Close how it works"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            className="relative flex max-h-[min(88vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+              <div>
+                <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+                  How AI Editor works
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Local footage · Windows workstation · Resolve finishing
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4">
+              <HowItWorksGuideContent />
+            </div>
+            <div className="border-t border-slate-100 px-5 py-3">
+              <Button type="button" className="w-full sm:w-auto" onClick={() => setOpen(false)}>
+                Got it
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
