@@ -1,5 +1,5 @@
 /**
- * V2 — plain-language Resolve workflow status (official scripting when available).
+ * V2/V4 — plain-language Resolve workflow status (official scripting when available).
  */
 
 export type ResolveWorkflowLevel = "ready" | "almost" | "manual" | "missing";
@@ -90,8 +90,26 @@ export function summarizeResolveWorkflow(
 export function importResultMessage(result: {
   imported: boolean;
   reason?: string;
+  mediaImported?: number;
+  mediaRequested?: number;
+  binName?: string;
 }): { title: string; detail: string } {
+  const bin = result.binName || "ShootSpine";
   if (result.imported) {
+    const linked = result.mediaImported ?? 0;
+    const requested = result.mediaRequested ?? 0;
+    if (linked > 0) {
+      return {
+        title: "Your rough cut is in Resolve",
+        detail: `${linked} clip${linked === 1 ? "" : "s"} linked in the “${bin}” media bin. Finish color and sound there.`,
+      };
+    }
+    if (requested > 0) {
+      return {
+        title: "Your rough cut is in Resolve",
+        detail: `Timeline imported. If clips are offline, relink from your project media folder (bin “${bin}”).`,
+      };
+    }
     return {
       title: "Your rough cut is in Resolve",
       detail: "If clips look missing, point Resolve at your project’s media folder.",
@@ -104,7 +122,7 @@ export function importResultMessage(result: {
       detail: "Then try Bring edit into Resolve again — or import the timeline by hand.",
     };
   }
-  if (reason.includes("running") || reason.includes("script")) {
+  if (reason.includes("running") || reason.includes("script") || reason.includes("import_fail")) {
     return {
       title: "Resolve wasn’t ready yet",
       detail:

@@ -13,10 +13,12 @@ describe("resolveBridge", () => {
     );
   });
 
-  it("builds companion python that references EDL and ImportTimelineFromFile", () => {
+  it("builds companion python that links media bin then imports EDL", () => {
     const py = buildResolveCompanionPython({ timelineName: "Rough Cut" });
     expect(py).toContain("DaVinciResolveScript");
     expect(py).toContain("ImportTimelineFromFile");
+    expect(py).toContain("ImportMedia");
+    expect(py).toContain("ShootSpine");
     expect(py).toContain("shootspine_rough_cut.edl");
     expect(py).toContain("Rough Cut");
   });

@@ -1140,8 +1140,10 @@ export function AiEditorClient({ projectId }: Props) {
       }
 
       const imported = await agentResolveImportEdl(DEFAULT_AGENT_BASE_URL, token, {
+        projectRoot,
         handoffDir: written.handoffDir,
         timelineName: timeline?.name || "ShootSpine Rough Cut",
+        linkMedia: true,
       });
       const msg = importResultMessage(imported);
       setResolveImported(imported.imported);
@@ -2560,8 +2562,8 @@ export function AiEditorClient({ projectId }: Props) {
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
                     <p className="font-semibold text-emerald-950">Your rough cut is in Resolve</p>
                     <p className="mt-1 text-sm text-emerald-900/80">
-                      If clips look missing, point Resolve at your project’s media folder. Read the
-                      look notes file in the saved folder for color tips.
+                      Clips are linked in the ShootSpine media bin when possible. Finish color and
+                      sound in Resolve — look tips are in LOOKS.txt in the saved folder.
                     </p>
                   </div>
                 ) : handoffDirOnDisk ? (

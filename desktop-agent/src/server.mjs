@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.7.0";
+const VERSION = "0.8.0";
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN !== "0";
 
 const MEDIA_EXTS = new Set([
@@ -1439,17 +1439,70 @@ raise SystemExit(0)
   };
 }
 
+const RESOLVE_MEDIA_BIN = "ShootSpine";
+
 /**
- * Import EDL via official Resolve scripting API (ImportTimelineFromFile).
+ * Collect on-disk media paths from shootspine_handoff.json (V4 bin link).
+ * Prefers resolvedPath; falls back to projectRoot + relativeProjectPath.
+ */
+async function collectHandoffMediaPaths(handoffDir, projectRoot) {
+  const manifestPath = path.join(handoffDir, "shootspine_handoff.json");
+  const requested = [];
+  const existing = [];
+  if (!(await pathExists(manifestPath))) {
+    return { requested, existing, missing: 0 };
+  }
+  let media = [];
+  try {
+    const raw = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    media = Array.isArray(raw?.media) ? raw.media : [];
+  } catch {
+    return { requested, existing, missing: 0 };
+  }
+
+  const seen = new Set();
+  for (const item of media.slice(0, 200)) {
+    let candidate = typeof item?.resolvedPath === "string" ? item.resolvedPath.trim() : "";
+    if (!candidate && projectRoot && typeof item?.relativeProjectPath === "string") {
+      const rel = item.relativeProjectPath.replace(/^[\\/]+/, "").replace(/\\/g, "/");
+      candidate = path.resolve(projectRoot, ...rel.split("/").filter(Boolean));
+    }
+    if (!candidate) continue;
+    let abs;
+    try {
+      abs = path.resolve(candidate);
+      assertSafePath(abs);
+    } catch {
+      continue;
+    }
+    const key = abs.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    requested.push(abs);
+    if (await pathExists(abs)) existing.push(abs);
+  }
+  return { requested, existing, missing: requested.length - existing.length };
+}
+
+/**
+ * V4 — Import media into a ShootSpine Media Pool bin, then ImportTimelineFromFile.
  * Requires Resolve running with a project open + External scripting enabled.
  */
 async function importEdlIntoResolve(body) {
+  let projectRoot = body.projectRoot ? path.resolve(body.projectRoot) : null;
+  if (projectRoot) assertSafePath(projectRoot);
+
   let handoffDir = body.handoffDir ? path.resolve(body.handoffDir) : null;
-  if (!handoffDir && body.projectRoot) {
-    handoffDir = path.resolve(body.projectRoot, RESOLVE_HANDOFF_REL);
+  if (!handoffDir && projectRoot) {
+    handoffDir = path.resolve(projectRoot, RESOLVE_HANDOFF_REL);
   }
   if (!handoffDir) throw new Error("handoffDir or projectRoot required");
   assertSafePath(handoffDir);
+
+  if (!projectRoot) {
+    // handoff lives at <root>/03_PROJECT_FILES/shootspine_resolve
+    projectRoot = path.resolve(handoffDir, "..", "..");
+  }
 
   const edlName = String(body.edlFilename || "shootspine_rough_cut.edl");
   const edlPath = path.join(handoffDir, path.basename(edlName));
@@ -1459,10 +1512,19 @@ async function importEdlIntoResolve(body) {
       imported: false,
       reason: "EDL_MISSING",
       message: "Timeline file not found — save the edit first",
+      mediaImported: 0,
+      mediaRequested: 0,
+      binName: RESOLVE_MEDIA_BIN,
     };
   }
 
+  const linkMedia = body.linkMedia !== false;
+  const { requested, existing } = linkMedia
+    ? await collectHandoffMediaPaths(handoffDir, projectRoot)
+    : { requested: [], existing: [] };
+
   const timelineName = String(body.timelineName || "ShootSpine Rough Cut").slice(0, 120);
+  const binName = String(body.binName || RESOLVE_MEDIA_BIN).slice(0, 80);
   const python = await findPythonLauncher();
   if (!python) {
     return {
@@ -1470,6 +1532,9 @@ async function importEdlIntoResolve(body) {
       imported: false,
       reason: "NO_PYTHON",
       message: "Python not found for Resolve scripting",
+      mediaImported: 0,
+      mediaRequested: requested.length,
+      binName,
     };
   }
 
@@ -1478,6 +1543,8 @@ ${resolveScriptEnvPrelude()}
 from pathlib import Path
 edl = Path(${JSON.stringify(edlPath)})
 name = ${JSON.stringify(timelineName)}
+bin_name = ${JSON.stringify(binName)}
+media_paths = ${JSON.stringify(existing)}
 try:
     import DaVinciResolveScript as dvr
 except Exception:
@@ -1492,11 +1559,42 @@ if not project:
     print("NO_PROJECT")
     raise SystemExit(3)
 media_pool = project.GetMediaPool()
+root = media_pool.GetRootFolder()
+bin_folder = None
+for sub in (root.GetSubFolderList() or []):
+    try:
+        if sub.GetName() == bin_name:
+            bin_folder = sub
+            break
+    except Exception:
+        pass
+if bin_folder is None:
+    try:
+        bin_folder = media_pool.AddSubFolder(root, bin_name)
+    except Exception:
+        bin_folder = None
+if bin_folder is not None:
+    try:
+        media_pool.SetCurrentFolder(bin_folder)
+    except Exception:
+        pass
+media_count = 0
+if media_paths:
+    try:
+        clips = media_pool.ImportMedia(media_paths)
+        if clips:
+            media_count = len(clips)
+    except Exception:
+        media_count = 0
 imported = media_pool.ImportTimelineFromFile(str(edl), {"timelineName": name})
 if not imported:
-    print("IMPORT_FAILED")
+    print(f"IMPORT_FAILED media={media_count} requested={len(media_paths)}")
     raise SystemExit(4)
-print("IMPORTED")
+try:
+    project.SetCurrentTimeline(imported)
+except Exception:
+    pass
+print(f"IMPORTED media={media_count} requested={len(media_paths)}")
 raise SystemExit(0)
 `;
 
@@ -1504,24 +1602,42 @@ raise SystemExit(0)
     python.bin,
     [...python.prefixArgs, "-c", code],
     { cwd: handoffDir },
-    30000
+    120000
   );
   const out = (result.stdout || "").trim();
+  const mediaMatch = out.match(/media=(\d+)\s+requested=(\d+)/);
+  const mediaImported = mediaMatch ? Number(mediaMatch[1]) : 0;
+  const mediaRequested = mediaMatch ? Number(mediaMatch[2]) : existing.length;
+
   if (out.includes("IMPORTED")) {
+    const parts = ["Timeline imported into the open Resolve project"];
+    if (mediaImported > 0) {
+      parts.push(`${mediaImported} clip(s) linked in the “${binName}” bin`);
+    } else if (requested.length > 0) {
+      parts.push("Media files weren’t linked — relink from your project media folder if clips are offline");
+    }
     return {
       ok: true,
       imported: true,
       reason: "OK",
-      message: "Timeline imported into the open Resolve project",
+      message: parts.join(". ") + ".",
       edlPath,
+      mediaImported,
+      mediaRequested: requested.length,
+      mediaMissing: requested.length - existing.length,
+      binName,
     };
   }
   return {
     ok: true,
     imported: false,
-    reason: out || "UNKNOWN",
+    reason: out.split(/\s/)[0] || "UNKNOWN",
     message: result.stderr?.slice(0, 300) || out || "Import did not succeed",
     edlPath,
+    mediaImported,
+    mediaRequested: requested.length,
+    mediaMissing: requested.length - existing.length,
+    binName,
   };
 }
 

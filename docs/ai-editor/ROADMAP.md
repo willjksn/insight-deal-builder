@@ -24,8 +24,9 @@
 | **V1.6 Finishing suggestions** | Mood/look notes + transition style → Resolve LOOKS.txt |
 | **V2 Workflow Integration** | Official Resolve scripting: status + auto-import when ready |
 | **V3 Feedback loop** | Wrap-up after Resolve → remember look defaults next time |
+| **V4 Resolve bin + media** | Media Pool “ShootSpine” bin + ImportMedia before EDL |
 
-Later: deeper Resolve bin automation, richer reverse-sync from NLE
+Later: richer reverse-sync from NLE
 
 ## Current implementation status
 
@@ -42,4 +43,5 @@ Later: deeper Resolve bin automation, richer reverse-sync from NLE
 - **V1.6 Finishing suggestions (initial)** — mood presets + transition style on timeline; LOOKS.txt in Resolve package; Step 9 UI (suggestions only — grade in Resolve)  
 - **V2 Workflow Integration (initial)** — scripting probe, Bring edit into Resolve (`ImportTimelineFromFile`), plain-language readiness status; manual fallback  
 - **V3 Feedback loop (initial)** — “How did finishing go?” wrap-up; stores last look preference; Look step pre-fills from feedback  
-- Later: deeper Resolve bin automation, richer reverse-sync from NLE
+- **V4 Resolve bin + media (initial)** — create/find Media Pool bin, link clips from handoff manifest, then import EDL; companion script matches  
+- Later: richer reverse-sync from NLE

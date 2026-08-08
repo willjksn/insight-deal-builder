@@ -38,4 +38,15 @@ describe("resolveWorkflow", () => {
     const m = importResultMessage({ imported: false, reason: "NO_PROJECT" });
     expect(m.title).toMatch(/project/i);
   });
+
+  it("mentions media bin when clips were linked", () => {
+    const m = importResultMessage({
+      imported: true,
+      mediaImported: 4,
+      mediaRequested: 4,
+      binName: "ShootSpine",
+    });
+    expect(m.detail).toMatch(/4 clips/i);
+    expect(m.detail).toMatch(/ShootSpine/);
+  });
 });

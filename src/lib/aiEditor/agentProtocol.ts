@@ -205,6 +205,11 @@ export type AgentResolveImportEdlResponse = {
   reason: string;
   message: string;
   edlPath?: string;
+  /** V4 — clips linked into Media Pool bin before timeline import */
+  mediaImported?: number;
+  mediaRequested?: number;
+  mediaMissing?: number;
+  binName?: string;
 };
 
 export type AgentFsRevealResponse = {

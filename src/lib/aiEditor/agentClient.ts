@@ -269,6 +269,9 @@ export async function agentResolveImportEdl(
     handoffDir?: string;
     edlFilename?: string;
     timelineName?: string;
+    /** Default true — import media into ShootSpine Media Pool bin first (V4). */
+    linkMedia?: boolean;
+    binName?: string;
   }
 ) {
   return agentFetch<AgentResolveImportEdlResponse>(baseUrl, token, "/resolve/import-edl", {

@@ -31,16 +31,22 @@ export function resolveHandoffAbsoluteDir(projectRoot: string): string {
   return joinProjectRelative(projectRoot.trim(), RESOLVE_HANDOFF_REL_DIR);
 }
 
-/** Python companion: feature-detect Resolve scripting and import the EDL. */
+/** Python companion: Media Pool bin + media link + EDL (V4). */
 export function buildResolveCompanionPython(input: {
   edlFilename?: string;
   timelineName?: string;
+  binName?: string;
 }): string {
   const edl = input.edlFilename || RESOLVE_HANDOFF_FILES.edl;
   const name = (input.timelineName || "ShootSpine Rough Cut").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const bin = (input.binName || "ShootSpine").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `#!/usr/bin/env python3
 """
-ShootSpine → DaVinci Resolve companion (V1.5)
+ShootSpine → DaVinci Resolve companion (V4)
+
+1) Creates/finds a Media Pool bin
+2) Imports media from shootspine_handoff.json
+3) Imports the rough-cut EDL
 
 Requires DaVinci Resolve running with External Scripting enabled
 (Preferences → System → General → External scripting using).
@@ -51,12 +57,15 @@ Usage (Mac or Windows), from this folder:
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
 
 EDL_NAME = ${JSON.stringify(edl)}
 TIMELINE_NAME = "${name}"
+BIN_NAME = "${bin}"
+MANIFEST_NAME = "shootspine_handoff.json"
 
 
 def setup_env() -> None:
@@ -89,12 +98,62 @@ def setup_env() -> None:
         sys.path.insert(0, modules)
 
 
+def collect_media_paths(handoff_dir: Path, project_root: Path) -> list[str]:
+    manifest = handoff_dir / MANIFEST_NAME
+    if not manifest.is_file():
+        return []
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    paths: list[str] = []
+    seen: set[str] = set()
+    for item in (data.get("media") or [])[:200]:
+        candidate = (item.get("resolvedPath") or "").strip()
+        rel = (item.get("relativeProjectPath") or "").strip().replace("\\\\", "/")
+        if not candidate and rel:
+            candidate = str(project_root.joinpath(*[p for p in rel.split("/") if p]))
+        if not candidate:
+            continue
+        p = Path(candidate)
+        if not p.is_file():
+            continue
+        key = str(p.resolve()).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        paths.append(str(p.resolve()))
+    return paths
+
+
+def ensure_bin(media_pool, name: str):
+    root = media_pool.GetRootFolder()
+    for sub in root.GetSubFolderList() or []:
+        try:
+            if sub.GetName() == name:
+                media_pool.SetCurrentFolder(sub)
+                return sub
+        except Exception:
+            pass
+    folder = media_pool.AddSubFolder(root, name)
+    if folder is not None:
+        try:
+            media_pool.SetCurrentFolder(folder)
+        except Exception:
+            pass
+    return folder
+
+
 def main() -> int:
     setup_env()
-    edl_path = Path(__file__).resolve().parent / EDL_NAME
+    handoff_dir = Path(__file__).resolve().parent
+    edl_path = handoff_dir / EDL_NAME
     if not edl_path.is_file():
         print(f"EDL not found: {edl_path}")
         return 1
+
+    # …/ProjectRoot/03_PROJECT_FILES/shootspine_resolve
+    project_root = handoff_dir.parent.parent
 
     try:
         import DaVinciResolveScript as dvr  # type: ignore
@@ -115,6 +174,16 @@ def main() -> int:
         return 4
 
     media_pool = project.GetMediaPool()
+    ensure_bin(media_pool, BIN_NAME)
+    media_paths = collect_media_paths(handoff_dir, project_root)
+    media_count = 0
+    if media_paths:
+        try:
+            clips = media_pool.ImportMedia(media_paths)
+            media_count = len(clips) if clips else 0
+        except Exception as exc:
+            print(f"Media import warning: {exc}")
+
     imported = media_pool.ImportTimelineFromFile(
         str(edl_path),
         {"timelineName": TIMELINE_NAME},
@@ -124,8 +193,15 @@ def main() -> int:
         print(f"  File → Import → Timeline → Import EDL… → {edl_path.name}")
         return 5
 
+    try:
+        project.SetCurrentTimeline(imported)
+    except Exception:
+        pass
+
     print(f"Imported timeline from {edl_path.name}")
-    print("Relink offline media using shootspine_handoff.json (relativeProjectPath / checksum).")
+    print(f"Linked {media_count} media file(s) into bin '{BIN_NAME}'.")
+    if media_count == 0:
+        print("If clips are offline, relink using paths in shootspine_handoff.json.")
     return 0
 
 
@@ -149,11 +225,13 @@ export function buildOpenOnMacReadme(input: {
     "  1. Open DaVinci Resolve and create/open a project.",
     "  2. cd into this folder",
     "  3. python3 import_shootspine_edl.py",
+    "     (creates a ShootSpine media bin, links clips, imports the EDL)",
     "",
     "Option B — manual:",
-    "  1. File → Import → Timeline → Import EDL…",
-    "  2. Choose shootspine_rough_cut.edl",
-    "  3. Relink using paths in shootspine_handoff.json",
+    "  1. Media Pool → import clips from 01_ORIGINAL_MEDIA (or proxies)",
+    "  2. File → Import → Timeline → Import EDL…",
+    "  3. Choose shootspine_rough_cut.edl",
+    "  4. Relink using paths in shootspine_handoff.json if needed",
     "",
     `Project: ${input.projectId}`,
     input.timelineName ? `Timeline: ${input.timelineName}` : "",
