@@ -36,6 +36,7 @@ import {
   agentProbe,
   agentResolveImportEdl,
   agentResolveScriptingProbe,
+  agentResolveSyncFromNle,
   agentRevealPath,
   agentSafeDelete,
   agentStorageStat,
@@ -44,7 +45,10 @@ import {
   checkAgentHealth,
   playbackPathForAsset,
 } from "@/lib/aiEditor/agentClient";
-import { RESOLVE_HANDOFF_REL_DIR } from "@/lib/aiEditor/resolveBridge";
+import {
+  RESOLVE_HANDOFF_REL_DIR,
+  resolveHandoffAbsoluteDir,
+} from "@/lib/aiEditor/resolveBridge";
 import {
   canReclaimActiveCopy,
   SAFE_DELETE_CONFIRM_PHRASE,
@@ -76,6 +80,7 @@ import {
   aiEditorRunMatch,
   aiEditorSaveAnalysis,
   aiEditorSaveFeedback,
+  aiEditorSaveResolveSync,
   aiEditorSaveStorage,
   aiEditorChatEdit,
   aiEditorExportResolve,
@@ -87,6 +92,12 @@ import {
   defaultsFromFeedback,
   summarizeFeedback,
 } from "@/lib/aiEditor/feedback";
+import {
+  compareResolveToRoughCut,
+  summarizeResolveSync,
+  type ResolveSyncCompare,
+} from "@/lib/aiEditor/resolveSync";
+import { timelineDurationFrames } from "@/lib/aiEditor/timeline";
 import type { FinishingFeedbackOutcome } from "@/lib/aiEditor/types";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 import { mockMediaEngine } from "@/lib/aiEditor/mediaEngine";
@@ -175,6 +186,9 @@ export function AiEditorClient({ projectId }: Props) {
   const [transitionStyle, setTransitionStyle] = useState<TransitionStyleId>("cuts");
   const [resolveWorkflow, setResolveWorkflow] = useState<ResolveWorkflowStatus | null>(null);
   const [resolveImported, setResolveImported] = useState(false);
+  const [resolveSyncCompare, setResolveSyncCompare] = useState<ResolveSyncCompare | null>(
+    null
+  );
   const [feedbackOutcome, setFeedbackOutcome] =
     useState<FinishingFeedbackOutcome>("kept_look");
   const [feedbackNote, setFeedbackNote] = useState("");
@@ -291,6 +305,7 @@ export function AiEditorClient({ projectId }: Props) {
   const step12Done = Boolean(settings?.lastFinishingFeedback);
   const finishingSummary = summarizeFinishing(timeline?.finishing);
   const feedbackSummary = summarizeFeedback(settings?.lastFinishingFeedback);
+  const resolveSyncSummary = summarizeResolveSync(settings?.lastResolveSync);
   const videoTrack = timeline?.tracks.find((t) => t.kind === "video");
 
   async function onRecheckAgent() {
@@ -965,6 +980,59 @@ export function AiEditorClient({ projectId }: Props) {
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save look");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onSyncFromResolve() {
+    setBusy("resolve-sync");
+    setError(null);
+    setStatusNote(null);
+    setResolveSyncCompare(null);
+    try {
+      const health = await checkAgentHealth();
+      setAgent(health);
+      if (!health.connected) throw new Error("Desktop Agent not connected");
+      const projectRoot = settings?.projectRootPath?.trim();
+      if (!projectRoot) throw new Error("Set your project folder in step 2 first");
+      const token = await ensureAgentSession();
+
+      let probe = await refreshResolveWorkflow(token);
+      if (!probe?.projectOpen) {
+        setStatusNote("Open Resolve with a project and timeline, then try again.");
+        return;
+      }
+
+      const handoffDir = handoffDirOnDisk || resolveHandoffAbsoluteDir(projectRoot);
+
+      const result = await agentResolveSyncFromNle(DEFAULT_AGENT_BASE_URL, token, {
+        projectRoot,
+        handoffDir,
+        exportEdl: true,
+      });
+      if (!result.synced || !result.snapshot) {
+        setStatusNote(result.message || "Couldn’t read Resolve yet.");
+        return;
+      }
+
+      const saved = await aiEditorSaveResolveSync(getToken, projectId, {
+        snapshot: result.snapshot,
+      });
+      setSettings(saved.settings);
+      setJobs((prev) => [saved.job, ...prev.filter((j) => j.id !== saved.job.id)]);
+
+      const compare = compareResolveToRoughCut({
+        sync: saved.sync,
+        roughCutDurationFrames: timeline ? timelineDurationFrames(timeline) : undefined,
+        roughCutClipCount: videoTrack?.clips.length,
+        roughCutFrameRate: timeline?.frameRate,
+      });
+      setResolveSyncCompare(compare);
+      setHandoffDirOnDisk(handoffDir);
+      setStatusNote(`${compare.title} ${compare.detail}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not sync from Resolve");
     } finally {
       setBusy(null);
     }
@@ -2717,6 +2785,42 @@ export function AiEditorClient({ projectId }: Props) {
                 ) : null}
               </div>
             )}
+
+            {finishWhere === "here" ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
+                <p className="font-semibold text-slate-900">After you finish in Resolve</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Read the open timeline back into ShootSpine (clip count, length, optional EDL
+                  snapshot). Your rough cut here is not overwritten.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => void onSyncFromResolve()}
+                    disabled={!!busy || !agent.connected || !settings?.projectRootPath}
+                  >
+                    {busy === "resolve-sync" ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-1.5 h-4 w-4" />
+                    )}
+                    Check what’s in Resolve
+                  </Button>
+                  {resolveSyncSummary ? (
+                    <span className="text-sm text-slate-600">
+                      Last sync:{" "}
+                      <span className="font-medium text-slate-800">{resolveSyncSummary}</span>
+                    </span>
+                  ) : null}
+                </div>
+                {resolveSyncCompare ? (
+                  <div className="mt-3 rounded-xl border border-emerald-100 bg-white px-3 py-2.5">
+                    <p className="text-sm font-medium text-slate-900">{resolveSyncCompare.title}</p>
+                    <p className="mt-0.5 text-sm text-slate-600">{resolveSyncCompare.detail}</p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </CardBody>
       </Card>

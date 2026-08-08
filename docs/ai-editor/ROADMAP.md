@@ -25,8 +25,9 @@
 | **V2 Workflow Integration** | Official Resolve scripting: status + auto-import when ready |
 | **V3 Feedback loop** | Wrap-up after Resolve → remember look defaults next time |
 | **V4 Resolve bin + media** | Media Pool “ShootSpine” bin + ImportMedia before EDL |
+| **V5 Reverse sync** | Read open Resolve timeline → snapshot + optional EDL (non-destructive) |
 
-Later: richer reverse-sync from NLE
+Later: deeper clip-level reverse import / planning feedback from final cuts
 
 ## Current implementation status
 
@@ -44,4 +45,5 @@ Later: richer reverse-sync from NLE
 - **V2 Workflow Integration (initial)** — scripting probe, Bring edit into Resolve (`ImportTimelineFromFile`), plain-language readiness status; manual fallback  
 - **V3 Feedback loop (initial)** — “How did finishing go?” wrap-up; stores last look preference; Look step pre-fills from feedback  
 - **V4 Resolve bin + media (initial)** — create/find Media Pool bin, link clips from handoff manifest, then import EDL; companion script matches  
-- Later: richer reverse-sync from NLE
+- **V5 Reverse sync (initial)** — “Check what’s in Resolve” reads timeline metadata + optional `resolve_from_nle.edl`; compares length/clips to rough cut; does not overwrite ShootSpine edit  
+- Later: deeper clip-level reverse import / planning feedback from final cuts

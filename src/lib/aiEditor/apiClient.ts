@@ -9,6 +9,7 @@ import type {
   FinishingFeedbackOutcome,
   FinishingMoodId,
   MediaAsset,
+  ResolveSyncSnapshot,
   PreferredTakeOverride,
   ProductionContext,
   StorageLocation,
@@ -244,6 +245,24 @@ export async function aiEditorSaveFeedback(
   return parseJson<{
     ok: true;
     feedback: FinishingFeedback;
+    settings: AiEditorProjectSettings;
+    job: AiEditorJob;
+  }>(res);
+}
+
+export async function aiEditorSaveResolveSync(
+  getToken: GetToken,
+  projectId: string,
+  body: { snapshot: ResolveSyncSnapshot }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/resolve-sync`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{
+    ok: true;
+    sync: ResolveSyncSnapshot;
     settings: AiEditorProjectSettings;
     job: AiEditorJob;
   }>(res);

@@ -212,6 +212,28 @@ export type AgentResolveImportEdlResponse = {
   binName?: string;
 };
 
+export type AgentResolveSyncFromNleResponse = {
+  ok: true;
+  synced: boolean;
+  reason: string;
+  message: string;
+  snapshot?: {
+    projectName?: string;
+    timelineName?: string;
+    startFrame?: number;
+    endFrame?: number;
+    durationFrames?: number;
+    durationSeconds?: number;
+    frameRate?: number;
+    videoTrackCount?: number;
+    audioTrackCount?: number;
+    videoClipCount?: number;
+    edlExported?: boolean;
+    edlPath?: string | null;
+  };
+  summaryPath?: string;
+};
+
 export type AgentFsRevealResponse = {
   ok: true;
   revealed: string;

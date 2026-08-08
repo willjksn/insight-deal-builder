@@ -35,6 +35,7 @@ export type AiEditorJobType =
   | "resolve_export"
   | "resolve_open"
   | "resolve_import"
+  | "resolve_sync"
   | "finishing"
   | "feedback";
 
@@ -79,6 +80,8 @@ export interface AiEditorProjectSettings {
   agentLastSeenAt?: string;
   /** V3 — last wrap-up after finishing in Resolve. */
   lastFinishingFeedback?: FinishingFeedback;
+  /** V5 — last read-only snapshot from the open Resolve timeline. */
+  lastResolveSync?: ResolveSyncSnapshot;
   createdAt: string;
   updatedAt: string;
 }
@@ -274,6 +277,23 @@ export interface FinishingFeedback {
   outcome: FinishingFeedbackOutcome;
   note?: string;
   updatedAt: string;
+}
+
+/** V5 — read-only snapshot of the open Resolve timeline. */
+export interface ResolveSyncSnapshot {
+  projectName?: string;
+  timelineName?: string;
+  startFrame?: number;
+  endFrame?: number;
+  durationFrames?: number;
+  durationSeconds?: number;
+  frameRate?: number;
+  videoTrackCount?: number;
+  audioTrackCount?: number;
+  videoClipCount?: number;
+  edlExported?: boolean;
+  edlPath?: string | null;
+  syncedAt?: string;
 }
 
 export interface ClipTransitionOut {

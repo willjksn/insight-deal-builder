@@ -17,6 +17,7 @@ import {
   type AgentResolveImportEdlResponse,
   type AgentResolveOpenResponse,
   type AgentResolveScriptingProbeResponse,
+  type AgentResolveSyncFromNleResponse,
   type AgentResolveWriteHandoffResponse,
   type AgentSafeDeleteFile,
   type AgentSafeDeleteResponse,
@@ -278,6 +279,27 @@ export async function agentResolveImportEdl(
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export async function agentResolveSyncFromNle(
+  baseUrl: string,
+  token: string,
+  body: {
+    projectRoot?: string;
+    handoffDir?: string;
+    /** Default true — write resolve_from_nle.edl under the handoff folder. */
+    exportEdl?: boolean;
+  }
+) {
+  return agentFetch<AgentResolveSyncFromNleResponse>(
+    baseUrl,
+    token,
+    "/resolve/sync-from-nle",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    }
+  );
 }
 
 /** Local media URL for <video>/<audio> — token in query (browsers can't set Authorization on media elements). */

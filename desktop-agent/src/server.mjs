@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.8.0";
+const VERSION = "0.9.0";
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN !== "0";
 
 const MEDIA_EXTS = new Set([
@@ -1642,6 +1642,191 @@ raise SystemExit(0)
 }
 
 /**
+ * V5 — Read the open Resolve timeline back (metadata + optional EDL snapshot).
+ * Non-destructive: never overwrites the ShootSpine rough cut EDL.
+ */
+async function syncFromResolve(body) {
+  let projectRoot = body.projectRoot ? path.resolve(body.projectRoot) : null;
+  if (projectRoot) assertSafePath(projectRoot);
+
+  let handoffDir = body.handoffDir ? path.resolve(body.handoffDir) : null;
+  if (!handoffDir && projectRoot) {
+    handoffDir = path.resolve(projectRoot, RESOLVE_HANDOFF_REL);
+  }
+  if (handoffDir) assertSafePath(handoffDir);
+
+  const exportEdl = body.exportEdl !== false;
+  const python = await findPythonLauncher();
+  if (!python) {
+    return {
+      ok: true,
+      synced: false,
+      reason: "NO_PYTHON",
+      message: "Python not found for Resolve scripting",
+    };
+  }
+
+  const edlOut =
+    handoffDir && exportEdl
+      ? path.join(handoffDir, "resolve_from_nle.edl")
+      : "";
+  const summaryOut =
+    handoffDir ? path.join(handoffDir, "RESOLVE_SYNC.txt") : "";
+
+  if (handoffDir) {
+    await fs.mkdir(handoffDir, { recursive: true });
+  }
+
+  const code = `
+${resolveScriptEnvPrelude()}
+import json
+from pathlib import Path
+edl_out = ${JSON.stringify(edlOut)}
+summary_out = ${JSON.stringify(summaryOut)}
+try:
+    import DaVinciResolveScript as dvr
+except Exception:
+    print("IMPORT_FAIL")
+    raise SystemExit(1)
+resolve = dvr.scriptapp("Resolve")
+if not resolve:
+    print("NO_RESOLVE")
+    raise SystemExit(2)
+project = resolve.GetProjectManager().GetCurrentProject()
+if not project:
+    print("NO_PROJECT")
+    raise SystemExit(3)
+timeline = project.GetCurrentTimeline()
+if not timeline:
+    print("NO_TIMELINE")
+    raise SystemExit(4)
+
+def safe_int(v, default=0):
+    try:
+        return int(v)
+    except Exception:
+        return default
+
+def safe_float(v, default=24.0):
+    try:
+        return float(v)
+    except Exception:
+        return default
+
+name = timeline.GetName() or "Untitled"
+project_name = project.GetName() or ""
+start = safe_int(timeline.GetStartFrame(), 0)
+end = safe_int(timeline.GetEndFrame(), start)
+fps_raw = project.GetSetting("timelineFrameRate") or timeline.GetSetting("timelineFrameRate") or "24"
+fps = safe_float(fps_raw, 24.0)
+vtracks = safe_int(timeline.GetTrackCount("video"), 0)
+atracks = safe_int(timeline.GetTrackCount("audio"), 0)
+video_clips = 0
+for i in range(1, vtracks + 1):
+    try:
+        items = timeline.GetItemListInTrack("video", i) or []
+        video_clips += len(items)
+    except Exception:
+        pass
+duration_frames = max(0, end - start)
+duration_seconds = duration_frames / fps if fps > 0 else 0.0
+
+edl_exported = False
+edl_path = ""
+if edl_out:
+    try:
+        ok = timeline.Export(edl_out, resolve.EXPORT_EDL, resolve.EXPORT_NONE)
+        edl_exported = bool(ok)
+        if edl_exported:
+            edl_path = edl_out
+    except Exception:
+        edl_exported = False
+
+payload = {
+    "projectName": project_name,
+    "timelineName": name,
+    "startFrame": start,
+    "endFrame": end,
+    "durationFrames": duration_frames,
+    "durationSeconds": round(duration_seconds, 3),
+    "frameRate": fps,
+    "videoTrackCount": vtracks,
+    "audioTrackCount": atracks,
+    "videoClipCount": video_clips,
+    "edlExported": edl_exported,
+    "edlPath": edl_path or None,
+}
+
+if summary_out:
+    try:
+        lines = [
+            "ShootSpine ← Resolve sync",
+            "=========================",
+            "",
+            f"Resolve project: {project_name}",
+            f"Timeline: {name}",
+            f"Duration: {duration_frames} frames (~{duration_seconds:.1f}s) @ {fps} fps",
+            f"Video clips: {video_clips} across {vtracks} track(s)",
+            f"Audio tracks: {atracks}",
+            f"EDL snapshot: {'yes — resolve_from_nle.edl' if edl_exported else 'not exported'}",
+            "",
+            "This is a read-only snapshot. Your ShootSpine rough cut was not changed.",
+        ]
+        Path(summary_out).write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+    except Exception:
+        pass
+
+print("SYNC_OK " + json.dumps(payload, separators=(",", ":")))
+raise SystemExit(0)
+`;
+
+  const result = await runProcessCapture(
+    python.bin,
+    [...python.prefixArgs, "-c", code],
+    handoffDir ? { cwd: handoffDir } : {},
+    60000
+  );
+  const out = (result.stdout || "").trim();
+  const line = out
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l.startsWith("SYNC_OK "));
+
+  if (line) {
+    let snapshot = {};
+    try {
+      snapshot = JSON.parse(line.slice("SYNC_OK ".length));
+    } catch {
+      snapshot = {};
+    }
+    return {
+      ok: true,
+      synced: true,
+      reason: "OK",
+      message: snapshot.timelineName
+        ? `Read “${snapshot.timelineName}” from Resolve`
+        : "Read current Resolve timeline",
+      snapshot,
+      summaryPath: summaryOut || undefined,
+    };
+  }
+
+  const reason = out.split(/\s/)[0] || "UNKNOWN";
+  const messages = {
+    NO_TIMELINE: "Open a timeline in Resolve first",
+    NO_PROJECT: "Open a project in Resolve first",
+    NO_RESOLVE: "Resolve isn’t running or scripting is off",
+    IMPORT_FAIL: "Resolve scripting modules aren’t available",
+  };
+  return {
+    ok: true,
+    synced: false,
+    reason,
+    message: messages[reason] || result.stderr?.slice(0, 300) || out || "Could not read Resolve",
+  };
+}
+
+/**
  * Launch Resolve from allowlisted detected path only — no arbitrary user shell.
  * Does not auto-open Explorer (steals focus while Resolve is loading).
  */
@@ -1984,6 +2169,12 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const imported = await importEdlIntoResolve(body);
       return json(res, 200, imported);
+    }
+
+    if (req.method === "POST" && pathname === "/v1/resolve/sync-from-nle") {
+      const body = await readBody(req);
+      const synced = await syncFromResolve(body);
+      return json(res, 200, synced);
     }
 
     if (req.method === "POST" && pathname === "/v1/shutdown") {

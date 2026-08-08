@@ -36,6 +36,7 @@ V1A accepts any non-empty bearer token when `SHOOTSPINE_AGENT_DEV_OPEN=1` (defau
 | POST | `/v1/resolve/detect` | Detect DaVinci Resolve + scripting modules |
 | POST | `/v1/resolve/scripting-probe` | Live scripting + project-open check |
 | POST | `/v1/resolve/import-edl` | Link media into ShootSpine bin + import EDL (V4) |
+| POST | `/v1/resolve/sync-from-nle` | Read open Resolve timeline + optional EDL snapshot (V5) |
 | POST | `/v1/resolve/write-handoff` | Write EDL/JSON/companion under project root |
 | POST | `/v1/resolve/open` | Launch Resolve (allowlisted) |
 | POST | `/v1/fs/reveal` | Open a folder in Explorer / Finder |
