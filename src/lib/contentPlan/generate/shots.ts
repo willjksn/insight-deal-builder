@@ -7,7 +7,7 @@ const JSON_OPTS = { temperature: 0.3, thinkingBudget: 0 as const };
 
 const OUTLINE_SYSTEM = `You are a Director of Photography inside ShootSpine.
 Create a COMPACT shot outline for a short-form video (not full how-to detail yet).
-Prefer available gear when useAvailableGearOnly is true.
+When an AVAILABLE SHOOTING KIT block is provided, cameraBody and lens MUST come from that kit only.
 Keep each shot SHORT: shotName + one-sentence visualDescription + short storyPurpose.
 HARD LIMIT: return at most 8 shots (6–8 is ideal for 15–45s).
 Return JSON only:
@@ -38,6 +38,7 @@ Return JSON only:
 const EXPAND_SYSTEM = `You are a DP + 1st AD inside ShootSpine.
 Expand ONE outline shot into a FULL executable shot card.
 Keep JSON compact and practical — short phrases, not essays.
+When an AVAILABLE SHOOTING KIT block is provided, do not invent bodies/lenses/lights outside that kit.
 Include:
 - camera/lens/exposure/placement
 - composition + lighting (concrete)
@@ -111,7 +112,8 @@ function slimOutlineShot(shot: ContentShot): Record<string, unknown> {
 }
 
 async function generateShotOutline(
-  plan: Pick<ContentPlan, "creativeBrief" | "beats" | "scriptLines" | "inputs">
+  plan: Pick<ContentPlan, "creativeBrief" | "beats" | "scriptLines" | "inputs">,
+  gearPromptBlock?: string
 ): Promise<ContentShot[]> {
   const raw = await callGeminiJsonWithHistory(
     OUTLINE_SYSTEM,
@@ -120,7 +122,13 @@ async function generateShotOutline(
         role: "user",
         parts: [
           {
-            text: `Create the compact shot outline (max 8 shots).\nPlan:${outlineContext(plan)}`,
+            text: [
+              `Create the compact shot outline (max 8 shots).`,
+              gearPromptBlock || "",
+              `Plan:${outlineContext(plan)}`,
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
           },
         ],
       },
@@ -132,7 +140,8 @@ async function generateShotOutline(
 
 async function expandOneShot(
   plan: Pick<ContentPlan, "creativeBrief" | "beats" | "scriptLines" | "inputs">,
-  outline: ContentShot
+  outline: ContentShot,
+  gearPromptBlock?: string
 ): Promise<ContentShot> {
   const raw = await callGeminiJsonWithHistory(
     EXPAND_SYSTEM,
@@ -143,6 +152,7 @@ async function expandOneShot(
           {
             text: [
               `Expand this single outline shot.`,
+              gearPromptBlock || "",
               `teachMe=${plan.inputs.teachMe}`,
               `useAvailableGearOnly=${plan.inputs.useAvailableGearOnly}`,
               `cameras=${plan.inputs.camerasAvailable || ""}`,
@@ -152,7 +162,9 @@ async function expandOneShot(
               `location=${plan.inputs.location || ""}`,
               `title=${plan.creativeBrief?.workingTitle || ""}`,
               `outline=${JSON.stringify(slimOutlineShot(outline))}`,
-            ].join("\n"),
+            ]
+              .filter(Boolean)
+              .join("\n"),
           },
         ],
       },
@@ -180,11 +192,13 @@ async function expandOneShot(
 export async function generateContentShots(
   plan: Pick<ContentPlan, "creativeBrief" | "beats" | "scriptLines" | "inputs">,
   opts?: {
+    gearPromptBlock?: string;
     onOutline?: (shots: ContentShot[]) => Promise<void> | void;
     onBatch?: (shots: ContentShot[]) => Promise<void> | void;
   }
 ): Promise<ContentShot[]> {
-  const outline = await generateShotOutline(plan);
+  const gearPromptBlock = opts?.gearPromptBlock;
+  const outline = await generateShotOutline(plan, gearPromptBlock);
   if (!outline.length) {
     throw new Error("Shot outline came back empty — try regenerating shots.");
   }
@@ -192,7 +206,7 @@ export async function generateContentShots(
 
   const full: ContentShot[] = [];
   for (const item of outline) {
-    const expanded = await expandOneShot(plan, item);
+    const expanded = await expandOneShot(plan, item, gearPromptBlock);
     full.push(expanded);
     await opts?.onBatch?.([...full, ...outline.slice(full.length)]);
   }

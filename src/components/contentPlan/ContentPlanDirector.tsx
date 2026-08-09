@@ -54,6 +54,14 @@ import {
   ShootOrderPanel,
 } from "@/components/contentPlan/ContentPlanPhase3Panels";
 import { ContentPlanPhase5Bar } from "@/components/contentPlan/ContentPlanPhase5Bar";
+import { useAccessibleProjects } from "@/hooks/useAccessibleProjects";
+import { getProductionBoardByProject } from "@/lib/firebase/productionFirestore";
+import {
+  flattenShootingKit,
+  normalizeShootingKit,
+  shootingKitFromLegacy,
+  shootingKitHasGear,
+} from "@/lib/production/shootingKit";
 import { cn } from "@/lib/utils/cn";
 
 type GetToken = () => Promise<string | null>;
@@ -298,6 +306,7 @@ function Block({ title, body }: { title: string; body?: string }) {
 }
 
 export function ContentPlanDirector({ getToken }: Props) {
+  const { projects, loading: projectsLoading } = useAccessibleProjects();
   const [step, setStep] = useState(1);
   const [inputs, setInputs] = useState<ContentPlanInputs>(() => defaultContentPlanInputs());
   const [plan, setPlan] = useState<ContentPlan | null>(null);
@@ -306,6 +315,8 @@ export function ContentPlanDirector({ getToken }: Props) {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
+  const [kitProjectId, setKitProjectId] = useState("");
+  const [kitBusy, setKitBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [projectLinks, setProjectLinks] = useState<{
@@ -329,6 +340,45 @@ export function ContentPlanDirector({ getToken }: Props) {
     const p3 = [p.coverage, p.shootOrder, p.checklist].filter(Boolean).length;
     return `P1 ${p1}/4 · P2 ${p2}/5 · P3 ${p3}/3`;
   }, [plan]);
+
+  async function loadKitFromProject() {
+    if (!kitProjectId) {
+      setError("Choose a project with a shooting kit first.");
+      return;
+    }
+    setKitBusy(true);
+    setError(null);
+    try {
+      const board = await getProductionBoardByProject(kitProjectId);
+      if (!board) {
+        setError("No production board found for that project.");
+        return;
+      }
+      const kit = shootingKitFromLegacy(board.shootingKit, board.gearItems ?? []);
+      if (!shootingKitHasGear(normalizeShootingKit(kit))) {
+        setError("That project’s shooting kit is empty. Add gear on the production board first.");
+        return;
+      }
+      const other = [
+        ...kit.supports,
+        ...kit.grip,
+        ...kit.audio,
+        ...kit.props,
+        ...kit.other,
+      ];
+      patchInputs({
+        camerasAvailable: kit.cameraBodies.join(", ") || inputs.camerasAvailable,
+        lensesAvailable: kit.lenses.join(", ") || inputs.lensesAvailable,
+        lightingAvailable: kit.lights.join(", ") || inputs.lightingAvailable,
+        equipmentAvailable: other.join(", ") || inputs.equipmentAvailable,
+        useAvailableGearOnly: true,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load shooting kit");
+    } finally {
+      setKitBusy(false);
+    }
+  }
 
   function patchInputs(partial: Partial<ContentPlanInputs>) {
     setInputs((prev) => {
@@ -682,6 +732,92 @@ export function ContentPlanDirector({ getToken }: Props) {
                   className={textInputClassName()}
                 />
               </Field>
+              <Field label="Lights available" className="sm:col-span-2">
+                <input
+                  value={inputs.lightingAvailable || ""}
+                  onChange={(e) => patchInputs({ lightingAvailable: e.target.value })}
+                  placeholder="e.g. Aputure 300d, tube lights, practicals"
+                  className={textInputClassName()}
+                />
+              </Field>
+              <Field label="Other gear (support / grip / audio)" className="sm:col-span-2">
+                <input
+                  value={inputs.equipmentAvailable || ""}
+                  onChange={(e) => patchInputs({ equipmentAvailable: e.target.value })}
+                  placeholder="e.g. Tripod, gimbal, boom, lavs"
+                  className={textInputClassName()}
+                />
+              </Field>
+              <div className="sm:col-span-2 space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Load kit from project board
+                </p>
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="min-w-[200px] flex-1">
+                    <Select
+                      value={kitProjectId}
+                      onChange={(e) => setKitProjectId(e.target.value)}
+                      options={
+                        projectsLoading
+                          ? [{ value: "", label: "Loading projects…" }]
+                          : [
+                              { value: "", label: "Select a project…" },
+                              ...projects.map((p) => ({
+                                value: p.id,
+                                label: p.projectName || p.id,
+                              })),
+                            ]
+                      }
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={kitBusy || !kitProjectId}
+                    onClick={() => void loadKitFromProject()}
+                  >
+                    {kitBusy ? (
+                      <>
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        Loading…
+                      </>
+                    ) : (
+                      "Fill from board kit"
+                    )}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Generation uses these lists (and a linked project’s board kit) when “Use available
+                  gear only” is on.
+                  {inputs.camerasAvailable || inputs.lensesAvailable || inputs.lightingAvailable
+                    ? ` Listed: ${flattenShootingKit(
+                        normalizeShootingKit({
+                          cameraBodies: (inputs.camerasAvailable || "")
+                            .split(/[,;\n]+/)
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                          lenses: (inputs.lensesAvailable || "")
+                            .split(/[,;\n]+/)
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                          lights: (inputs.lightingAvailable || "")
+                            .split(/[,;\n]+/)
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                          other: (inputs.equipmentAvailable || "")
+                            .split(/[,;\n]+/)
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                          supports: [],
+                          grip: [],
+                          audio: [],
+                          props: [],
+                        })
+                      ).length} items.`
+                    : ""}
+                </p>
+              </div>
               <Field label="Talking points / required phrases" className="sm:col-span-2">
                 <textarea
                   value={inputs.talkingPoints || ""}

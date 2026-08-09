@@ -12,6 +12,7 @@ import {
   refineContentPlanSection,
   type RefineTarget,
 } from "@/lib/contentPlan/generate/refine";
+import { resolveContentPlanGear } from "@/lib/contentPlan/resolveAvailableGear";
 import type { ContentPlan } from "@/lib/contentPlan/types";
 
 export const runtime = "nodejs";
@@ -68,11 +69,13 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const gear = await resolveContentPlanGear(db, plan);
     const patch = await refineContentPlanSection({
       plan,
       instruction,
       target,
       shotId: body.shotId,
+      gearPromptBlock: gear.promptBlock,
     });
 
     await ref.set(

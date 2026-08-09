@@ -55,9 +55,11 @@ export async function refineContentPlanSection(input: {
   instruction: string;
   target: RefineTarget;
   shotId?: string;
+  gearPromptBlock?: string;
 }): Promise<Partial<ContentPlan>> {
   const instruction = input.instruction.trim();
   if (!instruction) throw new Error("Describe what to change");
+  const gearBlock = input.gearPromptBlock?.trim() || "";
 
   if (input.target === "shot") {
     const shot = (input.plan.shots || []).find(
@@ -68,6 +70,7 @@ export async function refineContentPlanSection(input: {
     const raw = await callGeminiJsonWithHistory(
       `You revise ONE Content Plan shot for ShootSpine.
 Apply the user's instruction. Keep the shot executable and practical.
+When an AVAILABLE SHOOTING KIT block is provided, keep camera/lens/lights inside that kit.
 Return JSON only: { "shot": { /* full shot object including howToShoot */ } }
 Preserve id and shotNumber.`,
       [
@@ -75,7 +78,13 @@ Preserve id and shotNumber.`,
           role: "user",
           parts: [
             {
-              text: `Instruction: ${instruction}\n\nCurrent shot:\n${JSON.stringify(slimShot(shot))}`,
+              text: [
+                `Instruction: ${instruction}`,
+                gearBlock,
+                `Current shot:\n${JSON.stringify(slimShot(shot))}`,
+              ]
+                .filter(Boolean)
+                .join("\n\n"),
             },
           ],
         },
@@ -107,6 +116,10 @@ Preserve id and shotNumber.`,
     idea: input.plan.inputs.idea,
     durationSeconds: input.plan.inputs.durationSeconds,
     teachMe: input.plan.inputs.teachMe,
+    useAvailableGearOnly: input.plan.inputs.useAvailableGearOnly,
+    camerasAvailable: input.plan.inputs.camerasAvailable,
+    lensesAvailable: input.plan.inputs.lensesAvailable,
+    lightingAvailable: input.plan.inputs.lightingAvailable,
   };
 
   let system = "";
@@ -168,6 +181,7 @@ Preserve id and shotNumber.`,
   const raw = await callGeminiJsonWithHistory(
     `You revise a ShootSpine Content Plan section.
 Apply the instruction precisely. Keep recommendations practical and executable.
+When an AVAILABLE SHOOTING KIT block is provided and the target involves camera/lens/lighting, stay inside that kit.
 ${system}
 Return JSON only.`,
     [
@@ -175,7 +189,14 @@ Return JSON only.`,
         role: "user",
         parts: [
           {
-            text: `Instruction: ${instruction}\n\nContext: ${JSON.stringify(contextPayload)}\n\nCurrent:\n${JSON.stringify(current)}`,
+            text: [
+              `Instruction: ${instruction}`,
+              gearBlock,
+              `Context: ${JSON.stringify(contextPayload)}`,
+              `Current:\n${JSON.stringify(current)}`,
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
           },
         ],
       },

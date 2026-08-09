@@ -7,7 +7,7 @@ const JSON_OPTS = { temperature: 0.3, thinkingBudget: 0 as const, maxOutputToken
 
 const SYSTEM = `You are a Gaffer / DP lighting inside ShootSpine.
 Create a practical lighting strategy for the shoot.
-Prefer available gear when useAvailableGearOnly is true.
+When an AVAILABLE SHOOTING KIT block is provided, gearRecommendations and fixtures MUST stay within that kit (plus practicals already in the location).
 Be concrete: angles, distances, motivated sources, negative fill — not "cinematic lighting".
 Keep JSON compact.
 
@@ -29,7 +29,8 @@ Return JSON only:
 }`;
 
 export async function generateLightingPlan(
-  plan: Pick<ContentPlan, "inputs" | "creativeBrief" | "beats" | "shots" | "scriptLines">
+  plan: Pick<ContentPlan, "inputs" | "creativeBrief" | "beats" | "shots" | "scriptLines">,
+  opts?: { gearPromptBlock?: string }
 ): Promise<LightingPlan> {
   const raw = await callGeminiJsonWithHistory(
     SYSTEM,
@@ -38,7 +39,14 @@ export async function generateLightingPlan(
         role: "user",
         parts: [
           {
-            text: `Create the lighting plan.\nteachMe=${plan.inputs.teachMe}\nPlan:${phase2PlanContext(plan)}`,
+            text: [
+              `Create the lighting plan.`,
+              `teachMe=${plan.inputs.teachMe}`,
+              opts?.gearPromptBlock || "",
+              `Plan:${phase2PlanContext(plan)}`,
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
           },
         ],
       },

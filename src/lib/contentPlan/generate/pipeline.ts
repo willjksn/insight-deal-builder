@@ -14,12 +14,36 @@ import { generateLightingPlan } from "@/lib/contentPlan/generate/lighting";
 import { generateCoveragePlan } from "@/lib/contentPlan/generate/coverage";
 import { generateShootOrderPlan } from "@/lib/contentPlan/generate/shootOrder";
 import { generateShootChecklist } from "@/lib/contentPlan/generate/checklist";
+import {
+  hydrateInputsFromKit,
+  resolveContentPlanGear,
+} from "@/lib/contentPlan/resolveAvailableGear";
 import { emptyProgress } from "@/lib/contentPlan/types";
 import type {
   ContentPlan,
   ContentPlanGenerateSection,
   ContentPlanProgress,
 } from "@/lib/contentPlan/types";
+
+async function withResolvedGear(plan: ContentPlan): Promise<{
+  plan: ContentPlan;
+  gearPromptBlock: string;
+}> {
+  const db = getAdminDb();
+  if (!db) throw new Error("Firebase Admin is not configured");
+  const gear = await resolveContentPlanGear(db, plan);
+  const inputs = hydrateInputsFromKit(plan.inputs, gear.kit);
+  const inputsChanged =
+    inputs.camerasAvailable !== plan.inputs.camerasAvailable ||
+    inputs.lensesAvailable !== plan.inputs.lensesAvailable ||
+    inputs.lightingAvailable !== plan.inputs.lightingAvailable ||
+    inputs.equipmentAvailable !== plan.inputs.equipmentAvailable;
+  if (inputsChanged) {
+    const next = await patchPlan(plan.id, { inputs });
+    return { plan: next, gearPromptBlock: gear.promptBlock };
+  }
+  return { plan: { ...plan, inputs }, gearPromptBlock: gear.promptBlock };
+}
 
 async function loadPlan(planId: string, userId: string): Promise<ContentPlan> {
   const db = getAdminDb();
@@ -111,7 +135,11 @@ async function ensureShots(planId: string, plan: ContentPlan): Promise<ContentPl
     next = await patchPlan(planId, { scriptLines });
   }
   if (!next.shots?.length) {
-    const shots = await generateContentShots(next);
+    const geared = await withResolvedGear(next);
+    next = geared.plan;
+    const shots = await generateContentShots(next, {
+      gearPromptBlock: geared.gearPromptBlock,
+    });
     next = await patchPlan(planId, { shots });
   }
   return next;
@@ -154,7 +182,11 @@ async function runPhase2Sections(
     });
   }
   if (which.includes("lighting")) {
-    const lightingPlan = await generateLightingPlan(plan);
+    const geared = await withResolvedGear(plan);
+    plan = geared.plan;
+    const lightingPlan = await generateLightingPlan(plan, {
+      gearPromptBlock: geared.gearPromptBlock,
+    });
     plan = await patchPlan(planId, {
       lightingPlan,
       progress: { ...progressFrom(plan), lighting: true },
@@ -282,7 +314,10 @@ export async function runContentPlanGeneration(input: {
         );
         current = await patchPlan(input.planId, { scriptLines });
       }
+      const geared = await withResolvedGear(current);
+      current = geared.plan;
       const shots = await generateContentShots(current, {
+        gearPromptBlock: geared.gearPromptBlock,
         onOutline: async (outline) => {
           await patchPlan(input.planId, { shots: outline, status: "generating" });
         },
