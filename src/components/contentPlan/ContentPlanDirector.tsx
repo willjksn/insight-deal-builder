@@ -20,6 +20,7 @@ import {
   createProjectFromContentPlan,
   generateContentPlan,
   listContentPlans,
+  syncLinkedProjectFromContentPlan,
   updateContentPlan,
 } from "@/lib/contentPlan/apiClient";
 import {
@@ -315,6 +316,7 @@ export function ContentPlanDirector({ getToken }: Props) {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
+  const [syncingProject, setSyncingProject] = useState(false);
   const [kitProjectId, setKitProjectId] = useState("");
   const [kitBusy, setKitBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -471,6 +473,32 @@ export function ContentPlanDirector({ getToken }: Props) {
       setError(e instanceof Error ? e.message : "Create project failed");
     } finally {
       setCreatingProject(false);
+    }
+  }
+
+  async function onSyncLinkedProject() {
+    if (!plan?.projectId && !projectLinks?.projectId) {
+      setError("Link a project first (Create project from plan).");
+      return;
+    }
+    if (!plan?.shots?.length) {
+      setError("Generate shots before updating the linked project.");
+      return;
+    }
+    setSyncingProject(true);
+    setError(null);
+    try {
+      await updateContentPlan(getToken, plan.id, { inputs });
+      const result = await syncLinkedProjectFromContentPlan(getToken, plan.id);
+      setPlan(result.plan);
+      setProjectLinks({
+        projectId: result.projectId,
+        scriptSessionId: result.scriptSessionId,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Update linked project failed");
+    } finally {
+      setSyncingProject(false);
     }
   }
 
@@ -979,9 +1007,29 @@ export function ContentPlanDirector({ getToken }: Props) {
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-sm text-emerald-950">
                 <p className="font-medium">Linked to ShootSpine project</p>
                 <p className="mt-0.5 text-xs text-emerald-900/80">
-                  Shots are on the production board. Edit notes were seeded for AI Editor.
+                  After refine or regenerate, update the project so the board and AI Editor stay in
+                  sync. Board shot IDs are kept when shot numbers match.
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={syncingProject || busy || !plan.shots?.length}
+                    onClick={() => void onSyncLinkedProject()}
+                  >
+                    {syncingProject ? (
+                      <>
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        Updating project…
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                        Update linked project
+                      </>
+                    )}
+                  </Button>
                   <Link
                     href={`/projects/${plan.projectId || projectLinks?.projectId}`}
                     className="text-sm font-medium text-sky-800 hover:underline"

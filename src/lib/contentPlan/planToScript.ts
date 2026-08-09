@@ -250,6 +250,21 @@ export function contentPlanToScriptDocument(plan: ContentPlan): ScriptDocument {
   };
 }
 
+/** Prefix so sync can replace plan-seeded notes without wiping manual ones. */
+export const CONTENT_PLAN_EDIT_NOTE_PREFIX = "[Content plan]";
+
+export function isContentPlanEditNote(text: string | undefined): boolean {
+  return Boolean(text?.trim().startsWith(CONTENT_PLAN_EDIT_NOTE_PREFIX));
+}
+
+export function mergeContentPlanEditNotes<T extends { text: string }>(
+  existing: T[] | undefined,
+  nextFromPlan: T[]
+): T[] {
+  const kept = (existing || []).filter((n) => !isContentPlanEditNote(n.text));
+  return [...kept, ...nextFromPlan];
+}
+
 export function contentPlanEditNotes(plan: ContentPlan): Array<{
   id: string;
   text: string;
@@ -263,11 +278,12 @@ export function contentPlanEditNotes(plan: ContentPlan): Array<{
     source: "look" | "shooting" | "general";
     createdAt: string;
   }> = [];
+  const tag = (text: string) => `${CONTENT_PLAN_EDIT_NOTE_PREFIX} ${text}`;
 
   if (plan.creativeBrief?.editingPhilosophy) {
     notes.push({
       id: crypto.randomUUID(),
-      text: `Edit philosophy: ${plan.creativeBrief.editingPhilosophy}`,
+      text: tag(`Edit philosophy: ${plan.creativeBrief.editingPhilosophy}`),
       source: "general",
       createdAt: now,
     });
@@ -275,7 +291,9 @@ export function contentPlanEditNotes(plan: ContentPlan): Array<{
   for (const ed of (plan.editPlan?.instructions || []).slice(0, 12)) {
     notes.push({
       id: crypto.randomUUID(),
-      text: `${ed.approximateTimelinePosition} ${ed.editType}: ${ed.cutTrigger}${ed.why ? ` — ${ed.why}` : ""}`,
+      text: tag(
+        `${ed.approximateTimelinePosition} ${ed.editType}: ${ed.cutTrigger}${ed.why ? ` — ${ed.why}` : ""}`
+      ),
       source: "shooting",
       createdAt: now,
     });
@@ -283,7 +301,9 @@ export function contentPlanEditNotes(plan: ContentPlan): Array<{
   if (plan.colorPlan?.lookName) {
     notes.push({
       id: crypto.randomUUID(),
-      text: `Look: ${plan.colorPlan.lookName}. ${plan.colorPlan.skinToneDirection || ""} ${plan.colorPlan.contrast || ""}`.trim(),
+      text: tag(
+        `Look: ${plan.colorPlan.lookName}. ${plan.colorPlan.skinToneDirection || ""} ${plan.colorPlan.contrast || ""}`.trim()
+      ),
       source: "look",
       createdAt: now,
     });
@@ -291,7 +311,7 @@ export function contentPlanEditNotes(plan: ContentPlan): Array<{
   for (const n of plan.davinciBlueprint?.assemblyNotes || []) {
     notes.push({
       id: crypto.randomUUID(),
-      text: `DaVinci: ${n}`,
+      text: tag(`DaVinci: ${n}`),
       source: "general",
       createdAt: now,
     });

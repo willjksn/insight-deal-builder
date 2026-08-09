@@ -109,6 +109,23 @@ export async function createProjectFromContentPlan(
   }>(res);
 }
 
+export async function syncLinkedProjectFromContentPlan(
+  getToken: GetToken,
+  id: string
+) {
+  const res = await fetch(`/api/content-plans/${id}/sync-project`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    ok: true;
+    projectId: string;
+    scriptSessionId: string;
+    productionBoardId: string;
+    plan: ContentPlan;
+  }>(res);
+}
+
 export async function refineContentPlan(
   getToken: GetToken,
   id: string,

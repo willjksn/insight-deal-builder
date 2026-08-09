@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   briefFromContentPlan,
+  CONTENT_PLAN_EDIT_NOTE_PREFIX,
+  contentPlanEditNotes,
   contentPlanToScriptDocument,
+  mergeContentPlanEditNotes,
 } from "@/lib/contentPlan/planToScript";
 import { defaultContentPlanInputs, type ContentPlan } from "@/lib/contentPlan/types";
 
@@ -94,5 +97,22 @@ describe("contentPlanToScriptDocument", () => {
     const brief = briefFromContentPlan(samplePlan());
     expect(brief.contentType).toBe("social_reel");
     expect(brief.runtime).toBe("30s");
+  });
+
+  it("tags edit notes so sync can replace them", () => {
+    const notes = contentPlanEditNotes(samplePlan());
+    expect(notes.length).toBeGreaterThan(0);
+    expect(notes.every((n) => n.text.startsWith(CONTENT_PLAN_EDIT_NOTE_PREFIX))).toBe(
+      true
+    );
+    const merged = mergeContentPlanEditNotes(
+      [
+        { text: `${CONTENT_PLAN_EDIT_NOTE_PREFIX} old` },
+        { text: "Manual client note" },
+      ],
+      notes
+    );
+    expect(merged.some((n) => n.text === "Manual client note")).toBe(true);
+    expect(merged.some((n) => n.text.includes("old"))).toBe(false);
   });
 });
