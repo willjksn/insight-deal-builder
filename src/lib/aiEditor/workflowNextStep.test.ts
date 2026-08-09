@@ -29,17 +29,19 @@ describe("getWorkflowNextStep", () => {
     expect(next?.anchor).toBe("ai-step-1");
   });
 
-  it("skips completed early steps", () => {
+  it("skips completed early steps and renumbers for footage-only", () => {
     const next = getWorkflowNextStep(
       flags({
         connected: true,
         hasProjectRoot: true,
         hasMedia: true,
         prepareDone: true,
-      })
+      }),
+      { showPrepare: false, showPlanSteps: false }
     );
-    expect(next?.id).toBe("analyze");
-    expect(next?.n).toBe(5);
+    expect(next?.id).toBe("rough_cut");
+    expect(next?.n).toBe(3);
+    expect(next?.anchor).toBe("ai-step-7");
   });
 
   it("returns null when all steps are done", () => {
@@ -58,7 +60,8 @@ describe("getWorkflowNextStep", () => {
           resolveDone: true,
           archiveDone: true,
           wrapUpDone: true,
-        })
+        }),
+        { showPrepare: false, showPlanSteps: false }
       )
     ).toBeNull();
   });

@@ -91,13 +91,8 @@ export function buildResolveEditPlan(timeline: Timeline): ResolveEditPlan {
   const markers: ResolveMarkerPlan[] = [];
   const transitions: ResolveTransitionPlan[] = [];
 
-  markers.push({
-    frame: 0,
-    color: "Blue",
-    name: "ShootSpine",
-    note: `Rough cut v${timeline.version} - finish color in Resolve (no grade baked).`,
-    durationFrames: 1,
-  });
+  // Do not add an instructional "ShootSpine / finish color…" marker — Resolve draws
+  // marker name+note as a viewer overlay and it sticks on screen while parked there.
 
   for (const reel of sortedReels(timeline)) {
     const start = reelStartFrame(clips, reel.id);

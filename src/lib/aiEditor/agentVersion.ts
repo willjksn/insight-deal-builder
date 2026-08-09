@@ -5,6 +5,12 @@
 /** Features from V12–V16 need this agent build (or newer). */
 export const MIN_DESKTOP_AGENT_VERSION = "0.15.0";
 
+/** Reliable “Open Resolve app” launch (Start-Process + cmd fallback). */
+export const MIN_RESOLVE_LAUNCH_AGENT_VERSION = "0.17.4";
+
+/** Required for renaming the project folder on disk when the project name changes. */
+export const MIN_PROJECT_FOLDER_RENAME_AGENT_VERSION = "0.17.8";
+
 export type AgentVersionStatus =
   | { ok: true; version: string }
   | {

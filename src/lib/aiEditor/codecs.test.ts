@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { classifyCodec } from "@/lib/aiEditor/codecs";
+import {
+  assetNeedsBrowserProxy,
+  classifyCodec,
+} from "@/lib/aiEditor/codecs";
 
 describe("classifyCodec", () => {
   it("flags XAVC HS / XAVS HS for proxy", () => {
@@ -33,5 +36,32 @@ describe("classifyCodec", () => {
     const c = classifyCodec({ codec: "h264", filename: "screen.mp4" });
     expect(c.family).toBe("h264");
     expect(c.needsProxy).toBe(false);
+  });
+
+  it("flags UHD H.264 for browser proxy", () => {
+    const c = classifyCodec({
+      codec: "h264",
+      filename: "C0042.MP4",
+      resolution: "3840x2160",
+    });
+    expect(c.family).toBe("h264");
+    expect(c.needsProxy).toBe(true);
+  });
+
+  it("assetNeedsBrowserProxy treats existing 4K H.264 as needing prep", () => {
+    expect(
+      assetNeedsBrowserProxy({
+        needsProxy: false,
+        resolution: "3840x2160",
+        filename: "C0042.MP4",
+      })
+    ).toBe(true);
+    expect(
+      assetNeedsBrowserProxy({
+        needsProxy: false,
+        resolution: "3840x2160",
+        proxyPath: "D:\\proxies\\a.mp4",
+      })
+    ).toBe(false);
   });
 });

@@ -228,6 +228,8 @@ export type AgentResolveWriteHandoffResponse = {
   handoffDir: string;
   relativeDir: string;
   written: string[];
+  /** How many EDL events got camera Start TC applied (FX3/XAVC). */
+  edlAligned?: number;
 };
 
 export type AgentResolveOpenResponse = {

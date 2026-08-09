@@ -19,6 +19,8 @@ Do not assume Resolve and AI Editor share a machine or OS paths.
 - **V8 (initial)** — Next shoot checklist (missing coverage + Resolve feedback), check-off in AI Editor.
 - **V9 (initial)** — Send open checklist to production board **filming notes** (marked, replaceable section).
 - **V21 (initial)** — Soft-blend dissolves in EDL + timeline markers (acts/reels/transition cues) after import. **No baked grades.**
+- **V22 (initial)** — Local guide stubs + Step 10 CTA.
+- **V22.1** — **Resolve assistant** page (`/ai-editor/resolve-assistant`): chat grounded in the official DaVinci Resolve Reference Manual PDF (local index under `data/resolve-manual/`, retrieval + optional Gemini phrasing, PDF page citations).
 
 ## Phase plan
 
@@ -48,7 +50,7 @@ Requirements for auto-import:
 
 - DaVinci Resolve installed
 - Resolve **running** with a **project open**
-- External scripting enabled (Preferences → System → General)
+- **Studio** with Preferences → System → General → **External scripting using → Local** (then restart Resolve). Free Resolve often has no working external scripting — use File → Import → Timeline instead.
 - Python available (`py -3` / `python`)
 - Scripting modules present (Studio / supported installs)
 

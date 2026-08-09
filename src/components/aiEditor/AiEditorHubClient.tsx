@@ -12,6 +12,7 @@ import {
   ListChecks,
   Loader2,
   Plus,
+  MessageSquare,
   Sparkles,
   X,
 } from "lucide-react";
@@ -360,13 +361,15 @@ export function AiEditorHubClient() {
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
+    const projectName = name.trim();
+    if (!projectName || /^untitled/i.test(projectName)) {
+      setError("Give this edit a name first (e.g. Monopoly Night).");
+      return;
+    }
     setCreating(true);
     setError(null);
     try {
-      const res = await aiEditorCreateSession(
-        getToken,
-        name.trim() || "Untitled footage edit"
-      );
+      const res = await aiEditorCreateSession(getToken, projectName);
       router.push(`/projects/${res.projectId}/ai-editor`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create edit");
@@ -391,6 +394,31 @@ export function AiEditorHubClient() {
 
       <HowItWorksPanel />
 
+      <Card>
+        <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 font-semibold text-slate-900">
+              <MessageSquare className="h-4 w-4 text-sky-700" />
+              Resolve assistant
+            </div>
+            <p className="mt-1 text-sm text-slate-600">
+              Chat coach grounded in your DaVinci Resolve Reference Manual — steps plus PDF page
+              citations.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            onClick={() => router.push("/ai-editor/resolve-assistant")}
+          >
+            Open chat
+            <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+          </Button>
+        </CardBody>
+      </Card>
+
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
@@ -404,7 +432,10 @@ export function AiEditorHubClient() {
               <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">
                 Continue where you left off
               </p>
-              <p className="truncate font-semibold text-slate-900">{resume.projectName}</p>
+              <p className="truncate font-semibold text-slate-900">
+                {sessions.find((s) => s.id === resume.projectId)?.projectName ||
+                  resume.projectName}
+              </p>
               <p className="text-sm text-slate-600">
                 Step {resume.stepN}: {resume.stepTitle}
               </p>
@@ -585,11 +616,13 @@ export function AiEditorHubClient() {
           <form onSubmit={(e) => void onCreate(e)} className="flex flex-col gap-3 sm:flex-row">
             <input
               className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
-              placeholder="Name (e.g. Wedding reception selects)"
+              placeholder="Project name (e.g. Monopoly Night)"
               value={name}
+              required
+              maxLength={120}
               onChange={(e) => setName(e.target.value)}
             />
-            <Button type="submit" disabled={creating}>
+            <Button type="submit" disabled={creating || !name.trim()}>
               {creating ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
               Start editing
             </Button>

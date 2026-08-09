@@ -2,22 +2,19 @@
  * V18 — “Continue where you left off”: next incomplete AI Editor step.
  */
 
-export type WorkflowStepId =
-  | "connect"
-  | "workspace"
-  | "footage"
-  | "prepare"
-  | "analyze"
-  | "match"
-  | "rough_cut"
-  | "chat"
-  | "look"
-  | "resolve"
-  | "archive"
-  | "wrap_up";
+import {
+  type AiEditorLogicalStep,
+  type VisibleStepsOptions,
+  buildDisplayStepNumbers,
+  listVisibleLogicalSteps,
+  LOGICAL_STEP_ANCHOR_N,
+} from "@/lib/aiEditor/visibleSteps";
+
+export type WorkflowStepId = AiEditorLogicalStep;
 
 export type WorkflowNextStep = {
   id: WorkflowStepId;
+  /** Display number (renumbers when steps are hidden). */
   n: number;
   title: string;
   detail: string;
@@ -40,109 +37,89 @@ export type WorkflowStepFlags = {
   wrapUpDone: boolean;
 };
 
-const STEPS: Array<{
-  id: WorkflowStepId;
-  n: number;
-  title: string;
-  detail: string;
-  done: (f: WorkflowStepFlags) => boolean;
-}> = [
-  {
-    id: "connect",
-    n: 1,
+const STEP_COPY: Record<
+  AiEditorLogicalStep,
+  { title: string; detail: string; done: (f: WorkflowStepFlags) => boolean }
+> = {
+  connect: {
     title: "Connect this computer",
     detail: "Start the Desktop Agent so AI Editor can read your drives.",
     done: (f) => f.connected,
   },
-  {
-    id: "workspace",
-    n: 2,
-    title: "Choose where this edit lives",
-    detail: "Set your edit folder (SSD) and optional backup (HDD).",
-    done: (f) => f.hasProjectRoot,
+  footage: {
+    title: "Get footage in",
+    detail: "Copy from the camera card onto your SSD — ShootSpine picks the folders.",
+    // Guided card covers workspace + media
+    done: (f) => f.hasProjectRoot && f.hasMedia,
   },
-  {
-    id: "footage",
-    n: 3,
-    title: "Add your footage",
-    detail: "Point at clips on disk — nothing uploads to the cloud.",
-    done: (f) => f.hasMedia,
-  },
-  {
-    id: "prepare",
-    n: 4,
+  prepare: {
     title: "Prepare clips for smooth editing",
     detail: "Make light preview copies for tough camera formats.",
     done: (f) => f.prepareDone,
   },
-  {
-    id: "analyze",
-    n: 5,
+  analyze: {
     title: "Understand your footage",
     detail: "Run local analysis so matching and search have something to work with.",
     done: (f) => f.analyzeDone,
   },
-  {
-    id: "match",
-    n: 6,
+  match: {
     title: "Match to the plan",
     detail: "Score clips against planned shots and coverage.",
     done: (f) => f.matchDone,
   },
-  {
-    id: "rough_cut",
-    n: 7,
+  rough_cut: {
     title: "Build a rough cut",
     detail: "Assemble a first timeline from coverage or selects.",
     done: (f) => f.roughCutDone,
   },
-  {
-    id: "chat",
-    n: 8,
+  chat: {
     title: "Edit by chat",
     detail: "Tighten the cut with plain-language edits (optional).",
     done: (f) => f.chatDone,
   },
-  {
-    id: "look",
-    n: 9,
+  look: {
     title: "Set the look",
     detail: "Mood and transition tips for Resolve finishing.",
     done: (f) => f.lookDone,
   },
-  {
-    id: "resolve",
-    n: 10,
+  resolve: {
     title: "Finish in Resolve",
     detail: "Write the handoff package or bring the cut into Resolve.",
     done: (f) => f.resolveDone,
   },
-  {
-    id: "archive",
-    n: 11,
+  archive: {
     title: "Backup & free space",
     detail: "Copy footage to your backup drive when you’re ready.",
     done: (f) => f.archiveDone,
   },
-  {
-    id: "wrap_up",
-    n: 12,
+  wrap_up: {
     title: "How did finishing go?",
     detail: "Quick wrap-up so the next edit starts with a better look default.",
     done: (f) => f.wrapUpDone,
   },
-];
+};
 
-/** First incomplete step, or null when the workflow looks complete. */
-export function getWorkflowNextStep(flags: WorkflowStepFlags): WorkflowNextStep | null {
-  for (const step of STEPS) {
-    if (!step.done(flags)) {
+const DEFAULT_VISIBILITY: VisibleStepsOptions = {
+  showPrepare: true,
+  showPlanSteps: true,
+};
+
+/** First incomplete visible step, or null when the workflow looks complete. */
+export function getWorkflowNextStep(
+  flags: WorkflowStepFlags,
+  visibility: VisibleStepsOptions = DEFAULT_VISIBILITY
+): WorkflowNextStep | null {
+  const order = listVisibleLogicalSteps(visibility);
+  const display = buildDisplayStepNumbers(visibility);
+  for (const id of order) {
+    const meta = STEP_COPY[id];
+    if (!meta.done(flags)) {
       return {
-        id: step.id,
-        n: step.n,
-        title: step.title,
-        detail: step.detail,
-        anchor: `ai-step-${step.n}`,
+        id,
+        n: display[id],
+        title: meta.title,
+        detail: meta.detail,
+        anchor: `ai-step-${LOGICAL_STEP_ANCHOR_N[id]}`,
       };
     }
   }

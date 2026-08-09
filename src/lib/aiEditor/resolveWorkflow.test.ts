@@ -22,6 +22,7 @@ describe("resolveWorkflow", () => {
   it("almost when Resolve running but no project", () => {
     const s = summarizeResolveWorkflow({
       installed: true,
+      scriptingModules: true,
       scriptingReachable: true,
       projectOpen: false,
       running: true,
@@ -29,6 +30,22 @@ describe("resolveWorkflow", () => {
     });
     expect(s.level).toBe("almost");
     expect(s.title).toMatch(/project/i);
+  });
+
+  it("almost when Resolve running but External scripting is off", () => {
+    const s = summarizeResolveWorkflow({
+      installed: true,
+      scriptingModules: true,
+      scriptingReachable: false,
+      projectOpen: false,
+      running: true,
+      pythonAvailable: true,
+      note: "NO_RESOLVE",
+    });
+    expect(s.level).toBe("almost");
+    expect(s.title).toMatch(/auto-import|reach/i);
+    expect(s.detail).toMatch(/Free|Studio|Local/i);
+    expect(s.canAutoImport).toBe(false);
   });
 
   it("missing when Resolve not installed", () => {

@@ -17,6 +17,7 @@ import {
   buildRoughCutFromCoverage,
   bumpVersion,
   makeTimelineVersion,
+  stripNonVideoClipsFromTimeline,
   summarizeTimeline,
 } from "@/lib/aiEditor/timeline";
 import {
@@ -83,7 +84,8 @@ export async function POST(
         | "apply_finishing"
         | "setup_feature_reels"
         | "set_active_reel"
-        | "import_resolve_cut";
+        | "import_resolve_cut"
+        | "strip_non_video";
       ops?: TimelineEditOp[];
       versionId?: string;
       note?: string;
@@ -309,6 +311,24 @@ export async function POST(
       timeline = bumped;
       await upsertTimeline(timeline);
       await saveTimelineVersion(versionRecord);
+    } else if (action === "strip_non_video") {
+      if (!timeline) {
+        return NextResponse.json({ error: "No timeline yet" }, { status: 400 });
+      }
+      const media = await listMediaAssets(projectId);
+      const { timeline: cleaned, removed } = stripNonVideoClipsFromTimeline(
+        timeline,
+        media
+      );
+      if (removed > 0) {
+        const { timeline: bumped, versionRecord } = bumpVersion(
+          cleaned,
+          body.note || `Removed ${removed} camera still(s) / non-video`
+        );
+        timeline = bumped;
+        await upsertTimeline(timeline);
+        await saveTimelineVersion(versionRecord);
+      }
     } else {
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }

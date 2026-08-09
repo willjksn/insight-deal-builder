@@ -49,11 +49,25 @@ export function summarizeResolveWorkflow(
     };
   }
 
+  if (running && modules && python && !reachable) {
+    const note = String(probe.note || "");
+    return {
+      level: "almost",
+      title: "Auto-import can’t reach Resolve",
+      detail:
+        note.includes("NO_RESOLVE") || !note
+          ? "Resolve is open, but one-click import needs DaVinci Resolve Studio with Preferences → System → General → “External scripting using” → Local. Free Resolve often hides that setting. Use Show saved folder → File → Import → Timeline instead."
+          : `Resolve is open, but scripting isn’t reachable (${note}). Studio: set “External scripting using” to Local. Free: import the timeline by hand from the saved folder.`,
+      canAutoImport: false,
+    };
+  }
+
   if (reachable && running && !projectOpen) {
     return {
       level: "almost",
       title: "Open a project in Resolve",
-      detail: "Resolve is running — start or open a project, then bring your edit in.",
+      detail:
+        "Resolve is running — create or open a project (not just the Project Manager list), then bring your edit in.",
       canAutoImport: false,
     };
   }

@@ -41,6 +41,10 @@ Archive / restore / reclaim batches return **per-file** success/failure so the U
 
 `POST /v1/media/detect-sources` read-only scans removable/external volumes for camera/audio layouts (e.g. Sony `PRIVATE/M4ROOT`, Zoom `FOLDER##`). Returns filesystem probes; classification runs in the web app. Never modifies card contents.
 
+### Index / walk extensions (v0.17.2+)
+
+`POST /v1/media/index` (and detect-sources walks) include **video + audio only**. Camera proxy stills (`.jpg` / `.jpeg` / `.png` / TIFF) are skipped so Sony `*T01.JPG` sidecars are not copied into projects.
+
 ## Scaffold location
 
 `desktop-agent/` — Node TypeScript HTTP service for V1A (lightweight; Tauri shell can wrap later).

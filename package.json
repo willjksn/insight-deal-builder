@@ -12,7 +12,8 @@
     "agent": "node desktop-agent/src/server.mjs",
     "agent:start": "node desktop-agent/src/server.mjs",
     "process-brand-logos": "node scripts/process-brand-logos.mjs",
-    "create-admin-user": "node scripts/create-admin-user.mjs"
+    "create-admin-user": "node scripts/create-admin-user.mjs",
+    "index-resolve-manual": "py -3 scripts/index-resolve-manual.py"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",

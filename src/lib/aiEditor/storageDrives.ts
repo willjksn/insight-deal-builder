@@ -15,10 +15,47 @@ export function formatBytesShort(bytes?: number | null): string | null {
   return `${Math.max(1, Math.round(mb))} MB`;
 }
 
+/** Portable SSD hints when Windows reports MediaType=Unspecified (common for T7/T5). */
+export function looksLikePortableSsd(parts: {
+  volumeLabel?: string | null;
+  label?: string | null;
+  mediaType?: string | null;
+  busType?: string | null;
+  friendlyName?: string | null;
+}): boolean {
+  const blob = [
+    parts.volumeLabel,
+    parts.label,
+    parts.mediaType,
+    parts.friendlyName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (!blob) return false;
+  if (/\bhdd\b|hard\s*disk|spinning/.test(blob)) return false;
+  return (
+    /\bssd\b/.test(blob) ||
+    /\bpssd\b/.test(blob) ||
+    /\bt7\b/.test(blob) ||
+    /\bt5\b/.test(blob) ||
+    /\bt3\b/.test(blob) ||
+    /\bextreme\s*portable\b/.test(blob)
+  );
+}
+
 /** Infer ShootSpine storage type from agent drive metadata. */
 export function inferStorageType(drive?: AgentDriveEntry | null): StorageType {
   if (!drive) return "unknown";
-  if (drive.storageType) return drive.storageType;
+  // Prefer re-inferring for USB volumes — agent may mis-label T7 as externalHDD
+  // when Windows MediaType is blank.
+  if (
+    drive.storageType &&
+    drive.storageType !== "externalHDD" &&
+    drive.storageType !== "unknown"
+  ) {
+    return drive.storageType;
+  }
   if (drive.kind === "home" || drive.kind === "desktop" || drive.kind === "documents") {
     return "internal";
   }
@@ -38,7 +75,17 @@ export function inferStorageType(drive?: AgentDriveEntry | null): StorageType {
   if (driveType.includes("network") || bus.includes("file back")) return "network";
 
   if (isUsb) {
-    if (media.includes("ssd")) return "externalSSD";
+    if (
+      media.includes("ssd") ||
+      looksLikePortableSsd({
+        volumeLabel: drive.volumeLabel,
+        label: drive.label,
+        mediaType: drive.mediaType,
+        busType: drive.busType,
+      })
+    ) {
+      return "externalSSD";
+    }
     if (media.includes("hdd") || media.includes("hard")) return "externalHDD";
     // Large USB disks are usually archive HDDs; small sticks are removable.
     if ((drive.capacityBytes || 0) >= 500 * 1024 ** 3) return "externalHDD";
@@ -48,7 +95,53 @@ export function inferStorageType(drive?: AgentDriveEntry | null): StorageType {
   if (letter === "C:" || letter === "C") return "internal";
   if (media.includes("ssd")) return "internal"; // second internal SSD
   if (media.includes("hdd") || media.includes("hard")) return "externalHDD";
-  return "unknown";
+  return drive.storageType || "unknown";
+}
+
+/** Card mounts we should not offer as “save footage to” destinations. */
+const CARD_SOURCE_TYPES = new Set(["cameraCard", "audioRecorderCard"]);
+
+export type IngestDestinationDriveOption = {
+  rootPath: string;
+  label: string;
+  freeBytes?: number;
+  storageType: string;
+};
+
+/**
+ * Destination drives for managed ingest.
+ * Only exclude true camera/audio cards — an SSD with leftover MP4s must stay selectable.
+ */
+export function buildIngestDestinationDrives(
+  knownDrives: AgentDriveEntry[],
+  detectedSources: Array<{ mountPath?: string; sourceType?: string }>
+): IngestDestinationDriveOption[] {
+  const cardLetters = new Set(
+    detectedSources
+      .filter((s) => s.sourceType && CARD_SOURCE_TYPES.has(s.sourceType))
+      .map((s) => s.mountPath?.match(/^([A-Za-z]:)/)?.[1]?.toUpperCase() ?? null)
+      .filter((x): x is string => !!x)
+  );
+  const drives = sortDrivesForPurpose(
+    knownDrives.filter(
+      (d) => (d.kind === "drive" || d.kind === "volume") && /^[A-Za-z]:/i.test(d.path)
+    ),
+    "edit"
+  );
+  return drives.flatMap((d) => {
+    const letter = d.path.match(/^([A-Za-z]:)/)?.[1]?.toUpperCase();
+    if (!letter || cardLetters.has(letter)) return [];
+    const rootPath = `${letter}\\`;
+    const type = inferStorageType(d);
+    return [
+      {
+        rootPath,
+        label: friendlyDriveLabel(d),
+        freeBytes: typeof d.availableBytes === "number" ? d.availableBytes : undefined,
+        storageType: storageTypeLabel(type),
+      },
+    ];
+  });
 }
 
 export function storageTypeLabel(type: StorageType): string {

@@ -49,6 +49,51 @@ function blobFromProbe(input: {
  * Classify camera / delivery codecs from FFprobe-ish fields.
  * Accepts common misspellings (XAVS → XAVC).
  */
+/** Parse "3840x2160" / "1920×1080" style resolution strings. */
+export function parseResolution(
+  resolution?: string | null
+): { width: number; height: number } | null {
+  if (!resolution?.trim()) return null;
+  const m = resolution.trim().match(/(\d+)\s*[x×]\s*(\d+)/i);
+  if (!m) return null;
+  const width = Number(m[1]);
+  const height = Number(m[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+    return null;
+  }
+  return { width, height };
+}
+
+/** True when footage is large enough that browsers often fail without a proxy. */
+export function isUhdOrLarger(resolution?: string | null): boolean {
+  const r = parseResolution(resolution);
+  if (!r) return false;
+  return r.width >= 3000 || r.height >= 1600;
+}
+
+/**
+ * Whether the AI Editor should generate a browser proxy before Watch / analysis.
+ * Honors stored needsProxy, and also flags UHD H.264 camera originals that were
+ * ingested before we treated resolution as a proxy signal.
+ */
+export function assetNeedsBrowserProxy(asset: {
+  needsProxy?: boolean;
+  proxyPath?: string | null;
+  resolution?: string | null;
+  mediaType?: string | null;
+  filename?: string | null;
+}): boolean {
+  if (asset.proxyPath?.trim()) return false;
+  const mt = (asset.mediaType || "").toLowerCase();
+  if (mt === "audio" || mt === "image" || mt === "still") return false;
+  if (asset.needsProxy) return true;
+  if (isUhdOrLarger(asset.resolution)) return true;
+  // Sony proxy/still sidecars are not video to prepare
+  const name = asset.filename || "";
+  if (/\.jpe?g$/i.test(name) || /T\d+\.JPG$/i.test(name)) return false;
+  return false;
+}
+
 export function classifyCodec(input: {
   codec?: string;
   codecLongName?: string;
@@ -56,9 +101,13 @@ export function classifyCodec(input: {
   container?: string;
   filename?: string;
   mediaType?: string;
+  resolution?: string;
 }): CodecClassification {
   if (input.mediaType === "audio") {
     return { family: "audio", label: "Audio", needsProxy: false };
+  }
+  if (input.mediaType === "image" || input.mediaType === "still") {
+    return { family: "other", label: "Still", needsProxy: false };
   }
 
   const blob = blobFromProbe(input);
@@ -127,6 +176,15 @@ export function classifyCodec(input: {
   }
 
   if (codec === "h264" || codec === "avc" || codec === "avc1") {
+    if (isUhdOrLarger(input.resolution)) {
+      return {
+        family: "h264",
+        label: "H.264",
+        needsProxy: true,
+        reason:
+          "4K / UHD camera H.264 often won’t play in the browser — prepare a lighter proxy for Watch.",
+      };
+    }
     return { family: "h264", label: "H.264", needsProxy: false };
   }
 

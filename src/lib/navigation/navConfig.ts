@@ -27,6 +27,7 @@ import {
   Wallet,
   BarChart3,
   Clapperboard,
+  MessagesSquare,
 } from "lucide-react";
 import { AppUser } from "@/lib/types";
 import { Workspace } from "@/lib/workspace/types";
@@ -194,8 +195,21 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "AI Editor",
         icon: Clapperboard,
         canAccess: (u) => isAiEditorEnabled() && canUseProductionTools(u),
+        activePrefixes: ["/ai-editor"],
+      },
+      {
+        href: "/ai-editor/resolve-assistant",
+        label: "Resolve assistant",
+        icon: MessagesSquare,
+        canAccess: (u) => isAiEditorEnabled() && canUseProductionTools(u),
       },
       { href: "/script-writer", label: "Script writer", icon: ScrollText, canAccess: canUseProductionTools },
+      {
+        href: "/reel-prompts",
+        label: "Reel prompts",
+        icon: Clapperboard,
+        canAccess: canUseProductionTools,
+      },
       { href: "/stage", label: "Stage planner", icon: LayoutGrid, canAccess: canUseProductionTools },
       { href: "/reference", label: "Reference guide", icon: BookOpen, canAccess: canUseProductionTools },
     ],

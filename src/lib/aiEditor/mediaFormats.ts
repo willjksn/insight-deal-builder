@@ -1,6 +1,9 @@
 /**
  * Shared media extension registry for Managed Ingest / indexing.
  * Keep Desktop Agent MEDIA_EXTS aligned when adding formats.
+ *
+ * Ingest copies video + audio only. Camera proxy/still JPGs (e.g. Sony *T01.JPG)
+ * are recognized for detection but never indexed or copied.
  */
 
 export type MediaFormatKind = "video" | "audio" | "image";
@@ -27,7 +30,8 @@ export const MEDIA_FORMAT_REGISTRY: Record<MediaFormatKind, readonly string[]> =
   image: IMAGE_EXTS,
 };
 
-const ALL = new Set<string>([...VIDEO_EXTS, ...AUDIO_EXTS, ...IMAGE_EXTS]);
+const INGESTABLE = new Set<string>([...VIDEO_EXTS, ...AUDIO_EXTS]);
+const ALL = new Set<string>([...INGESTABLE, ...IMAGE_EXTS]);
 
 export function normalizeExtension(extOrFilename: string): string {
   const raw = extOrFilename.includes(".")
@@ -37,8 +41,14 @@ export function normalizeExtension(extOrFilename: string): string {
   return ext;
 }
 
+/** Video or audio — what we copy / catalog into a project. */
+export function isIngestableMediaExtension(extOrFilename: string): boolean {
+  return INGESTABLE.has(normalizeExtension(extOrFilename));
+}
+
+/** @deprecated Prefer isIngestableMediaExtension for copy/index. */
 export function isAllowedMediaExtension(extOrFilename: string): boolean {
-  return ALL.has(normalizeExtension(extOrFilename));
+  return isIngestableMediaExtension(extOrFilename);
 }
 
 export function kindForExtension(extOrFilename: string): MediaFormatKind | null {
@@ -49,7 +59,26 @@ export function kindForExtension(extOrFilename: string): MediaFormatKind | null 
   return null;
 }
 
-/** Flat list for agent / walk filters. */
+/** Flat list for agent walk / index (video + audio only). */
 export function allMediaExtensions(): string[] {
+  return [...INGESTABLE];
+}
+
+export function allKnownMediaExtensions(): string[] {
   return [...ALL];
+}
+
+/**
+ * True for clips that belong on a ShootSpine rough cut.
+ * Excludes camera proxy stills (*T01.JPG) even if ffprobe labeled them as MJPEG "video".
+ */
+export function isRoughCutVideoAsset(asset: {
+  filename?: string | null;
+  mediaType?: string | null;
+}): boolean {
+  const name = asset.filename || "";
+  if (!name || !isIngestableMediaExtension(name)) return false;
+  const mt = (asset.mediaType || "").toLowerCase();
+  if (mt === "image" || mt === "still" || mt === "audio") return false;
+  return kindForExtension(name) === "video";
 }

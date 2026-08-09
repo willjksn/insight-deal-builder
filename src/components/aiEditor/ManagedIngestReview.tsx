@@ -1,9 +1,10 @@
 "use client";
 
 import { HardDrive, Loader2, MemoryStick, RefreshCw } from "lucide-react";
+import { CameraLabelPicker } from "@/components/aiEditor/CameraLabelPicker";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { formatBytes } from "@/lib/aiEditor/checksum";
+import { formatBytes, sanitizeCameraLabel } from "@/lib/aiEditor/checksum";
 import type { DetectedMediaSource } from "@/lib/aiEditor/cameraDetectors/detectMediaSource";
 import {
   buildIngestDestinationPath,
@@ -11,14 +12,20 @@ import {
   sanitizePathSegment,
 } from "@/lib/aiEditor/mediaPathBuilder";
 
-const CAMERA_OPTIONS = ["CAMERA_A", "CAMERA_B", "CAMERA_C", "AUDIO", "DRONE", "OTHER"] as const;
-
 export type ManagedIngestOptions = {
   verifyCopy: boolean;
   generateProxies: boolean;
   generateThumbnails: boolean;
   extractMetadata: boolean;
   analyzeDuringIngest: boolean;
+};
+
+export type DestinationDriveOption = {
+  /** Drive root, e.g. H:\ */
+  rootPath: string;
+  label: string;
+  freeBytes?: number;
+  storageType?: string;
 };
 
 type Props = {
@@ -33,8 +40,8 @@ type Props = {
   shootLabelEdit: string;
   onShootLabelChange: (v: string) => void;
   destinationRoot: string | null;
-  /** Short drive name only — free space passed separately to avoid duplicates. */
-  destinationDriveName?: string | null;
+  destinationDrives: DestinationDriveOption[];
+  onDestinationRootChange: (rootPath: string) => void;
   freeBytes?: number | null;
   options: ManagedIngestOptions;
   onOptionsChange: (next: ManagedIngestOptions) => void;
@@ -56,7 +63,8 @@ export function ManagedIngestReview({
   shootLabelEdit,
   onShootLabelChange,
   destinationRoot,
-  destinationDriveName,
+  destinationDrives,
+  onDestinationRootChange,
   freeBytes,
   options,
   onOptionsChange,
@@ -68,23 +76,32 @@ export function ManagedIngestReview({
   if (!sources.length && !scanning) return null;
 
   const selected = sources.find((s) => s.id === selectedSourceId) || sources[0] || null;
+  const selectedDest =
+    destinationDrives.find((d) => normalizeRoot(d.rootPath) === normalizeRoot(destinationRoot || "")) ||
+    destinationDrives[0] ||
+    null;
+  const effectiveDestRoot = destinationRoot || selectedDest?.rootPath || null;
+  const effectiveFree =
+    freeBytes ?? selectedDest?.freeBytes ?? null;
   const folderName = selected
     ? buildIngestFolderName({
         clientOrProject: sanitizePathSegment(clientOrProject, 40),
         shootLabel: sanitizePathSegment(shootLabelEdit || shootLabel || "Shoot", 40),
-        cameraLabel: cameraLabelFromAssignment(cameraAssignment, selected),
+        cameraLabel: folderCameraLabel(cameraAssignment, selected),
       })
     : "";
   const destPath =
-    destinationRoot && folderName
-      ? buildIngestDestinationPath(destinationRoot, folderName)
+    effectiveDestRoot && folderName
+      ? buildIngestDestinationPath(effectiveDestRoot, folderName)
       : null;
 
   const requiredBytes = selected
     ? Math.round(selected.totalBytes * (options.generateProxies ? 1.35 : 1.05))
     : 0;
   const spaceOk =
-    freeBytes == null || !selected ? true : freeBytes > requiredBytes + 2 * 1024 * 1024 * 1024;
+    effectiveFree == null || !selected
+      ? true
+      : effectiveFree > requiredBytes + 2 * 1024 * 1024 * 1024;
 
   return (
     <div className="space-y-4 rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
@@ -174,24 +191,14 @@ export function ManagedIngestReview({
               2 · To (on this PC)
             </p>
             <div className="space-y-3 rounded-xl border border-white/80 bg-white/90 p-3">
-              <label className="block text-sm">
-                <span className="mb-1 block text-slate-600">Assign as</span>
-                <select
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                  value={cameraAssignment}
-                  disabled={disabled}
-                  onChange={(e) => onCameraAssignmentChange(e.target.value)}
-                >
-                  {CAMERA_OPTIONS.map((c) => (
-                    <option key={c} value={c}>
-                      {c.replace("_", " ")}
-                      {selected.probableCameraModel && c === selected.suggestedCameraAssignment
-                        ? ` — ${selected.probableCameraModel}`
-                        : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <CameraLabelPicker
+                idPrefix="ingest-camera"
+                value={cameraAssignment}
+                onChange={onCameraAssignmentChange}
+                disabled={disabled}
+                detectedModel={selected.probableCameraModel}
+                suggestedRole={selected.suggestedCameraAssignment}
+              />
 
               <label className="block text-sm">
                 <span className="mb-1 block text-slate-600">
@@ -206,21 +213,45 @@ export function ManagedIngestReview({
                 />
               </label>
 
+              <label className="block text-sm">
+                <span className="mb-1 block text-slate-600">Save footage to drive</span>
+                {destinationDrives.length ? (
+                  <select
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                    value={normalizeRoot(effectiveDestRoot || destinationDrives[0]!.rootPath)}
+                    disabled={disabled}
+                    onChange={(e) => onDestinationRootChange(e.target.value)}
+                  >
+                    {destinationDrives.map((d) => (
+                      <option key={normalizeRoot(d.rootPath)} value={normalizeRoot(d.rootPath)}>
+                        {d.label}
+                        {d.freeBytes != null ? ` · ${formatBytes(d.freeBytes)} free` : ""}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    No destination drives listed yet. Connect the Desktop Agent, plug in your SSD
+                    (e.g. T7 on H:), click Rescan, or set the edit folder in Step 2.
+                  </p>
+                )}
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Prefer your external SSD (T7 / H:). Camera cards stay in the source list only.
+                  Picking a drive updates Step 2’s edit folder to{" "}
+                  <span className="font-mono">Media\ShootSpine</span> — then click{" "}
+                  <span className="font-medium">Save workspace</span> in Step 2.
+                </p>
+              </label>
+
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-700">
                 <div className="flex items-center gap-1.5 font-medium text-slate-800">
                   <HardDrive className="h-3.5 w-3.5" />
                   Files would go here
                 </div>
-                <p className="mt-1 text-slate-600">
-                  {destinationDriveName || "Edit drive from Step 2"}
-                  {freeBytes != null ? ` · ${formatBytes(freeBytes)} free` : ""}
-                </p>
                 {destPath ? (
                   <p className="mt-1 break-all font-mono text-[11px] text-slate-500">{destPath}</p>
                 ) : (
-                  <p className="mt-1 text-amber-800">
-                    Choose an edit folder in Step 2 first (where this project lives).
-                  </p>
+                  <p className="mt-1 text-amber-800">Pick a destination drive above.</p>
                 )}
                 {!spaceOk ? (
                   <p className="mt-2 font-medium text-red-700">
@@ -229,8 +260,8 @@ export function ManagedIngestReview({
                   </p>
                 ) : destPath ? (
                   <p className="mt-2 text-slate-500">
-                    Folder name is automatic. One-click copy into this path is coming next — for now
-                    use the button below to point Step 3 at the card.
+                    Folder name is automatic. After you pick an SSD, save the workspace in Step 2,
+                    then use the source button below.
                   </p>
                 ) : null}
               </div>
@@ -253,8 +284,8 @@ export function ManagedIngestReview({
               </div>
               <p className="text-xs leading-relaxed text-slate-600">
                 That fills the “Footage folder” field below with the card/drive path. Then click{" "}
-                <span className="font-medium">Copy into project folders</span> (or catalog in place)
-                — same as picking the folder by hand.
+                <span className="font-medium">Review files to copy</span>, uncheck takes you don’t
+                need, and <span className="font-medium">Copy & verify</span> only the selection.
               </p>
               <p className="text-[11px] text-slate-500">
                 Full “Ingest” (auto-verify, proxies, analysis in one click) is the next build step.
@@ -297,16 +328,23 @@ export function ManagedIngestReview({
   );
 }
 
-function cameraLabelFromAssignment(assignment: string, source: DetectedMediaSource): string {
+function normalizeRoot(p: string): string {
+  const s = p.replace(/\//g, "\\").trim();
+  if (/^[A-Za-z]:$/i.test(s)) return `${s.toUpperCase()}\\`;
+  if (/^[A-Za-z]:\\$/i.test(s)) return s.toUpperCase();
+  const m = s.match(/^([A-Za-z]:)/);
+  return m ? `${m[1].toUpperCase()}\\` : s;
+}
+
+/** Human folder segment for the managed ingest path preview. */
+function folderCameraLabel(assignment: string, source: DetectedMediaSource): string {
+  if (assignment?.trim()) return sanitizeCameraLabel(assignment);
   if (source.probableCameraModel) {
     const m = source.probableCameraModel
       .replace(/^Sony\s+/i, "")
       .replace(/^Zoom\s+/i, "")
       .replace(/\s+/g, "");
-    if (m && m.length < 20) return m;
+    if (m && m.length < 20) return sanitizeCameraLabel(m);
   }
-  if (assignment === "AUDIO") return "Audio";
-  if (assignment === "DRONE") return "Drone";
-  if (assignment === "OTHER") return "Other";
-  return assignment.replace("CAMERA_", "Cam");
+  return "CAMERA_A";
 }

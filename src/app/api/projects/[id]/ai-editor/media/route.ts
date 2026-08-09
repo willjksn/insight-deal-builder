@@ -68,7 +68,12 @@ export async function POST(
     const media: MediaAsset[] = body.files.map((f) => {
       const filename = f.filename || f.path.replace(/\\/g, "/").split("/").pop() || "unknown";
       const probe = f.probe ?? {};
-      const mediaType = probe.mediaType || inferMediaType(filename);
+      // Filename wins for stills — ffprobe often labels Sony *T01.JPG as MJPEG "video".
+      const inferredType = inferMediaType(filename);
+      const mediaType =
+        inferredType === "image" || inferredType === "audio"
+          ? inferredType
+          : probe.mediaType || inferredType;
       const classified = classifyCodec({
         codec: probe.codec,
         codecLongName: (probe as { codecLongName?: string }).codecLongName,
@@ -76,6 +81,7 @@ export async function POST(
         container: probe.container,
         filename,
         mediaType,
+        resolution: probe.resolution,
       });
       const verified = Boolean(probe.checksum) && body.ingestMode === "managed";
       return {

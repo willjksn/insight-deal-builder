@@ -71,6 +71,34 @@ describe("aiEditor timeline", () => {
     expect(summarizeTimeline(tl).clipCount).toBe(4); // video + audio copies
   });
 
+  it("skips camera JPG stills in footage-only rough cut", () => {
+    const coverage: CoverageReport = {
+      projectId: "p1",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      plannedShotCount: 0,
+      coveredCount: 0,
+      partialCount: 0,
+      missingCount: 0,
+      unmatchedMediaIds: [],
+      overrides: [],
+      shots: [],
+    };
+    const jpg: MediaAsset = {
+      ...media("j1", "C0042T01.JPG", 0.5),
+      extension: ".jpg",
+      mediaType: "video", // ffprobe mislabel
+    };
+    const tl = buildRoughCutFromCoverage({
+      projectId: "p1",
+      coverage,
+      media: [media("m1", "C0042.MP4", 12), jpg],
+      frameRate: 24,
+    });
+    const video = tl.tracks.find((t) => t.kind === "video")!;
+    expect(video.clips).toHaveLength(1);
+    expect(video.clips[0].label).toBe("C0042.MP4");
+  });
+
   it("applies ripple delete and trim", () => {
     let tl = emptyTimeline({ projectId: "p1", frameRate: 24 });
     const video = tl.tracks.find((t) => t.kind === "video")!;

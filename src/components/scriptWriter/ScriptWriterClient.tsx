@@ -38,6 +38,7 @@ import {
   scriptWriterFeatureAssemble,
   scriptWriterSendMessage,
   scriptWriterUpdateBrief,
+  scriptWriterGenerateReelPrompts,
 } from "@/lib/scriptWriter/apiClient";
 import {
   SCRIPT_CAST_SIZE_LABELS,
@@ -66,6 +67,7 @@ import { ScriptShootingKitPanel } from "@/components/scriptWriter/ScriptShooting
 import { AddToSeriesButton } from "@/components/scriptWriter/AddToSeriesButton";
 import { TrailerSourcesPanel } from "@/components/scriptWriter/TrailerSourcesPanel";
 import { SharedNotesPanel } from "@/components/sharedNotes/SharedNotesPanel";
+import { ReelPromptDirectorPanel } from "@/components/reelPrompt/ReelPromptDirectorPanel";
 
 interface ScriptWriterClientProps {
   sessionId: string;
@@ -925,6 +927,22 @@ export function ScriptWriterClient({ sessionId }: ScriptWriterClientProps) {
           ) : null}
           {script && script.suggestedShots.length > 0 ? (
             <ScriptSuggestedShotsPanel shots={script.suggestedShots} />
+          ) : null}
+          {script && script.scenes.length > 0 && !adminReadOnly ? (
+            <div className="border-b border-slate-100 px-4 py-4">
+              <ReelPromptDirectorPanel
+                mode="script"
+                compact
+                onGenerateFromScript={async (opts) => {
+                  const { pack } = await scriptWriterGenerateReelPrompts(
+                    () => user!.getIdToken(),
+                    sessionId,
+                    opts
+                  );
+                  return pack;
+                }}
+              />
+            </div>
           ) : null}
           <div className="min-w-0 overflow-x-auto px-4 py-4">
             {script ? (

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildGuidedProjectRoot,
   buildIngestFolderName,
   buildManagedMediaRoot,
   resolveUniqueFolderName,
@@ -25,6 +26,12 @@ describe("mediaPathBuilder", () => {
   it("builds managed media root under a drive", () => {
     expect(buildManagedMediaRoot("H:\\")).toMatch(/Media[\\/]ShootSpine$/i);
     expect(buildManagedMediaRoot("H:")).toMatch(/^H:\\Media\\ShootSpine$/i);
+  });
+
+  it("builds guided project root with project name", () => {
+    expect(buildGuidedProjectRoot("H:\\", "Monopoly Night")).toMatch(
+      /^H:\\Media\\ShootSpine\\Monopoly_Night$/i
+    );
   });
 
   it("avoids folder collisions with Card02", () => {

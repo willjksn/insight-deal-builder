@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { applyFinishingPlan } from "@/lib/aiEditor/finishing";
-import { buildEdl, buildResolveHandoff } from "@/lib/aiEditor/resolveExport";
+import {
+  buildEdl,
+  buildResolveHandoff,
+  sourceTimecodeOffsetFrames,
+} from "@/lib/aiEditor/resolveExport";
 import { buildRoughCutFromCoverage } from "@/lib/aiEditor/timeline";
 import type { CoverageReport, MediaAsset } from "@/lib/aiEditor/types";
 
@@ -25,6 +29,43 @@ function media(id: string, filename: string): MediaAsset {
 }
 
 describe("resolveExport", () => {
+  it("offsets EDL source TC by camera start timecode (FX3)", () => {
+    const asset = {
+      ...media("m1", "C0042.MP4"),
+      startTimecode: "01:10:00:00",
+    };
+    expect(sourceTimecodeOffsetFrames(asset, 24)).toBe(24 * (1 * 3600 + 10 * 60));
+    const timeline = buildRoughCutFromCoverage({
+      projectId: "p1",
+      coverage: {
+        projectId: "p1",
+        updatedAt: "",
+        plannedShotCount: 0,
+        coveredCount: 0,
+        partialCount: 0,
+        missingCount: 0,
+        unmatchedMediaIds: [],
+        overrides: [],
+        shots: [],
+      },
+      media: [asset],
+      frameRate: 24,
+    });
+    const video = timeline.tracks.find((t) => t.kind === "video")!;
+    video.clips = [
+      {
+        ...video.clips[0],
+        mediaAssetId: "m1",
+        sourceInFrame: 0,
+        durationFrames: 24,
+        timelineStartFrame: 0,
+      },
+    ];
+    const edl = buildEdl(timeline, [asset]);
+    expect(edl).toContain("01:10:00:00 01:10:01:00");
+    expect(edl).not.toMatch(/V\s+C\s+00:00:00:00\s+00:00:01:00/);
+  });
+
   it("builds EDL with shootspine media comments", () => {
     const coverage: CoverageReport = {
       projectId: "p1",

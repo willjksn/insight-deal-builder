@@ -1,6 +1,7 @@
 /** Deterministic offline matching of clips → planned shots (V1D). */
 
 import type { ClipAnalysisBundle } from "@/lib/aiEditor/analysis";
+import { isRoughCutVideoAsset } from "@/lib/aiEditor/mediaFormats";
 import type {
   CoverageReport,
   CoverageShotRow,
@@ -260,7 +261,7 @@ export function buildCoverageReport(input: {
     Object.entries(dialogueByScene).map(([k, v]) => [k.toLowerCase(), v])
   );
 
-  const videoMedia = media.filter((m) => m.mediaType === "video" || !m.mediaType || m.mediaType === "other");
+  const videoMedia = media.filter((m) => isRoughCutVideoAsset(m));
 
   const shots: CoverageShotRow[] = (context.shots ?? []).map((shot) => {
     const dialogueLines = dialogueForShot(shot, dialMap);

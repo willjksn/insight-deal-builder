@@ -5,10 +5,12 @@ import Link from "next/link";
 import {
   CheckCircle2,
   Clapperboard,
+  Copy,
   FolderOpen,
   HardDrive,
   Loader2,
   Monitor,
+  Pencil,
   Play,
   RefreshCw,
   Sparkles,
@@ -16,11 +18,14 @@ import {
   WifiOff,
 } from "lucide-react";
 import { FolderPicker } from "@/components/aiEditor/FolderPicker";
+import { CameraLabelPicker } from "@/components/aiEditor/CameraLabelPicker";
+import { GuidedFootagePanel } from "@/components/aiEditor/GuidedFootagePanel";
 import {
   ManagedIngestReview,
   type ManagedIngestOptions,
 } from "@/components/aiEditor/ManagedIngestReview";
 import { MediaPreview, type PreviewItem } from "@/components/aiEditor/MediaPreview";
+import { ResolveCoachPanel } from "@/components/aiEditor/ResolveCoachPanel";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -45,13 +50,20 @@ import {
   agentListDrives,
   agentRegisterSession,
   agentRevealPath,
+  agentRenameDir,
   agentSafeDelete,
   agentStorageStat,
   agentThumbnail,
   agentWriteResolveHandoff,
   checkAgentHealth,
   playbackPathForAsset,
+  sourcePathForProxy,
 } from "@/lib/aiEditor/agentClient";
+import {
+  inferManagedProjectRootFromMedia,
+  resolveLiveProjectRoot,
+} from "@/lib/aiEditor/inferProjectRoot";
+import { planManagedProjectFolderRename } from "@/lib/aiEditor/projectFolderRename";
 import type { AgentDriveEntry } from "@/lib/aiEditor/agentProtocol";
 import { driveActionGates } from "@/lib/aiEditor/driveActionGates";
 import { assessDrivePresence } from "@/lib/aiEditor/drivePresence";
@@ -66,12 +78,23 @@ import {
   driveForPath,
   friendlyDriveLabel,
   inferStorageTypeForPath,
+  buildIngestDestinationDrives,
   storageTypeLabel,
 } from "@/lib/aiEditor/storageDrives";
+import { buildManagedMediaRoot } from "@/lib/aiEditor/mediaPathBuilder";
+import {
+  buildGuidedWorkspaceFromDrive,
+  pickBestCameraSource,
+  planGuidedCamera,
+  planGuidedWorkspace,
+} from "@/lib/aiEditor/guidedWorkspace";
 import { assessStorageHealth } from "@/lib/aiEditor/storageHealth";
 import {
   assessAgentVersion,
+  isAgentVersionAtLeast,
   MIN_DESKTOP_AGENT_VERSION,
+  MIN_PROJECT_FOLDER_RENAME_AGENT_VERSION,
+  MIN_RESOLVE_LAUNCH_AGENT_VERSION,
 } from "@/lib/aiEditor/agentVersion";
 import {
   detectMediaSources,
@@ -81,8 +104,11 @@ import {
   getWorkflowNextStep,
   writeResumeBookmark,
 } from "@/lib/aiEditor/workflowNextStep";
+import { buildDisplayStepNumbers } from "@/lib/aiEditor/visibleSteps";
 import {
+  RESOLVE_HANDOFF_FILES,
   RESOLVE_HANDOFF_REL_DIR,
+  activeHandoffDir,
   resolveHandoffAbsoluteDir,
 } from "@/lib/aiEditor/resolveBridge";
 import {
@@ -105,6 +131,11 @@ import type { FinishingMoodId, TransitionStyleId } from "@/lib/aiEditor/types";
 import { framesToSeconds } from "@/lib/aiEditor/frames";
 import type { ClipAnalysisBundle } from "@/lib/aiEditor/analysis";
 import { formatBytes } from "@/lib/aiEditor/checksum";
+import { assetNeedsBrowserProxy } from "@/lib/aiEditor/codecs";
+import {
+  isIngestableMediaExtension,
+  isRoughCutVideoAsset,
+} from "@/lib/aiEditor/mediaFormats";
 import {
   aiEditorArchiveAction,
   aiEditorCreateFoldersJob,
@@ -113,6 +144,7 @@ import {
   aiEditorLaunchAgent,
   aiEditorLogResolveOpen,
   aiEditorMintAgentSession,
+  aiEditorRenameSession,
   aiEditorPatchMedia,
   aiEditorRunMatch,
   aiEditorSaveAnalysis,
@@ -209,6 +241,8 @@ export function AiEditorClient({ projectId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const cancelBatchRef = useRef(false);
+  const copyAbortRef = useRef<AbortController | null>(null);
+  const [batchStopping, setBatchStopping] = useState(false);
   const [context, setContext] = useState<ProductionContext | null>(null);
   const [settings, setSettings] = useState<AiEditorProjectSettings | null>(null);
   const [storage, setStorage] = useState<StorageLocation[]>([]);
@@ -242,6 +276,11 @@ export function AiEditorClient({ projectId }: Props) {
   const [ingestDestFreeBytes, setIngestDestFreeBytes] = useState<number | null>(null);
   const [diskNote, setDiskNote] = useState<string | null>(null);
   const [ingestQueue, setIngestQueue] = useState<IngestQueueItem[]>([]);
+  /** Files found on a card/folder awaiting selective copy. */
+  const [pendingCopyFiles, setPendingCopyFiles] = useState<
+    Array<{ path: string; filename: string; sizeBytes: number }> | null
+  >(null);
+  const [selectedCopyPaths, setSelectedCopyPaths] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<{ pct: number; label: string } | null>(null);
   const [analysis, setAnalysis] = useState<ClipAnalysisBundle[]>([]);
   const [coverage, setCoverage] = useState<CoverageReport | null>(null);
@@ -286,6 +325,15 @@ export function AiEditorClient({ projectId }: Props) {
   const [feedbackHint, setFeedbackHint] = useState<string | null>(null);
   const [archivePath, setArchivePath] = useState("");
   const [reclaimConfirm, setReclaimConfirm] = useState("");
+  const [copiedProjectName, setCopiedProjectName] = useState(false);
+  const [editingProjectName, setEditingProjectName] = useState(false);
+  /** Guided Steps 2–3; advanced folder pickers stay collapsed. */
+  const [showAdvancedFootage, setShowAdvancedFootage] = useState(false);
+  /** User override for guided destination drive root (e.g. H:\). */
+  const [guidedDriveRoot, setGuidedDriveRoot] = useState<string | null>(null);
+  const [projectNameDraft, setProjectNameDraft] = useState("");
+  const [renamingProject, setRenamingProject] = useState(false);
+  const folderHealKeyRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -362,7 +410,21 @@ export function AiEditorClient({ projectId }: Props) {
       const priorHandoff = resolveJobs
         .map((j) => j.payload?.handoffDir)
         .find((d): d is string => typeof d === "string" && d.trim().length > 0);
-      if (priorHandoff) setHandoffDirOnDisk(priorHandoff);
+      const mediaRoot = inferManagedProjectRootFromMedia(dash.media ?? []);
+      const root = resolveLiveProjectRoot({
+        settingsRoot: dash.settings?.projectRootPath,
+        mediaRoot,
+        projectName: dash.context?.projectName,
+      });
+      const handoff = activeHandoffDir(root, priorHandoff);
+      // Only keep a prior job path when it still belongs to the live project root.
+      if (handoff && priorHandoff && handoff === priorHandoff.trim().replace(/[/\\]+$/, "")) {
+        setHandoffDirOnDisk(priorHandoff);
+      } else if (handoff && root) {
+        setHandoffDirOnDisk(handoff);
+      } else {
+        setHandoffDirOnDisk(null);
+      }
       const health = await checkAgentHealth(DEFAULT_AGENT_BASE_URL);
       setAgent(health);
     } catch (e) {
@@ -401,6 +463,62 @@ export function AiEditorClient({ projectId }: Props) {
     setAgentExpiresAt(session.expiresAt);
     return session.token;
   }, [agentExpiresAt, agentToken, getToken, projectId]);
+
+  const thumbBackfillAttempted = useRef(new Set<string>());
+
+  useEffect(() => {
+    setPendingCopyFiles(null);
+    setSelectedCopyPaths(new Set());
+  }, [indexFolderPath, addMode]);
+
+  // Generate preview stills for clips that were ingested without thumbnails.
+  useEffect(() => {
+    if (!agent.connected || loading || !!busy) return;
+    const missing = media.filter((m) => {
+      if (m.thumbnailDataUrl) return false;
+      if (thumbBackfillAttempted.current.has(m.id)) return false;
+      if (!isIngestableMediaExtension(m.filename)) return false;
+      const mt = (m.mediaType || "").toLowerCase();
+      if (mt === "audio" || mt === "image") return false;
+      return Boolean(playbackPathForAsset(m));
+    });
+    if (!missing.length) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await ensureAgentSession();
+        const patches: Array<{ id: string; thumbnailDataUrl: string }> = [];
+        for (const m of missing.slice(0, 40)) {
+          if (cancelled) return;
+          thumbBackfillAttempted.current.add(m.id);
+          const path = playbackPathForAsset(m);
+          if (!path) continue;
+          try {
+            const thumb = await agentThumbnail(DEFAULT_AGENT_BASE_URL, token, path);
+            if (thumb.dataUrl) {
+              patches.push({ id: m.id, thumbnailDataUrl: thumb.dataUrl });
+            }
+          } catch {
+            /* best-effort */
+          }
+        }
+        if (cancelled || !patches.length) return;
+        await aiEditorPatchMedia(getToken, projectId, patches);
+        if (cancelled) return;
+        setMedia((prev) =>
+          prev.map((m) => {
+            const p = patches.find((x) => x.id === m.id);
+            return p ? { ...m, thumbnailDataUrl: p.thumbnailDataUrl } : m;
+          })
+        );
+      } catch {
+        /* optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [agent.connected, media, loading, busy, ensureAgentSession, getToken, projectId]);
 
   useEffect(() => {
     if (!agent.connected || !settings?.projectRootPath) return;
@@ -487,14 +605,72 @@ export function AiEditorClient({ projectId }: Props) {
 
   const needsPrepare = useMemo(
     () =>
-      media.filter((m) => m.needsProxy && !m.proxyPath && playbackPathForAsset(m)),
+      media.filter(
+        (m) => assetNeedsBrowserProxy(m) && playbackPathForAsset(m)
+      ),
     [media]
   );
   const preparedCount = useMemo(
-    () => media.filter((m) => m.proxyPath || !m.needsProxy).length,
+    () => media.filter((m) => !assetNeedsBrowserProxy(m)).length,
     [media]
   );
   const safety = useMemo(() => summarizeMediaSafety(media), [media]);
+  const ingestDestinationDrives = useMemo(
+    () => buildIngestDestinationDrives(knownDrives, detectedSources),
+    [knownDrives, detectedSources]
+  );
+  const guidedCameraPlan = useMemo(() => {
+    if (selectedSourceId) {
+      const selected = detectedSources.find((s) => s.id === selectedSourceId);
+      if (selected) {
+        const model = selected.probableCameraModel || selected.label || "Camera";
+        return {
+          source: selected,
+          title: `${model} · ${selected.clipCount} clip${selected.clipCount === 1 ? "" : "s"}`,
+          detail: `${formatBytes(selected.totalBytes)} from ${selected.mountPath}`,
+        };
+      }
+    }
+    return planGuidedCamera(detectedSources);
+  }, [detectedSources, selectedSourceId]);
+  const guidedWorkspacePlan = useMemo(() => {
+    const projectName = context?.projectName?.trim() || "Untitled footage edit";
+    const base = planGuidedWorkspace({
+      projectName,
+      destinationDrives: ingestDestinationDrives,
+      knownDrives,
+      currentProjectRoot: settings?.projectRootPath || storagePath || null,
+    });
+    if (!base) return null;
+    if (guidedDriveRoot) {
+      const forced = buildGuidedWorkspaceFromDrive(guidedDriveRoot, projectName);
+      const drive =
+        ingestDestinationDrives.find(
+          (d) =>
+            d.rootPath.replace(/\\/g, "").toUpperCase() ===
+            guidedDriveRoot.replace(/\\/g, "").toUpperCase()
+        ) || null;
+      return {
+        ...base,
+        projectRoot: forced,
+        driveRoot: guidedDriveRoot.endsWith("\\") ? guidedDriveRoot : `${guidedDriveRoot}\\`,
+        driveLabel: drive?.label || base.driveLabel,
+        freeBytes: drive?.freeBytes ?? base.freeBytes,
+        storageType: drive?.storageType || base.storageType,
+        shouldMigrate: false,
+        keepingExisting: false,
+        summary: `Will save to ${drive?.label || guidedDriveRoot}`,
+      };
+    }
+    return base;
+  }, [
+    context?.projectName,
+    ingestDestinationDrives,
+    knownDrives,
+    settings?.projectRootPath,
+    storagePath,
+    guidedDriveRoot,
+  ]);
   const analyzedCount = useMemo(
     () => analysis.filter((a) => a.analysisStatus === "complete").length,
     [analysis]
@@ -533,33 +709,73 @@ export function AiEditorClient({ projectId }: Props) {
   const step7Done = Boolean(timeline && timeline.tracks.some((t) => t.clips.length));
   const step8Done = Boolean(timeline && timeline.version > 1);
   const step9Done = Boolean(timeline?.finishing);
-  const step10Done = Boolean(handoffDirOnDisk || resolveImported);
+  const liveProjectRoot = useMemo(() => {
+    const mediaRoot = inferManagedProjectRootFromMedia(media);
+    return resolveLiveProjectRoot({
+      settingsRoot: settings?.projectRootPath || storagePath,
+      mediaRoot,
+      projectName: context?.projectName,
+    });
+  }, [media, settings?.projectRootPath, storagePath, context?.projectName]);
+
+  const resolveHandoffDir = useMemo(
+    () => activeHandoffDir(liveProjectRoot, handoffDirOnDisk),
+    [liveProjectRoot, handoffDirOnDisk]
+  );
+  const step10Done = Boolean(resolveHandoffDir || resolveImported);
   const archiveSummary = useMemo(
     () => summarizeArchiveState(media, settings?.projectRootPath),
     [media, settings?.projectRootPath]
   );
+
+  // Drop stale Resolve paths when the project folder moves (SSD / rename).
+  useEffect(() => {
+    if (!liveProjectRoot || !handoffDirOnDisk) return;
+    const next = activeHandoffDir(liveProjectRoot, handoffDirOnDisk);
+    if (next && next !== handoffDirOnDisk) setHandoffDirOnDisk(next);
+  }, [liveProjectRoot, handoffDirOnDisk]);
   const step11Done = archiveSummary.archived > 0;
   const step12Done = Boolean(settings?.lastFinishingFeedback);
+  /** Shot list / coverage tools only when linked to a production plan. */
+  const hasProductionPlan = Boolean(
+    context && !context.aiEditorOnly && (context.shotCount ?? 0) > 0
+  );
+  const showPrepareStep = needsPrepare.length > 0;
+  const stepVisibility = useMemo(
+    () => ({
+      showPrepare: showPrepareStep,
+      showPlanSteps: hasProductionPlan,
+    }),
+    [showPrepareStep, hasProductionPlan]
+  );
+  const stepNo = useMemo(
+    () => buildDisplayStepNumbers(stepVisibility),
+    [stepVisibility]
+  );
   const workflowNext = useMemo(() => {
-    const skipMatch =
-      Boolean(context?.aiEditorOnly) || !context || (context.shotCount ?? 0) === 0;
-    return getWorkflowNextStep({
-      connected: step1Done,
-      hasProjectRoot: step2Done,
-      hasMedia: step3Done,
-      prepareDone: !step3Done || step4Done,
-      analyzeDone: !step3Done || step5Done,
-      matchDone: skipMatch || step6Done,
-      roughCutDone: step7Done,
-      // Chat is optional - don't block Look / Resolve if they skipped it
-      chatDone: step8Done || step9Done || step10Done,
-      lookDone: step9Done,
-      resolveDone: step10Done,
-      archiveDone: step11Done || step12Done,
-      wrapUpDone: step12Done,
-    });
+    return getWorkflowNextStep(
+      {
+        connected: step1Done,
+        hasProjectRoot: step2Done,
+        hasMedia: step3Done,
+        // Guided copy already prepares previews; skip prep step when none needed
+        prepareDone: !step3Done || step4Done || !showPrepareStep,
+        analyzeDone: !hasProductionPlan || !step3Done || step5Done,
+        matchDone: !hasProductionPlan || step6Done,
+        roughCutDone: step7Done,
+        // Chat is optional - don't block Look / Resolve if they skipped it
+        chatDone: step8Done || step9Done || step10Done,
+        lookDone: step9Done,
+        resolveDone: step10Done,
+        archiveDone: step11Done || step12Done,
+        wrapUpDone: step12Done,
+      },
+      stepVisibility
+    );
   }, [
-    context,
+    hasProductionPlan,
+    showPrepareStep,
+    stepVisibility,
     step1Done,
     step2Done,
     step3Done,
@@ -587,6 +803,17 @@ export function AiEditorClient({ projectId }: Props) {
       updatedAt: Date.now(),
     });
   }, [context?.projectName, loading, projectId, workflowNext]);
+
+  // Prompt for a real name when the session is still “Untitled…”
+  useEffect(() => {
+    if (loading || !context) return;
+    const n = context.projectName?.trim() || "";
+    setProjectNameDraft(n || "");
+    if (!n || /^untitled(\s+footage)?(\s+edit)?$/i.test(n)) {
+      setEditingProjectName(true);
+      if (/^untitled/i.test(n)) setProjectNameDraft("");
+    }
+  }, [loading, context?.projectName, context]);
 
   useEffect(() => {
     if (loading || typeof window === "undefined") return;
@@ -687,9 +914,24 @@ export function AiEditorClient({ projectId }: Props) {
     timeline?.reels?.find((r) => r.id === timeline.activeReelId)?.name || null;
   const visibleClips = useMemo(() => {
     const clips = videoTrack?.clips ?? [];
-    if (!timeline?.activeReelId || !timeline.reels?.length) return clips;
-    return clips.filter((c) => c.reelId === timeline.activeReelId);
-  }, [videoTrack, timeline?.activeReelId, timeline?.reels]);
+    const inReel =
+      !timeline?.activeReelId || !timeline.reels?.length
+        ? clips
+        : clips.filter((c) => c.reelId === timeline.activeReelId);
+    // Hide camera stills even if an older cut included MJPEG JPGs as "video"
+    return inReel.filter((c) => {
+      const asset = media.find((m) => m.id === c.mediaAssetId);
+      return asset ? isRoughCutVideoAsset(asset) : true;
+    });
+  }, [videoTrack, timeline?.activeReelId, timeline?.reels, media]);
+
+  const stillClipsOnCut = useMemo(() => {
+    const clips = videoTrack?.clips ?? [];
+    return clips.filter((c) => {
+      const asset = media.find((m) => m.id === c.mediaAssetId);
+      return asset ? !isRoughCutVideoAsset(asset) : false;
+    });
+  }, [videoTrack, media]);
 
   async function onRecheckAgent() {
     setBusy("recheck");
@@ -733,14 +975,15 @@ export function AiEditorClient({ projectId }: Props) {
         });
         const sources = detectMediaSources(res.probes || []);
         setDetectedSources(sources);
+        const bestCard = pickBestCameraSource(sources);
         setSelectedSourceId((prev) => {
           if (prev && sources.some((s) => s.id === prev)) return prev;
-          return sources[0]?.id ?? null;
+          return bestCard?.id ?? sources[0]?.id ?? null;
         });
         // Only suggest camera on a visible (non-quiet) scan so background polls don't yank the dropdown
-        if (!quiet && sources[0]?.suggestedCameraAssignment) {
+        if (!quiet && bestCard?.suggestedCameraAssignment) {
           setCameraLabel((prev) =>
-            prev === "CAMERA_A" || !prev ? sources[0]!.suggestedCameraAssignment! : prev
+            prev === "CAMERA_A" || !prev ? bestCard.suggestedCameraAssignment! : prev
           );
         }
         const dest = (settings?.projectRootPath || storagePath).trim();
@@ -798,6 +1041,14 @@ export function AiEditorClient({ projectId }: Props) {
       const after = await checkAgentHealth();
       setAgent(after);
       if (after.connected) {
+        // Agent process is new — always mint/register a session before other calls.
+        setAgentToken(null);
+        setAgentExpiresAt(null);
+        try {
+          await ensureAgentSession();
+        } catch {
+          /* Connect UI still useful; next action will retry mint */
+        }
         if (after.ffmpegAvailable === false) {
           setError("Connected, but video tools are missing. Install FFmpeg, then Restart.");
         } else {
@@ -913,22 +1164,24 @@ export function AiEditorClient({ projectId }: Props) {
     });
   }
 
-  async function onSaveWorkspace() {
-    if (!storagePath.trim()) return;
+  async function onSaveWorkspace(pathOverride?: string) {
+    const pathToSave = (pathOverride ?? storagePath).trim();
+    if (!pathToSave) return;
+    if (pathOverride) setStoragePath(pathToSave);
     setBusy("storage");
     setStatusNote(null);
     setError(null);
     try {
       const drives = await refreshKnownDrives();
-      const storageType = inferStorageTypeForPath(storagePath.trim(), drives);
-      const editDrive = driveForPath(storagePath.trim(), drives);
+      const storageType = inferStorageTypeForPath(pathToSave, drives);
+      const editDrive = driveForPath(pathToSave, drives);
       const res = await aiEditorSaveStorage(getToken, projectId, {
         name: context?.projectName || "Edit workspace",
-        path: storagePath.trim(),
+        path: pathToSave,
         purpose: "active",
         type: storageType,
         setAsActive: true,
-        volumeIdentifier: volumeIdForPath(storagePath.trim(), drives),
+        volumeIdentifier: volumeIdForPath(pathToSave, drives),
         capacityBytes: editDrive?.capacityBytes,
         availableBytes: editDrive?.availableBytes,
       });
@@ -937,7 +1190,8 @@ export function AiEditorClient({ projectId }: Props) {
         const others = prev.filter((s) => s.id !== res.storage.id);
         return [...others, res.storage];
       });
-      const root = res.settings.projectRootPath || storagePath.trim();
+      const root = res.settings.projectRootPath || pathToSave;
+      setStoragePath(root);
       setIndexFolderPath(root);
 
       if (createProjectFolders && res.settings.projectRootPath) {
@@ -989,6 +1243,178 @@ export function AiEditorClient({ projectId }: Props) {
       setError(e instanceof Error ? e.message : "Could not save workspace");
     } finally {
       setBusy(null);
+    }
+  }
+
+  /** Guided mode: pick SSD path, save workspace + folders without a separate Step 2 ritual. */
+  async function ensureGuidedWorkspace(forceMigrate = false): Promise<string> {
+    const projectName = context?.projectName?.trim() || "Untitled footage edit";
+    const drives = await refreshKnownDrives();
+    const dests = buildIngestDestinationDrives(drives, detectedSources);
+    const plan = planGuidedWorkspace({
+      projectName,
+      destinationDrives: dests,
+      knownDrives: drives,
+      currentProjectRoot: settings?.projectRootPath || storagePath || null,
+    });
+    let root: string | null = null;
+    if (guidedDriveRoot) {
+      root = buildGuidedWorkspaceFromDrive(guidedDriveRoot, projectName);
+    } else if (forceMigrate && plan) {
+      root = buildGuidedWorkspaceFromDrive(plan.driveRoot, projectName);
+    } else if (plan?.shouldMigrate) {
+      root = plan.projectRoot;
+    } else if (settings?.projectRootPath?.trim()) {
+      root = settings.projectRootPath.trim();
+    } else if (plan) {
+      root = plan.projectRoot;
+    }
+    if (!root) {
+      throw new Error("Plug in an external SSD (like your T7), then Rescan.");
+    }
+    const current = settings?.projectRootPath?.trim() || "";
+    if (current.toLowerCase() === root.toLowerCase()) {
+      setStoragePath(root);
+      return root;
+    }
+
+    const storageType = inferStorageTypeForPath(root, drives);
+    const editDrive = driveForPath(root, drives);
+    const res = await aiEditorSaveStorage(getToken, projectId, {
+      name: projectName,
+      path: root,
+      purpose: "active",
+      type: storageType === "unknown" ? "externalSSD" : storageType,
+      setAsActive: true,
+      volumeIdentifier: volumeIdForPath(root, drives),
+      capacityBytes: editDrive?.capacityBytes,
+      availableBytes: editDrive?.availableBytes,
+    });
+    setSettings(res.settings);
+    setStorage((prev) => {
+      const others = prev.filter((s) => s.id !== res.storage.id);
+      return [...others, res.storage];
+    });
+    const savedRoot = res.settings.projectRootPath || root;
+    setStoragePath(savedRoot);
+
+    try {
+      const { job, projectRootPath } = await aiEditorCreateFoldersJob(getToken, projectId, {});
+      setJobs((prev) => [job, ...prev.filter((j) => j.id !== job.id)]);
+      const token = await ensureAgentSession();
+      await agentCreateFolders(
+        DEFAULT_AGENT_BASE_URL,
+        token,
+        projectRootPath || savedRoot,
+        res.settings.cameraLabels
+      );
+    } catch {
+      /* folders best-effort; copy can still create camera dirs */
+    }
+    return savedRoot.trim();
+  }
+
+  async function onGuidedReviewClips() {
+    setError(null);
+    setStatusNote(null);
+    try {
+      if (!guidedCameraPlan) throw new Error("No camera card found — plug it in and Rescan.");
+      await ensureGuidedWorkspace(false);
+      const src = guidedCameraPlan.source;
+      setAddMode("copy");
+      setPrepareWhileCopying(true);
+      setCameraLabel(src.suggestedCameraAssignment || cameraLabel || "CAMERA_A");
+      setIndexFolderPath(src.mediaRoot);
+      setSelectedSourceId(src.id);
+      setBusy("index");
+      const health = await checkAgentHealth();
+      setAgent(health);
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
+      const token = await ensureAgentSession();
+      const indexed = await agentIndexFolder(DEFAULT_AGENT_BASE_URL, token, src.mediaRoot, true);
+      const sourceFiles = filterIngestableFiles(indexed.files || []);
+      if (!sourceFiles.length) {
+        setPendingCopyFiles(null);
+        setSelectedCopyPaths(new Set());
+        setStatusNote("No video or audio files found on that card.");
+        return;
+      }
+      setPendingCopyFiles(sourceFiles);
+      setSelectedCopyPaths(new Set(sourceFiles.map((f) => f.path)));
+      setStatusNote(
+        `Found ${sourceFiles.length} clip(s). Uncheck anything you don’t need, then Copy.`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not review clips");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onGuidedCopyFootage() {
+    setError(null);
+    setStatusNote(null);
+    cancelBatchRef.current = false;
+    setBatchStopping(false);
+    try {
+      if (!guidedCameraPlan) throw new Error("No camera card found — plug it in and Rescan.");
+      setBusy("index");
+      setProgress({ pct: 5, label: "Preparing project folder on your SSD…" });
+      const projectRoot = await ensureGuidedWorkspace(Boolean(guidedWorkspacePlan?.shouldMigrate));
+      if (!projectRoot) throw new Error("Could not set project folder");
+
+      const src = guidedCameraPlan.source;
+      setAddMode("copy");
+      setPrepareWhileCopying(true);
+      const cam = src.suggestedCameraAssignment || cameraLabel || "CAMERA_A";
+      setCameraLabel(cam);
+      setIndexFolderPath(src.mediaRoot);
+      setSelectedSourceId(src.id);
+
+      const health = await checkAgentHealth();
+      setAgent(health);
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
+      const token = await ensureAgentSession();
+
+      let files = pendingCopyFiles;
+      let selected = files?.filter((f) => selectedCopyPaths.has(f.path)) || [];
+      if (!files?.length) {
+        setProgress({ pct: 15, label: "Reading clips on the camera card…" });
+        const indexed = await agentIndexFolder(DEFAULT_AGENT_BASE_URL, token, src.mediaRoot, true);
+        files = filterIngestableFiles(indexed.files || []);
+        setPendingCopyFiles(files);
+        setSelectedCopyPaths(new Set(files.map((f) => f.path)));
+        selected = files;
+      }
+      const toCopy = selected.length ? selected : files;
+      if (!toCopy.length) throw new Error("No clips selected to copy.");
+
+      setProgress({ pct: 20, label: `Copying ${toCopy.length} clip(s) to your SSD…` });
+      await runManagedCopy({
+        token,
+        sourceFiles: toCopy,
+        camera: cam,
+        prepare: true,
+        projectRoot,
+      });
+      if (!cancelBatchRef.current) {
+        setPendingCopyFiles(null);
+        setSelectedCopyPaths(new Set());
+        setStatusNote(
+          `Footage is on your drive at ${projectRoot}. Next: make a first cut below.`
+        );
+        document.getElementById("ai-step-7")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not copy footage");
+    } finally {
+      setBusy(null);
+      setProgress(null);
+      setBatchStopping(false);
+      copyAbortRef.current = null;
     }
   }
 
@@ -1067,6 +1493,14 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  function filterIngestableFiles<T extends { filename: string; path?: string }>(
+    files: T[]
+  ): T[] {
+    return files.filter(
+      (f) => isIngestableMediaExtension(f.filename || f.path || "")
+    );
+  }
+
   async function probeIndexedFiles(
     token: string,
     indexed: Array<{ path: string; filename: string; sizeBytes: number }>
@@ -1102,6 +1536,8 @@ export function AiEditorClient({ projectId }: Props) {
     return files;
   }
 
+
+  /** Scan footage folder — for copy mode, show a picker; for in-place, catalog immediately. */
   async function onIndexFolder() {
     const folder = indexFolderPath.trim() || settings?.projectRootPath || "";
     if (!folder) return;
@@ -1110,21 +1546,32 @@ export function AiEditorClient({ projectId }: Props) {
     setStatusNote(null);
     setDiskNote(null);
     setError(null);
+    setProgress({ pct: 5, label: "Scanning folder for video & audio…" });
     try {
       const health = await checkAgentHealth();
       setAgent(health);
       if (!health.connected) throw new Error("Connect this computer first, then add footage.");
 
       const token = await ensureAgentSession();
+      setProgress({ pct: 25, label: "Listing clips on this drive…" });
       const indexed = await agentIndexFolder(DEFAULT_AGENT_BASE_URL, token, folder, true);
-      if (!indexed.files.length) {
-        setStatusNote("No video or audio files found in that folder.");
+      const sourceFiles = filterIngestableFiles(indexed.files || []).sort((a, b) =>
+        a.filename.localeCompare(b.filename, undefined, { numeric: true })
+      );
+      if (!sourceFiles.length) {
+        setPendingCopyFiles(null);
+        setSelectedCopyPaths(new Set());
+        setStatusNote(
+          "No video or audio files found in that folder (camera JPG stills are skipped)."
+        );
         return;
       }
 
       // In-place: catalog where files already are
       if (addMode === "in_place") {
-        const files = await probeIndexedFiles(token, indexed.files);
+        setProgress({ pct: 50, label: `Reading ${sourceFiles.length} clip(s)…` });
+        const files = await probeIndexedFiles(token, sourceFiles);
+        setProgress({ pct: 90, label: "Saving clip records…" });
         const res = await aiEditorIndexMedia(getToken, projectId, {
           files,
           ingestMode: "in_place",
@@ -1144,13 +1591,14 @@ export function AiEditorClient({ projectId }: Props) {
         return;
       }
 
-      // Managed copy for a single camera assignment (also used by queue runner)
-      await runManagedCopy({
-        token,
-        sourceFiles: indexed.files,
-        camera: cameraLabel,
-        prepare: prepareWhileCopying,
-      });
+      // Copy mode: stop for selection — do not copy everything yet
+      setPendingCopyFiles(sourceFiles);
+      setSelectedCopyPaths(new Set(sourceFiles.map((f) => f.path)));
+      const totalBytes = sourceFiles.reduce((s, f) => s + (f.sizeBytes || 0), 0);
+      setStatusNote(
+        `Found ${sourceFiles.length} clip(s) (${formatBytes(totalBytes)}). Uncheck takes you don’t need, then Copy & verify.`
+      );
+      setDiskNote(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add footage");
     } finally {
@@ -1159,15 +1607,58 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  async function onCopySelectedFiles() {
+    if (addMode !== "copy" || !pendingCopyFiles?.length) return;
+    if (!requireEditDisk()) return;
+    const selected = pendingCopyFiles.filter((f) => selectedCopyPaths.has(f.path));
+    if (!selected.length) {
+      setError("Select at least one clip to copy.");
+      return;
+    }
+    setBusy("index");
+    setError(null);
+    setStatusNote(null);
+    cancelBatchRef.current = false;
+    setBatchStopping(false);
+    setProgress({
+      pct: 0,
+      label: `Starting copy of ${selected.length} clip(s)…`,
+    });
+    try {
+      const health = await checkAgentHealth();
+      setAgent(health);
+      if (!health.connected) throw new Error("Connect this computer first, then add footage.");
+      const token = await ensureAgentSession();
+      await runManagedCopy({
+        token,
+        sourceFiles: selected,
+        camera: cameraLabel,
+        prepare: prepareWhileCopying,
+      });
+      if (!cancelBatchRef.current) {
+        setPendingCopyFiles(null);
+        setSelectedCopyPaths(new Set());
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not copy footage");
+    } finally {
+      setBusy(null);
+      setProgress(null);
+      setBatchStopping(false);
+      copyAbortRef.current = null;
+    }
+  }
+
   async function runManagedCopy(opts: {
     token: string;
     sourceFiles: Array<{ path: string; filename: string; sizeBytes: number }>;
     camera: string;
     prepare: boolean;
+    projectRoot?: string;
   }) {
-    const projectRoot = settings?.projectRootPath?.trim();
+    const projectRoot = (opts.projectRoot || settings?.projectRootPath || "").trim();
     if (!projectRoot) {
-      throw new Error("Save a project workspace folder first (step 2), then copy footage into it.");
+      throw new Error("Save a project workspace folder first, then copy footage into it.");
     }
 
     const batch = opts.sourceFiles.slice(0, 80);
@@ -1191,65 +1682,138 @@ export function AiEditorClient({ projectId }: Props) {
       relativeProjectPath?: string;
       probe?: Partial<MediaAsset>;
     }> = [];
+    const cam = opts.camera.replace(/_/g, " ");
+    let copiedOk = 0;
+    let failed = 0;
+    copyAbortRef.current?.abort();
+    const abort = new AbortController();
+    copyAbortRef.current = abort;
 
     for (let i = 0; i < batch.length; i += chunkSize) {
+      if (cancelBatchRef.current || abort.signal.aborted) break;
       const slice = batch.slice(i, i + chunkSize);
-      const pct = Math.round(((i + slice.length) / batch.length) * 100);
+      const fileLabel = slice[0]?.filename || "clip";
+      const pct = Math.round((i / Math.max(1, batch.length)) * 90);
       setProgress({
         pct,
-        label: `Copying & verifying ${i + 1}-${Math.min(i + slice.length, batch.length)} of ${batch.length} ? ${opts.camera.replace(/_/g, " ")}`,
+        label: cancelBatchRef.current
+          ? "Stopping…"
+          : `Copying & verifying ${i + 1}/${batch.length}: ${fileLabel} · ${cam}`,
       });
-      const copied = await agentIngestCopy(DEFAULT_AGENT_BASE_URL, opts.token, {
-        projectRoot,
-        cameraLabel: opts.camera,
-        files: slice.map((f) => ({
-          sourcePath: f.path,
-          filename: f.filename,
-          sizeBytes: f.sizeBytes,
-        })),
-        generateProxies: opts.prepare,
-      });
+      try {
+        const copied = await agentIngestCopy(
+          DEFAULT_AGENT_BASE_URL,
+          opts.token,
+          {
+            projectRoot,
+            cameraLabel: opts.camera,
+            files: slice.map((f) => ({
+              sourcePath: f.path,
+              filename: f.filename,
+              sizeBytes: f.sizeBytes,
+            })),
+            // Don't start heavy proxies if user already hit Stop
+            generateProxies: opts.prepare && !cancelBatchRef.current,
+          },
+          { signal: abort.signal }
+        );
 
-      for (const r of copied.results) {
-        let probe: Partial<MediaAsset> = {
-          checksum: r.checksum,
-          checksumAlgorithm: "sha256",
-          cameraAssignment: r.cameraAssignment,
-          relativeProjectPath: r.relativeProjectPath,
-          proxyPath: r.proxyPath,
-          sizeBytes: r.sizeBytes,
-          needsProxy: true,
-        };
-        try {
-          const probed = await agentProbe(DEFAULT_AGENT_BASE_URL, opts.token, r.destPath);
-          probe = { ...probe, ...(probed.probe as Partial<MediaAsset>) };
-          if (r.proxyPath) probe.proxyPath = r.proxyPath;
-        } catch {
-          probe = { ...probe, ...(await mockMediaEngine.probe(r.destPath)) };
+        if (cancelBatchRef.current || abort.signal.aborted) break;
+
+        for (const r of copied.results) {
+          if (cancelBatchRef.current || abort.signal.aborted) break;
+          setProgress({
+            pct: Math.min(95, pct + 2),
+            label: `Checking ${r.filename} · ${cam}`,
+          });
+          let probe: Partial<MediaAsset> = {
+            checksum: r.checksum,
+            checksumAlgorithm: "sha256",
+            cameraAssignment: r.cameraAssignment,
+            relativeProjectPath: r.relativeProjectPath,
+            proxyPath: r.proxyPath,
+            sizeBytes: r.sizeBytes,
+            needsProxy: true,
+          };
+          try {
+            const probed = await agentProbe(DEFAULT_AGENT_BASE_URL, opts.token, r.destPath);
+            probe = { ...probe, ...(probed.probe as Partial<MediaAsset>) };
+            if (r.proxyPath) probe.proxyPath = r.proxyPath;
+          } catch {
+            probe = { ...probe, ...(await mockMediaEngine.probe(r.destPath)) };
+          }
+          if (cancelBatchRef.current || abort.signal.aborted) {
+            // Still keep the verified copy we already have
+            allResults.push({
+              path: r.destPath,
+              filename: r.filename,
+              sizeBytes: r.sizeBytes,
+              relativeProjectPath: r.relativeProjectPath,
+              probe,
+            });
+            copiedOk += 1;
+            break;
+          }
+          try {
+            const thumb = await agentThumbnail(
+              DEFAULT_AGENT_BASE_URL,
+              opts.token,
+              r.proxyPath || r.destPath
+            );
+            if (thumb.dataUrl) probe = { ...probe, thumbnailDataUrl: thumb.dataUrl };
+          } catch {
+            /* optional */
+          }
+          allResults.push({
+            path: r.destPath,
+            filename: r.filename,
+            sizeBytes: r.sizeBytes,
+            relativeProjectPath: r.relativeProjectPath,
+            probe,
+          });
+          copiedOk += 1;
         }
-        allResults.push({
-          path: r.destPath,
-          filename: r.filename,
-          sizeBytes: r.sizeBytes,
-          relativeProjectPath: r.relativeProjectPath,
-          probe,
-        });
+      } catch (e) {
+        if (
+          cancelBatchRef.current ||
+          abort.signal.aborted ||
+          (e instanceof Error && e.message === "CANCELLED")
+        ) {
+          break;
+        }
+        failed += 1;
       }
     }
 
-    setProgress({ pct: 100, label: "Saving clip records..." });
-    const res = await aiEditorIndexMedia(getToken, projectId, {
-      files: allResults,
-      ingestMode: "managed",
-    });
-    setMedia((prev) => {
-      const byId = new Map(prev.map((m) => [m.id, m]));
-      for (const m of res.media) byId.set(m.id, m);
-      return [...byId.values()].sort((a, b) => a.filename.localeCompare(b.filename));
-    });
-    setJobs((prev) => [res.job as AiEditorJob, ...prev]);
+    if (allResults.length) {
+      setProgress({ pct: 98, label: "Saving clip records…" });
+      const res = await aiEditorIndexMedia(getToken, projectId, {
+        files: allResults,
+        ingestMode: "managed",
+      });
+      setMedia((prev) => {
+        const byId = new Map(prev.map((m) => [m.id, m]));
+        for (const m of res.media) byId.set(m.id, m);
+        return [...byId.values()].sort((a, b) => a.filename.localeCompare(b.filename));
+      });
+      setJobs((prev) => [res.job as AiEditorJob, ...prev]);
+    }
+    const stopped = cancelBatchRef.current || abort.signal.aborted;
     setStatusNote(
-      `Copied and verified ${res.media.length} clip(s) into ${opts.camera.replace(/_/g, " ")}. Camera cards are never erased by ShootSpine.`
+      stopped
+        ? `Stopped — saved ${copiedOk} clip(s) that finished copying into ${cam}.`
+        : `Copied and verified ${copiedOk} clip(s) into ${cam}` +
+            (failed ? ` (${failed} failed)` : "") +
+            ". Camera cards are never erased by ShootSpine."
+    );
+  }
+
+  function requestStopBatch() {
+    cancelBatchRef.current = true;
+    setBatchStopping(true);
+    copyAbortRef.current?.abort();
+    setProgress((prev) =>
+      prev ? { ...prev, label: "Stopping — finishing the current clip, then closing…" } : prev
     );
   }
 
@@ -1294,10 +1858,11 @@ export function AiEditorClient({ projectId }: Props) {
           item.sourcePath,
           true
         );
-        if (!indexed.files.length) continue;
+        const sourceFiles = filterIngestableFiles(indexed.files || []);
+        if (!sourceFiles.length) continue;
         await runManagedCopy({
           token,
-          sourceFiles: indexed.files,
+          sourceFiles,
           camera: item.cameraLabel,
           prepare: item.prepare,
         });
@@ -1515,6 +2080,29 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  async function onStripNonVideoFromCut() {
+    if (!stillClipsOnCut.length) return;
+    setBusy("rough_cut");
+    setError(null);
+    try {
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "strip_non_video",
+        note: "Remove camera stills from rough cut",
+      });
+      setTimeline(res.timeline);
+      setExportFiles(null);
+      setExportStamp(null);
+      setTimelineVersions(res.versions);
+      setStatusNote(
+        `Removed camera stills / non-video from the cut (v${res.timeline.version}).`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not clean cut");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function onRestoreVersion(versionId: string) {
     setBusy("rough_cut");
     setError(null);
@@ -1551,38 +2139,123 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
-  function previewClipAsset(asset: MediaAsset) {
-    const path = playbackPathForAsset(asset);
-    if (!path) {
-      setError("This clip has no path on this PC.");
-      return;
+  async function ensureProxyForWatch(asset: MediaAsset): Promise<string | null> {
+    const existing = asset.proxyPath?.trim();
+    if (existing && !assetNeedsBrowserProxy(asset)) return existing;
+
+    const sourcePath = sourcePathForProxy(asset);
+    if (!sourcePath) return null;
+    if (!requireEditDisk()) return null;
+
+    const health = await checkAgentHealth();
+    setAgent(health);
+    if (!health.connected) throw new Error("Connect this computer first to prepare a preview.");
+    if (health.ffmpegAvailable === false) {
+      throw new Error("Video tools are missing. Restart the Desktop Agent after FFmpeg is installed.");
     }
-    void openPreview(asset.filename, [{ path, label: asset.filename }]);
+
+    setBusy("proxy");
+    setProgress({ pct: 35, label: `Preparing preview: ${asset.filename}` });
+    try {
+      const token = await ensureAgentSession();
+      const res = await agentCreateProxy(DEFAULT_AGENT_BASE_URL, token, sourcePath, {
+        profile: "ai_720p",
+      });
+      await aiEditorPatchMedia(getToken, projectId, [
+        { id: asset.id, proxyPath: res.proxyPath, needsProxy: true },
+      ]);
+      setMedia((prev) =>
+        prev.map((m) =>
+          m.id === asset.id ? { ...m, proxyPath: res.proxyPath, needsProxy: true } : m
+        )
+      );
+      return res.proxyPath;
+    } finally {
+      setBusy(null);
+      setProgress(null);
+    }
+  }
+
+  async function previewClipAsset(asset: MediaAsset) {
+    try {
+      setError(null);
+      let path = playbackPathForAsset(asset);
+      if (!path) {
+        setError("This clip has no path on this PC.");
+        return;
+      }
+      // FX3 / XAVC originals usually fail in the browser and Windows Media Player.
+      if (assetNeedsBrowserProxy(asset)) {
+        setStatusNote(`Making a light preview for ${asset.filename} (original stays untouched)…`);
+        path = await ensureProxyForWatch(asset);
+        if (!path) {
+          setError(
+            "Couldn’t prepare a preview for this clip. Use Step 4 · Prepare clips, or open the original in DaVinci Resolve / VLC (Windows Media Player can’t play many FX3 files)."
+          );
+          return;
+        }
+        setStatusNote(null);
+      }
+      await openPreview(asset.filename, [{ path, label: asset.filename }]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not open preview");
+    }
   }
 
   function previewTimelineClip(clipId: string) {
     if (!timeline) return;
     const clip = videoTrack?.clips.find((c) => c.id === clipId);
     const asset = clip ? media.find((m) => m.id === clip.mediaAssetId) : undefined;
-    const path = asset ? playbackPathForAsset(asset) : null;
-    if (!clip || !path) {
+    if (!clip || !asset) {
       setError("Clip media isn't available on this PC.");
       return;
     }
-    const startSeconds = framesToSeconds(clip.sourceInFrame, timeline.frameRate);
-    const endSeconds = startSeconds + framesToSeconds(clip.durationFrames, timeline.frameRate);
-    void openPreview(clip.label || asset?.filename || "Timeline clip", [
-      {
-        path,
-        label: clip.label || asset?.filename || clip.id,
-        startSeconds,
-        endSeconds,
-      },
-    ]);
+    void (async () => {
+      try {
+        setError(null);
+        let path = playbackPathForAsset(asset);
+        if (assetNeedsBrowserProxy(asset)) {
+          setStatusNote(`Making a light preview for ${asset.filename}…`);
+          path = await ensureProxyForWatch(asset);
+          setStatusNote(null);
+        }
+        if (!path) {
+          setError("Clip media isn't available on this PC.");
+          return;
+        }
+        const startSeconds = framesToSeconds(clip.sourceInFrame, timeline.frameRate);
+        const endSeconds =
+          startSeconds + framesToSeconds(clip.durationFrames, timeline.frameRate);
+        await openPreview(clip.label || asset.filename || "Timeline clip", [
+          {
+            path,
+            label: clip.label || asset.filename || clip.id,
+            startSeconds,
+            endSeconds,
+          },
+        ]);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not open preview");
+      }
+    })();
   }
 
   function previewRoughCut() {
     if (!timeline || !visibleClips.length) return;
+    const needPrep = visibleClips.filter((clip) => {
+      const asset = media.find((m) => m.id === clip.mediaAssetId);
+      return asset ? assetNeedsBrowserProxy(asset) : false;
+    }).length;
+    if (needPrep > 0) {
+      setError(
+        `${needPrep} clip${needPrep === 1 ? "" : "s"} still need a light preview for browser play (FX3 originals won’t play in Windows Media Player). Use Step 4 · Prepare clips, then Play again.`
+      );
+      document.getElementById("ai-step-4")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      return;
+    }
     const items: PreviewItem[] = [];
     let skipped = 0;
     for (const clip of visibleClips) {
@@ -1902,7 +2575,9 @@ export function AiEditorClient({ projectId }: Props) {
         setStatusNote("Open Resolve with a project and timeline, then try again.");
         return;
       }
-      const handoffDir = handoffDirOnDisk || resolveHandoffAbsoluteDir(projectRoot);
+      const handoffDir =
+        activeHandoffDir(projectRoot, handoffDirOnDisk) ||
+        resolveHandoffAbsoluteDir(projectRoot);
       const synced = await agentResolveSyncFromNle(DEFAULT_AGENT_BASE_URL, token, {
         projectRoot,
         handoffDir,
@@ -1918,7 +2593,13 @@ export function AiEditorClient({ projectId }: Props) {
       setSettings(saved.settings);
       setPlanningFeedback(saved.planning);
       if (saved.checklist) setNextShootChecklist(saved.checklist);
-      setHandoffDirOnDisk(handoffDir);
+      // Only keep handoffDir if the folder already exists (don't fake "edit saved").
+      try {
+        const st = await agentStorageStat(DEFAULT_AGENT_BASE_URL, token, handoffDir);
+        if (st.exists) setHandoffDirOnDisk(handoffDir);
+      } catch {
+        /* leave prior handoffDir state */
+      }
 
       const res = await aiEditorTimelineAction(getToken, projectId, {
         action: "import_resolve_cut",
@@ -1965,7 +2646,9 @@ export function AiEditorClient({ projectId }: Props) {
         return;
       }
 
-      const handoffDir = handoffDirOnDisk || resolveHandoffAbsoluteDir(projectRoot);
+      const handoffDir =
+        activeHandoffDir(projectRoot, handoffDirOnDisk) ||
+        resolveHandoffAbsoluteDir(projectRoot);
 
       const result = await agentResolveSyncFromNle(DEFAULT_AGENT_BASE_URL, token, {
         projectRoot,
@@ -1992,7 +2675,12 @@ export function AiEditorClient({ projectId }: Props) {
         roughCutFrameRate: timeline?.frameRate,
       });
       setResolveSyncCompare(compare);
-      setHandoffDirOnDisk(handoffDir);
+      try {
+        const st = await agentStorageStat(DEFAULT_AGENT_BASE_URL, token, handoffDir);
+        if (st.exists) setHandoffDirOnDisk(handoffDir);
+      } catch {
+        /* leave prior handoffDir state */
+      }
       const tip = saved.planning.insights[0]?.text;
       setStatusNote(
         tip ? `${compare.title} ${tip}` : `${compare.title} ${compare.detail}`
@@ -2027,7 +2715,7 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
-  async function ensureExportFiles(): Promise<{
+  async function ensureExportFiles(force = false): Promise<{
     files: Record<string, string>;
     projectRootPath?: string | null;
   }> {
@@ -2035,6 +2723,7 @@ export function AiEditorClient({ projectId }: Props) {
       ? `${timeline.version}:${timeline.updatedAt || ""}:${timeline.finishing?.moodId || ""}:${timeline.finishing?.transitionStyle || ""}`
       : "";
     if (
+      !force &&
       exportFiles &&
       exportStamp === stamp &&
       Object.keys(exportFiles).length
@@ -2057,10 +2746,10 @@ export function AiEditorClient({ projectId }: Props) {
       const health = await checkAgentHealth();
       setAgent(health);
       if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
-      const projectRoot = settings?.projectRootPath?.trim();
+      const projectRoot = liveProjectRoot?.trim();
       if (!projectRoot) throw new Error("Set a project folder in step 2 first");
       const token = await ensureAgentSession();
-      const { files } = await ensureExportFiles();
+      const { files } = await ensureExportFiles(true);
       const written = await agentWriteResolveHandoff(DEFAULT_AGENT_BASE_URL, token, {
         projectRoot,
         files,
@@ -2076,10 +2765,60 @@ export function AiEditorClient({ projectId }: Props) {
       setStatusNote(
         finishWhere === "mac"
           ? "Saved. Copy your project folder to the Mac, then open Resolve there."
-          : "Saved with your project. Open Resolve when you're ready."
+          : written.edlAligned
+            ? `Saved with camera timecode on ${written.edlAligned} clip(s). Ready for Resolve.`
+            : "Saved with your project. Open Resolve when you're ready."
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Write handoff failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** Rewrite handoff if needed, then open Explorer/Finder on shootspine_rough_cut.edl. */
+  async function onShowHandoffFolder() {
+    setBusy("reveal-handoff");
+    setError(null);
+    setStatusNote(null);
+    try {
+      const health = await checkAgentHealth();
+      setAgent(health);
+      if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
+      const projectRoot = liveProjectRoot?.trim();
+      if (!projectRoot) throw new Error("Set your project folder in step 2 first");
+      if (!timeline) throw new Error("Build a rough cut before saving for Resolve");
+      if (!requireEditDisk()) return;
+
+      const token = await ensureAgentSession();
+      const { files } = await ensureExportFiles(true);
+      if (!files?.[RESOLVE_HANDOFF_FILES.edl]) {
+        throw new Error("Could not build the timeline file — rebuild the rough cut, then try again.");
+      }
+      const written = await agentWriteResolveHandoff(DEFAULT_AGENT_BASE_URL, token, {
+        projectRoot,
+        files,
+        relativeDir: RESOLVE_HANDOFF_REL_DIR,
+      });
+      setHandoffDirOnDisk(written.handoffDir);
+
+      await agentRevealPath(DEFAULT_AGENT_BASE_URL, token, written.handoffDir);
+      const sep = written.handoffDir.includes("\\") ? "\\" : "/";
+      setStatusNote(
+        `Opened the Resolve folder${
+          written.edlAligned ? ` (camera timecode applied to ${written.edlAligned} clip${written.edlAligned === 1 ? "" : "s"})` : ""
+        }. Import: ${written.handoffDir}${sep}${RESOLVE_HANDOFF_FILES.edl}`
+      );
+      document.getElementById("ai-step-10")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not open the folder");
+      document.getElementById("ai-step-10")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     } finally {
       setBusy(null);
     }
@@ -2099,49 +2838,329 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  function isPlaceholderProjectName(name?: string | null) {
+    const n = (name || "").trim();
+    return !n || /^untitled(\s+footage)?(\s+edit)?$/i.test(n);
+  }
+
+  async function syncProjectFolderToName(projectName: string): Promise<string> {
+    const folderPlan = planManagedProjectFolderRename({
+      currentProjectRoot: settings?.projectRootPath || storagePath,
+      newProjectName: projectName,
+    });
+
+    if (folderPlan.action === "none") return "";
+    if (folderPlan.action === "name_only") {
+      return " Footage stays in your current folder (custom path) — rename doesn’t move it.";
+    }
+
+    // folderPlan.action === "rename"
+    const health = await checkAgentHealth();
+    setAgent(health);
+    if (!health.connected) {
+      return " Connect this computer to rename the project folder on disk.";
+    }
+    if (
+      !isAgentVersionAtLeast(
+        health.version,
+        MIN_PROJECT_FOLDER_RENAME_AGENT_VERSION
+      )
+    ) {
+      return ` Folder not moved — Desktop Agent ${
+        health.version || "?"
+      } is too old (need ${MIN_PROJECT_FOLDER_RENAME_AGENT_VERSION}+). Restart the agent in Step 1, then Save name again.`;
+    }
+
+    try {
+      const token = await ensureAgentSession();
+      let diskRenamed = false;
+      try {
+        const st = await agentStorageStat(
+          DEFAULT_AGENT_BASE_URL,
+          token,
+          folderPlan.from
+        );
+        if (st.exists) {
+          await agentRenameDir(
+            DEFAULT_AGENT_BASE_URL,
+            token,
+            folderPlan.from,
+            folderPlan.to
+          );
+          diskRenamed = true;
+        }
+      } catch (diskErr) {
+        const msg = diskErr instanceof Error ? diskErr.message : "";
+        // Source already moved, or destination already there — remount paths below.
+        if (
+          !(
+            msg.includes("not found") ||
+            msg.includes("Source folder") ||
+            msg.includes("Destination already exists")
+          )
+        ) {
+          throw diskErr;
+        }
+      }
+
+      if (!diskRenamed) {
+        const destStat = await agentStorageStat(
+          DEFAULT_AGENT_BASE_URL,
+          token,
+          folderPlan.to
+        ).catch(() => ({ exists: false }));
+        if (destStat.exists) diskRenamed = true;
+      }
+
+      const drives = await refreshKnownDrives();
+      const storageType = inferStorageTypeForPath(folderPlan.to, drives);
+      const editDrive = driveForPath(folderPlan.to, drives);
+      const saved = await aiEditorSaveStorage(getToken, projectId, {
+        name: projectName,
+        path: folderPlan.to,
+        purpose: "active",
+        type: storageType === "unknown" ? "externalSSD" : storageType,
+        setAsActive: true,
+        volumeIdentifier: volumeIdForPath(folderPlan.to, drives),
+        capacityBytes: editDrive?.capacityBytes,
+        availableBytes: editDrive?.availableBytes,
+      });
+      setSettings(saved.settings);
+      setStoragePath(folderPlan.to);
+      setIndexFolderPath(folderPlan.to);
+
+      if (media.length) {
+        const patches = planMediaRemount(media, folderPlan.from, folderPlan.to, {
+          volumeIdentifier: volumeIdForPath(folderPlan.to, drives) || undefined,
+          mode: "edit",
+        });
+        for (let i = 0; i < patches.length; i += 200) {
+          await aiEditorPatchMedia(getToken, projectId, patches.slice(i, i + 200));
+        }
+        if (patches.length) {
+          setMedia((prev) => {
+            const byId = new Map(patches.map((p) => [p.id, p]));
+            return prev.map((m) => {
+              const p = byId.get(m.id);
+              return p ? { ...m, ...p } : m;
+            });
+          });
+        }
+      }
+
+      setHandoffDirOnDisk(resolveHandoffAbsoluteDir(folderPlan.to));
+
+      return diskRenamed
+        ? ` Folder on disk is now ${folderPlan.to}.`
+        : ` Project folder path set to ${folderPlan.to} (will be used on next copy).`;
+    } catch (folderErr) {
+      return ` Name saved, but the folder wasn’t moved: ${
+        folderErr instanceof Error ? folderErr.message : "disk error"
+      }.`;
+    }
+  }
+
+  async function onSaveProjectName() {
+    const next = projectNameDraft.trim();
+    if (!next) {
+      setError("Enter a project name (e.g. Monopoly Night).");
+      return;
+    }
+    if (isPlaceholderProjectName(next)) {
+      setError("Pick a real name — not “Untitled”.");
+      return;
+    }
+    const nameUnchanged = next === (context?.projectName || "").trim();
+    const folderNeedsSync =
+      planManagedProjectFolderRename({
+        currentProjectRoot: settings?.projectRootPath || storagePath,
+        newProjectName: next,
+      }).action === "rename";
+
+    if (nameUnchanged && !folderNeedsSync) {
+      setEditingProjectName(false);
+      return;
+    }
+    setRenamingProject(true);
+    setError(null);
+    try {
+      let projectName = next;
+      if (!nameUnchanged) {
+        const res = await aiEditorRenameSession(getToken, projectId, next);
+        projectName = res.projectName;
+        setContext((prev) =>
+          prev ? { ...prev, projectName: res.projectName } : prev
+        );
+      }
+      setEditingProjectName(false);
+
+      const folderNote = await syncProjectFolderToName(projectName);
+
+      setStatusNote(`Project named “${projectName}”.${folderNote}`);
+      writeResumeBookmark({
+        projectId,
+        projectName,
+        stepN: workflowNext?.n ?? 1,
+        stepTitle: workflowNext?.title ?? "Continue editing",
+        stepDetail:
+          workflowNext?.detail ?? "Open this project anytime to keep refining.",
+        anchor: workflowNext?.anchor ?? "ai-step-2",
+        updatedAt: Date.now(),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not rename project");
+    } finally {
+      setRenamingProject(false);
+    }
+  }
+
+  // Settings/media can still say Untitled_footage_edit after the folder was
+  // renamed on disk (or the project was renamed). Heal once when agent is up.
+  useEffect(() => {
+    if (loading || renamingProject || busy || !agent.connected) return;
+    const name = context?.projectName?.trim();
+    if (!name || isPlaceholderProjectName(name)) return;
+    const current = settings?.projectRootPath || storagePath;
+    const plan = planManagedProjectFolderRename({
+      currentProjectRoot: current,
+      newProjectName: name,
+    });
+    if (plan.action !== "rename") return;
+    const key = `${projectId}:${plan.from}->${plan.to}`;
+    if (folderHealKeyRef.current === key) return;
+    folderHealKeyRef.current = key;
+    void (async () => {
+      try {
+        const note = await syncProjectFolderToName(name);
+        if (note.includes("Folder on disk") || note.includes("path set to")) {
+          setStatusNote(`Project folder updated.${note}`);
+        } else if (note.includes("too old") || note.includes("wasn’t moved")) {
+          folderHealKeyRef.current = null;
+        }
+      } catch {
+        folderHealKeyRef.current = null;
+      }
+    })();
+  }, [
+    loading,
+    renamingProject,
+    busy,
+    agent.connected,
+    context?.projectName,
+    settings?.projectRootPath,
+    storagePath,
+    projectId,
+  ]);
+
   async function onOpenInResolve() {
     if (!requireEditDisk()) return;
     setBusy("open-resolve");
     setError(null);
     setStatusNote(null);
+    setProgress({ pct: 10, label: "Starting DaVinci Resolve…" });
     try {
-      const health = await checkAgentHealth();
+      let health = await checkAgentHealth();
       setAgent(health);
       if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
-      const projectRoot = settings?.projectRootPath?.trim();
+
+      // Old agents often reported success without actually launching Resolve.
+      if (!isAgentVersionAtLeast(health.version, MIN_RESOLVE_LAUNCH_AGENT_VERSION)) {
+        setProgress({
+          pct: 20,
+          label: `Updating Desktop Agent (need ${MIN_RESOLVE_LAUNCH_AGENT_VERSION}+)…`,
+        });
+        setStatusNote(
+          `Desktop Agent ${health.version || "?"} is too old to open Resolve reliably. Restarting…`
+        );
+        setAgentToken(null);
+        setAgentExpiresAt(null);
+        await aiEditorLaunchAgent(getToken, { restart: true });
+        await new Promise((r) => setTimeout(r, 2500));
+        health = await checkAgentHealth();
+        setAgent(health);
+        if (!health.connected) {
+          throw new Error(
+            "Desktop Agent didn’t come back after restart. Use Restart in Step 1, then try Open Resolve again."
+          );
+        }
+        if (!isAgentVersionAtLeast(health.version, MIN_RESOLVE_LAUNCH_AGENT_VERSION)) {
+          throw new Error(
+            `Still on Desktop Agent ${health.version || "?"}. Need ${MIN_RESOLVE_LAUNCH_AGENT_VERSION}+. Use Restart in Step 1.`
+          );
+        }
+      }
+
+      const projectRoot = liveProjectRoot?.trim() || settings?.projectRootPath?.trim();
       if (!projectRoot) throw new Error("Set your project folder in step 2 first");
+      // Always re-register after agent process changes so Open Resolve isn’t 401.
+      setAgentToken(null);
+      setAgentExpiresAt(null);
       const token = await ensureAgentSession();
-      const { files } = await ensureExportFiles();
-      const written = await agentWriteResolveHandoff(DEFAULT_AGENT_BASE_URL, token, {
-        projectRoot,
-        files,
-        relativeDir: RESOLVE_HANDOFF_REL_DIR,
-      });
-      setHandoffDirOnDisk(written.handoffDir);
+      if (!token?.trim()) {
+        throw new Error("Could not create an agent session — click Restart in Step 1.");
+      }
+
+      setProgress({ pct: 40, label: "Starting DaVinci Resolve…" });
+      // Launch first — that's what “Open Resolve app” means.
       const opened = await agentOpenResolve(DEFAULT_AGENT_BASE_URL, token, {
         projectRoot,
-        handoffDir: written.handoffDir,
         launch: true,
         reveal: false,
       });
+      if (!opened.launched) {
+        setError(
+          opened.message ||
+            opened.detect?.note ||
+            "Couldn’t start Resolve. Open DaVinci Resolve from the Start menu, then come back here."
+        );
+        setStatusNote(
+          "If Resolve won’t start from ShootSpine, open it once from the Start menu (Windows sometimes blocks background launches)."
+        );
+      } else {
+        setStatusNote(
+          opened.message ||
+            (opened.alreadyRunning
+              ? "Resolve is already open — check the taskbar / Alt+Tab if you don’t see it."
+              : "Resolve is starting (splash can take ~30–60s). Check the taskbar.")
+        );
+      }
+
+      // Then save the edit package so Bring edit into Resolve is ready.
+      setProgress({ pct: 55, label: "Saving edit package for Resolve…" });
+      let handoffDir: string | undefined;
+      let handoffWriteError: string | null = null;
+      try {
+        const { files } = await ensureExportFiles();
+        const written = await agentWriteResolveHandoff(DEFAULT_AGENT_BASE_URL, token, {
+          projectRoot,
+          files,
+          relativeDir: RESOLVE_HANDOFF_REL_DIR,
+        });
+        handoffDir = written.handoffDir;
+        setHandoffDirOnDisk(written.handoffDir);
+      } catch (e) {
+        handoffWriteError =
+          e instanceof Error ? e.message : "Could not save the Resolve timeline file";
+      }
+
       const log = await aiEditorLogResolveOpen(getToken, projectId, {
         message: opened.message,
         launched: opened.launched,
-        handoffDir: written.handoffDir,
+        handoffDir,
       });
       setJobs((prev) => [log.job, ...prev.filter((j) => j.id !== log.job.id)]);
+      if (handoffWriteError) {
+        // Don't make a successful launch look like Resolve failed to open.
+        setStatusNote(
+          `${opened.message || "Resolve is ready."} Timeline file not saved yet: ${handoffWriteError}. Use “Show me the folder” or “Bring edit into Resolve”.`
+        );
+      }
       await refreshResolveWorkflow(token);
-      setStatusNote(
-        opened.launched
-          ? opened.alreadyRunning
-            ? "Resolve is already open - check your taskbar if you don't see the window."
-            : "Resolve is starting. It can take a minute - check your taskbar."
-          : "Your edit is saved. Open Resolve from the Start menu if it didn't appear."
-      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open Resolve");
     } finally {
       setBusy(null);
+      setProgress(null);
     }
   }
 
@@ -2150,6 +3169,7 @@ export function AiEditorClient({ projectId }: Props) {
     setBusy("import-resolve");
     setError(null);
     setStatusNote(null);
+    setProgress({ pct: 10, label: "Saving edit package for Resolve…" });
     try {
       const health = await checkAgentHealth();
       setAgent(health);
@@ -2158,6 +3178,7 @@ export function AiEditorClient({ projectId }: Props) {
       if (!projectRoot) throw new Error("Set your project folder in step 2 first");
       const token = await ensureAgentSession();
       const { files } = await ensureExportFiles();
+      setProgress({ pct: 35, label: "Writing timeline files…" });
       const written = await agentWriteResolveHandoff(DEFAULT_AGENT_BASE_URL, token, {
         projectRoot,
         files,
@@ -2165,6 +3186,7 @@ export function AiEditorClient({ projectId }: Props) {
       });
       setHandoffDirOnDisk(written.handoffDir);
 
+      setProgress({ pct: 55, label: "Checking Resolve…" });
       let probe = await refreshResolveWorkflow(token);
       if (!probe?.running) {
         await agentOpenResolve(DEFAULT_AGENT_BASE_URL, token, {
@@ -2173,16 +3195,49 @@ export function AiEditorClient({ projectId }: Props) {
           launch: true,
           reveal: false,
         });
-        setStatusNote("Starting Resolve- open a project, then we'll try again.");
+        setStatusNote("Starting Resolve — open your project, then we’ll try again.");
         await new Promise((r) => setTimeout(r, 2500));
         probe = await refreshResolveWorkflow(token);
       }
 
       if (!probe?.projectOpen) {
-        setStatusNote("Open or create a project in Resolve, then press Bring edit into Resolve again.");
+        const note = String(probe?.note || "");
+        const scriptingBlocked =
+          Boolean(probe?.running) &&
+          (!probe?.scriptingReachable ||
+            note.includes("NO_RESOLVE") ||
+            note.includes("IMPORT_FAIL"));
+        if (scriptingBlocked) {
+          setError(
+            "Resolve is open, but ShootSpine can’t auto-import (needs Studio + “External scripting using” = Local). Free Resolve often doesn’t show that setting — import by hand: Show saved folder → in Resolve File → Import → Timeline → pick shootspine_rough_cut.edl."
+          );
+          setStatusNote(
+            "Edit package is saved. Studio users: Preferences → System → General → External scripting using → Local, restart Resolve, try Bring edit again."
+          );
+        } else {
+          setError(
+            "Resolve doesn’t have a project open yet. Create/open your project in Resolve (you should see the Edit page), then press Bring edit into Resolve again."
+          );
+          setStatusNote("Edit package is saved — you can also import it by hand from the saved folder.");
+        }
+        try {
+          await agentOpenResolve(DEFAULT_AGENT_BASE_URL, token, {
+            projectRoot,
+            handoffDir: written.handoffDir,
+            launch: false,
+            reveal: true,
+          });
+        } catch {
+          /* reveal is best-effort */
+        }
+        document.getElementById("ai-step-10")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
         return;
       }
 
+      setProgress({ pct: 75, label: "Importing timeline into Resolve…" });
       const imported = await agentResolveImportEdl(DEFAULT_AGENT_BASE_URL, token, {
         projectRoot,
         handoffDir: written.handoffDir,
@@ -2200,13 +3255,28 @@ export function AiEditorClient({ projectId }: Props) {
       setJobs((prev) => [log.job, ...prev.filter((j) => j.id !== log.job.id)]);
       setStatusNote(`${msg.title} ${msg.detail}`);
       if (!imported.imported) {
-        setError(null);
+        setError(`${msg.title} — ${msg.detail}`);
+        try {
+          await agentOpenResolve(DEFAULT_AGENT_BASE_URL, token, {
+            projectRoot,
+            handoffDir: written.handoffDir,
+            launch: false,
+            reveal: true,
+          });
+        } catch {
+          /* optional */
+        }
       }
       await refreshResolveWorkflow(token);
+      document.getElementById("ai-step-10")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not bring edit into Resolve");
     } finally {
       setBusy(null);
+      setProgress(null);
     }
   }
 
@@ -2533,7 +3603,7 @@ export function AiEditorClient({ projectId }: Props) {
           pct: Math.round(((i + 1) / list.length) * 100),
           label: `Preparing preview ${i + 1}/${list.length}: ${m.filename}`,
         });
-        const sourcePath = playbackPathForAsset(m);
+        const sourcePath = sourcePathForProxy(m);
         if (!sourcePath) {
           failed += 1;
           continue;
@@ -2591,13 +3661,9 @@ export function AiEditorClient({ projectId }: Props) {
       <PageHeader
         title="AI Editor"
         subtitle={
-          context
-            ? `${context.projectName}${
-                context.aiEditorOnly
-                  ? " - bring in footage and get a strong first edit"
-                  : " - from your ShootSpine plan to a rough cut"
-              }`
-            : "Bring in footage and get a strong first edit"
+          context?.aiEditorOnly
+            ? "Bring in footage and get a strong first edit"
+            : "From your ShootSpine plan to a rough cut"
         }
         action={
           <Link href="/ai-editor">
@@ -2607,6 +3673,71 @@ export function AiEditorClient({ projectId }: Props) {
           </Link>
         }
       />
+
+      <Card>
+        <CardBody className="space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Project name</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Used in ShootSpine, Resolve, and — when your footage is in a ShootSpine project
+              folder — the folder name on disk (same drive).
+            </p>
+          </div>
+          {editingProjectName || isPlaceholderProjectName(context?.projectName) ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base font-medium text-slate-900 shadow-sm"
+                value={projectNameDraft}
+                disabled={renamingProject || !!busy}
+                autoFocus
+                maxLength={120}
+                placeholder="e.g. Monopoly Night"
+                onChange={(e) => setProjectNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void onSaveProjectName();
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                disabled={renamingProject || !!busy || !projectNameDraft.trim()}
+                onClick={() => void onSaveProjectName()}
+              >
+                {renamingProject ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : null}
+                Save name
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900">
+                {context?.projectName}
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={!!busy || renamingProject}
+                onClick={() => {
+                  setProjectNameDraft(context?.projectName?.trim() || "");
+                  setEditingProjectName(true);
+                }}
+              >
+                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                Rename
+              </Button>
+            </div>
+          )}
+          {isPlaceholderProjectName(context?.projectName) ? (
+            <p className="text-xs font-medium text-amber-800">
+              Name this edit before you continue — e.g. Monopoly Night.
+            </p>
+          ) : null}
+        </CardBody>
+      </Card>
 
       {context && !context.aiEditorOnly ? (
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 text-sm text-slate-600">
@@ -2729,20 +3860,36 @@ export function AiEditorClient({ projectId }: Props) {
       ) : null}
 
       {progress ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+        <div className="sticky top-2 z-40 rounded-2xl border border-sky-200 bg-white/95 px-4 py-3 shadow-md shadow-slate-200/50 backdrop-blur-sm">
           <div className="mb-1 flex items-center justify-between gap-3 text-xs text-slate-600">
-            <span className="min-w-0 truncate">{progress.label}</span>
+            <span className="min-w-0 truncate font-medium text-slate-800">
+              {progress.label}
+            </span>
             <span className="flex shrink-0 items-center gap-2">
               <span>{progress.pct}%</span>
-              {busy === "analyze" || busy === "proxy" ? (
+              {busy === "analyze" || busy === "proxy" || busy === "index" ? (
+                batchStopping ? (
+                  <span className="font-medium text-amber-800">Stopping…</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="font-medium text-sky-800 underline"
+                    onClick={() => requestStopBatch()}
+                  >
+                    Stop
+                  </button>
+                )
+              ) : null}
+              {!busy ? (
                 <button
                   type="button"
-                  className="font-medium text-sky-800 underline"
+                  className="font-medium text-slate-600 underline"
                   onClick={() => {
-                    cancelBatchRef.current = true;
+                    setProgress(null);
+                    setBatchStopping(false);
                   }}
                 >
-                  Stop
+                  Dismiss
                 </button>
               ) : null}
             </span>
@@ -2775,7 +3922,7 @@ export function AiEditorClient({ projectId }: Props) {
       <Card id="ai-step-1">
         <CardBody className="space-y-4">
           <div className="flex items-start gap-3">
-            <StepBadge n={1} done={step1Done} />
+            <StepBadge n={stepNo.connect} done={step1Done} />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-lg font-semibold text-slate-900">Connect this computer</h2>
@@ -2866,21 +4013,99 @@ export function AiEditorClient({ projectId }: Props) {
         </CardBody>
       </Card>
 
-      {/* Step 2 */}
+      {/* Steps 2–3: Guided footage (advanced folder UI collapsed) */}
       <Card id="ai-step-2">
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={2} done={step2Done} />
+            <StepBadge n={stepNo.footage} done={step2Done && step3Done} />
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Choose where this edit lives</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Get footage in</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Put the working project on a fast drive (external SSD). Optionally set a backup
-                folder on a larger HDD. Footage stays on your drives - nothing uploads to the cloud.
+                Plug in the camera card and your SSD. ShootSpine chooses where files go — nothing
+                uploads to the cloud.
               </p>
             </div>
           </div>
 
           <div className="pl-10 space-y-4">
+            <GuidedFootagePanel
+              agentConnected={agent.connected}
+              scanning={detectScanning}
+              busy={!!busy}
+              busyCopying={busy === "index"}
+              projectName={context?.projectName?.trim() || "Untitled footage edit"}
+              cameraPlan={guidedCameraPlan}
+              workspacePlan={guidedWorkspacePlan}
+              destinationDrives={ingestDestinationDrives}
+              selectedDriveRoot={guidedDriveRoot || guidedWorkspacePlan?.driveRoot || null}
+              onSelectDriveRoot={(root) => {
+                setGuidedDriveRoot(root.endsWith("\\") ? root : `${root}\\`);
+                const managed = buildGuidedWorkspaceFromDrive(
+                  root,
+                  context?.projectName?.trim() || "Untitled footage edit"
+                );
+                setStoragePath(managed);
+                const drive = driveForPath(root, knownDrives);
+                setIngestDestFreeBytes(
+                  typeof drive?.availableBytes === "number" ? drive.availableBytes : null
+                );
+              }}
+              sources={detectedSources}
+              selectedSourceId={selectedSourceId}
+              onSelectSource={setSelectedSourceId}
+              pendingFiles={pendingCopyFiles}
+              selectedPaths={selectedCopyPaths}
+              onTogglePath={(path) => {
+                setSelectedCopyPaths((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(path)) next.delete(path);
+                  else next.add(path);
+                  return next;
+                });
+              }}
+              onSelectAllPending={() => {
+                if (pendingCopyFiles) {
+                  setSelectedCopyPaths(new Set(pendingCopyFiles.map((f) => f.path)));
+                }
+              }}
+              onSelectNonePending={() => setSelectedCopyPaths(new Set())}
+              mediaCount={media.length}
+              progressLabel={busy === "index" ? progress?.label : null}
+              onRescan={() => {
+                void refreshKnownDrives();
+                void scanDetectedSources({ quiet: false });
+              }}
+              onPrepareAndReview={() => void onGuidedReviewClips()}
+              onCopyFootage={() => void onGuidedCopyFootage()}
+              onUseRecommendedDrive={() => {
+                const projectName = context?.projectName?.trim() || "Untitled footage edit";
+                const plan = planGuidedWorkspace({
+                  projectName,
+                  destinationDrives: ingestDestinationDrives,
+                  knownDrives,
+                  currentProjectRoot: null,
+                });
+                if (!plan) {
+                  setError("No SSD found — plug in your T7 and Rescan.");
+                  return;
+                }
+                setGuidedDriveRoot(plan.driveRoot);
+                setStoragePath(plan.projectRoot);
+                setStatusNote(`Will use ${plan.driveLabel}. Press Copy footage when ready.`);
+              }}
+            />
+
+            <div id="ai-step-3" />
+
+            <details
+              className="rounded-2xl border border-slate-200 bg-slate-50/40 px-4 py-3"
+              open={showAdvancedFootage}
+              onToggle={(e) => setShowAdvancedFootage((e.target as HTMLDetailsElement).open)}
+            >
+              <summary className="cursor-pointer text-sm font-medium text-slate-700">
+                Advanced — folders, backup drive, manual copy
+              </summary>
+              <div className="mt-4 space-y-4 border-t border-slate-200 pt-4">
             <div className="rounded-2xl border border-sky-100 bg-sky-50/50 px-4 py-3 text-sm text-slate-700">
               <p className="font-medium text-slate-900">Recommended setup</p>
               <ul className="mt-1.5 list-disc space-y-1 pl-5">
@@ -3035,25 +4260,8 @@ export function AiEditorClient({ projectId }: Props) {
                 </Button>
               </div>
             ) : null}
-          </div>
-        </CardBody>
-      </Card>
 
-      {/* Step 3 */}
-      <Card id="ai-step-3">
-        <CardBody className="space-y-5">
-          <div className="flex items-start gap-3">
-            <StepBadge n={3} done={step3Done} />
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Add your footage</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Point at a folder with clips (SSD, card copy, or project folder). Nothing uploads to
-                the cloud, and ShootSpine never erases a camera card.
-              </p>
-            </div>
-          </div>
-
-          <div className="pl-10 space-y-4">
+            <p className="text-sm font-medium text-slate-800">Manual add / multi-camera</p>
             <ManagedIngestReview
               projectName={context?.projectName || "This edit"}
               clientOrProject={context?.projectName || "Project"}
@@ -3070,26 +4278,27 @@ export function AiEditorClient({ projectId }: Props) {
                   const root = (settings?.projectRootPath || storagePath).trim();
                   if (!root) return null;
                   const m = root.match(/^([A-Za-z]:)([\\/]|$)/);
-                  return m ? `${m[1]}\\` : root;
+                  return m ? `${m[1].toUpperCase()}\\` : root;
                 })()
               }
-              destinationDriveName={
-                (() => {
-                  const root = (settings?.projectRootPath || storagePath).trim();
-                  if (!root) return null;
-                  const drive = driveForPath(root, knownDrives);
-                  if (drive) {
-                    const letter = drive.path.match(/^([A-Za-z]:)/)?.[1]?.toUpperCase();
-                    const name = (drive.volumeLabel || drive.label || "").trim();
-                    const type = storageTypeLabel(inferStorageTypeForPath(root, knownDrives));
-                    if (name && letter) return `${name} (${letter}) · ${type}`;
-                    if (letter) return `${letter} · ${type}`;
-                    return type;
-                  }
-                  const letter = root.match(/^([A-Za-z]:)/)?.[1]?.toUpperCase();
-                  return letter ? `${letter} · This PC` : "Edit drive";
-                })()
-              }
+              destinationDrives={ingestDestinationDrives}
+              onDestinationRootChange={(rootPath) => {
+                setGuidedDriveRoot(rootPath.endsWith("\\") ? rootPath : `${rootPath}\\`);
+                const managed = buildGuidedWorkspaceFromDrive(
+                  rootPath,
+                  context?.projectName?.trim() || "Untitled footage edit"
+                );
+                setStoragePath(managed);
+                const drive = driveForPath(rootPath, knownDrives);
+                setIngestDestFreeBytes(
+                  typeof drive?.availableBytes === "number"
+                    ? drive.availableBytes
+                    : null
+                );
+                setStatusNote(
+                  `Edit folder set to ${managed}. Save workspace below (or use Copy footage in Guided).`
+                );
+              }}
               freeBytes={ingestDestFreeBytes}
               options={ingestOptions}
               onOptionsChange={setIngestOptions}
@@ -3102,12 +4311,14 @@ export function AiEditorClient({ projectId }: Props) {
                 if (!src) return;
                 setAddMode("copy");
                 setIndexFolderPath(src.mediaRoot);
+                setPendingCopyFiles(null);
+                setSelectedCopyPaths(new Set());
                 if (src.suggestedCameraAssignment) {
                   setCameraLabel(src.suggestedCameraAssignment);
                 }
                 setPrepareWhileCopying(ingestOptions.generateProxies);
                 setStatusNote(
-                  `Source folder set to the selected drive. Next: click “Find clips” or “Copy into project folders” below.`
+                  `Source folder set. Next: Review files to copy, then Copy & verify.`
                 );
               }}
               disabled={!!busy || !agent.connected}
@@ -3163,21 +4374,12 @@ export function AiEditorClient({ projectId }: Props) {
 
             {addMode === "copy" ? (
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-                <label className="block text-sm">
-                  <span className="mb-1 block text-slate-600">Assign to</span>
-                  <select
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                    value={cameraLabel}
-                    disabled={!!busy}
-                    onChange={(e) => setCameraLabel(e.target.value)}
-                  >
-                    {["CAMERA_A", "CAMERA_B", "CAMERA_C", "AUDIO", "DRONE", "OTHER"].map((c) => (
-                      <option key={c} value={c}>
-                        {c.replace("_", " ")}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <CameraLabelPicker
+                  idPrefix="copy-camera"
+                  value={cameraLabel}
+                  onChange={setCameraLabel}
+                  disabled={!!busy}
+                />
                 <label className="flex cursor-pointer items-start gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -3197,6 +4399,81 @@ export function AiEditorClient({ projectId }: Props) {
               </div>
             ) : null}
 
+            {addMode === "copy" && pendingCopyFiles?.length ? (
+              <div className="space-y-3 rounded-2xl border border-sky-200 bg-sky-50/50 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">
+                      Choose clips to copy ({selectedCopyPaths.size} of{" "}
+                      {pendingCopyFiles.length})
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-600">
+                      Uncheck bad takes / scenes you don’t need. Selected:{" "}
+                      {formatBytes(
+                        pendingCopyFiles
+                          .filter((f) => selectedCopyPaths.has(f.path))
+                          .reduce((s, f) => s + (f.sizeBytes || 0), 0)
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <button
+                      type="button"
+                      className="font-medium text-sky-800 underline disabled:opacity-50"
+                      disabled={!!busy}
+                      onClick={() =>
+                        setSelectedCopyPaths(new Set(pendingCopyFiles.map((f) => f.path)))
+                      }
+                    >
+                      Select all
+                    </button>
+                    <button
+                      type="button"
+                      className="font-medium text-sky-800 underline disabled:opacity-50"
+                      disabled={!!busy}
+                      onClick={() => setSelectedCopyPaths(new Set())}
+                    >
+                      Select none
+                    </button>
+                  </div>
+                </div>
+                <ul className="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-white bg-white/90 p-2">
+                  {pendingCopyFiles.map((f) => {
+                    const checked = selectedCopyPaths.has(f.path);
+                    return (
+                      <li key={f.path}>
+                        <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                          <input
+                            type="checkbox"
+                            className="shrink-0"
+                            checked={checked}
+                            disabled={!!busy}
+                            onChange={() => {
+                              setSelectedCopyPaths((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(f.path)) next.delete(f.path);
+                                else next.add(f.path);
+                                return next;
+                              });
+                            }}
+                          />
+                          <span className="min-w-0 flex-1 truncate font-medium text-slate-800">
+                            {f.filename}
+                          </span>
+                          <span className="shrink-0 text-xs text-slate-500">
+                            {formatBytes(f.sizeBytes || 0)}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {busy === "index" && progress ? (
+                  <p className="text-xs font-medium text-sky-900">{progress.label}</p>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => void onIndexFolder()}
@@ -3208,13 +4485,33 @@ export function AiEditorClient({ projectId }: Props) {
                   (addMode === "copy" && !diskGates.editDiskReady)
                 }
               >
-                {busy === "index" ? (
+                {busy === "index" && !pendingCopyFiles ? (
                   <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                 ) : (
                   <FolderOpen className="mr-1.5 h-4 w-4" />
                 )}
-                {addMode === "copy" ? "Copy & verify now" : "Find clips in this folder"}
+                {addMode === "copy"
+                  ? pendingCopyFiles?.length
+                    ? "Rescan folder"
+                    : "Review files to copy"
+                  : "Find clips in this folder"}
               </Button>
+              {addMode === "copy" && pendingCopyFiles?.length ? (
+                <Button
+                  onClick={() => void onCopySelectedFiles()}
+                  disabled={
+                    !!busy ||
+                    !selectedCopyPaths.size ||
+                    !diskGates.editDiskReady ||
+                    !agent.connected
+                  }
+                >
+                  {busy === "index" ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Copy & verify {selectedCopyPaths.size} selected
+                </Button>
+              ) : null}
               {addMode === "copy" ? (
                 <Button
                   variant="secondary"
@@ -3262,15 +4559,18 @@ export function AiEditorClient({ projectId }: Props) {
                 </Button>
               </div>
             ) : null}
+              </div>
+            </details>
           </div>
         </CardBody>
       </Card>
 
-      {/* Step 4 */}
+      {/* Step 4 — only when previews still needed (guided copy usually handles this) */}
+      {needsPrepare.length > 0 ? (
       <Card id="ai-step-4">
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={4} done={step4Done} />
+            <StepBadge n={stepNo.prepare} done={step4Done} />
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold text-slate-900">
                 Prepare clips for smooth editing
@@ -3314,12 +4614,17 @@ export function AiEditorClient({ projectId }: Props) {
           </div>
         </CardBody>
       </Card>
+      ) : (
+        <div id="ai-step-4" className="hidden" aria-hidden />
+      )}
 
-      {/* Step 5 — V1C */}
+      {/* Steps 5–6 — only when linked to a production shot list / plan */}
+      {hasProductionPlan ? (
+      <>
       <Card id="ai-step-5">
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={5} done={step5Done} />
+            <StepBadge n={stepNo.analyze} done={step5Done} />
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Understand your footage</h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -3435,7 +4740,7 @@ export function AiEditorClient({ projectId }: Props) {
       <Card id="ai-step-6">
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={6} done={step6Done} />
+            <StepBadge n={stepNo.match} done={step6Done} />
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Match to your shot list</h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -3566,21 +4871,46 @@ export function AiEditorClient({ projectId }: Props) {
           </div>
         </CardBody>
       </Card>
+      </>
+      ) : (
+        <>
+          <div id="ai-step-5" className="hidden" aria-hidden />
+          <div id="ai-step-6" className="hidden" aria-hidden />
+        </>
+      )}
 
       {/* Step 7 — V1E */}
       <Card id="ai-step-7">
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={7} done={step7Done} />
+            <StepBadge n={stepNo.rough_cut} done={step7Done} />
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Build a rough cut</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Line up a first cut</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Assemble preferred takes into a ShootSpine timeline you can trim, reorder later via
-                chat, and eventually hand off to Resolve.
+                This is not the final edit. It puts your clips in order so you can watch them, drop
+                bad takes, then send that order to DaVinci Resolve.
               </p>
             </div>
           </div>
           <div className="space-y-4 pl-10">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
+              {hasProductionPlan && coverage?.shots?.some((s) => s.preferredMediaAssetId) ? (
+                <p>
+                  <span className="font-medium text-slate-900">From your shot list:</span> uses the
+                  preferred take for each planned shot.
+                </p>
+              ) : (
+                <p>
+                  Sequences your video clips in filename order — a starting assembly so you can
+                  watch and remove bad takes. Long clips are capped (~12s each) for a quick first
+                  pass.
+                </p>
+              )}
+              <p className="mt-1.5 text-xs text-slate-500">
+                Next: watch → Remove junk → Play → hand off to Resolve.
+              </p>
+            </div>
+
             {timeline ? (
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-xl bg-slate-50 px-3 py-3 text-center">
@@ -3589,14 +4919,14 @@ export function AiEditorClient({ projectId }: Props) {
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-3 text-center">
                   <div className="text-2xl font-semibold text-slate-900">
-                    {videoTrack?.clips.length ?? 0}
+                    {visibleClips.length}
                   </div>
-                  <div className="text-xs text-slate-500">Video clips</div>
+                  <div className="text-xs text-slate-500">Clips in this cut</div>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-3 text-center">
                   <div className="text-lg font-semibold text-slate-900">
                     {framesToTimecode(
-                      (videoTrack?.clips ?? []).reduce(
+                      visibleClips.reduce(
                         (max, c) => Math.max(max, c.timelineStartFrame + c.durationFrames),
                         0
                       ),
@@ -3606,12 +4936,7 @@ export function AiEditorClient({ projectId }: Props) {
                   <div className="text-xs text-slate-500">Duration</div>
                 </div>
               </div>
-            ) : (
-              <p className="text-sm text-slate-500">
-                After matching, build a first assembly from preferred takes (or all clips if there's
-                no shot list).
-              </p>
-            )}
+            ) : null}
 
             <div className="flex flex-wrap gap-2">
               <Button
@@ -3623,7 +4948,7 @@ export function AiEditorClient({ projectId }: Props) {
                 ) : (
                   <Clapperboard className="mr-1.5 h-4 w-4" />
                 )}
-                {timeline ? "Rebuild rough cut" : "Build rough cut"}
+                {timeline ? "Rebuild first cut" : "Build first cut"}
               </Button>
               {videoTrack?.clips?.length ? (
                 <Button
@@ -3632,7 +4957,7 @@ export function AiEditorClient({ projectId }: Props) {
                   disabled={!!busy || !agent.connected}
                 >
                   <Play className="mr-1.5 h-4 w-4" />
-                  {activeReelName ? `Play ${activeReelName}` : "Play rough cut"}
+                  {activeReelName ? `Play ${activeReelName}` : "Play this cut"}
                 </Button>
               ) : null}
             </div>
@@ -3696,16 +5021,59 @@ export function AiEditorClient({ projectId }: Props) {
               </div>
             ) : null}
 
+            {stillClipsOnCut.length ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
+                <p>
+                  This cut still includes {stillClipsOnCut.length} camera still
+                  {stillClipsOnCut.length === 1 ? "" : "s"} (JPG). They’re hidden below.
+                </p>
+                <button
+                  type="button"
+                  className="mt-1 text-xs font-medium text-amber-900 underline disabled:opacity-50"
+                  disabled={!!busy}
+                  onClick={() => void onStripNonVideoFromCut()}
+                >
+                  Remove stills from cut
+                </button>
+              </div>
+            ) : null}
+
             {visibleClips.length ? (
               <ul className="space-y-2">
                 {visibleClips.map((c) => {
                   const asset = media.find((m) => m.id === c.mediaAssetId);
+                  const canPlay = Boolean(asset && playbackPathForAsset(asset));
                   return (
                     <li
                       key={c.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 text-sm"
+                      className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 text-sm"
                     >
-                      <div className="min-w-0">
+                      <button
+                        type="button"
+                        className="relative shrink-0 disabled:opacity-50"
+                        disabled={!canPlay || !agent.connected || !!busy}
+                        onClick={() => previewTimelineClip(c.id)}
+                        title={canPlay ? "Watch clip" : "No local path"}
+                      >
+                        {asset?.thumbnailDataUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={asset.thumbnailDataUrl}
+                            alt=""
+                            className="h-14 w-24 rounded-lg object-cover bg-slate-200"
+                          />
+                        ) : (
+                          <div className="flex h-14 w-24 items-center justify-center rounded-lg bg-slate-200 text-[10px] text-slate-500">
+                            No still
+                          </div>
+                        )}
+                        {canPlay ? (
+                          <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/30 text-white">
+                            <Play className="h-4 w-4 fill-current" />
+                          </span>
+                        ) : null}
+                      </button>
+                      <div className="min-w-0 flex-1">
                         <div className="truncate font-medium text-slate-900">
                           {c.label || asset?.filename || c.mediaAssetId}
                         </div>
@@ -3718,7 +5086,7 @@ export function AiEditorClient({ projectId }: Props) {
                         <button
                           type="button"
                           className="text-xs text-sky-800 underline disabled:opacity-50"
-                          disabled={!!busy || !agent.connected}
+                          disabled={!!busy || !agent.connected || !canPlay}
                           onClick={() => previewTimelineClip(c.id)}
                         >
                           Watch
@@ -3737,15 +5105,19 @@ export function AiEditorClient({ projectId }: Props) {
                 })}
               </ul>
             ) : videoTrack?.clips?.length ? (
-              <p className="text-sm text-slate-500">No clips in this reel yet - pick another act/reel.</p>
+              <p className="text-sm text-slate-500">
+                {stillClipsOnCut.length
+                  ? "Only camera stills were on this reel — remove them or rebuild the rough cut."
+                  : "No clips in this reel yet - pick another act/reel."}
+              </p>
             ) : null}
 
             {timelineVersions.length > 1 ? (
-              <div className="space-y-2">
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Versions
-                </div>
-                <ul className="space-y-1.5">
+              <details className="rounded-xl border border-slate-200 bg-slate-50/40 px-3 py-2">
+                <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Versions ({timelineVersions.length}) — show / hide
+                </summary>
+                <ul className="mt-2 space-y-1.5 border-t border-slate-200 pt-2">
                   {timelineVersions.slice(0, 6).map((v) => (
                     <li
                       key={v.id}
@@ -3770,7 +5142,7 @@ export function AiEditorClient({ projectId }: Props) {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </details>
             ) : null}
           </div>
         </CardBody>
@@ -3865,7 +5237,7 @@ export function AiEditorClient({ projectId }: Props) {
       <Card id="ai-step-8">
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={8} done={step8Done} />
+            <StepBadge n={stepNo.chat} done={step8Done} />
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Edit by chat</h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -3982,7 +5354,7 @@ export function AiEditorClient({ projectId }: Props) {
       <Card id="ai-step-9">
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={9} done={step9Done} />
+            <StepBadge n={stepNo.look} done={step9Done} />
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Look &amp; transitions</h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -4065,7 +5437,7 @@ export function AiEditorClient({ projectId }: Props) {
       <Card id="ai-step-10">
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={10} done={step10Done} />
+            <StepBadge n={stepNo.resolve} done={step10Done} />
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Finish in DaVinci Resolve</h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -4174,6 +5546,49 @@ export function AiEditorClient({ projectId }: Props) {
                   <p className="text-sm text-slate-500">Connect this computer (step 1) first.</p>
                 )}
 
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-xs text-slate-500">Resolve project name</span>
+                    <code className="min-w-0 flex-1 truncate font-mono text-slate-900">
+                      {context?.projectName?.trim() || "Name this project at the top"}
+                    </code>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      type="button"
+                      disabled={
+                        !!busy ||
+                        !context?.projectName?.trim() ||
+                        isPlaceholderProjectName(context?.projectName)
+                      }
+                      onClick={() => {
+                        const name = (context?.projectName || "").trim();
+                        if (!name) return;
+                        void navigator.clipboard.writeText(name).then(
+                          () => {
+                            setCopiedProjectName(true);
+                            window.setTimeout(() => setCopiedProjectName(false), 2000);
+                            setStatusNote(
+                              `Copied “${name}” — paste that when you create the Resolve project.`
+                            );
+                          },
+                          () => {
+                            setError(
+                              "Couldn’t copy project name — select and copy it manually."
+                            );
+                          }
+                        );
+                      }}
+                    >
+                      <Copy className="mr-1.5 h-3.5 w-3.5" />
+                      {copiedProjectName ? "Copied" : "Copy name"}
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Change the name in the Project name box at the top of this page.
+                  </p>
+                </div>
+
                 <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={() => void onBringIntoResolve()}
@@ -4197,7 +5612,6 @@ export function AiEditorClient({ projectId }: Props) {
                     onClick={() => void onOpenInResolve()}
                     disabled={
                       !!busy ||
-                      !timeline ||
                       !agent.connected ||
                       !settings?.projectRootPath ||
                       !diskGates.editDiskReady
@@ -4206,12 +5620,18 @@ export function AiEditorClient({ projectId }: Props) {
                     {busy === "open-resolve" ? (
                       <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                     ) : null}
-                    Just open Resolve
+                    Open Resolve app
                   </Button>
                 </div>
+                <p className="text-xs text-slate-500">
+                  Copy the ShootSpine name → create/open that project in Resolve → then{" "}
+                  <span className="font-medium text-slate-700">Bring edit into Resolve</span>.
+                </p>
 
                 {!timeline ? (
-                  <p className="text-sm text-slate-500">Build a rough cut above first.</p>
+                  <p className="text-sm text-slate-500">
+                    Build a first cut above before “Bring edit into Resolve”.
+                  </p>
                 ) : null}
 
                 {resolveImported ? (
@@ -4222,7 +5642,7 @@ export function AiEditorClient({ projectId }: Props) {
                       sound in Resolve - look tips are saved with your project folder.
                     </p>
                   </div>
-                ) : handoffDirOnDisk ? (
+                ) : resolveHandoffDir ? (
                   <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-white px-4 py-4 shadow-sm shadow-sky-100/50">
                     <div className="flex items-start gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700">
@@ -4240,41 +5660,78 @@ export function AiEditorClient({ projectId }: Props) {
                         <ol className="space-y-2 text-sm text-slate-700">
                           <li className="flex gap-2">
                             <span className="font-semibold text-sky-700">1.</span>
-                            <span>In Resolve: File → Import → Timeline</span>
+                            <span>
+                              Media Pool → import the{" "}
+                              <span className="font-mono text-xs">C00xx.MP4</span> files from{" "}
+                              <span className="font-mono text-xs">
+                                01_ORIGINAL_MEDIA\CAMERA_A
+                              </span>{" "}
+                              (skip any{" "}
+                              <span className="font-mono text-xs">.shootspine-proxies</span> folder
+                              — that’s only for ShootSpine preview)
+                            </span>
                           </li>
                           <li className="flex gap-2">
                             <span className="font-semibold text-sky-700">2.</span>
-                            <span>Pick the timeline file in the folder we saved</span>
+                            <span>
+                              File → Import → Timeline → on the{" "}
+                              <span className="font-medium">H:</span> drive pick{" "}
+                              <span className="font-mono text-xs">
+                                shootspine_rough_cut.xml
+                              </span>{" "}
+                              (free Resolve — easier than EDL). Same folder as the .edl.
+                            </span>
                           </li>
                           <li className="flex gap-2">
                             <span className="font-semibold text-sky-700">3.</span>
-                            <span>If clips are missing, point Resolve at your media folder</span>
+                            <span>
+                              Studio only:{" "}
+                              <span className="font-medium">Bring edit into Resolve</span>
+                            </span>
                           </li>
                         </ol>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          disabled={!!busy || !agent.connected}
-                          onClick={() => {
-                            void (async () => {
-                              try {
-                                const token = await ensureAgentSession();
-                                await agentRevealPath(
-                                  DEFAULT_AGENT_BASE_URL,
-                                  token,
-                                  handoffDirOnDisk
-                                );
-                              } catch (e) {
-                                setError(
-                                  e instanceof Error ? e.message : "Could not open the folder"
-                                );
-                              }
-                            })();
-                          }}
-                        >
-                          <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
-                          Show me the folder
-                        </Button>
+                        <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2">
+                          <p className="text-xs font-medium text-slate-500">Saved folder</p>
+                          <p className="mt-0.5 break-all font-mono text-xs text-slate-800">
+                            {resolveHandoffDir}
+                          </p>
+                          <p className="mt-1 break-all font-mono text-xs text-sky-800">
+                            {`${resolveHandoffDir.replace(/[/\\]+$/, "")}${
+                              resolveHandoffDir.includes("\\") ? "\\" : "/"
+                            }${RESOLVE_HANDOFF_FILES.edl}`}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={!!busy}
+                            onClick={() => void onShowHandoffFolder()}
+                          >
+                            {busy === "reveal-handoff" ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            Show me the folder
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={!!busy}
+                            onClick={() => {
+                              const sep = resolveHandoffDir.includes("\\") ? "\\" : "/";
+                              const full = `${resolveHandoffDir.replace(/[/\\]+$/, "")}${sep}${RESOLVE_HANDOFF_FILES.edl}`;
+                              void navigator.clipboard.writeText(full).then(
+                                () => setStatusNote(`Copied path: ${full}`),
+                                () => setError("Could not copy path")
+                              );
+                            }}
+                          >
+                            <Copy className="mr-1.5 h-3.5 w-3.5" />
+                            Copy EDL path
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -4339,34 +5796,23 @@ export function AiEditorClient({ projectId }: Props) {
                     )}
                     Prepare for Mac
                   </Button>
-                  {handoffDirOnDisk ? (
+                  {resolveHandoffDir ? (
                     <Button
                       variant="secondary"
-                      disabled={!!busy || !agent.connected}
-                      onClick={() => {
-                        void (async () => {
-                          try {
-                            const token = await ensureAgentSession();
-                            await agentRevealPath(
-                              DEFAULT_AGENT_BASE_URL,
-                              token,
-                              handoffDirOnDisk
-                            );
-                          } catch (e) {
-                            setError(
-                              e instanceof Error ? e.message : "Could not open the folder"
-                            );
-                          }
-                        })();
-                      }}
+                      disabled={!!busy}
+                      onClick={() => void onShowHandoffFolder()}
                     >
-                      <FolderOpen className="mr-1.5 h-4 w-4" />
+                      {busy === "reveal-handoff" ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FolderOpen className="mr-1.5 h-4 w-4" />
+                      )}
                       Show project folder
                     </Button>
                   ) : null}
                 </div>
 
-                {handoffDirOnDisk ? (
+                {resolveHandoffDir ? (
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
                     <p className="font-medium text-emerald-950">Ready to move</p>
                     <p className="mt-1 text-sm text-emerald-900/80">
@@ -4379,6 +5825,8 @@ export function AiEditorClient({ projectId }: Props) {
                 ) : null}
               </div>
             )}
+
+            <ResolveCoachPanel />
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
                 <p className="font-semibold text-slate-900">After you finish in Resolve</p>
@@ -4500,7 +5948,7 @@ export function AiEditorClient({ projectId }: Props) {
       <Card id="ai-step-11">
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={11} done={step11Done} />
+            <StepBadge n={stepNo.archive} done={step11Done} />
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Backup &amp; free space</h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -4687,7 +6135,7 @@ export function AiEditorClient({ projectId }: Props) {
       <Card id="ai-step-12">
         <CardBody className="space-y-5">
           <div className="flex items-start gap-3">
-            <StepBadge n={12} done={step12Done} />
+            <StepBadge n={stepNo.wrap_up} done={step12Done} />
             <div>
               <h2 className="text-lg font-semibold text-slate-900">How did finishing go?</h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -4765,15 +6213,32 @@ export function AiEditorClient({ projectId }: Props) {
               Refresh
             </Button>
           </div>
+          <p className="text-xs text-slate-500">
+            FX3 originals in{" "}
+            <span className="font-mono">01_ORIGINAL_MEDIA</span> often won’t play in Windows Media
+            Player. Use <span className="font-medium text-slate-700">Watch</span> here (builds a
+            light preview) or open them in Resolve / VLC.
+          </p>
 
-          {media.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              Nothing here yet - finish steps 1-3 to bring clips in.
-            </p>
-          ) : (
+          {(() => {
+            const clips = media.filter((m) => {
+              const mt = (m.mediaType || "").toLowerCase();
+              if (mt === "image" || mt === "still") return false;
+              if (/\.jpe?g$/i.test(m.filename)) return false;
+              return isIngestableMediaExtension(m.filename) || mt === "video" || mt === "audio";
+            });
+            if (clips.length === 0) {
+              return (
+                <p className="text-sm text-slate-500">
+                  Nothing here yet - finish steps 1-3 to bring clips in.
+                </p>
+              );
+            }
+            return (
             <ul className="divide-y divide-slate-100">
-              {media.map((m) => {
-                const ready = !m.needsProxy || Boolean(m.proxyPath);
+              {clips.map((m) => {
+                const needsPrep = assetNeedsBrowserProxy(m);
+                const ready = !needsPrep;
                 const canPlay = Boolean(playbackPathForAsset(m));
                 return (
                   <li key={m.id} className="flex items-center gap-3 py-3">
@@ -4782,7 +6247,13 @@ export function AiEditorClient({ projectId }: Props) {
                       className="relative shrink-0 disabled:opacity-50"
                       disabled={!canPlay || !agent.connected || !!busy}
                       onClick={() => previewClipAsset(m)}
-                      title={canPlay ? "Watch clip" : "No local path"}
+                      title={
+                        !canPlay
+                          ? "No local path"
+                          : needsPrep
+                            ? "Watch may fail until you Prepare clips (Step 4)"
+                            : "Watch clip"
+                      }
                     >
                       {m.thumbnailDataUrl ? (
                         <img
@@ -4835,7 +6306,8 @@ export function AiEditorClient({ projectId }: Props) {
                 );
               })}
             </ul>
-          )}
+            );
+          })()}
         </CardBody>
       </Card>
 

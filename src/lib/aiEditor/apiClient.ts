@@ -114,6 +114,19 @@ export async function aiEditorCreateSession(getToken: GetToken, name: string) {
   return parseJson<{ ok: true; id: string; projectId: string; projectName: string }>(res);
 }
 
+export async function aiEditorRenameSession(
+  getToken: GetToken,
+  projectId: string,
+  name: string
+) {
+  const res = await fetch("/api/ai-editor/sessions", {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ projectId, name }),
+  });
+  return parseJson<{ ok: true; projectId: string; projectName: string }>(res);
+}
+
 export async function aiEditorLaunchAgent(
   getToken: GetToken,
   opts?: { restart?: boolean }
@@ -215,7 +228,8 @@ export async function aiEditorTimelineAction(
       | "apply_finishing"
       | "setup_feature_reels"
       | "set_active_reel"
-      | "import_resolve_cut";
+      | "import_resolve_cut"
+      | "strip_non_video";
     ops?: TimelineEditOp[];
     versionId?: string;
     note?: string;
@@ -587,4 +601,47 @@ export async function aiEditorCreateFoldersJob(
     folderPlan: string[];
     projectRootPath: string;
   }>(res);
+}
+
+export type ResolveAssistantStatus = {
+  ready: boolean;
+  manifest: {
+    sourceName: string;
+    pageCount: number;
+    chunkCount: number;
+    manualLabel: string;
+  } | null;
+  indexHint: string;
+};
+
+export type ResolveAssistantChatResult = {
+  answer: string;
+  steps: string[];
+  citations: Array<{ page: number; excerpt: string; chunkId: string }>;
+  mode: "manual_grounded" | "excerpts_only" | "index_missing";
+  manualLabel: string | null;
+  pageCount: number | null;
+};
+
+export async function aiEditorResolveAssistantStatus(getToken: GetToken) {
+  const res = await fetch("/api/ai-editor/resolve-assistant", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<ResolveAssistantStatus>(res);
+}
+
+export async function aiEditorResolveAssistantChat(
+  getToken: GetToken,
+  body: {
+    message: string;
+    history?: Array<{ role: "user" | "assistant"; content: string }>;
+    localOnly?: boolean;
+  }
+) {
+  const res = await fetch("/api/ai-editor/resolve-assistant", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ result: ResolveAssistantChatResult }>(res);
 }

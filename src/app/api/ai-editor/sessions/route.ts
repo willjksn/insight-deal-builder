@@ -9,6 +9,7 @@ import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 import { upsertAiEditorProjectSettings } from "@/lib/aiEditor/server";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { hasProjectAreaAccess } from "@/lib/projectAccess/server";
 import type { Project } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -99,6 +100,56 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create edit session";
+    return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
+  }
+}
+
+/** Rename an AI Editor workspace (updates the ShootSpine project name). */
+export async function PATCH(request: NextRequest) {
+  try {
+    if (!isAiEditorEnabled()) {
+      return NextResponse.json({ error: "AI Editor is disabled" }, { status: 404 });
+    }
+    const { uid, appUser } = await requireApprovedAuthUser(request);
+    assertCanUseProductionTools(appUser);
+
+    const body = (await request.json()) as { projectId?: string; name?: string };
+    const projectId = body.projectId?.trim();
+    const projectName = body.name?.trim();
+    if (!projectId) {
+      return NextResponse.json({ error: "projectId is required" }, { status: 400 });
+    }
+    if (!projectName || projectName.length > 120) {
+      return NextResponse.json(
+        { error: "Enter a project name (max 120 characters)" },
+        { status: 400 }
+      );
+    }
+
+    const db = getAdminDb();
+    if (!db) throw new Error("Firebase Admin is not configured");
+
+    const ref = db.collection("projects").doc(projectId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    const data = snap.data() || {};
+    const allowed =
+      data.ownerUserId === uid ||
+      (await hasProjectAreaAccess(db, projectId, uid, appUser, "production"));
+    if (!allowed) {
+      return NextResponse.json({ error: "Not allowed to rename this project" }, { status: 403 });
+    }
+
+    await ref.update({
+      projectName,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return NextResponse.json({ ok: true, projectId, projectName });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to rename project";
     return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
   }
 }

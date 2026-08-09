@@ -25,6 +25,9 @@
 *.pem
 .tmp-smoke/
 
+# Local DaVinci Resolve Reference Manual index + page image cache (copyrighted — do not commit)
+/data/resolve-manual/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

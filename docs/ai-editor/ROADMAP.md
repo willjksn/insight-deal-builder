@@ -44,6 +44,8 @@
 | **V19 Org analytics (opt-in)** | Anonymized studio patterns from opted-in teammates (metadata only) |
 | **V20 Agent version check** | Warn + soft-block Step 1 when Desktop Agent &lt; 0.15 (drive features) |
 | **V21 Resolve edit control** | EDL dissolves + timeline markers (acts/reels/transitions); no baked grades |
+| **V22 Resolve coach** | Local page stubs + Step 10 CTA |
+| **V22.1 Resolve assistant** | Chat page grounded in official Resolve Reference Manual PDF (local index + citations) |
 | **Managed Ingest A** | Detect camera/audio cards + ingest review UI (no auto-copy yet) |
 
 ## Current implementation status

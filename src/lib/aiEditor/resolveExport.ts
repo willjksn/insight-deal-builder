@@ -1,6 +1,10 @@
 /** V1G/V1.6/V21 — portable Resolve handoff (EDL + media manifest + look notes + edit plan). No camera bytes uploaded. */
 
-import { framesToSeconds, framesToTimecode } from "@/lib/aiEditor/frames";
+import {
+  framesToSeconds,
+  framesToTimecode,
+  parseTimecodeToFrames,
+} from "@/lib/aiEditor/frames";
 import { buildFinishingGuide } from "@/lib/aiEditor/finishing";
 import {
   buildResolveEditPlan,
@@ -23,6 +27,20 @@ function reelName(asset: MediaAsset | undefined, clip: TimelineClip): string {
   return (asset?.reelName || asset?.filename || clip.mediaAssetId)
     .replace(/[^\w.-]+/g, "_")
     .slice(0, 32);
+}
+
+/**
+ * ShootSpine sourceInFrame is file-relative (0 = first frame of file).
+ * Resolve links EDL source TC against each clip’s Start TC (often camera TC on FX3).
+ * Offset by the asset start timecode when we know it.
+ */
+export function sourceTimecodeOffsetFrames(
+  asset: MediaAsset | undefined,
+  frameRate: number
+): number {
+  const tc = asset?.startTimecode?.trim();
+  if (!tc) return 0;
+  return parseTimecodeToFrames(tc, frameRate) ?? 0;
 }
 
 function clampDissolveFrames(prev: TimelineClip, next: TimelineClip, requested: number): number {
@@ -58,8 +76,9 @@ export function buildEdl(timeline: Timeline, media: MediaAsset[]): string {
         ? clampDissolveFrames(prev, clip, prev.transitionOut.durationFrames)
         : 0;
 
-    let srcInFrame = clip.sourceInFrame;
-    let srcOutFrame = clip.sourceInFrame + clip.durationFrames;
+    const srcOffset = sourceTimecodeOffsetFrames(asset, fps);
+    let srcInFrame = srcOffset + clip.sourceInFrame;
+    let srcOutFrame = srcOffset + clip.sourceInFrame + clip.durationFrames;
     let recInFrame = clip.timelineStartFrame;
     let recOutFrame = clip.timelineStartFrame + clip.durationFrames;
     let editKind: "C" | "D" = "C";
@@ -71,7 +90,7 @@ export function buildEdl(timeline: Timeline, media: MediaAsset[]): string {
       // Overlap record in by dissolve length (CMX dissolve into this event)
       recInFrame = Math.max(0, clip.timelineStartFrame - dissolveFromPrev);
       // Prefer source handle before in-point when available
-      srcInFrame = Math.max(0, clip.sourceInFrame - dissolveFromPrev);
+      srcInFrame = srcOffset + Math.max(0, clip.sourceInFrame - dissolveFromPrev);
     }
 
     const srcIn = framesToTimecode(srcInFrame, fps);
@@ -180,6 +199,8 @@ export function buildResolveHandoff(input: {
     "2. Prefer: python3 import_shootspine_edl.py (Resolve open, External scripting on).",
     "   Links media into a ShootSpine bin, then imports the EDL and timeline markers.",
     "   Or: File → Import → Timeline → Import EDL… → shootspine_rough_cut.edl",
+    "   FX3 tip: if Resolve says timecode extents don’t match, use the companion script",
+    "   (or ShootSpine → Bring edit into Resolve). Manual EDL import needs camera Start TC.",
     "3. If clips are offline, relink via shootspine_handoff.json",
     "   (MediaAsset.id + relativeProjectPath + checksum).",
     looksGuide ? "4. Read LOOKS.txt for mood notes (apply grade in Resolve — nothing is baked)." : "",

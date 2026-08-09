@@ -67,6 +67,16 @@ export function buildManagedMediaRoot(storageRootPath: string): string {
   return `${root}${sep}${segment}`;
 }
 
+/** Guided mode: Media/ShootSpine/{ProjectName} under a drive root. */
+export function buildGuidedProjectRoot(
+  storageRootPath: string,
+  projectName: string
+): string {
+  const mediaRoot = buildManagedMediaRoot(storageRootPath);
+  const sep = mediaRoot.includes("\\") ? "\\" : "/";
+  return `${mediaRoot}${sep}${sanitizePathSegment(projectName || "Untitled", 48)}`;
+}
+
 export type IngestFolderNameInput = {
   shootDate?: string | Date;
   clientOrProject: string;

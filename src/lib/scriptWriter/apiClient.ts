@@ -18,6 +18,12 @@ import {
   ScriptTrailerSceneRef,
   ScriptTrailerSourceEntry,
 } from "@/lib/scriptWriter/series/types";
+import type {
+  ReelPromptPack,
+  ReelPromptPlatform,
+  ReelPromptStyle,
+  ReelPromptToolTarget,
+} from "@/lib/reelPrompt/types";
 
 export const SCRIPT_WRITER_SESSIONS_COLLECTION = "scriptWriterSessions";
 
@@ -497,3 +503,44 @@ export type PendingInspirationUrl = {
   label: string;
   referenceMode?: ScriptVideoReferenceMode;
 };
+
+export async function scriptWriterGenerateReelPrompts(
+  getToken: () => Promise<string | null>,
+  sessionId: string,
+  body: {
+    style?: ReelPromptStyle;
+    platform?: ReelPromptPlatform;
+    targetLength?: string;
+    talentKitId?: string | null;
+    talentNotes?: string;
+    idea?: string;
+  }
+) {
+  const res = await fetch(`/api/script-writer/sessions/${sessionId}/reel-prompts`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ ...body, toolTarget: "generic" satisfies ReelPromptToolTarget }),
+  });
+  return parseJson<{ pack: ReelPromptPack }>(res);
+}
+
+export async function generateFreeformReelPrompts(
+  getToken: () => Promise<string | null>,
+  body: {
+    idea: string;
+    style?: ReelPromptStyle;
+    platform?: ReelPromptPlatform;
+    targetLength?: string;
+    talentKitId?: string | null;
+    talentNotes?: string;
+    /** @deprecated ignored — always generic */
+    toolTarget?: ReelPromptToolTarget;
+  }
+) {
+  const res = await fetch("/api/reel-prompts/generate", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ ...body, toolTarget: "generic" }),
+  });
+  return parseJson<{ pack: ReelPromptPack }>(res);
+}

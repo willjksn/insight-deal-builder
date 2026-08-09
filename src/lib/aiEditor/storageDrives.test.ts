@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildIngestDestinationDrives,
   driveForPath,
   friendlyDriveLabel,
   inferStorageType,
+  looksLikePortableSsd,
   sortDrivesForPurpose,
 } from "@/lib/aiEditor/storageDrives";
 import type { AgentDriveEntry } from "@/lib/aiEditor/agentProtocol";
@@ -77,5 +79,53 @@ describe("storageDrives", () => {
     ];
     expect(sortDrivesForPurpose(drives, "edit")[0].path).toBe("E:\\");
     expect(sortDrivesForPurpose(drives, "archive")[0].path).toBe("F:\\");
+  });
+
+  it("recognizes T7 volume labels as portable SSDs", () => {
+    expect(looksLikePortableSsd({ volumeLabel: "T7 Shield" })).toBe(true);
+    expect(
+      inferStorageType(
+        drive({
+          path: "H:\\",
+          busType: "USB",
+          volumeLabel: "T7 Shield",
+          storageType: "externalHDD",
+          capacityBytes: 1000 * 1024 ** 3,
+        })
+      )
+    ).toBe("externalSSD");
+  });
+
+  it("keeps SSDs with leftover media as ingest destinations", () => {
+    const known = [
+      drive({
+        path: "C:\\",
+        mediaType: "SSD",
+        busType: "NVMe",
+        storageType: "internal",
+      }),
+      drive({
+        path: "H:\\",
+        busType: "USB",
+        volumeLabel: "T7 Shield",
+        storageType: "externalSSD",
+        availableBytes: 800 * 1024 ** 3,
+      }),
+      drive({
+        path: "E:\\",
+        busType: "USB",
+        volumeLabel: "FX3",
+        storageType: "removable",
+        removable: true,
+      }),
+    ];
+    const dest = buildIngestDestinationDrives(known, [
+      { mountPath: "E:\\", sourceType: "cameraCard" },
+      { mountPath: "H:\\", sourceType: "externalHDD" },
+    ]);
+    const roots = dest.map((d) => d.rootPath);
+    expect(roots).toContain("H:\\");
+    expect(roots).toContain("C:\\");
+    expect(roots).not.toContain("E:\\");
   });
 });

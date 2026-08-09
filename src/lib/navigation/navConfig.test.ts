@@ -87,6 +87,8 @@ describe("getVisibleNavGroups", () => {
   it("exposes AI Editor hub for IMG admins in production workspace", () => {
     const hrefs = itemHrefs(imgAdmin, "production");
     expect(hrefs).toContain("/ai-editor");
+    expect(hrefs).toContain("/ai-editor/resolve-assistant");
+    expect(hrefs).toContain("/reel-prompts");
   });
 
   it("drops empty groups (Content development is flagged off by default)", () => {

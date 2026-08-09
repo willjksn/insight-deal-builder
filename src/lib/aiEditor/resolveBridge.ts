@@ -32,6 +32,39 @@ export function resolveHandoffAbsoluteDir(projectRoot: string): string {
   return joinProjectRelative(projectRoot.trim(), RESOLVE_HANDOFF_REL_DIR);
 }
 
+function normalizeRootPrefix(p: string): string {
+  return p.trim().replace(/[/\\]+$/, "").replace(/\//g, "\\").toLowerCase();
+}
+
+/** True when handoffDir lives under the current project root (same volume path). */
+export function isHandoffUnderProjectRoot(
+  handoffDir: string | null | undefined,
+  projectRoot: string | null | undefined
+): boolean {
+  const root = projectRoot?.trim();
+  const handoff = handoffDir?.trim();
+  if (!root || !handoff) return false;
+  const r = normalizeRootPrefix(root);
+  const h = normalizeRootPrefix(handoff);
+  return h === r || h.startsWith(`${r}\\`);
+}
+
+/**
+ * Prefer a previously saved handoff path only when it still belongs to this project root.
+ * Otherwise return the expected handoff folder under the current root (after migrate/rename).
+ */
+export function activeHandoffDir(
+  projectRoot: string | null | undefined,
+  storedHandoffDir?: string | null
+): string | null {
+  const root = projectRoot?.trim();
+  if (!root) return storedHandoffDir?.trim() || null;
+  if (isHandoffUnderProjectRoot(storedHandoffDir, root)) {
+    return storedHandoffDir!.trim().replace(/[/\\]+$/, "");
+  }
+  return resolveHandoffAbsoluteDir(root);
+}
+
 /** Python companion: Media Pool bin + media link + EDL + markers (V4/V21). */
 export function buildResolveCompanionPython(input: {
   edlFilename?: string;
@@ -180,12 +213,36 @@ def main() -> int:
     ensure_bin(media_pool, BIN_NAME)
     media_paths = collect_media_paths(handoff_dir, project_root)
     media_count = 0
+    clips = []
     if media_paths:
         try:
-            clips = media_pool.ImportMedia(media_paths)
+            clips = media_pool.ImportMedia(media_paths) or []
             media_count = len(clips) if clips else 0
         except Exception as exc:
             print(f"Media import warning: {exc}")
+            clips = []
+
+    # Only zero Start TC when EVERY event is file-relative (source-in 00:00:00:00).
+    # One unaligned/missing clip at 00:00:00:00 must not wipe camera Start TC on the rest.
+    try:
+        import re
+        edl_text = edl_path.read_text(encoding="utf-8", errors="ignore")
+        src_ins = re.findall(
+            r"^\\d{3}\\s+\\S+\\s+\\S+\\s+(?:C|D(?:\\s+\\d+)?)\\s+(\\d{2}:\\d{2}:\\d{2}[:;]\\d{2})\\s+",
+            edl_text,
+            flags=re.M,
+        )
+        file_relative = bool(src_ins) and all(
+            s.replace(";", ":") == "00:00:00:00" for s in src_ins
+        )
+        if file_relative:
+            for clip in clips:
+                try:
+                    clip.SetClipProperty("Start TC", "00:00:00:00")
+                except Exception:
+                    pass
+    except Exception:
+        pass
 
     imported = media_pool.ImportTimelineFromFile(
         str(edl_path),

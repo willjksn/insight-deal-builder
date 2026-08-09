@@ -67,7 +67,7 @@ describe("buildResolveEditPlan", () => {
       transitionStyle: "soft_dissolves",
     });
     const plan = buildResolveEditPlan(timeline);
-    expect(plan.markers.some((m) => m.name === "ShootSpine")).toBe(true);
+    expect(plan.markers.some((m) => m.name === "ShootSpine")).toBe(false);
     expect(plan.transitions.length).toBe(1);
     expect(plan.transitions[0]?.edlDissolve).toBe(true);
     expect(plan.markers.some((m) => m.name === "Dissolve")).toBe(true);

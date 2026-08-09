@@ -1,6 +1,7 @@
 /** Internal NLE-independent timeline model + deterministic ops (V1E). */
 
 import { framesToSeconds, framesToTimecode, secondsToFrames } from "@/lib/aiEditor/frames";
+import { isRoughCutVideoAsset } from "@/lib/aiEditor/mediaFormats";
 import type {
   CoverageReport,
   MediaAsset,
@@ -101,9 +102,10 @@ export function buildRoughCutFromCoverage(input: {
     const mediaId = row.preferredMediaAssetId;
     if (!mediaId) continue;
     const asset = mediaById.get(mediaId);
+    if (!asset || !isRoughCutVideoAsset(asset)) continue;
     const durSec = Math.max(
       0.5,
-      asset?.durationSeconds && asset.durationSeconds > 0
+      asset.durationSeconds && asset.durationSeconds > 0
         ? Math.min(asset.durationSeconds, 12)
         : fallbackDur
     );
@@ -115,7 +117,7 @@ export function buildRoughCutFromCoverage(input: {
       timelineStartFrame: cursor,
       sourceInFrame: 0,
       durationFrames,
-      label: [row.scene, row.shotName || asset?.filename].filter(Boolean).join(" · "),
+      label: [row.scene, row.shotName || asset.filename].filter(Boolean).join(" · "),
       plannedShotId: row.plannedShotId,
     };
     video.clips.push(clip);
@@ -127,9 +129,10 @@ export function buildRoughCutFromCoverage(input: {
     cursor += durationFrames;
   }
 
-  // Footage-only fallback: sequence all media if no preferred takes
-  if (!video.clips.length && input.media.length) {
-    for (const asset of input.media.filter((m) => m.mediaType === "video" || !m.mediaType)) {
+  // Footage-only fallback: sequence real video only (skip camera JPG stills / audio)
+  const videoAssets = input.media.filter((m) => isRoughCutVideoAsset(m));
+  if (!video.clips.length && videoAssets.length) {
+    for (const asset of videoAssets) {
       const durSec = Math.max(0.5, asset.durationSeconds || fallbackDur);
       const durationFrames = Math.max(1, secondsToFrames(Math.min(durSec, 12), fps));
       const clip: TimelineClip = {
@@ -196,6 +199,31 @@ function compactTrack(track: TimelineTrack): void {
     clip.timelineStartFrame = cursor;
     cursor += clip.durationFrames;
   }
+}
+
+/** Drop camera stills / non-video placements and ripple the remaining cut. */
+export function stripNonVideoClipsFromTimeline(
+  timeline: Timeline,
+  media: MediaAsset[]
+): { timeline: Timeline; removed: number } {
+  const byId = new Map(media.map((m) => [m.id, m]));
+  const next = cloneTimeline(timeline);
+  let removed = 0;
+  for (const track of next.tracks) {
+    const keep: TimelineClip[] = [];
+    for (const clip of track.clips) {
+      const asset = byId.get(clip.mediaAssetId);
+      if (asset && isRoughCutVideoAsset(asset)) {
+        keep.push(clip);
+      } else {
+        removed += 1;
+      }
+    }
+    track.clips = keep;
+    compactTrack(track);
+  }
+  next.updatedAt = new Date().toISOString();
+  return { timeline: next, removed };
 }
 
 /** Apply a single validated edit op. Returns a new timeline (immutable apply). */

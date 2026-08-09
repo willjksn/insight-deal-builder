@@ -36,18 +36,31 @@ async function agentFetch<T>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
-  const res = await fetch(`${baseUrl.replace(/\/$/, "")}${AGENT_API_PREFIX}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl.replace(/\/$/, "")}${AGENT_API_PREFIX}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (e) {
+    if (init?.signal?.aborted || (e instanceof DOMException && e.name === "AbortError")) {
+      throw new Error("CANCELLED");
+    }
+    throw e;
+  }
   const data = (await res.json()) as T & { error?: string };
   if (!res.ok) {
     if (res.status === 401) {
-      throw new Error("Agent session expired — reconnect this computer and try again");
+      throw new Error(
+        data.error?.includes("Missing")
+          ? "Desktop Agent needs a fresh connection — click Restart in Step 1, then try again"
+          : data.error ||
+              "Agent session expired — reconnect this computer (Step 1) and try again"
+      );
     }
     throw new Error(data.error ?? res.statusText);
   }
@@ -186,11 +199,13 @@ export async function agentDetectSources(
 export async function agentIngestCopy(
   baseUrl: string,
   token: string,
-  body: AgentIngestCopyRequest
+  body: AgentIngestCopyRequest,
+  opts?: { signal?: AbortSignal }
 ) {
   return agentFetch<AgentIngestCopyResponse>(baseUrl, token, "/media/ingest-copy", {
     method: "POST",
     body: JSON.stringify(body),
+    signal: opts?.signal,
   });
 }
 
@@ -288,6 +303,24 @@ export async function agentRevealPath(baseUrl: string, token: string, dirPath: s
   });
 }
 
+export async function agentRenameDir(
+  baseUrl: string,
+  token: string,
+  from: string,
+  to: string
+) {
+  return agentFetch<{
+    ok: true;
+    from: string;
+    to: string;
+    renamed: boolean;
+    reason?: string;
+  }>(baseUrl, token, "/fs/rename-dir", {
+    method: "POST",
+    body: JSON.stringify({ from, to }),
+  });
+}
+
 export async function agentResolveScriptingProbe(baseUrl: string, token: string) {
   return agentFetch<AgentResolveScriptingProbeResponse>(
     baseUrl,
@@ -369,7 +402,16 @@ export function playbackPathForAsset(asset: {
   currentPath?: string;
   archivePath?: string;
 }): string | null {
+  const proxy = asset.proxyPath?.trim();
   const current = asset.currentPath?.trim();
   const archive = asset.archivePath?.trim();
-  return asset.proxyPath || current || archive || null;
+  return proxy || current || archive || null;
+}
+
+/** Camera original used to build a preview proxy (never the proxy itself). */
+export function sourcePathForProxy(asset: {
+  currentPath?: string;
+  archivePath?: string;
+}): string | null {
+  return asset.currentPath?.trim() || asset.archivePath?.trim() || null;
 }

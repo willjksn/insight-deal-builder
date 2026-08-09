@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.17.1";
+const VERSION = "0.17.14";
 /** Set SHOOTSPINE_AGENT_DEV_OPEN=1 to accept any non-empty Bearer token (local agent testing). */
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN === "1";
 /** Optional: ShootSpine origin for verifying minted tokens (e.g. http://localhost:3000). */
@@ -40,11 +40,7 @@ const MEDIA_EXTS = new Set([
   ".mp3",
   ".m4a",
   ".aac",
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".tif",
-  ".tiff",
+  // Images intentionally omitted — Sony / camera proxy stills (*T01.JPG) are not ingested.
 ]);
 
 const MANAGED_ROOT = [
@@ -538,7 +534,12 @@ function mapProbe(filePath, raw) {
         return b ? a / b : a;
       })()
     : undefined;
-  const mediaType = video ? "video" : audio ? "audio" : "other";
+  // Extension wins for stills — Sony proxy JPGs probe as MJPEG video streams.
+  const imageExts = new Set(["jpg", "jpeg", "png", "tif", "tiff"]);
+  const audioExts = new Set(["wav", "bwf", "aiff", "aif", "mp3", "m4a", "aac"]);
+  let mediaType = video ? "video" : audio ? "audio" : "other";
+  if (imageExts.has(ext)) mediaType = "image";
+  else if (audioExts.has(ext) && !video) mediaType = "audio";
   const codec = video?.codec_name || audio?.codec_name;
   const codecLongName = video?.codec_long_name || audio?.codec_long_name;
   const codecTag = video?.codec_tag_string;
@@ -570,7 +571,13 @@ function mapProbe(filePath, raw) {
     videoBitrate: video?.bit_rate ? Number(video.bit_rate) : undefined,
     audioChannels: audio?.channels,
     audioSampleRate: audio?.sample_rate ? Number(audio.sample_rate) : undefined,
-    startTimecode: video?.tags?.timecode || raw.format?.tags?.timecode,
+    // Sony XAVC often stores TC on a timed-metadata stream, not the video track.
+    startTimecode:
+      video?.tags?.timecode ||
+      raw.format?.tags?.timecode ||
+      (Array.isArray(raw.streams)
+        ? raw.streams.map((s) => s?.tags?.timecode).find((t) => typeof t === "string" && t.trim())
+        : undefined),
     creationTime: raw.format?.tags?.creation_time,
     onlineStatus: "online",
   };
@@ -874,6 +881,23 @@ function runFfmpegProxy(filePath, outPath, profile) {
   });
 }
 
+async function hideDotFolder(dirPath) {
+  if (process.platform !== "win32") return;
+  try {
+    await new Promise((resolve) => {
+      const child = spawn(
+        "attrib",
+        ["+H", "+S", dirPath],
+        { windowsHide: true, stdio: "ignore" }
+      );
+      child.on("error", () => resolve());
+      child.on("close", () => resolve());
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
 async function createProxy(filePath, outputPath, profile = "ai_720p") {
   assertSafePath(filePath);
   const out =
@@ -884,7 +908,12 @@ async function createProxy(filePath, outputPath, profile = "ai_720p") {
       `${path.basename(filePath)}.${profile}.mp4`
     );
   assertSafePath(out);
-  await fs.mkdir(path.dirname(out), { recursive: true });
+  const proxyDir = path.dirname(out);
+  await fs.mkdir(proxyDir, { recursive: true });
+  // Keep Resolve / Explorer import dialogs from showing preview junk as empty folders.
+  if (path.basename(proxyDir).toLowerCase() === ".shootspine-proxies") {
+    await hideDotFolder(proxyDir);
+  }
   await runFfmpegProxy(filePath, out, profile);
   return { proxyPath: out, profile };
 }
@@ -920,15 +949,15 @@ function runFfmpegThumb(filePath, outPath) {
     const args = [
       "-y",
       "-ss",
-      "1",
+      "0.5",
       "-i",
       filePath,
       "-frames:v",
       "1",
       "-vf",
-      "scale=320:-1",
+      "scale=240:-1",
       "-q:v",
-      "5",
+      "7",
       outPath,
     ];
     const child = spawn(bin, args, { windowsHide: true });
@@ -999,6 +1028,23 @@ function redirectWindowsJunction(dirPath) {
   return path.join(home, targetName);
 }
 
+function looksLikePortableSsdLabel(meta) {
+  const blob = [meta.volumeLabel, meta.friendlyName, meta.mediaType]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (!blob) return false;
+  if (/\bhdd\b|hard\s*disk|spinning/.test(blob)) return false;
+  return (
+    /\bssd\b/.test(blob) ||
+    /\bpssd\b/.test(blob) ||
+    /\bt7\b/.test(blob) ||
+    /\bt5\b/.test(blob) ||
+    /\bt3\b/.test(blob) ||
+    /\bextreme\s*portable\b/.test(blob)
+  );
+}
+
 async function classifyWinDrive(meta) {
   const letter = String(meta.letter || "").toUpperCase().replace(":", "");
   const bus = String(meta.busType || "").toLowerCase();
@@ -1013,7 +1059,8 @@ async function classifyWinDrive(meta) {
   if (driveType.includes("network") || bus.includes("file back")) return "network";
   // CFexpress / ProGrade readers often appear as Fixed + USB (not Removable).
   if (isUsb) {
-    if (media.includes("ssd") && Number(meta.capacityBytes) >= 500 * 1024 ** 3) {
+    // T7/T5 often report MediaType=Unspecified — use volume / disk name.
+    if (media.includes("ssd") || looksLikePortableSsdLabel(meta)) {
       return "externalSSD";
     }
     if (media.includes("hdd") || media.includes("hard")) return "externalHDD";
@@ -1051,6 +1098,7 @@ Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
     capacityBytes = [int64]$_.Size
     busType = if ($disk) { [string]$disk.BusType } else { '' }
     mediaType = if ($disk) { [string]$disk.MediaType } else { '' }
+    friendlyName = if ($disk) { [string]$disk.FriendlyName } else { '' }
     serial = if ($serial) { $serial } else { $unique }
     removable = ([string]$_.DriveType -match 'Removable')
   }
@@ -1498,10 +1546,13 @@ async function detectResolveInstall() {
 
   if (platform === "win32") {
     const pf = process.env.PROGRAMFILES || "C:\\Program Files";
+    const pf86 = process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)";
     const pd = process.env.PROGRAMDATA || "C:\\ProgramData";
     const candidates = [
       path.join(pf, "Blackmagic Design", "DaVinci Resolve", "Resolve.exe"),
       path.join(pf, "Blackmagic Design", "DaVinci Resolve", "DaVinci Resolve.exe"),
+      path.join(pf86, "Blackmagic Design", "DaVinci Resolve", "Resolve.exe"),
+      path.join(pf86, "Blackmagic Design", "DaVinci Resolve", "DaVinci Resolve.exe"),
     ];
     for (const c of candidates) {
       if (await pathExists(c)) {
@@ -1559,6 +1610,244 @@ async function detectResolveInstall() {
   };
 }
 
+function parseSmpteToFrames(tc, frameRate) {
+  const m = String(tc || "")
+    .trim()
+    .match(/^(\d{1,2}):(\d{2}):(\d{2})[:;](\d{2})$/);
+  if (!m) return null;
+  const fps = Math.max(1, Math.round(Number(frameRate) || 24));
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  const ss = Number(m[3]);
+  const ff = Number(m[4]);
+  if ([hh, mm, ss, ff].some((n) => !Number.isFinite(n))) return null;
+  if (mm >= 60 || ss >= 60 || ff >= fps) return null;
+  return ((hh * 60 + mm) * 60 + ss) * fps + ff;
+}
+
+function framesToSmpte(frames, frameRate) {
+  const fps = Math.max(1, Math.round(Number(frameRate) || 24));
+  const total = Math.max(0, Math.floor(frames));
+  const ff = total % fps;
+  const totalSeconds = Math.floor(total / fps);
+  const ss = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const mm = totalMinutes % 60;
+  const hh = Math.floor(totalMinutes / 60);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(ff)}`;
+}
+
+async function findOriginalMediaFile(projectRoot, relPath, filename) {
+  const tries = [];
+  if (relPath) {
+    const rel = String(relPath).replace(/^[\\/]+/, "").replace(/\\/g, "/");
+    tries.push(path.resolve(projectRoot, ...rel.split("/").filter(Boolean)));
+  }
+  if (filename) {
+    const base = path.basename(filename);
+    tries.push(path.resolve(projectRoot, "01_ORIGINAL_MEDIA", base));
+    for (const cam of ["CAMERA_A", "CAMERA_B", "FX3", "OTHER", "DRONE"]) {
+      tries.push(path.resolve(projectRoot, "01_ORIGINAL_MEDIA", cam, base));
+    }
+  }
+  for (const candidate of tries) {
+    try {
+      assertSafePath(candidate);
+      if (await pathExists(candidate)) return candidate;
+    } catch {
+      /* skip */
+    }
+  }
+  // Last resort: shallow search under 01_ORIGINAL_MEDIA
+  if (filename) {
+    const root = path.resolve(projectRoot, "01_ORIGINAL_MEDIA");
+    const want = path.basename(filename).toLowerCase();
+    try {
+      assertSafePath(root);
+      if (await pathExists(root)) {
+        const cams = await fs.readdir(root);
+        for (const cam of cams) {
+          const full = path.join(root, cam, path.basename(filename));
+          try {
+            if ((await fs.stat(full)).isFile() && path.basename(full).toLowerCase() === want) {
+              return full;
+            }
+          } catch {
+            /* skip */
+          }
+        }
+      }
+    } catch {
+      /* skip */
+    }
+  }
+  return null;
+}
+
+/**
+ * Rewrite EDL source in/out using each clip’s embedded Start TC (FX3/XAVC).
+ * ShootSpine edits are file-relative; Resolve links against camera TC.
+ */
+async function alignEdlToCameraTimecode(edlText, projectRoot) {
+  const lines = String(edlText || "").split(/\r?\n/);
+  // Cut:  … C        00:00:00:00 …
+  // Dissolve: … D    030 00:00:00:00 …
+  // Do not let an optional dissolve group swallow TC digits (e.g. "00").
+  const eventRe =
+    /^(\d{3})\s+(\S+)\s+(\S+)\s+(C|D)(?:\s+(\d{3}))?\s+(\d{2}:\d{2}:\d{2}[:;]\d{2})\s+(\d{2}:\d{2}:\d{2}[:;]\d{2})\s+(\d{2}:\d{2}:\d{2}[:;]\d{2})\s+(\d{2}:\d{2}:\d{2}[:;]\d{2})\s*$/;
+  let fps = 24;
+  let aligned = 0;
+  let i = 0;
+  while (i < lines.length) {
+    const m = lines[i].match(eventRe);
+    if (!m) {
+      i += 1;
+      continue;
+    }
+    let j = i + 1;
+    let relPath = "";
+    let clipName = "";
+    while (j < lines.length && lines[j].startsWith("*")) {
+      const rel = lines[j].match(/^\*\s*SHOOTSPINE_REL_PATH:\s*(.+)\s*$/i);
+      if (rel) relPath = rel[1].trim();
+      const from = lines[j].match(/^\*\s*FROM CLIP NAME:\s*(.+)\s*$/i);
+      if (from) clipName = from[1].trim();
+      j += 1;
+    }
+    const mediaPath = await findOriginalMediaFile(projectRoot, relPath, clipName || m[2]);
+    if (mediaPath) {
+      try {
+        const probed = await probeFile(mediaPath);
+        const startTc = probed?.startTimecode;
+        const mediaFps = Number(probed?.frameRate) || fps;
+        const offset = parseSmpteToFrames(startTc, mediaFps);
+        if (offset != null && offset > 0) {
+          const srcIn = parseSmpteToFrames(m[6], mediaFps);
+          const srcOut = parseSmpteToFrames(m[7], mediaFps);
+          if (srcIn != null && srcOut != null && srcIn < offset) {
+            const dissolvePad = (m[5] || "").trim();
+            const newIn = framesToSmpte(offset + srcIn, mediaFps);
+            const newOut = framesToSmpte(offset + srcOut, mediaFps);
+            const reel = String(m[2]).padEnd(8).slice(0, 8);
+            const track = String(m[3]).padEnd(5);
+            if (m[4] === "C") {
+              lines[i] = `${m[1]}  ${reel} ${track} C        ${newIn} ${newOut} ${m[8]} ${m[9]}`;
+            } else {
+              lines[i] =
+                `${m[1]}  ${reel} ${track} D    ${String(dissolvePad || "001").padStart(3, "0")} ${newIn} ${newOut} ${m[8]} ${m[9]}`;
+            }
+            aligned += 1;
+          }
+        }
+      } catch {
+        /* leave event unchanged */
+      }
+    }
+    i = j;
+  }
+  return { edl: lines.join("\n"), aligned };
+}
+
+/**
+ * Drop EDL events whose media file is missing on disk, and close the record-side gap
+ * so later clips don’t sit after an offline hole (e.g. C0042 never ingested).
+ */
+async function stripMissingMediaFromEdl(edlText, projectRoot) {
+  const lines = String(edlText || "").split(/\r?\n/);
+  const eventRe =
+    /^(\d{3})\s+(\S+)\s+(\S+)\s+(C|D)(?:\s+(\d{3}))?\s+(\d{2}:\d{2}:\d{2}[:;]\d{2})\s+(\d{2}:\d{2}:\d{2}[:;]\d{2})\s+(\d{2}:\d{2}:\d{2}[:;]\d{2})\s+(\d{2}:\d{2}:\d{2}[:;]\d{2})\s*$/;
+  const blocks = [];
+  let i = 0;
+  let preamble = [];
+  let sawEvent = false;
+  while (i < lines.length) {
+    const m = lines[i].match(eventRe);
+    if (!m) {
+      if (!sawEvent) preamble.push(lines[i]);
+      i += 1;
+      continue;
+    }
+    sawEvent = true;
+    let j = i + 1;
+    const meta = [];
+    let relPath = "";
+    let clipName = "";
+    while (j < lines.length && lines[j].startsWith("*")) {
+      meta.push(lines[j]);
+      const rel = lines[j].match(/^\*\s*SHOOTSPINE_REL_PATH:\s*(.+)\s*$/i);
+      if (rel) relPath = rel[1].trim();
+      const from = lines[j].match(/^\*\s*FROM CLIP NAME:\s*(.+)\s*$/i);
+      if (from) clipName = from[1].trim();
+      j += 1;
+    }
+    const mediaPath = await findOriginalMediaFile(projectRoot, relPath, clipName || m[2]);
+    blocks.push({
+      line: lines[i],
+      meta,
+      match: m,
+      exists: Boolean(mediaPath),
+      mediaPath,
+    });
+    i = j;
+  }
+
+  const kept = blocks.filter((b) => b.exists);
+  const removed = blocks.length - kept.length;
+  if (!removed) {
+    return { edl: edlText, removed: 0, kept: kept.length };
+  }
+
+  let fps = 24;
+  const fcm = preamble.find((l) => /FCM:/i.test(l));
+  if (fcm && /DROP FRAME/i.test(fcm) && !/NON-DROP/i.test(fcm)) {
+    fps = 29.97;
+  }
+
+  let recordCursor = 0;
+  const out = [...preamble];
+  for (let n = 0; n < kept.length; n += 1) {
+    const b = kept[n];
+    const m = b.match;
+    const srcIn = m[6];
+    const srcOut = m[7];
+    const oldRecIn = parseSmpteToFrames(m[8], fps);
+    const oldRecOut = parseSmpteToFrames(m[9], fps);
+    const dur =
+      oldRecIn != null && oldRecOut != null && oldRecOut > oldRecIn
+        ? oldRecOut - oldRecIn
+        : 0;
+    const recIn = framesToSmpte(recordCursor, fps);
+    const recOut = framesToSmpte(recordCursor + dur, fps);
+    recordCursor += dur;
+    const reel = String(m[2]).padEnd(8).slice(0, 8);
+    const track = String(m[3]).padEnd(5);
+    const num = String(n + 1).padStart(3, "0");
+    if (m[4] === "C") {
+      out.push(`${num}  ${reel} ${track} C        ${srcIn} ${srcOut} ${recIn} ${recOut}`);
+    } else {
+      const dissolvePad = (m[5] || "001").trim();
+      out.push(
+        `${num}  ${reel} ${track} D    ${String(dissolvePad).padStart(3, "0")} ${srcIn} ${srcOut} ${recIn} ${recOut}`
+      );
+    }
+    // Rewrite REL_PATH comments to the path we actually found on disk.
+    for (const metaLine of b.meta) {
+      if (/^\*\s*SHOOTSPINE_REL_PATH:/i.test(metaLine) && b.mediaPath && projectRoot) {
+        const rel = path
+          .relative(projectRoot, b.mediaPath)
+          .split(path.sep)
+          .join("/");
+        out.push(`* SHOOTSPINE_REL_PATH: ${rel}`);
+      } else {
+        out.push(metaLine);
+      }
+    }
+  }
+  if (out.length && out[out.length - 1] !== "") out.push("");
+  return { edl: out.join("\n"), removed, kept: kept.length };
+}
+
 /**
  * Write text handoff files under projectRoot/03_PROJECT_FILES/shootspine_resolve.
  * Text only — never copies camera media.
@@ -1583,6 +1872,7 @@ async function writeResolveHandoff(body) {
 
   await fs.mkdir(destDir, { recursive: true });
   const written = [];
+  let edlAligned = 0;
   for (const name of names) {
     const base = path.basename(String(name));
     if (!base || base !== name.replace(/\\/g, "/").split("/").pop()) {
@@ -1591,8 +1881,49 @@ async function writeResolveHandoff(body) {
     if (!/\.(edl|json|txt|py|md)$/i.test(base)) {
       throw new Error(`Unsupported handoff file type: ${base}`);
     }
-    const content = String(files[name] ?? "");
+    let content = String(files[name] ?? "");
     if (content.length > 5_000_000) throw new Error(`File too large: ${base}`);
+    if (/\.edl$/i.test(base)) {
+      try {
+        const aligned = await alignEdlToCameraTimecode(content, projectRoot);
+        content = aligned.edl;
+        edlAligned = aligned.aligned;
+      } catch {
+        /* keep original EDL */
+      }
+      try {
+        const stripped = await stripMissingMediaFromEdl(content, projectRoot);
+        content = stripped.edl;
+      } catch {
+        /* keep EDL as-aligned */
+      }
+    }
+    if (/handoff\.json$/i.test(base)) {
+      try {
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed.media)) {
+          const nextMedia = [];
+          for (const item of parsed.media) {
+            const found = await findOriginalMediaFile(
+              projectRoot,
+              item?.relativeProjectPath,
+              item?.filename
+            );
+            if (!found) continue;
+            const rel = path.relative(projectRoot, found).split(path.sep).join("/");
+            nextMedia.push({
+              ...item,
+              resolvedPath: found,
+              relativeProjectPath: rel,
+            });
+          }
+          parsed.media = nextMedia;
+          content = `${JSON.stringify(parsed, null, 2)}\n`;
+        }
+      } catch {
+        /* keep original JSON */
+      }
+    }
     const dest = path.join(destDir, base);
     await fs.writeFile(dest, content, "utf8");
     written.push(base);
@@ -1603,7 +1934,52 @@ async function writeResolveHandoff(body) {
     handoffDir: destDir,
     relativeDir: relDir,
     written,
+    edlAligned,
   };
+}
+
+/**
+ * Rename/move a project folder on the same volume (Windows rename fails across drives).
+ * Used when the ShootSpine project name changes so disk paths stay aligned.
+ */
+async function renameDirectory(fromPath, toPath) {
+  assertSafePath(fromPath);
+  assertSafePath(toPath);
+  const from = path.resolve(fromPath);
+  const to = path.resolve(toPath);
+  if (from.toLowerCase() === to.toLowerCase()) {
+    return { ok: true, from, to, renamed: false, reason: "same_path" };
+  }
+  if (!(await pathExists(from))) {
+    throw new Error(`Source folder not found: ${from}`);
+  }
+  const st = await fs.stat(from);
+  if (!st.isDirectory()) throw new Error("Source is not a folder");
+  if (await pathExists(to)) {
+    throw new Error(`Destination already exists: ${to}`);
+  }
+  // Refuse drive-letter changes (would need a full copy)
+  if (process.platform === "win32") {
+    const fromDrive = from.slice(0, 2).toLowerCase();
+    const toDrive = to.slice(0, 2).toLowerCase();
+    if (/^[a-z]:$/.test(fromDrive) && /^[a-z]:$/.test(toDrive) && fromDrive !== toDrive) {
+      throw new Error(
+        `Cannot rename across drives (${fromDrive} → ${toDrive}). Copy footage to the SSD project folder instead.`
+      );
+    }
+  }
+  await fs.mkdir(path.dirname(to), { recursive: true });
+  try {
+    await fs.rename(from, to);
+  } catch (e) {
+    const code = e && typeof e === "object" && "code" in e ? e.code : "";
+    throw new Error(
+      code === "EXDEV"
+        ? "Cannot move folder across disks — use Copy footage onto your SSD instead."
+        : e.message || "Could not rename folder"
+    );
+  }
+  return { ok: true, from, to, renamed: true };
 }
 
 function revealInFileManager(targetPath) {
@@ -1611,17 +1987,40 @@ function revealInFileManager(targetPath) {
     try {
       assertSafePath(targetPath);
       const abs = path.resolve(targetPath);
-      if (!(await pathExists(abs))) throw new Error("Path not found");
+      if (!(await pathExists(abs))) {
+        throw new Error(
+          `Folder not found on this PC: ${abs}. Save the edit package again (or check the project drive is plugged in).`
+        );
+      }
       const platform = os.platform();
       if (platform === "win32") {
-        // explorer with a folder path opens it; avoid /select quirks
-        const child = spawn("explorer.exe", [abs], {
+        // Prefer highlighting the EDL when revealing the handoff folder.
+        let selectPath = abs;
+        try {
+          const st = await fs.stat(abs);
+          if (st.isDirectory()) {
+            const edl = path.join(abs, "shootspine_rough_cut.edl");
+            if (await pathExists(edl)) selectPath = edl;
+          }
+        } catch {
+          /* open folder as-is */
+        }
+        const args =
+          selectPath.toLowerCase() === abs.toLowerCase()
+            ? [abs]
+            : [`/select,${selectPath}`];
+        const child = spawn("explorer.exe", args, {
           detached: true,
           stdio: "ignore",
           windowsHide: true,
         });
         child.unref();
-        resolve({ ok: true, revealed: abs, method: "explorer" });
+        resolve({
+          ok: true,
+          revealed: abs,
+          selected: selectPath !== abs ? selectPath : undefined,
+          method: "explorer",
+        });
       } else if (platform === "darwin") {
         const child = spawn("open", [abs], { detached: true, stdio: "ignore" });
         child.unref();
@@ -1668,28 +2067,176 @@ function isResolveProcessRunning() {
 }
 
 /**
- * Launch a GUI app via Windows ShellExecute (`start`).
- * Direct spawn(Resolve.exe) from a Node service often leaves Resolve stuck on splash.
+ * Bring an existing Resolve window to the foreground on Windows.
+ * Start-Process alone often fails to focus when Resolve is already open.
  */
-function launchWindowsGuiApp(exePath) {
-  return new Promise((resolve, reject) => {
-    const abs = path.resolve(exePath);
-    const child = spawn(
-      "powershell.exe",
-      [
-        "-NoProfile",
-        "-Command",
-        `Start-Process -FilePath ${JSON.stringify(abs)} -WorkingDirectory ${JSON.stringify(path.dirname(abs))}`,
-      ],
-      { detached: true, stdio: "ignore", windowsHide: true }
-    );
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code === 0 || code === null) resolve(true);
-      else reject(new Error(`Start-Process exited ${code}`));
+function focusResolveWindowWindows() {
+  return new Promise((resolve) => {
+    const ps = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class ShootSpineFocus {
+  [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+  public static bool Focus(IntPtr hWnd) {
+    if (hWnd == IntPtr.Zero) return false;
+    if (IsIconic(hWnd)) ShowWindowAsync(hWnd, 9);
+    else ShowWindowAsync(hWnd, 5);
+    IntPtr fg = GetForegroundWindow();
+    uint fgPid;
+    uint fgTid = GetWindowThreadProcessId(fg, out fgPid);
+    uint cur = GetCurrentThreadId();
+    AttachThreadInput(cur, fgTid, true);
+    bool ok = SetForegroundWindow(hWnd);
+    AttachThreadInput(cur, fgTid, false);
+    return ok;
+  }
+}
+"@
+$p = Get-Process -Name Resolve -ErrorAction SilentlyContinue |
+  Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
+  Select-Object -First 1
+if (-not $p) {
+  # Splash sometimes has no MainWindowHandle yet — still report process alive
+  if (Get-Process -Name Resolve -ErrorAction SilentlyContinue) {
+    Write-Output "NO_WINDOW|PROCESS"
+  } else {
+    Write-Output "NO_WINDOW"
+  }
+  exit 0
+}
+$title = $p.MainWindowTitle
+$ok = [ShootSpineFocus]::Focus($p.MainWindowHandle)
+if (-not $ok) {
+  try {
+    $wshell = New-Object -ComObject WScript.Shell
+    $ok = [bool]$wshell.AppActivate($p.Id)
+  } catch { $ok = $false }
+}
+if ($ok) { Write-Output ("FOCUSED|" + $title) } else { Write-Output ("FOCUS_FAIL|" + $title) }
+`;
+    const child = spawn("powershell.exe", ["-NoProfile", "-Command", ps], {
+      windowsHide: true,
     });
-    child.unref();
+    let out = "";
+    child.stdout?.on("data", (d) => {
+      out += String(d);
+    });
+    child.on("error", () => resolve({ ok: false, reason: "powershell_error" }));
+    child.on("close", () => {
+      const line = out.trim().split(/\r?\n/).filter(Boolean).pop() || "";
+      if (line.startsWith("FOCUSED|")) {
+        resolve({ ok: true, title: line.slice("FOCUSED|".length) || undefined });
+      } else if (line.startsWith("FOCUS_FAIL|")) {
+        resolve({
+          ok: false,
+          reason: "focus_blocked",
+          title: line.slice("FOCUS_FAIL|".length) || undefined,
+        });
+      } else if (line.startsWith("NO_WINDOW")) {
+        resolve({
+          ok: false,
+          reason: line.includes("PROCESS") ? "splash_starting" : "no_window",
+        });
+      } else {
+        resolve({ ok: false, reason: "unknown" });
+      }
+    });
   });
+}
+
+function waitForResolveProcess(timeoutMs = 12000, intervalMs = 500) {
+  const started = Date.now();
+  return new Promise(async (resolve) => {
+    while (Date.now() - started < timeoutMs) {
+      if (await isResolveProcessRunning()) {
+        resolve(true);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    resolve(false);
+  });
+}
+
+/**
+ * Launch a GUI app via Windows ShellExecute.
+ * Avoid windowsHide/detached PowerShell — that often reports success without starting Resolve.
+ */
+async function launchWindowsGuiApp(exePath) {
+  const abs = path.resolve(exePath);
+  const cwd = path.dirname(abs);
+
+  const tryCmdStart = () =>
+    new Promise((resolve, reject) => {
+      // `start ""` uses ShellExecute — most reliable for Resolve.exe from a service.
+      const child = spawn("cmd.exe", ["/c", "start", "", "/D", cwd, abs], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: false,
+      });
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (code === 0 || code === null) resolve(true);
+        else reject(new Error(`cmd start exited ${code}`));
+      });
+      child.unref();
+    });
+
+  const tryPowerShell = () =>
+    new Promise((resolve, reject) => {
+      const child = spawn(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          "-WindowStyle",
+          "Hidden",
+          "-Command",
+          `Start-Process -FilePath ${JSON.stringify(abs)} -WorkingDirectory ${JSON.stringify(cwd)}`,
+        ],
+        { detached: false, stdio: "ignore", windowsHide: false }
+      );
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (code === 0 || code === null) resolve(true);
+        else reject(new Error(`Start-Process exited ${code}`));
+      });
+    });
+
+  const tryExplorer = () =>
+    new Promise((resolve, reject) => {
+      const child = spawn("explorer.exe", [abs], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: false,
+      });
+      child.on("error", reject);
+      child.on("spawn", () => {
+        child.unref();
+        resolve(true);
+      });
+    });
+
+  // Prefer cmd start first — powershell+windowsHide was a silent no-op on this PC.
+  try {
+    await tryCmdStart();
+    return "cmd_start";
+  } catch {
+    /* try next */
+  }
+  try {
+    await tryPowerShell();
+    return "powershell";
+  } catch {
+    await tryExplorer();
+    return "explorer";
+  }
 }
 
 function runProcessCapture(bin, args, opts = {}, timeoutMs = 20000) {
@@ -1872,14 +2419,23 @@ async function collectHandoffMediaPaths(handoffDir, projectRoot) {
       const rel = item.relativeProjectPath.replace(/^[\\/]+/, "").replace(/\\/g, "/");
       candidate = path.resolve(projectRoot, ...rel.split("/").filter(Boolean));
     }
-    if (!candidate) continue;
-    let abs;
-    try {
-      abs = path.resolve(candidate);
-      assertSafePath(abs);
-    } catch {
-      continue;
+    let abs = null;
+    if (candidate) {
+      try {
+        abs = path.resolve(candidate);
+        assertSafePath(abs);
+      } catch {
+        abs = null;
+      }
     }
+    if ((!abs || !(await pathExists(abs))) && projectRoot) {
+      abs = await findOriginalMediaFile(
+        projectRoot,
+        item?.relativeProjectPath,
+        item?.filename
+      );
+    }
+    if (!abs) continue;
     const key = abs.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -1987,13 +2543,37 @@ if bin_folder is not None:
     except Exception:
         pass
 media_count = 0
+clips = []
 if media_paths:
     try:
-        clips = media_pool.ImportMedia(media_paths)
+        clips = media_pool.ImportMedia(media_paths) or []
         if clips:
             media_count = len(clips)
     except Exception:
         media_count = 0
+        clips = []
+# Only zero Start TC when EVERY event is file-relative (source-in 00:00:00:00).
+# A single missing/unaligned clip (e.g. C0042 at 00:00:00:00) must NOT wipe camera
+# Start TC on the rest — that makes later events ask for TC past the file duration.
+try:
+    import re
+    edl_text = edl.read_text(encoding="utf-8", errors="ignore")
+    src_ins = re.findall(
+        r"^\\d{3}\\s+\\S+\\s+\\S+\\s+(?:C|D(?:\\s+\\d+)?)\\s+(\\d{2}:\\d{2}:\\d{2}[:;]\\d{2})\\s+",
+        edl_text,
+        flags=re.M,
+    )
+    file_relative = bool(src_ins) and all(
+        s.replace(";", ":") == "00:00:00:00" for s in src_ins
+    )
+    if file_relative:
+        for clip in clips:
+            try:
+                clip.SetClipProperty("Start TC", "00:00:00:00")
+            except Exception:
+                pass
+except Exception:
+    pass
 imported = media_pool.ImportTimelineFromFile(str(edl), {"timelineName": name})
 if not imported:
     print(f"IMPORT_FAILED media={media_count} requested={len(media_paths)}")
@@ -2310,6 +2890,7 @@ async function openResolve(body) {
   let launched = false;
   let alreadyRunning = false;
   let revealed = false;
+  let windowTitle;
 
   const revealNow = body.reveal === true;
   if (revealNow && (body.handoffDir || body.projectRoot)) {
@@ -2330,24 +2911,78 @@ async function openResolve(body) {
 
     if (alreadyRunning) {
       actions.push("resolve_already_running");
-      // Still nudge a Start-Process — Windows usually focuses the existing instance.
+      launched = true;
       if (platform === "win32") {
-        try {
-          await launchWindowsGuiApp(detect.appPath);
-          launched = true;
+        const focused = await focusResolveWindowWindows();
+        if (focused.ok) {
           actions.push("focused_resolve");
-        } catch {
-          launched = false;
+          windowTitle = focused.title;
+        } else {
+          actions.push(`focus_${focused.reason || "failed"}`);
+          windowTitle = focused.title;
+          // Fallback: Start-Process can still surface a single-instance app
+          try {
+            const method = await launchWindowsGuiApp(detect.appPath);
+            actions.push(`launch_${method}`);
+            const retry = await focusResolveWindowWindows();
+            if (retry.ok) {
+              actions.push("focused_resolve_retry");
+              windowTitle = retry.title || windowTitle;
+            }
+          } catch (e) {
+            actions.push(
+              `focus_fallback_failed:${e instanceof Error ? e.message : "unknown"}`
+            );
+          }
         }
       } else if (platform === "darwin") {
         spawn("open", ["-a", "DaVinci Resolve"], { detached: true, stdio: "ignore" }).unref();
-        launched = true;
         actions.push("focused_resolve");
       }
     } else if (platform === "win32") {
-      await launchWindowsGuiApp(detect.appPath);
-      launched = true;
-      actions.push("launched_resolve");
+      try {
+        const method = await launchWindowsGuiApp(detect.appPath);
+        actions.push(`launch_${method}`);
+        let running = await waitForResolveProcess(10000);
+        // If the first method claimed success but Resolve never appeared, try fallbacks.
+        if (!running) {
+          actions.push("resolve_process_not_seen_retrying");
+          try {
+            await launchWindowsGuiApp(detect.appPath);
+          } catch {
+            /* already tried */
+          }
+          // Last resort: explorer ShellExecute
+          try {
+            spawn("explorer.exe", [detect.appPath], {
+              detached: true,
+              stdio: "ignore",
+            }).unref();
+            actions.push("launch_explorer_retry");
+          } catch {
+            /* ignore */
+          }
+          running = await waitForResolveProcess(8000);
+        }
+        launched = running;
+        if (running) {
+          actions.push("resolve_process_seen");
+          // Splash can take a bit before a real window exists
+          await new Promise((r) => setTimeout(r, 1500));
+          const focused = await focusResolveWindowWindows();
+          if (focused.ok) {
+            actions.push("focused_resolve");
+            windowTitle = focused.title;
+          } else {
+            actions.push(`focus_${focused.reason || "pending_splash"}`);
+          }
+        } else {
+          actions.push("resolve_process_not_seen");
+        }
+      } catch (e) {
+        launched = false;
+        actions.push(`launch_failed:${e instanceof Error ? e.message : "unknown"}`);
+      }
     } else if (platform === "darwin") {
       const child = spawn("open", ["-a", "DaVinci Resolve"], {
         detached: true,
@@ -2364,8 +2999,11 @@ async function openResolve(body) {
     }
   } else if (!detect.installed) {
     actions.push("resolve_not_installed_use_mac_companion");
+  } else if (body.launch !== false && !detect.appPath) {
+    actions.push("resolve_path_missing");
   }
 
+  const titleBit = windowTitle ? ` (“${windowTitle}”)` : "";
   return {
     ok: true,
     detect,
@@ -2373,11 +3011,18 @@ async function openResolve(body) {
     alreadyRunning,
     revealed,
     actions,
+    windowTitle: windowTitle || undefined,
     message: launched
       ? alreadyRunning
-        ? "Resolve was already running — brought it forward. Give it a moment if the project picker is still loading."
-        : "Resolve is starting. The splash can take a minute — use Show saved folder when you’re ready to import."
-      : detect.note,
+        ? actions.some((a) => String(a).startsWith("focused_resolve"))
+          ? `Resolve was already open${titleBit} — brought it to the front.`
+          : `Resolve is already open${titleBit}. Use Alt+Tab or the taskbar if you don’t see it.`
+        : actions.includes("resolve_process_seen")
+          ? "Resolve is starting — look for the splash/taskbar icon (can take 30–60s)."
+          : "Resolve is starting. Splash can take 30–60s — check the taskbar."
+      : detect.installed
+        ? `Couldn’t start Resolve from ${detect.appPath || "its install path"}. Open DaVinci Resolve from the Start menu once, then try again.`
+        : detect.note,
   };
 }
 
@@ -2463,7 +3108,7 @@ async function createThumbnail(filePath, outputDir) {
     const buf = await fs.readFile(outPath);
     // Keep Firestore payloads small — only inline tiny thumbs
     const dataUrl =
-      buf.length <= 48_000
+      buf.length <= 90_000
         ? `data:image/jpeg;base64,${buf.toString("base64")}`
         : undefined;
     return { path: outPath, dataUrl };
@@ -2480,6 +3125,26 @@ const server = http.createServer(async (req, res) => {
 
     const url = new URL(req.url || "/", `http://${HOST}:${PORT}`);
     const pathname = url.pathname;
+
+    // Root / unknown browser visits — never useful as a webpage; point people back to the app.
+    if (
+      req.method === "GET" &&
+      (pathname === "/" || pathname === "") &&
+      String(req.headers.accept || "").includes("text/html")
+    ) {
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.end(`<!doctype html><meta charset="utf-8"/><title>ShootSpine Desktop Agent</title>
+<body style="font-family:system-ui,sans-serif;max-width:36rem;margin:2rem;line-height:1.5;color:#0f172a">
+<h1 style="font-size:1.25rem">Desktop Agent is running</h1>
+<p>This is a background helper for ShootSpine — not a website. Close this tab and go back to the AI Editor.</p>
+<p><a href="http://localhost:3000" style="color:#0369a1;font-weight:600">Open ShootSpine</a></p>
+<p style="font-size:0.85rem;color:#64748b">Then use <strong>Connect / Restart</strong> in Step 1 if needed.</p>
+</body>`);
+      return;
+    }
 
     if (req.method === "GET" && pathname === "/v1/health") {
       // Prefer cached probes so launch/health never waits on Whisper cold start.
@@ -2536,11 +3201,25 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (!(await requireAuth(req))) {
-      return json(res, 401, {
-        error: DEV_OPEN
-          ? "Missing agent session token"
-          : "Register a ShootSpine session first (reconnect this computer)",
-      });
+      const msg = DEV_OPEN
+        ? "Missing agent session token"
+        : "Register a ShootSpine session first (reconnect this computer)";
+      const accept = String(req.headers.accept || "");
+      // Browser navigations show a readable page instead of raw JSON in <pre>
+      if (req.method === "GET" && accept.includes("text/html")) {
+        res.writeHead(401, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Access-Control-Allow-Origin": "*",
+        });
+        res.end(`<!doctype html><meta charset="utf-8"/><title>ShootSpine Desktop Agent</title>
+<body style="font-family:system-ui,sans-serif;max-width:36rem;margin:2rem;line-height:1.45">
+<h1>Desktop Agent</h1>
+<p>${msg}.</p>
+<p>Don’t open this URL in the browser. Go back to ShootSpine AI Editor, click <strong>Connect</strong> / <strong>Restart</strong> in Step 1, then try again.</p>
+</body>`);
+        return;
+      }
+      return json(res, 401, { error: msg });
     }
 
     if (req.method === "POST" && pathname === "/v1/folders/create") {
@@ -2649,6 +3328,12 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const revealed = await revealInFileManager(body.path);
       return json(res, 200, revealed);
+    }
+
+    if (req.method === "POST" && pathname === "/v1/fs/rename-dir") {
+      const body = await readBody(req);
+      const renamed = await renameDirectory(body.from, body.to);
+      return json(res, 200, renamed);
     }
 
     if (req.method === "POST" && pathname === "/v1/resolve/detect") {
