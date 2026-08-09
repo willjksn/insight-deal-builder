@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  downloadContentPlanOnePagerPdf,
   downloadContentPlanPdf,
+  getContentPlanOnePagerFilename,
   getContentPlanPdfFilename,
 } from "@/lib/contentPlan/exportPdf";
 import { defaultContentPlanInputs, type ContentPlan } from "@/lib/contentPlan/types";
@@ -91,5 +93,21 @@ describe("contentPlan exportPdf", () => {
     const instances = (mod as unknown as { __instances: Array<{ save: ReturnType<typeof vi.fn> }> })
       .__instances;
     expect(instances.at(-1)?.save).toHaveBeenCalledWith("The-First-Sip-content-plan.pdf");
+  });
+
+  it("builds a one-pager filename", () => {
+    expect(getContentPlanOnePagerFilename(plan)).toBe(
+      "The-First-Sip-onset-one-pager.pdf"
+    );
+  });
+
+  it("saves an on-set one-pager pdf", async () => {
+    downloadContentPlanOnePagerPdf(plan);
+    const mod = await import("jspdf");
+    const instances = (mod as unknown as { __instances: Array<{ save: ReturnType<typeof vi.fn> }> })
+      .__instances;
+    expect(instances.at(-1)?.save).toHaveBeenCalledWith(
+      "The-First-Sip-onset-one-pager.pdf"
+    );
   });
 });

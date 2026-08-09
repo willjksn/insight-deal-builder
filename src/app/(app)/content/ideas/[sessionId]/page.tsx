@@ -87,6 +87,24 @@ export default function IdeaSessionPage() {
       const { plan } = await createContentPlan(() => user.getIdToken(), {
         title: idea.title,
         inputs,
+        sourceIdeaSessionId: session.id,
+        sourceIdeaId: idea.id,
+      });
+      setSession((prev) => {
+        if (!prev) return prev;
+        const ideas = prev.ideas.map((i) =>
+          i.id === ideaId
+            ? {
+                ...i,
+                contentPlanId: plan.id,
+                status:
+                  i.status === "converted_to_project"
+                    ? i.status
+                    : "developed_in_content_plan",
+              }
+            : i
+        );
+        return { ...prev, ideas };
       });
       router.push(`/reel-prompts?planId=${encodeURIComponent(plan.id)}`);
     } catch (e) {

@@ -202,6 +202,8 @@ export function parseContentShots(raw: unknown): ContentShot[] {
       editorNotes: str(o.editorNotes) || undefined,
       transitionInto: str(o.transitionInto) || undefined,
       transitionOut: str(o.transitionOut) || undefined,
+      speedRampNotes: str(o.speedRampNotes) || undefined,
+      referenceImageUrl: str(o.referenceImageUrl) || undefined,
       cutTrigger: str(o.cutTrigger) || undefined,
       soundEffects: str(o.soundEffects) || undefined,
       foley: str(o.foley) || undefined,

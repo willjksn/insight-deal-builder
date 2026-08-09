@@ -46,7 +46,14 @@ export function IdeaCard({
           <p className="text-xs text-slate-500">Location: {idea.production.recommendedLocation}</p>
         )}
         <div className="mt-auto flex flex-wrap gap-2 pt-2">
-          {onDevelopInContentPlan ? (
+          {idea.contentPlanId ? (
+            <Link href={`/reel-prompts?planId=${encodeURIComponent(idea.contentPlanId)}`}>
+              <Button size="sm" variant="secondary">
+                <Clapperboard className="mr-1 h-4 w-4" />
+                Open Content plan
+              </Button>
+            </Link>
+          ) : onDevelopInContentPlan ? (
             <Button
               size="sm"
               variant="secondary"

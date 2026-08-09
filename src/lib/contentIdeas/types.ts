@@ -271,6 +271,8 @@ export interface ContentIdea {
   status?: string;
   projectId?: string;
   scriptSessionId?: string;
+  /** Set when developed into Content Plan director. */
+  contentPlanId?: string;
   tags?: string[];
 }
 

@@ -8,6 +8,7 @@ import {
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { CONTENT_PLANS_COLLECTION } from "@/lib/contentPlan/collections";
+import { IDEA_SESSIONS_COLLECTION } from "@/lib/contentIdeas/collections";
 import {
   defaultContentPlanInputs,
   emptyProgress,
@@ -98,6 +99,8 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
       inputs?: Partial<ContentPlanInputs>;
       title?: string;
+      sourceIdeaSessionId?: string | null;
+      sourceIdeaId?: string | null;
     };
     const inputs = normalizeInputs(body.inputs || {});
     if (!inputs.idea) {
@@ -107,12 +110,17 @@ export async function POST(request: NextRequest) {
     const db = getAdminDb();
     if (!db) throw new Error("Firebase Admin is not configured");
 
+    const sourceIdeaSessionId = body.sourceIdeaSessionId?.trim() || null;
+    const sourceIdeaId = body.sourceIdeaId?.trim() || null;
+
     const ref = await db.collection(CONTENT_PLANS_COLLECTION).add(
       stripUndefined({
         userId: uid,
         projectId: null,
         creatorId: inputs.creatorId || null,
         scriptSessionId: null,
+        sourceIdeaSessionId,
+        sourceIdeaId,
         title: body.title?.trim() || "Untitled content plan",
         status: "draft",
         inputs,
@@ -127,6 +135,38 @@ export async function POST(request: NextRequest) {
         updatedAt: FieldValue.serverTimestamp(),
       })
     );
+
+    // Best-effort: mark the Weekly Idea as developed into a content plan.
+    if (sourceIdeaSessionId && sourceIdeaId) {
+      try {
+        const sessionRef = db.collection(IDEA_SESSIONS_COLLECTION).doc(sourceIdeaSessionId);
+        const sessionSnap = await sessionRef.get();
+        if (sessionSnap.exists && sessionSnap.data()?.userId === uid) {
+          const ideas = Array.isArray(sessionSnap.data()?.ideas)
+            ? [...sessionSnap.data()!.ideas]
+            : [];
+          const idx = ideas.findIndex(
+            (i: { id?: string }) => i?.id === sourceIdeaId
+          );
+          if (idx >= 0) {
+            ideas[idx] = {
+              ...ideas[idx],
+              contentPlanId: ref.id,
+              status:
+                ideas[idx].status === "converted_to_project"
+                  ? ideas[idx].status
+                  : "developed_in_content_plan",
+            };
+            await sessionRef.set(
+              { ideas, updatedAt: FieldValue.serverTimestamp() },
+              { merge: true }
+            );
+          }
+        }
+      } catch {
+        // Non-fatal provenance write.
+      }
+    }
 
     const snap = await ref.get();
     return NextResponse.json({ plan: { id: ref.id, ...snap.data() } });

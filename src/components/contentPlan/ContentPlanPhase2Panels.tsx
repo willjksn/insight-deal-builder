@@ -81,12 +81,14 @@ export function EditMapPanel({
   teachMe,
   busy,
   onRegen,
+  onUpdateEditPlan,
 }: {
   editPlan?: EditPlan | null;
   davinci?: DavinciBlueprint | null;
   teachMe: boolean;
   busy: boolean;
   onRegen: (section: ContentPlanGenerateSection) => void;
+  onUpdateEditPlan?: (next: EditPlan) => void;
 }) {
   if (!editPlan) {
     return (
@@ -116,10 +118,35 @@ export function EditMapPanel({
               </p>
               <p className="mt-0.5 text-sm font-medium text-slate-900">{item.shotLabel}</p>
               {item.note ? <p className="mt-1 text-sm text-slate-600">{item.note}</p> : null}
-              {item.transitionToNext && i < editPlan.map.length - 1 ? (
-                <p className="mt-2 text-center text-xs font-semibold text-slate-500">
-                  ↓ {item.transitionToNext}
-                </p>
+              {i < editPlan.map.length - 1 ? (
+                onUpdateEditPlan ? (
+                  <label className="mt-2 block space-y-1">
+                    <span className="text-[11px] font-medium text-slate-500">
+                      Transition to next
+                    </span>
+                    <input
+                      defaultValue={item.transitionToNext || ""}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (v === (item.transitionToNext || "")) return;
+                        onUpdateEditPlan({
+                          ...editPlan,
+                          map: editPlan.map.map((m) =>
+                            m.id === item.id
+                              ? { ...m, transitionToNext: v || undefined }
+                              : m
+                          ),
+                        });
+                      }}
+                      placeholder="e.g. cut / dissolve / whip"
+                      className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none ring-sky-200 focus:ring-2"
+                    />
+                  </label>
+                ) : item.transitionToNext ? (
+                  <p className="mt-2 text-center text-xs font-semibold text-slate-500">
+                    ↓ {item.transitionToNext}
+                  </p>
+                ) : null
               ) : null}
             </li>
           ))}
@@ -143,7 +170,26 @@ export function EditMapPanel({
                 <span className="font-medium">Trigger:</span> {ed.cutTrigger}
               </p>
               <p className="mt-1 text-sm text-slate-600">{ed.why}</p>
-              {ed.speedNotes ? (
+              {onUpdateEditPlan ? (
+                <label className="mt-2 block space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">Speed notes</span>
+                  <input
+                    defaultValue={ed.speedNotes || ""}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v === (ed.speedNotes || "")) return;
+                      onUpdateEditPlan({
+                        ...editPlan,
+                        instructions: editPlan.instructions.map((x) =>
+                          x.id === ed.id ? { ...x, speedNotes: v || undefined } : x
+                        ),
+                      });
+                    }}
+                    placeholder="e.g. ramp to 50% then smash cut"
+                    className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none ring-sky-200 focus:ring-2"
+                  />
+                </label>
+              ) : ed.speedNotes ? (
                 <p className="mt-1 text-xs text-slate-500">Speed: {ed.speedNotes}</p>
               ) : null}
               {teachMe && ed.teachMeNotes ? (

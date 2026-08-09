@@ -87,6 +87,15 @@ service firebase.storage {
         );
     }
 
+    // Content Plan director — reference frames for shot cards
+    match /content-plans/{userId}/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     // Revenue meeting audio — uploaded by revenue managers; read by revenue users.
     match /revenue/meetings/{meetingId}/{allPaths=**} {
       allow read: if request.auth != null

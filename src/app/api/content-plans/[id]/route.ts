@@ -14,6 +14,7 @@ import {
   type ContentPlanInputs,
   type ContentShot,
   type CoveragePlan,
+  type EditPlan,
   type ShootChecklist,
   type ShootOrderPlan,
 } from "@/lib/contentPlan/types";
@@ -91,6 +92,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       title?: string;
       teachMe?: boolean;
       shots?: ContentShot[];
+      editPlan?: EditPlan;
       coveragePlan?: CoveragePlan;
       shootOrderPlan?: ShootOrderPlan;
       checklist?: ShootChecklist;
@@ -113,7 +115,17 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     const patch: Record<string, unknown> = {
       updatedAt: FieldValue.serverTimestamp(),
     };
-    if (body.title !== undefined) patch.title = String(body.title || "").trim();
+    if (body.title !== undefined) {
+      const nextTitle = String(body.title || "").trim();
+      patch.title = nextTitle;
+      // Keep creative brief working title in sync when renaming.
+      if (existing.creativeBrief && typeof existing.creativeBrief === "object") {
+        patch.creativeBrief = {
+          ...existing.creativeBrief,
+          workingTitle: nextTitle || existing.creativeBrief.workingTitle || "Untitled",
+        };
+      }
+    }
     if (typeof body.teachMe === "boolean") {
       patch.teachMe = body.teachMe;
       if (body.inputs === undefined) {
@@ -132,6 +144,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       patch.teachMe = inputs.teachMe;
     }
     if (Array.isArray(body.shots)) patch.shots = body.shots;
+    if (body.editPlan) patch.editPlan = body.editPlan;
     if (body.coveragePlan) patch.coveragePlan = body.coveragePlan;
     if (body.shootOrderPlan) patch.shootOrderPlan = body.shootOrderPlan;
     if (body.checklist) patch.checklist = body.checklist;

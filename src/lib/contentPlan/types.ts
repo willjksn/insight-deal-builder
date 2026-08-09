@@ -241,6 +241,10 @@ export type ContentShot = {
   editorNotes?: string;
   transitionInto?: string;
   transitionOut?: string;
+  /** Speed ramp / retiming note for edit (e.g. “slow push 80%”). */
+  speedRampNotes?: string;
+  /** Optional reference still / frame URL for the shot card. */
+  referenceImageUrl?: string;
   cutTrigger?: string;
   soundEffects?: string;
   foley?: string;
@@ -474,6 +478,9 @@ export type ContentPlan = {
   projectId?: string | null;
   creatorId?: string | null;
   scriptSessionId?: string | null;
+  /** Weekly Idea Engine provenance when developed from an idea. */
+  sourceIdeaSessionId?: string | null;
+  sourceIdeaId?: string | null;
   title: string;
   status: ContentPlanStatus;
   inputs: ContentPlanInputs;

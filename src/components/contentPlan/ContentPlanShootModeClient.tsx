@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, MonitorSmartphone } from "lucide-react";
 import {
   CompletionBar,
   ShootModePanel,
@@ -21,6 +21,7 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wakeLockActive, setWakeLockActive] = useState(false);
 
   const getToken = useCallback(() => {
     if (!user) return Promise.resolve(null);
@@ -48,6 +49,43 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
       cancelled = true;
     };
   }, [user, appUser, getToken, planId]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) {
+      return;
+    }
+    let lock: WakeLockSentinel | null = null;
+    let cancelled = false;
+
+    const request = async () => {
+      try {
+        lock = await navigator.wakeLock.request("screen");
+        if (cancelled) {
+          void lock.release();
+          lock = null;
+          return;
+        }
+        setWakeLockActive(true);
+        lock.addEventListener("release", () => {
+          if (!cancelled) setWakeLockActive(false);
+        });
+      } catch {
+        if (!cancelled) setWakeLockActive(false);
+      }
+    };
+
+    void request();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void request();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      void lock?.release();
+      setWakeLockActive(false);
+    };
+  }, []);
 
   async function onUpdateShots(shots: ContentShot[]) {
     if (!plan) return;
@@ -116,6 +154,12 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
             {title}
           </h1>
           <p className="text-sm text-slate-600">Shoot Mode — on-set shot tracker</p>
+          {wakeLockActive ? (
+            <p className="mt-1 inline-flex items-center gap-1 text-xs text-emerald-700">
+              <MonitorSmartphone className="h-3.5 w-3.5" />
+              Screen stays on
+            </p>
+          ) : null}
         </div>
         {saving ? (
           <span className="inline-flex items-center gap-1 text-xs text-slate-500">

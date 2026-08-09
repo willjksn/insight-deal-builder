@@ -128,13 +128,25 @@ function ShotCard({
   shot,
   teachMe,
   defaultOpen,
+  userId,
+  planId,
+  onPatch,
 }: {
   shot: ContentShot;
   teachMe: boolean;
   defaultOpen?: boolean;
+  userId?: string | null;
+  planId?: string;
+  onPatch?: (shotId: string, partial: Partial<ContentShot>) => void;
 }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
   const [howOpen, setHowOpen] = useState(false);
+  const [uploadingFrame, setUploadingFrame] = useState(false);
+  const [frameUrlDraft, setFrameUrlDraft] = useState(shot.referenceImageUrl || "");
+
+  useEffect(() => {
+    setFrameUrlDraft(shot.referenceImageUrl || "");
+  }, [shot.referenceImageUrl]);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white">
@@ -143,7 +155,14 @@ function ShotCard({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-start gap-3 px-4 py-3 text-left"
       >
-        {open ? (
+        {shot.referenceImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={shot.referenceImageUrl}
+            alt=""
+            className="mt-0.5 h-14 w-10 shrink-0 rounded-md object-cover"
+          />
+        ) : open ? (
           <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
         ) : (
           <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
@@ -168,13 +187,95 @@ function ShotCard({
               <span>Lens: {shot.lens || shot.focalLength}</span>
             ) : null}
             <span>Move: {shot.movement}</span>
-            {shot.cutTrigger ? <span>Edit: {shot.transitionOut || "cut"}</span> : null}
+            {shot.transitionOut || shot.cutTrigger ? (
+              <span>Edit: {shot.transitionOut || shot.cutTrigger}</span>
+            ) : null}
+            {shot.speedRampNotes ? <span>Speed: {shot.speedRampNotes}</span> : null}
           </div>
         </div>
+        {!shot.referenceImageUrl ? null : open ? (
+          <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+        ) : (
+          <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+        )}
       </button>
 
       {open ? (
         <div className="space-y-3 border-t border-slate-100 px-4 py-3 text-sm">
+          {onPatch ? (
+            <div className="space-y-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Reference frame
+              </p>
+              {shot.referenceImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={shot.referenceImageUrl}
+                  alt={`Reference for ${shot.shotName}`}
+                  className="max-h-40 w-auto rounded-lg border border-slate-200 object-contain"
+                />
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={frameUrlDraft}
+                  onChange={(e) => setFrameUrlDraft(e.target.value)}
+                  onBlur={() => {
+                    const next = frameUrlDraft.trim();
+                    if (next !== (shot.referenceImageUrl || "")) {
+                      onPatch(shot.id, { referenceImageUrl: next || undefined });
+                    }
+                  }}
+                  placeholder="Paste image URL"
+                  className={textInputClassName()}
+                />
+                <label className="inline-flex cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                  {uploadingFrame ? "Uploading…" : "Upload"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingFrame || !userId || !planId}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file || !userId || !planId || !onPatch) return;
+                      setUploadingFrame(true);
+                      void import("@/lib/contentPlan/storage")
+                        .then(({ uploadContentPlanShotImage }) =>
+                          uploadContentPlanShotImage(userId, planId, shot.id, file)
+                        )
+                        .then(({ storageUrl }) => {
+                          setFrameUrlDraft(storageUrl);
+                          onPatch(shot.id, { referenceImageUrl: storageUrl });
+                        })
+                        .catch(() => undefined)
+                        .finally(() => setUploadingFrame(false));
+                    }}
+                  />
+                </label>
+                {shot.referenceImageUrl ? (
+                  <button
+                    type="button"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    onClick={() => {
+                      setFrameUrlDraft("");
+                      onPatch(shot.id, { referenceImageUrl: undefined });
+                    }}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : shot.referenceImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={shot.referenceImageUrl}
+              alt={`Reference for ${shot.shotName}`}
+              className="max-h-40 w-auto rounded-lg border border-slate-200 object-contain"
+            />
+          ) : null}
+
           <Block title="Creative purpose" body={shot.storyPurpose} />
           <Block
             title="Camera"
@@ -235,8 +336,6 @@ function ShotCard({
             body={[
               shot.cutTrigger && `Cut trigger: ${shot.cutTrigger}`,
               shot.editorNotes && `Editor: ${shot.editorNotes}`,
-              shot.transitionInto && `In: ${shot.transitionInto}`,
-              shot.transitionOut && `Out: ${shot.transitionOut}`,
               shot.productionAudio && `Prod audio: ${shot.productionAudio}`,
               shot.foley && `Foley: ${shot.foley}`,
               shot.soundEffects && `SFX: ${shot.soundEffects}`,
@@ -247,6 +346,70 @@ function ShotCard({
               .filter(Boolean)
               .join("\n")}
           />
+
+          {onPatch ? (
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="block space-y-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Transition in
+                </span>
+                <input
+                  defaultValue={shot.transitionInto || ""}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v !== (shot.transitionInto || "")) {
+                      onPatch(shot.id, { transitionInto: v || undefined });
+                    }
+                  }}
+                  placeholder="e.g. cut / dissolve"
+                  className={textInputClassName()}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Transition out
+                </span>
+                <input
+                  defaultValue={shot.transitionOut || ""}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v !== (shot.transitionOut || "")) {
+                      onPatch(shot.id, { transitionOut: v || undefined });
+                    }
+                  }}
+                  placeholder="e.g. whip pan"
+                  className={textInputClassName()}
+                />
+              </label>
+              <label className="block space-y-1 sm:col-span-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Speed ramp
+                </span>
+                <input
+                  defaultValue={shot.speedRampNotes || ""}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v !== (shot.speedRampNotes || "")) {
+                      onPatch(shot.id, { speedRampNotes: v || undefined });
+                    }
+                  }}
+                  placeholder="e.g. slow push 80%"
+                  className={textInputClassName()}
+                />
+              </label>
+            </div>
+          ) : (
+            <Block
+              title="Transitions / speed"
+              body={[
+                shot.transitionInto && `In: ${shot.transitionInto}`,
+                shot.transitionOut && `Out: ${shot.transitionOut}`,
+                shot.speedRampNotes && `Speed: ${shot.speedRampNotes}`,
+              ]
+                .filter(Boolean)
+                .join("\n")}
+            />
+          )}
 
           {teachMe && shot.teachMeNotes ? (
             <div className="rounded-xl border border-amber-100 bg-amber-50/80 px-3 py-2">
@@ -323,7 +486,7 @@ function Block({ title, body }: { title: string; body?: string }) {
 }
 
 export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
-  const { appUser } = useAuth();
+  const { user, appUser } = useAuth();
   const { projects, loading: projectsLoading } = useAccessibleProjects();
   const {
     data: locationCatalog,
@@ -344,12 +507,21 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
   const [creatorsLoading, setCreatorsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   const [projectLinks, setProjectLinks] = useState<{
     projectId: string;
     scriptSessionId: string;
   } | null>(null);
 
   const showCreatorCatalog = canManageCreators(appUser);
+
+  useEffect(() => {
+    if (!plan) {
+      setTitleDraft("");
+      return;
+    }
+    setTitleDraft(plan.creativeBrief?.workingTitle || plan.title || "");
+  }, [plan?.id, plan?.title, plan?.creativeBrief?.workingTitle]);
 
   useEffect(() => {
     void listContentPlans(getToken)
@@ -489,7 +661,7 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
     try {
       const { plan: next } = await updateContentPlan(getToken, plan.id, {
         inputs,
-        title: plan.creativeBrief?.workingTitle || plan.title,
+        title: titleDraft.trim() || plan.creativeBrief?.workingTitle || plan.title,
         teachMe: inputs.teachMe,
       });
       setPlan(next);
@@ -501,6 +673,44 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onSaveTitle() {
+    if (!plan) return;
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle) {
+      setError("Title cannot be empty.");
+      return;
+    }
+    if (nextTitle === (plan.creativeBrief?.workingTitle || plan.title)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const { plan: next } = await updateContentPlan(getToken, plan.id, {
+        title: nextTitle,
+      });
+      setPlan(next);
+      const listed = await listContentPlans(getToken);
+      setSavedPlans(listed.plans);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not rename plan");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onPatchShot(shotId: string, partial: Partial<ContentShot>) {
+    if (!plan) return;
+    const shots = (plan.shots || []).map((s) =>
+      s.id === shotId ? { ...s, ...partial } : s
+    );
+    setPlan({ ...plan, shots });
+    try {
+      const { plan: next } = await updateContentPlan(getToken, plan.id, { shots });
+      setPlan(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update shot");
     }
   }
 
@@ -948,6 +1158,14 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
                   />
                 </div>
               </Field>
+              <Field label="Wardrobe (optional)" className="sm:col-span-2">
+                <input
+                  value={inputs.wardrobe || ""}
+                  onChange={(e) => patchInputs({ wardrobe: e.target.value })}
+                  placeholder="e.g. Athleisure, matching brand colors, no logos"
+                  className={textInputClassName()}
+                />
+              </Field>
               <Field label="Cameras available" className="sm:col-span-2">
                 <input
                   value={inputs.camerasAvailable || ""}
@@ -1110,6 +1328,25 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
 
         {step === 4 && plan ? (
           <div className="mt-4 space-y-3">
+            <div className="flex flex-col gap-1.5 sm:max-w-xl">
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Plan title
+              </label>
+              <input
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => void onSaveTitle()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+                disabled={saving || busy}
+                className={textInputClassName()}
+                placeholder="Working title"
+              />
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" size="sm" variant="secondary" onClick={() => setStep(3)}>
                 Edit inputs
@@ -1330,9 +1567,9 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
 
             {section === "brief" && plan.creativeBrief ? (
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h4 className="text-lg font-semibold text-slate-900">
-                    {plan.creativeBrief.workingTitle}
+                    {plan.creativeBrief.workingTitle || plan.title}
                   </h4>
                   <Button
                     type="button"
@@ -1470,6 +1707,9 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
                       shot={shot}
                       teachMe={teachMe}
                       defaultOpen={i === 0}
+                      userId={user?.uid}
+                      planId={plan.id}
+                      onPatch={(shotId, partial) => void onPatchShot(shotId, partial)}
                     />
                   ))}
                 </div>
@@ -1483,6 +1723,16 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
                 teachMe={teachMe}
                 busy={busy}
                 onRegen={(s) => void regenerate(s)}
+                onUpdateEditPlan={(editPlan) => {
+                  setPlan((p) => (p ? { ...p, editPlan } : p));
+                  void updateContentPlan(getToken, plan.id, { editPlan })
+                    .then(({ plan: next }) => setPlan(next))
+                    .catch((e) =>
+                      setError(
+                        e instanceof Error ? e.message : "Could not update edit map"
+                      )
+                    );
+                }}
               />
             ) : null}
             {section === "sound" ? (

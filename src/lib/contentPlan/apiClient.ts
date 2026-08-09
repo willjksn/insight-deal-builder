@@ -36,7 +36,12 @@ export async function listContentPlans(getToken: GetToken) {
 
 export async function createContentPlan(
   getToken: GetToken,
-  body: { inputs: ContentPlanInputs; title?: string }
+  body: {
+    inputs: ContentPlanInputs;
+    title?: string;
+    sourceIdeaSessionId?: string | null;
+    sourceIdeaId?: string | null;
+  }
 ) {
   const res = await fetch("/api/content-plans", {
     method: "POST",
@@ -63,6 +68,7 @@ export async function updateContentPlan(
       | "title"
       | "teachMe"
       | "shots"
+      | "editPlan"
       | "coveragePlan"
       | "shootOrderPlan"
       | "checklist"

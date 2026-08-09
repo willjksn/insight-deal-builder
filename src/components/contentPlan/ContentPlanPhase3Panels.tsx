@@ -500,6 +500,26 @@ export function ShootModePanel({
         <ClipboardList className="h-5 w-5 text-slate-400" />
       </div>
 
+      {shot.referenceImageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={shot.referenceImageUrl}
+          alt={`Reference for ${shot.shotName}`}
+          className="max-h-48 w-full rounded-xl border border-slate-200 object-contain"
+        />
+      ) : null}
+
+      {(shot.transitionOut || shot.speedRampNotes) && (
+        <p className="text-sm text-slate-600">
+          {[
+            shot.transitionOut && `Out: ${shot.transitionOut}`,
+            shot.speedRampNotes && `Speed: ${shot.speedRampNotes}`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      )}
+
       <label className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm font-medium text-emerald-950">
         <input
           type="checkbox"

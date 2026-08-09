@@ -10,7 +10,10 @@ import {
   downloadContentPlanExport,
   refineContentPlan,
 } from "@/lib/contentPlan/apiClient";
-import { downloadContentPlanPdf } from "@/lib/contentPlan/exportPdf";
+import {
+  downloadContentPlanOnePagerPdf,
+  downloadContentPlanPdf,
+} from "@/lib/contentPlan/exportPdf";
 import {
   refineTargetFromSection,
   type RefineTarget,
@@ -119,6 +122,17 @@ export function ContentPlanPhase5Bar({
       downloadContentPlanPdf(plan);
     } catch (e) {
       onError(e instanceof Error ? e.message : "PDF export failed");
+    } finally {
+      setBusyExport(false);
+    }
+  }
+
+  function onExportOnePager() {
+    setBusyExport(true);
+    try {
+      downloadContentPlanOnePagerPdf(plan);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "One-pager export failed");
     } finally {
       setBusyExport(false);
     }
@@ -266,6 +280,16 @@ export function ContentPlanPhase5Bar({
         >
           <Download className="mr-1.5 h-3.5 w-3.5" />
           Export PDF
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busyExport}
+          onClick={() => onExportOnePager()}
+        >
+          <Download className="mr-1.5 h-3.5 w-3.5" />
+          On-set one-pager
         </Button>
       </div>
     </div>
