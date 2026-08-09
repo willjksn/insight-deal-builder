@@ -38,7 +38,7 @@ export default function ReelPromptsPage() {
       </Link>
       <PageHeader
         title="Reel prompt director"
-        description="Turn an idea into a tight shot-by-shot video prompt pack — hook through CTA, with talent continuity locked."
+        subtitle="Turn an idea into a tight shot-by-shot video prompt pack — hook through CTA, with talent continuity locked."
       />
       <div className="mt-6">
         <ReelPromptDirectorPanel

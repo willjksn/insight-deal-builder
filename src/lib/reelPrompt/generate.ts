@@ -43,41 +43,41 @@ export function parseReelPromptPack(
 ): ReelPromptPack {
   const obj = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const clipsRaw = Array.isArray(obj.clips) ? obj.clips : [];
-  const clips: ReelPromptClip[] = clipsRaw
-    .map((c, i) => {
-      const row = (c && typeof c === "object" ? c : {}) as Record<string, unknown>;
-      const index = typeof row.index === "number" ? row.index : i + 1;
-      const prompt = String(row.prompt || "").trim();
-      if (!prompt) return null;
-      return {
-        id: typeof row.id === "string" && row.id ? row.id : clipId(index),
-        index,
-        duration: String(row.duration || "2–3s").trim(),
-        beat: String(row.beat || `Beat ${index}`).trim(),
-        sceneNumber:
-          typeof row.sceneNumber === "string" && row.sceneNumber.trim()
-            ? row.sceneNumber.trim()
-            : undefined,
-        prompt,
-        dialogueOrVo:
-          typeof row.dialogueOrVo === "string" && row.dialogueOrVo.trim()
-            ? row.dialogueOrVo.trim()
-            : undefined,
-        onScreenText:
-          typeof row.onScreenText === "string" && row.onScreenText.trim()
-            ? row.onScreenText.trim()
-            : undefined,
-        camera:
-          typeof row.camera === "string" && row.camera.trim()
-            ? row.camera.trim()
-            : undefined,
-        notes:
-          typeof row.notes === "string" && row.notes.trim()
-            ? row.notes.trim()
-            : undefined,
-      } satisfies ReelPromptClip;
-    })
-    .filter((c): c is ReelPromptClip => Boolean(c));
+  const clips: ReelPromptClip[] = [];
+  for (let i = 0; i < clipsRaw.length; i++) {
+    const c = clipsRaw[i];
+    const row = (c && typeof c === "object" ? c : {}) as Record<string, unknown>;
+    const index = typeof row.index === "number" ? row.index : i + 1;
+    const prompt = String(row.prompt || "").trim();
+    if (!prompt) continue;
+    clips.push({
+      id: typeof row.id === "string" && row.id ? row.id : clipId(index),
+      index,
+      duration: String(row.duration || "2–3s").trim(),
+      beat: String(row.beat || `Beat ${index}`).trim(),
+      sceneNumber:
+        typeof row.sceneNumber === "string" && row.sceneNumber.trim()
+          ? row.sceneNumber.trim()
+          : undefined,
+      prompt,
+      dialogueOrVo:
+        typeof row.dialogueOrVo === "string" && row.dialogueOrVo.trim()
+          ? row.dialogueOrVo.trim()
+          : undefined,
+      onScreenText:
+        typeof row.onScreenText === "string" && row.onScreenText.trim()
+          ? row.onScreenText.trim()
+          : undefined,
+      camera:
+        typeof row.camera === "string" && row.camera.trim()
+          ? row.camera.trim()
+          : undefined,
+      notes:
+        typeof row.notes === "string" && row.notes.trim()
+          ? row.notes.trim()
+          : undefined,
+    });
+  }
 
   const avoid = Array.isArray(obj.avoid)
     ? obj.avoid.filter((x): x is string => typeof x === "string" && x.trim().length > 0)

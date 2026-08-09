@@ -357,7 +357,7 @@ export function ResolveAssistantClient() {
 
       <PageHeader
         title="Resolve assistant"
-        description="Chat about DaVinci Resolve. Answers use your official Reference Manual — with steps and zoomable page images."
+        subtitle="Chat about DaVinci Resolve. Answers use your official Reference Manual — with steps and zoomable page images."
       />
 
       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm">
