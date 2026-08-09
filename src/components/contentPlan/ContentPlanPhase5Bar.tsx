@@ -10,6 +10,7 @@ import {
   downloadContentPlanExport,
   refineContentPlan,
 } from "@/lib/contentPlan/apiClient";
+import { downloadContentPlanPdf } from "@/lib/contentPlan/exportPdf";
 import {
   refineTargetFromSection,
   type RefineTarget,
@@ -107,6 +108,17 @@ export function ContentPlanPhase5Bar({
       await downloadContentPlanExport(getToken, plan.id, format);
     } catch (e) {
       onError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setBusyExport(false);
+    }
+  }
+
+  function onExportPdf() {
+    setBusyExport(true);
+    try {
+      downloadContentPlanPdf(plan);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "PDF export failed");
     } finally {
       setBusyExport(false);
     }
@@ -254,6 +266,16 @@ export function ContentPlanPhase5Bar({
         >
           <Download className="mr-1.5 h-3.5 w-3.5" />
           Export printable
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busyExport}
+          onClick={() => onExportPdf()}
+        >
+          <Download className="mr-1.5 h-3.5 w-3.5" />
+          Export PDF
         </Button>
       </div>
     </div>
