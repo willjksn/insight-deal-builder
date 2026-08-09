@@ -252,16 +252,6 @@ export function ContentPlanPhase5Bar({
           size="sm"
           variant="secondary"
           disabled={busyExport}
-          onClick={() => void onExport("json")}
-        >
-          <Download className="mr-1.5 h-3.5 w-3.5" />
-          Export JSON
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={busyExport}
           onClick={() => void onExport("text")}
         >
           <Download className="mr-1.5 h-3.5 w-3.5" />

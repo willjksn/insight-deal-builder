@@ -7,17 +7,21 @@ import {
   ChevronDown,
   ChevronRight,
   Clapperboard,
+  Copy,
   FolderKanban,
   Loader2,
   RefreshCw,
   Save,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import {
+  cloneContentPlan,
   createContentPlan,
   createProjectFromContentPlan,
+  deleteContentPlan,
   generateContentPlan,
   listContentPlans,
   syncLinkedProjectFromContentPlan,
@@ -593,6 +597,49 @@ export function ContentPlanDirector({ getToken }: Props) {
       setSection("brief");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load plan");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onClonePlan(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const { plan: next } = await cloneContentPlan(getToken, id);
+      const listed = await listContentPlans(getToken);
+      setSavedPlans(listed.plans);
+      setPlan(next);
+      setInputs(defaultContentPlanInputs(next.inputs));
+      setProjectLinks(null);
+      setStep(4);
+      setSection("brief");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not duplicate plan");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDeletePlan(id: string, title: string) {
+    const ok = window.confirm(
+      `Delete “${title || "this plan"}”? This cannot be undone.\n\nLinked projects are not deleted.`
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteContentPlan(getToken, id);
+      if (plan?.id === id) {
+        setPlan(null);
+        setProjectLinks(null);
+        setStep(1);
+        setInputs(defaultContentPlanInputs());
+      }
+      const listed = await listContentPlans(getToken);
+      setSavedPlans(listed.plans);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete plan");
     } finally {
       setBusy(false);
     }
@@ -1515,15 +1562,37 @@ export function ContentPlanDirector({ getToken }: Props) {
                     {p.shots?.length ? ` · ${p.shots.length} shots` : ""}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => void loadPlan(p.id)}
-                >
-                  Open
-                </Button>
+                <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void loadPlan(p.id)}
+                  >
+                    Open
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void onClonePlan(p.id)}
+                    title="Duplicate plan"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void onDeletePlan(p.id, p.title)}
+                    title="Delete plan"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>

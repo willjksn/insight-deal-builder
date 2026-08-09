@@ -56,6 +56,31 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   }
 }
 
+export async function DELETE(request: NextRequest, ctx: Ctx) {
+  try {
+    const { uid, appUser } = await requireApprovedAuthUser(request);
+    assertCanUseProductionTools(appUser);
+    const { id } = await ctx.params;
+    const db = getAdminDb();
+    if (!db) throw new Error("Firebase Admin is not configured");
+
+    const ref = db.collection(CONTENT_PLANS_COLLECTION).doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const data = snap.data() || {};
+    if (data.userId !== uid) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    await ref.delete();
+    return NextResponse.json({ ok: true, id });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to delete content plan";
+    return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
+  }
+}
+
 export async function PATCH(request: NextRequest, ctx: Ctx) {
   try {
     const { uid, appUser } = await requireApprovedAuthUser(request);

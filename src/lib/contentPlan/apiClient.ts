@@ -77,6 +77,22 @@ export async function updateContentPlan(
   return parseJson<{ plan: ContentPlan }>(res);
 }
 
+export async function deleteContentPlan(getToken: GetToken, id: string) {
+  const res = await fetch(`/api/content-plans/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ ok: true; id: string }>(res);
+}
+
+export async function cloneContentPlan(getToken: GetToken, id: string) {
+  const res = await fetch(`/api/content-plans/${id}/clone`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ plan: ContentPlan }>(res);
+}
+
 export async function generateContentPlan(
   getToken: GetToken,
   id: string,
