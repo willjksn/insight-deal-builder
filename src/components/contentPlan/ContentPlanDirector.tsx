@@ -83,6 +83,8 @@ type GetToken = () => Promise<string | null>;
 
 type Props = {
   getToken: GetToken;
+  /** Deep-link from Weekly Idea Engine / bookmarks. */
+  initialPlanId?: string | null;
 };
 
 const SECTIONS: { id: ContentPlanSection; label: string; ready: boolean }[] = [
@@ -320,7 +322,7 @@ function Block({ title, body }: { title: string; body?: string }) {
   );
 }
 
-export function ContentPlanDirector({ getToken }: Props) {
+export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
   const { appUser } = useAuth();
   const { projects, loading: projectsLoading } = useAccessibleProjects();
   const {
@@ -354,6 +356,13 @@ export function ContentPlanDirector({ getToken }: Props) {
       .then(({ plans }) => setSavedPlans(plans))
       .catch(() => undefined);
   }, [getToken]);
+
+  useEffect(() => {
+    if (!initialPlanId) return;
+    void loadPlan(initialPlanId);
+    // Intentionally only when deep-link id arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadPlan is stable enough for mount/deep-link
+  }, [initialPlanId, getToken]);
 
   useEffect(() => {
     if (!showCreatorCatalog) {

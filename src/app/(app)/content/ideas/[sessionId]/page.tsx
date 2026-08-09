@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,9 @@ import {
   contentIdeasGenerate,
   contentIdeasGetSession,
 } from "@/lib/contentIdeas/apiClient";
+import { contentPlanInputsFromIdea } from "@/lib/contentIdeas/contentPlanInputsFromIdea";
 import { ContentIdea, IdeaGenerationSession } from "@/lib/contentIdeas/types";
+import { createContentPlan } from "@/lib/contentPlan/apiClient";
 import { IdeaCard } from "@/components/contentIdeas/IdeaCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -19,11 +21,13 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 export default function IdeaSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const router = useRouter();
   const { user } = useAuth();
   const [session, setSession] = useState<IdeaGenerationSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [creatingId, setCreatingId] = useState<string | null>(null);
+  const [developingId, setDevelopingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = () => {
@@ -69,6 +73,25 @@ export default function IdeaSessionPage() {
       setError(e instanceof Error ? e.message : "Create project failed");
     } finally {
       setCreatingId(null);
+    }
+  };
+
+  const developInContentPlan = async (ideaId: string) => {
+    if (!user || !session) return;
+    const idea = session.ideas.find((i) => i.id === ideaId);
+    if (!idea) return;
+    setDevelopingId(ideaId);
+    setError(null);
+    try {
+      const inputs = contentPlanInputsFromIdea(idea, session.inputs);
+      const { plan } = await createContentPlan(() => user.getIdToken(), {
+        title: idea.title,
+        inputs,
+      });
+      router.push(`/reel-prompts?planId=${encodeURIComponent(plan.id)}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not open Content plan");
+      setDevelopingId(null);
     }
   };
 
@@ -144,7 +167,9 @@ export default function IdeaSessionPage() {
             idea={idea}
             sessionId={session.id}
             creating={creatingId === idea.id}
+            developing={developingId === idea.id}
             onCreateProject={createProject}
+            onDevelopInContentPlan={developInContentPlan}
           />
         ))}
       </div>

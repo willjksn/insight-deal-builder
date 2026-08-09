@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Loader2, Sparkles } from "lucide-react";
+import { Clapperboard, Loader2, Sparkles } from "lucide-react";
 import { ContentIdea } from "@/lib/contentIdeas/types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -10,14 +10,19 @@ export function IdeaCard({
   idea,
   sessionId,
   creating,
+  developing,
   onCreateProject,
+  onDevelopInContentPlan,
 }: {
   idea: ContentIdea;
   sessionId: string;
   creating?: boolean;
+  developing?: boolean;
   onCreateProject: (ideaId: string) => void;
+  onDevelopInContentPlan?: (ideaId: string) => void;
 }) {
   const score = idea.score?.overall;
+  const busy = Boolean(creating || developing);
 
   return (
     <Card className="h-full">
@@ -41,6 +46,21 @@ export function IdeaCard({
           <p className="text-xs text-slate-500">Location: {idea.production.recommendedLocation}</p>
         )}
         <div className="mt-auto flex flex-wrap gap-2 pt-2">
+          {onDevelopInContentPlan ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={busy}
+              onClick={() => onDevelopInContentPlan(idea.id)}
+            >
+              {developing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Clapperboard className="mr-1 h-4 w-4" />
+              )}
+              Develop in Content plan
+            </Button>
+          ) : null}
           {idea.projectId ? (
             <>
               <Link href={`/projects/${idea.projectId}`}>
@@ -55,7 +75,7 @@ export function IdeaCard({
               )}
             </>
           ) : (
-            <Button size="sm" disabled={creating} onClick={() => onCreateProject(idea.id)}>
+            <Button size="sm" disabled={busy} onClick={() => onCreateProject(idea.id)}>
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
               Create project + script
             </Button>
