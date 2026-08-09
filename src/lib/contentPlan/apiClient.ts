@@ -108,3 +108,42 @@ export async function createProjectFromContentPlan(
     plan: ContentPlan;
   }>(res);
 }
+
+export async function refineContentPlan(
+  getToken: GetToken,
+  id: string,
+  body: { instruction: string; target: string; shotId?: string }
+) {
+  const res = await fetch(`/api/content-plans/${id}/refine`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ plan: ContentPlan }>(res);
+}
+
+export async function downloadContentPlanExport(
+  getToken: GetToken,
+  id: string,
+  format: "json" | "text"
+) {
+  const token = await getToken();
+  if (!token) throw new Error("Not signed in");
+  const res = await fetch(`/api/content-plans/${id}/export?format=${format}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || "Export failed");
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match?.[1] || `content-plan.${format === "json" ? "json" : "txt"}`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

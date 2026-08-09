@@ -39,7 +39,7 @@ export async function createProjectFromContentPlan(params: {
 
   if (plan.projectId && !existingProjectId) {
     throw new Error(
-      "This plan is already linked to a project. Open that project or apply to another project."
+      "This plan is already linked to a project. Open that project, or choose Apply to existing project."
     );
   }
 

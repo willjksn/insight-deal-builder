@@ -53,6 +53,7 @@ import {
   ShootModePanel,
   ShootOrderPanel,
 } from "@/components/contentPlan/ContentPlanPhase3Panels";
+import { ContentPlanPhase5Bar } from "@/components/contentPlan/ContentPlanPhase5Bar";
 import { cn } from "@/lib/utils/cn";
 
 type GetToken = () => Promise<string | null>;
@@ -921,6 +922,22 @@ export function ContentPlanDirector({ getToken }: Props) {
               plan={plan}
               busy={busy}
               onRegen={(s) => void regenerate(s)}
+            />
+            <ContentPlanPhase5Bar
+              plan={plan}
+              section={section}
+              getToken={getToken}
+              onError={setError}
+              onPlanUpdated={(next, links) => {
+                setPlan(next);
+                if (links) setProjectLinks(links);
+                else if (next.projectId) {
+                  setProjectLinks({
+                    projectId: next.projectId,
+                    scriptSessionId: next.scriptSessionId || "",
+                  });
+                }
+              }}
             />
 
             {section === "brief" && plan.creativeBrief ? (
