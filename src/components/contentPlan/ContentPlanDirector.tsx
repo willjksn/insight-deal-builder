@@ -56,6 +56,15 @@ import {
 } from "@/components/contentPlan/ContentPlanPhase3Panels";
 import { ContentPlanPhase5Bar } from "@/components/contentPlan/ContentPlanPhase5Bar";
 import { useAccessibleProjects } from "@/hooks/useAccessibleProjects";
+import { useLocationCatalog } from "@/hooks/useLocationCatalog";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  creatorCatalogNotes,
+  formatLocationCatalogLabel,
+  locationCatalogNotes,
+} from "@/lib/contentPlan/catalogPickers";
+import { listCreators } from "@/lib/creators/apiClient";
+import type { Creator } from "@/lib/creators/types";
 import { getProductionBoardByProject } from "@/lib/firebase/productionFirestore";
 import {
   flattenShootingKit,
@@ -63,6 +72,7 @@ import {
   shootingKitFromLegacy,
   shootingKitHasGear,
 } from "@/lib/production/shootingKit";
+import { canManageCreators } from "@/lib/utils/permissions";
 import { cn } from "@/lib/utils/cn";
 
 type GetToken = () => Promise<string | null>;
@@ -307,7 +317,12 @@ function Block({ title, body }: { title: string; body?: string }) {
 }
 
 export function ContentPlanDirector({ getToken }: Props) {
+  const { appUser } = useAuth();
   const { projects, loading: projectsLoading } = useAccessibleProjects();
+  const {
+    data: locationCatalog,
+    loading: locationsLoading,
+  } = useLocationCatalog();
   const [step, setStep] = useState(1);
   const [inputs, setInputs] = useState<ContentPlanInputs>(() => defaultContentPlanInputs());
   const [plan, setPlan] = useState<ContentPlan | null>(null);
@@ -319,6 +334,8 @@ export function ContentPlanDirector({ getToken }: Props) {
   const [syncingProject, setSyncingProject] = useState(false);
   const [kitProjectId, setKitProjectId] = useState("");
   const [kitBusy, setKitBusy] = useState(false);
+  const [creators, setCreators] = useState<Creator[]>([]);
+  const [creatorsLoading, setCreatorsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [projectLinks, setProjectLinks] = useState<{
@@ -326,11 +343,36 @@ export function ContentPlanDirector({ getToken }: Props) {
     scriptSessionId: string;
   } | null>(null);
 
+  const showCreatorCatalog = canManageCreators(appUser);
+
   useEffect(() => {
     void listContentPlans(getToken)
       .then(({ plans }) => setSavedPlans(plans))
       .catch(() => undefined);
   }, [getToken]);
+
+  useEffect(() => {
+    if (!showCreatorCatalog) {
+      setCreators([]);
+      return;
+    }
+    let cancelled = false;
+    setCreatorsLoading(true);
+    void listCreators(getToken)
+      .then((list) => {
+        if (cancelled) return;
+        setCreators(list.filter((c) => c.status === "active"));
+      })
+      .catch(() => {
+        if (!cancelled) setCreators([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCreatorsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, showCreatorCatalog]);
 
   const teachMe = plan?.teachMe ?? inputs.teachMe;
 
@@ -730,19 +772,125 @@ export function ContentPlanDirector({ getToken }: Props) {
                   className={textInputClassName()}
                 />
               </Field>
-              <Field label="Creator / talent (optional)">
-                <input
-                  value={inputs.creatorName || ""}
-                  onChange={(e) => patchInputs({ creatorName: e.target.value })}
-                  className={textInputClassName()}
-                />
+              <Field label="Creator / talent (optional)" className="sm:col-span-2">
+                {showCreatorCatalog ? (
+                  <div className="space-y-2">
+                    <Select
+                      value={inputs.creatorId || ""}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (!id) {
+                          patchInputs({
+                            creatorId: null,
+                            creatorName: "",
+                            creatorCatalogNotes: "",
+                          });
+                          return;
+                        }
+                        const c = creators.find((x) => x.id === id);
+                        if (!c) return;
+                        patchInputs({
+                          creatorId: c.id,
+                          creatorName: c.professionalName,
+                          creatorCatalogNotes: creatorCatalogNotes(c),
+                          wardrobe:
+                            inputs.wardrobe?.trim() ||
+                            c.primaryNiche ||
+                            inputs.wardrobe,
+                        });
+                      }}
+                      options={
+                        creatorsLoading
+                          ? [{ value: "", label: "Loading creators…" }]
+                          : [
+                              { value: "", label: "Select from creator catalog…" },
+                              ...creators.map((c) => ({
+                                value: c.id,
+                                label: c.primaryNiche
+                                  ? `${c.professionalName} · ${c.primaryNiche}`
+                                  : c.professionalName,
+                              })),
+                            ]
+                      }
+                    />
+                    <input
+                      value={inputs.creatorName || ""}
+                      onChange={(e) =>
+                        patchInputs({
+                          creatorName: e.target.value,
+                          creatorId: e.target.value.trim() ? inputs.creatorId : null,
+                          creatorCatalogNotes: e.target.value.trim()
+                            ? inputs.creatorCatalogNotes
+                            : "",
+                        })
+                      }
+                      placeholder="Or type a talent name"
+                      className={textInputClassName()}
+                    />
+                  </div>
+                ) : (
+                  <input
+                    value={inputs.creatorName || ""}
+                    onChange={(e) =>
+                      patchInputs({
+                        creatorName: e.target.value,
+                        creatorId: null,
+                        creatorCatalogNotes: "",
+                      })
+                    }
+                    className={textInputClassName()}
+                  />
+                )}
               </Field>
-              <Field label="Location (optional)">
-                <input
-                  value={inputs.location || ""}
-                  onChange={(e) => patchInputs({ location: e.target.value })}
-                  className={textInputClassName()}
-                />
+              <Field label="Location (optional)" className="sm:col-span-2">
+                <div className="space-y-2">
+                  <Select
+                    value={inputs.locationId || ""}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      if (!id) {
+                        patchInputs({
+                          locationId: null,
+                          location: "",
+                          locationCatalogNotes: "",
+                        });
+                        return;
+                      }
+                      const loc = locationCatalog.find((x) => x.id === id);
+                      if (!loc) return;
+                      patchInputs({
+                        locationId: loc.id,
+                        location: formatLocationCatalogLabel(loc),
+                        locationCatalogNotes: locationCatalogNotes(loc),
+                      });
+                    }}
+                    options={
+                      locationsLoading
+                        ? [{ value: "", label: "Loading locations…" }]
+                        : [
+                            { value: "", label: "Select from location catalog…" },
+                            ...locationCatalog.map((loc) => ({
+                              value: loc.id,
+                              label: formatLocationCatalogLabel(loc),
+                            })),
+                          ]
+                    }
+                  />
+                  <input
+                    value={inputs.location || ""}
+                    onChange={(e) =>
+                      patchInputs({
+                        location: e.target.value,
+                        locationId: e.target.value.trim() ? inputs.locationId : null,
+                        locationCatalogNotes: e.target.value.trim()
+                          ? inputs.locationCatalogNotes
+                          : "",
+                      })
+                    }
+                    placeholder="Or type a location"
+                    className={textInputClassName()}
+                  />
+                </div>
               </Field>
               <Field label="Cameras available" className="sm:col-span-2">
                 <input

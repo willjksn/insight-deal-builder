@@ -134,7 +134,12 @@ export type ContentPlanInputs = {
   product?: string;
   creatorName?: string;
   creatorId?: string | null;
+  /** Short catalog notes injected into AI prompts when a creator is picked. */
+  creatorCatalogNotes?: string;
   location?: string;
+  locationId?: string | null;
+  /** Short catalog notes injected into AI prompts when a location is picked. */
+  locationCatalogNotes?: string;
   wardrobe?: string;
   existingScript?: string;
   talkingPoints?: string;
