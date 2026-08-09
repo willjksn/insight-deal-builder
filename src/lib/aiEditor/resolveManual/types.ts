@@ -27,6 +27,8 @@ export type ResolveManualChatMessage = {
 export type ResolveManualChatResult = {
   answer: string;
   steps: string[];
+  /** Optional coach tips / gotchas grounded in the manual excerpts. */
+  tips?: string[];
   citations: ResolveManualCitation[];
   mode: "manual_grounded" | "excerpts_only" | "index_missing";
   manualLabel: string | null;

@@ -617,6 +617,7 @@ export type ResolveAssistantStatus = {
 export type ResolveAssistantChatResult = {
   answer: string;
   steps: string[];
+  tips?: string[];
   citations: Array<{ page: number; excerpt: string; chunkId: string }>;
   mode: "manual_grounded" | "excerpts_only" | "index_missing";
   manualLabel: string | null;

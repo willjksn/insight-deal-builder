@@ -204,7 +204,7 @@ async function vertexGenerateOnce(
 
   const data = (await res.json()) as {
     candidates?: {
-      content?: { parts?: { text?: string }[] };
+      content?: { parts?: Array<{ text?: string; thought?: boolean }> };
       finishReason?: string;
     }[];
     usageMetadata?: {
@@ -213,7 +213,16 @@ async function vertexGenerateOnce(
     };
   };
   const candidate = data.candidates?.[0];
-  const text = candidate?.content?.parts?.[0]?.text;
+  const parts = candidate?.content?.parts;
+  const nonThought = parts
+    ?.filter((p) => !p.thought && typeof p.text === "string" && p.text.trim())
+    .map((p) => p.text!.trim());
+  const text =
+    (nonThought?.length ? nonThought.join("\n") : undefined) ||
+    parts
+      ?.filter((p) => typeof p.text === "string" && p.text.trim())
+      .map((p) => p.text!.trim())
+      .join("\n");
   if (!text) {
     return { ok: false, status: 500, errText: "Empty response from Vertex AI Gemini" };
   }
@@ -392,6 +401,7 @@ export async function vertexGeminiGenerate(params: {
   model?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  thinkingBudget?: number;
 }): Promise<string> {
   const projectId = vertexProjectId();
   if (!projectId) {
@@ -413,14 +423,44 @@ export async function vertexGeminiGenerate(params: {
       ...(params.json ? { responseMimeType: "application/json" } : {}),
       temperature: params.temperature ?? 0.4,
       ...(params.maxOutputTokens ? { maxOutputTokens: params.maxOutputTokens } : {}),
+      ...(typeof params.thinkingBudget === "number"
+        ? { thinkingConfig: { thinkingBudget: params.thinkingBudget } }
+        : {}),
     },
   };
 
   const attempts = buildVertexAttempts(preferredModel);
   let lastError = { status: 500, errText: "No Vertex attempts", location: "unknown", model: preferredModel };
+  let bodyForAttempt = body;
+  let droppedThinkingConfig = false;
 
   for (const { location, model } of attempts) {
-    const result = await vertexGenerateOnce(projectId, location, model, token, body);
+    const result = await vertexGenerateOnce(projectId, location, model, token, bodyForAttempt);
+    if (
+      !result.ok &&
+      !droppedThinkingConfig &&
+      typeof params.thinkingBudget === "number" &&
+      /thinking/i.test(result.errText)
+    ) {
+      // Some Vertex model variants reject thinkingBudget=0 — retry without it.
+      droppedThinkingConfig = true;
+      const gc = { ...(bodyForAttempt.generationConfig as Record<string, unknown>) };
+      delete gc.thinkingConfig;
+      bodyForAttempt = { ...bodyForAttempt, generationConfig: gc };
+      console.warn("[Scout] Vertex rejected thinkingConfig — retrying without it");
+      const retry = await vertexGenerateOnce(projectId, location, model, token, bodyForAttempt);
+      if (retry.ok) {
+        logGeminiTextUsage({
+          provider: "vertex",
+          model: retry.model,
+          inputTokens: retry.usage?.promptTokenCount,
+          outputTokens: retry.usage?.candidatesTokenCount,
+        });
+        return retry.text;
+      }
+      lastError = { status: retry.status, errText: retry.errText, location, model };
+      continue;
+    }
     if (result.ok) {
       if (model !== preferredModel || location !== vertexLocation()) {
         console.info(`[Scout] Vertex using ${model} @ ${location}`);

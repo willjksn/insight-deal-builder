@@ -197,6 +197,9 @@ export interface Project {
   sourceIdeaEngine?: boolean;
   sourceIdeaSessionId?: string;
   sourceIdeaId?: string;
+  /** Created from Content Plan director */
+  sourceContentPlan?: boolean;
+  sourceContentPlanId?: string;
   /** Created from Revenue & opportunities conversion */
   sourceRevenueOpportunity?: boolean;
   sourceRevenueOpportunityId?: string;

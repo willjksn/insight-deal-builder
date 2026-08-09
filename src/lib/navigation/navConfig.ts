@@ -206,7 +206,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/script-writer", label: "Script writer", icon: ScrollText, canAccess: canUseProductionTools },
       {
         href: "/reel-prompts",
-        label: "Reel prompts",
+        label: "Content plan",
         icon: Clapperboard,
         canAccess: canUseProductionTools,
       },

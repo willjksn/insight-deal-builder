@@ -83,7 +83,7 @@ def main() -> int:
     doc = fitz.open(pdf)
     total = doc.page_count
     limit = min(total, args.max_pages) if args.max_pages else total
-    print(f"Indexing {limit}/{total} pages from {pdf.name} …", flush=True)
+    print(f"Indexing {limit}/{total} pages from {pdf.name}...", flush=True)
 
     count = 0
     with chunks_path.open("w", encoding="utf-8") as out:
@@ -97,7 +97,7 @@ def main() -> int:
                 out.write(json.dumps(ch, ensure_ascii=False) + "\n")
                 count += 1
             if (i + 1) % 100 == 0 or i + 1 == limit:
-                print(f"  pages {i + 1}/{limit} → {count} chunks", flush=True)
+                print(f"  pages {i + 1}/{limit} -> {count} chunks", flush=True)
 
     doc.close()
     manifest = {
@@ -109,7 +109,7 @@ def main() -> int:
         "indexedWith": "pymupdf",
     }
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    print(f"Done. {count} chunks → {chunks_path}")
+    print(f"Done. {count} chunks -> {chunks_path}")
     return 0
 
 

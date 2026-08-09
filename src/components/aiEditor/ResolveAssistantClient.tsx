@@ -357,7 +357,7 @@ export function ResolveAssistantClient() {
 
       <PageHeader
         title="Resolve assistant"
-        subtitle="Chat about DaVinci Resolve. Answers use your official Reference Manual — with steps and zoomable page images."
+        subtitle="Detailed how-tos from your official Reference Manual — fuller steps, tips, and zoomable page images."
       />
 
       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm">
@@ -453,7 +453,7 @@ export function ResolveAssistantClient() {
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-800">
                       Do this in Resolve
                     </p>
-                    <ol className="mt-2 space-y-1.5">
+                    <ol className="mt-2 space-y-2">
                       {m.result.steps.map((step, i) => (
                         <li key={`${m.id}-s${i}`} className="flex gap-2 text-sm text-slate-800">
                           <span className="font-semibold text-sky-700">{i + 1}.</span>
@@ -461,6 +461,19 @@ export function ResolveAssistantClient() {
                         </li>
                       ))}
                     </ol>
+                  </div>
+                ) : null}
+
+                {m.result?.tips?.length ? (
+                  <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900">
+                      Tips from the manual
+                    </p>
+                    <ul className="mt-2 list-disc space-y-1.5 pl-4 text-sm text-slate-800">
+                      {m.result.tips.map((tip, i) => (
+                        <li key={`${m.id}-t${i}`}>{tip}</li>
+                      ))}
+                    </ul>
                   </div>
                 ) : null}
 

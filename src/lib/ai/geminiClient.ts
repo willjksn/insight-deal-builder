@@ -55,6 +55,20 @@ function shouldRetryWithVertexGemini(err: unknown): boolean {
   );
 }
 
+function extractGeminiCandidateText(
+  parts: Array<{ text?: string; thought?: boolean }> | undefined
+): string | undefined {
+  if (!parts?.length) return undefined;
+  const nonThought = parts
+    .filter((p) => !p.thought && typeof p.text === "string" && p.text.trim())
+    .map((p) => p.text!.trim());
+  if (nonThought.length) return nonThought.join("\n");
+  const anyText = parts
+    .filter((p) => typeof p.text === "string" && p.text.trim())
+    .map((p) => p.text!.trim());
+  return anyText.length ? anyText.join("\n") : undefined;
+}
+
 async function callGeminiApiKeyGenerate(params: {
   systemPrompt: string;
   userParts?: GeminiPart[];
@@ -63,6 +77,8 @@ async function callGeminiApiKeyGenerate(params: {
   model?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  /** Gemini 2.5 thinking budget. 0 disables thinking (recommended for JSON). */
+  thinkingBudget?: number;
 }): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
@@ -87,6 +103,9 @@ async function callGeminiApiKeyGenerate(params: {
         ...(params.json ? { responseMimeType: "application/json" } : {}),
         temperature: params.temperature ?? 0.4,
         ...(params.maxOutputTokens ? { maxOutputTokens: params.maxOutputTokens } : {}),
+        ...(typeof params.thinkingBudget === "number"
+          ? { thinkingConfig: { thinkingBudget: params.thinkingBudget } }
+          : {}),
       },
     }),
   });
@@ -98,7 +117,7 @@ async function callGeminiApiKeyGenerate(params: {
 
   const data = (await res.json()) as {
     candidates?: {
-      content?: { parts?: { text?: string }[] };
+      content?: { parts?: Array<{ text?: string; thought?: boolean }> };
       finishReason?: string;
     }[];
     usageMetadata?: {
@@ -108,7 +127,7 @@ async function callGeminiApiKeyGenerate(params: {
     };
   };
   const candidate = data.candidates?.[0];
-  const text = candidate?.content?.parts?.[0]?.text;
+  const text = extractGeminiCandidateText(candidate?.content?.parts);
   if (!text) throw new Error("Empty response from Gemini");
   // A truncated response (hit the output token cap) yields invalid JSON such as
   // "Unterminated string". Surface a clear, actionable error instead.
@@ -165,6 +184,7 @@ export async function callGeminiGenerate(params: {
   model?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  thinkingBudget?: number;
 }): Promise<string> {
   return withAiCallLogging(
     { provider: "gemini", op: "generate", model: geminiModel(params.model), meta: { json: Boolean(params.json) } },
@@ -180,6 +200,7 @@ async function callGeminiGenerateInner(params: {
   model?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  thinkingBudget?: number;
 }): Promise<string> {
   const model = geminiModel(params.model);
 
@@ -370,7 +391,12 @@ export async function callGeminiJson(
 export async function callGeminiJsonWithHistory(
   systemPrompt: string,
   history: GeminiChatTurn[],
-  options?: { model?: string; temperature?: number; maxOutputTokens?: number }
+  options?: {
+    model?: string;
+    temperature?: number;
+    maxOutputTokens?: number;
+    thinkingBudget?: number;
+  }
 ): Promise<unknown> {
   const text = await callGeminiGenerate({
     systemPrompt,
@@ -379,6 +405,7 @@ export async function callGeminiJsonWithHistory(
     model: options?.model,
     temperature: options?.temperature,
     maxOutputTokens: options?.maxOutputTokens,
+    thinkingBudget: options?.thinkingBudget,
   });
   return extractJson(text);
 }
