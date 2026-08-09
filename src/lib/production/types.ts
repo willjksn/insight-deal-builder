@@ -85,6 +85,8 @@ export interface ProductionDayShot {
   sceneHeading?: string;
   done: boolean;
   scoutShotNumber?: number;
+  /** Stable Content Plan shot id when seeded from Content Plan director. */
+  contentPlanShotId?: string;
   /** Freeform / legacy notes; structured fields preferred when present. */
   notes?: string;
   sortOrder: number;

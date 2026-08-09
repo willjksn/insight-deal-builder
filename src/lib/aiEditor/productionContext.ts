@@ -58,7 +58,13 @@ export function buildProductionContext(input: {
         camera: shot.cameraBody,
         lens: shot.lens,
         movement: shot.cameraMovement,
-        description: shot.description || shot.notes,
+        description: [shot.description, shot.subjectAction, shot.notes, shot.editNote]
+          .filter(Boolean)
+          .join(" · ") || undefined,
+        scoutShotNumber: shot.scoutShotNumber,
+        contentPlanShotId: shot.contentPlanShotId,
+        subjectAction: shot.subjectAction,
+        editNote: shot.editNote,
         hasFrame: Boolean(shot.referenceImageUrl),
       });
     }

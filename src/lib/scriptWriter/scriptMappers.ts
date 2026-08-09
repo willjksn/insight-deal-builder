@@ -101,6 +101,9 @@ function scriptShotToProduction(
     ...(shot.assignedProps?.length ? { assignedProps: shot.assignedProps } : {}),
     ...(optionalTrim(shot.dollyMoveRef) ? { dollyMoveRef: optionalTrim(shot.dollyMoveRef) } : {}),
     ...(optionalTrim(shot.editNote) ? { editNote: optionalTrim(shot.editNote) } : {}),
+    ...(optionalTrim(shot.contentPlanShotId)
+      ? { contentPlanShotId: optionalTrim(shot.contentPlanShotId) }
+      : {}),
   };
   const notes = shotListNotesBlock(shot);
   if (notes) entry.notes = notes;
@@ -206,6 +209,8 @@ export function mergeProductionShotsFromScript(
       audioCue: prefer(prev.audioCue, next.audioCue),
       label: prefer(prev.label, next.label) ?? next.label,
       notes: prefer(prev.notes, next.notes),
+      contentPlanShotId: prefer(prev.contentPlanShotId, next.contentPlanShotId),
+      editNote: prefer(prev.editNote, next.editNote),
     };
   });
   // Keep leftover numbered shots that have frames or were marked done

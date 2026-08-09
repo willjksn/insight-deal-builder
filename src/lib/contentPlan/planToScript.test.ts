@@ -85,6 +85,7 @@ describe("contentPlanToScriptDocument", () => {
     expect(script.title).toBe("The First Sip");
     expect(script.suggestedShots).toHaveLength(1);
     expect(script.suggestedShots[0]?.shotName).toBe("Approach");
+    expect(script.suggestedShots[0]?.contentPlanShotId).toBe("shot_01");
     expect(script.scenes[0]?.dialogue[0]?.line).toContain("exactly what I needed");
     expect(script.fountain).toContain("STORMI");
   });

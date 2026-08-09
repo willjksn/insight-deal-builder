@@ -82,6 +82,7 @@ import {
   storageTypeLabel,
 } from "@/lib/aiEditor/storageDrives";
 import { buildManagedMediaRoot } from "@/lib/aiEditor/mediaPathBuilder";
+import { planPreferredTakeRenames } from "@/lib/aiEditor/shotListClipNames";
 import {
   buildGuidedWorkspaceFromDrive,
   pickBestCameraSource,
@@ -2021,6 +2022,67 @@ export function AiEditorClient({ projectId }: Props) {
       setJobs((prev) => [res.job, ...prev]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not set preferred take");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onRenamePreferredFromShotList() {
+    if (!coverage?.shots?.some((s) => s.preferredMediaAssetId)) {
+      setError("Match clips and set preferred takes first.");
+      return;
+    }
+    const planned = planPreferredTakeRenames({ coverage, context, media });
+    if (!planned.length) {
+      setStatusNote("Preferred takes already use shot-list names (or none to rename).");
+      return;
+    }
+    const preview = planned
+      .slice(0, 6)
+      .map((p) => `${p.fromFilename} → ${p.filename}`)
+      .join("\n");
+    const more = planned.length > 6 ? `\n…and ${planned.length - 6} more` : "";
+    const ok = window.confirm(
+      `Rename ${planned.length} preferred take(s) in ShootSpine to match the shot list?\n\n` +
+        `This updates display names only — camera files on disk stay as-is.\n` +
+        `Original camera names are kept as originalFilename.\n\n${preview}${more}`
+    );
+    if (!ok) return;
+
+    setBusy("match");
+    setError(null);
+    setStatusNote(null);
+    try {
+      const patches = planned.map((p) => ({
+        id: p.id,
+        filename: p.filename,
+        clipName: p.clipName,
+        originalFilename: p.originalFilename,
+      }));
+      await aiEditorPatchMedia(getToken, projectId, patches);
+      const byId = new Map(patches.map((p) => [p.id, p]));
+      setMedia((prev) =>
+        prev.map((m) => {
+          const patch = byId.get(m.id);
+          return patch
+            ? {
+                ...m,
+                filename: patch.filename,
+                clipName: patch.clipName,
+                originalFilename: patch.originalFilename || m.originalFilename,
+              }
+            : m;
+        })
+      );
+      setStatusNote(
+        `Renamed ${patches.length} preferred take(s) from the shot list (display names only).`
+      );
+      // Refresh coverage so Preferred labels show the new names.
+      const res = await aiEditorRunMatch(getToken, projectId, coverage.overrides);
+      setCoverage(res.coverage);
+      setJobs((prev) => [res.job, ...prev]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not rename preferred takes");
     } finally {
       setBusy(null);
     }
@@ -4783,14 +4845,33 @@ export function AiEditorClient({ projectId }: Props) {
               </p>
             )}
 
-            <Button onClick={() => void onRunMatch()} disabled={!!busy || !media.length}>
-              {busy === "match" ? (
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-              ) : (
-                <Clapperboard className="mr-1.5 h-4 w-4" />
-              )}
-              {coverage ? "Re-run matching" : "Match clips to shot list"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => void onRunMatch()} disabled={!!busy || !media.length}>
+                {busy === "match" ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Clapperboard className="mr-1.5 h-4 w-4" />
+                )}
+                {coverage ? "Re-run matching" : "Match clips to shot list"}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void onRenamePreferredFromShotList()}
+                disabled={
+                  !!busy ||
+                  !coverage?.shots?.some((s) => s.preferredMediaAssetId) ||
+                  !context?.shots?.length
+                }
+              >
+                <Pencil className="mr-1.5 h-4 w-4" />
+                Rename preferred from shot list
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Rename updates ShootSpine display names to{" "}
+              <span className="font-mono text-[11px]">shot_01_Approach</span> style for matching and
+              Resolve — files on disk stay as the camera originals.
+            </p>
 
             {coverage?.notes?.length ? (
               <p className="text-xs text-slate-500">{coverage.notes.join(" ")}</p>

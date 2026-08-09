@@ -71,6 +71,7 @@ function contentShotToSuggested(shot: ContentShot): ScriptSuggestedShot {
         ? "tripod"
         : undefined,
     editNote: editNote || undefined,
+    contentPlanShotId: shot.id || undefined,
   };
 }
 

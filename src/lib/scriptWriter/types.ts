@@ -125,6 +125,8 @@ export interface ScriptSuggestedShot {
   dollyMoveRef?: string;
   /** Post/edit note for this shot (selects, speed ramp, sound cue). */
   editNote?: string;
+  /** Stable Content Plan shot id when this row came from a content plan. */
+  contentPlanShotId?: string;
 }
 
 /** One storyboard panel per scene — hero frame for grid view / client PDF. */

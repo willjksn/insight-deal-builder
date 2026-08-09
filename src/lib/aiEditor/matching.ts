@@ -120,6 +120,53 @@ function clipTextBlob(media: MediaAsset): string {
     .join(" ");
 }
 
+/**
+ * Score filename/path hints for content-plan / scout shot numbers.
+ * Prefers explicit `shot_01` / slate-like segments over bare digits.
+ */
+export function scoreShotNumberInClipText(
+  clipText: string,
+  shotNumber?: number,
+  contentPlanShotId?: string
+): { score: number; reason?: string } {
+  const lower = clipText.toLowerCase();
+  const id = contentPlanShotId?.trim().toLowerCase();
+  if (id && lower.includes(id)) {
+    return { score: 0.36, reason: `Content plan id ${contentPlanShotId}` };
+  }
+  if (shotNumber == null || !Number.isFinite(shotNumber)) return { score: 0 };
+  const n = Math.trunc(shotNumber);
+  if (n < 1 || n > 999) return { score: 0 };
+  const padded = String(n).padStart(2, "0");
+
+  if (
+    lower.includes(`_${padded}_`) ||
+    lower.includes(`-${padded}-`) ||
+    lower.includes(`/${padded}/`) ||
+    lower.includes(`_${padded}.`) ||
+    lower.includes(`-${padded}.`)
+  ) {
+    return { score: 0.3, reason: `Shot ${padded} in path` };
+  }
+
+  const patterns: { re: RegExp; score: number; reason: string }[] = [
+    {
+      re: new RegExp(`(?:^|[^a-z0-9])shot[_\\s-]*0*${n}(?:[^a-z0-9]|$)`, "i"),
+      score: 0.32,
+      reason: `Shot ${n} in filename`,
+    },
+    {
+      re: new RegExp(`(?:^|[^a-z0-9])s[_]?0*${n}(?:[^a-z0-9]|$)`, "i"),
+      score: 0.26,
+      reason: `S${padded} in filename`,
+    },
+  ];
+  for (const p of patterns) {
+    if (p.re.test(lower)) return { score: p.score, reason: p.reason };
+  }
+  return { score: 0 };
+}
+
 function dialogueForShot(
   shot: ProductionContextShot,
   dialogueByScene: Map<string, MatchDialogueLine[]>
@@ -153,9 +200,22 @@ export function scoreClipAgainstShot(input: {
   const reasons: string[] = [];
   let score = 0;
 
-  const clipTokens = tokenize(clipTextBlob(media));
+  const clipBlob = clipTextBlob(media);
+  const clipTokens = tokenize(clipBlob);
   const shotTokens = tokenize(
-    [shot.shotName, shot.scene, shot.shotType, shot.description, shot.camera].filter(Boolean).join(" ")
+    [
+      shot.shotName,
+      shot.scene,
+      shot.shotType,
+      shot.description,
+      shot.subjectAction,
+      shot.editNote,
+      shot.camera,
+      shot.contentPlanShotId,
+      shot.scoutShotNumber != null ? `shot ${shot.scoutShotNumber}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ")
   );
   const tokenScore = jaccard(clipTokens, shotTokens);
   if (tokenScore > 0) {
@@ -164,11 +224,38 @@ export function scoreClipAgainstShot(input: {
     reasons.push(`Name/path overlap ${(tokenScore * 100).toFixed(0)}%`);
   }
 
+  const nameTokens = tokenize(shot.shotName);
+  if (nameTokens.length) {
+    const nameHits = nameTokens.filter((t) => clipTokens.includes(t));
+    if (nameHits.length) {
+      const w = Math.min(0.25, nameHits.length * 0.1);
+      score += w;
+      reasons.push(`Shot name: ${nameHits.join(", ")}`);
+    }
+  }
+
+  const numberHit = scoreShotNumberInClipText(
+    clipBlob,
+    shot.scoutShotNumber,
+    shot.contentPlanShotId
+  );
+  if (numberHit.score > 0) {
+    score += numberHit.score;
+    if (numberHit.reason) reasons.push(numberHit.reason);
+  }
+
   const sceneToks = sceneNumberTokens(shot.scene);
-  const clipLower = clipTextBlob(media).toLowerCase();
+  const clipLower = clipBlob.toLowerCase();
   for (const sn of sceneToks) {
-    if (clipLower.includes(sn) || clipLower.includes(`sc${sn}`) || clipLower.includes(`scene${sn}`)) {
-      score += 0.2;
+    // Scene "1" is common on content-plan boards — only boost when filename looks like a scene tag.
+    const isGenericOne = sn === "1";
+    const sceneTagged =
+      clipLower.includes(`sc${sn}`) ||
+      clipLower.includes(`scene${sn}`) ||
+      clipLower.includes(`scene_${sn}`) ||
+      clipLower.includes(`sc_${sn}`);
+    if ((!isGenericOne && clipLower.includes(sn)) || sceneTagged) {
+      score += isGenericOne ? 0.1 : 0.2;
       reasons.push(`Scene ${sn} in filename`);
       break;
     }

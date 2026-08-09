@@ -74,6 +74,10 @@ export function mergeShotPreserveManual(
     editNote: preferExistingText(existing.editNote, incoming.editNote),
     duration: preferExistingText(existing.duration, incoming.duration),
     sceneHeading: preferExistingText(existing.sceneHeading, incoming.sceneHeading),
+    contentPlanShotId:
+      existing.contentPlanShotId?.trim() ||
+      incoming.contentPlanShotId?.trim() ||
+      undefined,
     // If user framed manually, keep their label when present
     label: preferManualFields
       ? preferExistingText(existing.label, incoming.label) ?? incoming.label

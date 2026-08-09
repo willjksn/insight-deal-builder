@@ -187,6 +187,12 @@ export interface ProductionContextShot {
   lens?: string;
   movement?: string;
   description?: string;
+  /** Board scout / content-plan shot number for filename matching. */
+  scoutShotNumber?: number;
+  /** Stable Content Plan shot id when present. */
+  contentPlanShotId?: string;
+  subjectAction?: string;
+  editNote?: string;
   hasFrame: boolean;
 }
 

@@ -5,6 +5,7 @@ import {
   jaccard,
   normalizeShotSize,
   scoreClipAgainstShot,
+  scoreShotNumberInClipText,
   tokenize,
 } from "@/lib/aiEditor/matching";
 import type { MediaAsset, ProductionContext } from "@/lib/aiEditor/types";
@@ -35,6 +36,34 @@ describe("aiEditor matching", () => {
     expect(normalizeShotSize("CU")).toBe("close_up");
     expect(normalizeShotSize("Wide Shot")).toBe("wide");
     expect(normalizeShotSize("MCU")).toBe("medium");
+  });
+
+  it("scores content-plan shot numbers and ids in filenames", () => {
+    expect(scoreShotNumberInClipText("C001_shot_01_Approach.mp4", 1, "shot_01").score).toBeGreaterThan(
+      0.3
+    );
+    expect(scoreShotNumberInClipText("reel/S02_product.mp4", 2).reason).toMatch(/S02|Shot 2/i);
+    expect(scoreShotNumberInClipText("random_bts.mp4", 1).score).toBe(0);
+
+    const m = media({
+      id: "m-cp",
+      filename: "shot_01_Approach_camA.mp4",
+      durationSeconds: 4,
+    });
+    const { score, reasons } = scoreClipAgainstShot({
+      media: m,
+      shot: {
+        id: "board-uuid",
+        scene: "1",
+        shotName: "Approach",
+        shotType: "MS",
+        scoutShotNumber: 1,
+        contentPlanShotId: "shot_01",
+        hasFrame: false,
+      },
+    });
+    expect(score).toBeGreaterThan(0.35);
+    expect(reasons.some((r) => /shot|approach|content plan/i.test(r))).toBe(true);
   });
 
   it("scores filename scene + dialogue overlap", () => {
