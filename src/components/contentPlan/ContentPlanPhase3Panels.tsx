@@ -454,9 +454,12 @@ const DEFAULT_COVERAGE_CHECKS = ["Master", "CU", "Insert", "Safety"];
 export function ShootModePanel({
   plan,
   onUpdateShots,
+  largeControls = false,
 }: {
   plan: ContentPlan;
   onUpdateShots: (shots: ContentShot[]) => void;
+  /** Bigger touch targets for the dedicated on-set Shoot Mode page. */
+  largeControls?: boolean;
 }) {
   const orderedIds =
     plan.shootOrderPlan?.shootOrder?.map((s) => s.shotId) ||
@@ -608,7 +611,8 @@ export function ShootModePanel({
         <Button
           type="button"
           variant="secondary"
-          size="sm"
+          size={largeControls ? "touch" : "sm"}
+          className={largeControls ? "flex-1" : undefined}
           disabled={index <= 0}
           onClick={() => setIndex((i) => Math.max(0, i - 1))}
         >
@@ -617,7 +621,8 @@ export function ShootModePanel({
         </Button>
         <Button
           type="button"
-          size="sm"
+          size={largeControls ? "touch" : "sm"}
+          className={largeControls ? "flex-1" : undefined}
           disabled={index >= list.length - 1}
           onClick={() => setIndex((i) => Math.min(list.length - 1, i + 1))}
         >

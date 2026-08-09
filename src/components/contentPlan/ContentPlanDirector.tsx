@@ -1536,13 +1536,26 @@ export function ContentPlanDirector({ getToken }: Props) {
               />
             ) : null}
             {section === "davinci" ? (
-              <ShootModePanel
-                plan={plan}
-                onUpdateShots={(shots) => {
-                  setPlan((p) => (p ? { ...p, shots } : p));
-                  void updateContentPlan(getToken, plan.id, { shots });
-                }}
-              />
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2.5">
+                  <p className="text-sm text-slate-700">
+                    Open full-screen Shoot Mode on your phone or iPad for on-set tracking.
+                  </p>
+                  <Link
+                    href={`/content-plans/${plan.id}/shoot`}
+                    className="inline-flex items-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                  >
+                    Open Shoot Mode
+                  </Link>
+                </div>
+                <ShootModePanel
+                  plan={plan}
+                  onUpdateShots={(shots) => {
+                    setPlan((p) => (p ? { ...p, shots } : p));
+                    void updateContentPlan(getToken, plan.id, { shots });
+                  }}
+                />
+              </div>
             ) : null}
           </main>
         </div>
