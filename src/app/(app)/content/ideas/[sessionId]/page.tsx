@@ -106,7 +106,7 @@ export default function IdeaSessionPage() {
         );
         return { ...prev, ideas };
       });
-      router.push(`/reel-prompts?planId=${encodeURIComponent(plan.id)}`);
+      router.push(`/content-plans/${encodeURIComponent(plan.id)}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open Content plan");
       setDevelopingId(null);

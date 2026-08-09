@@ -205,10 +205,11 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       { href: "/script-writer", label: "Script writer", icon: ScrollText, canAccess: canUseProductionTools },
       {
-        href: "/reel-prompts",
+        href: "/content-plans",
         label: "Content plan",
         icon: Clapperboard,
         canAccess: canUseProductionTools,
+        activePrefixes: ["/content-plans", "/reel-prompts"],
       },
       { href: "/stage", label: "Stage planner", icon: LayoutGrid, canAccess: canUseProductionTools },
       { href: "/reference", label: "Reference guide", icon: BookOpen, canAccess: canUseProductionTools },

@@ -47,7 +47,7 @@ export function IdeaCard({
         )}
         <div className="mt-auto flex flex-wrap gap-2 pt-2">
           {idea.contentPlanId ? (
-            <Link href={`/reel-prompts?planId=${encodeURIComponent(idea.contentPlanId)}`}>
+            <Link href={`/content-plans/${encodeURIComponent(idea.contentPlanId)}`}>
               <Button size="sm" variant="secondary">
                 <Clapperboard className="mr-1 h-4 w-4" />
                 Open Content plan

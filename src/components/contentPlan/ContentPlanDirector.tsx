@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   Check,
   ChevronDown,
   ChevronRight,
@@ -85,6 +87,8 @@ type Props = {
   getToken: GetToken;
   /** Deep-link from Weekly Idea Engine / bookmarks. */
   initialPlanId?: string | null;
+  /** When true, omit the inline saved-plans list (library lives at /content-plans). */
+  hideSavedPlans?: boolean;
 };
 
 const SECTIONS: { id: ContentPlanSection; label: string; ready: boolean }[] = [
@@ -485,7 +489,12 @@ function Block({ title, body }: { title: string; body?: string }) {
   );
 }
 
-export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
+export function ContentPlanDirector({
+  getToken,
+  initialPlanId,
+  hideSavedPlans = false,
+}: Props) {
+  const router = useRouter();
   const { user, appUser } = useAuth();
   const { projects, loading: projectsLoading } = useAccessibleProjects();
   const {
@@ -524,10 +533,11 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
   }, [plan?.id, plan?.title, plan?.creativeBrief?.workingTitle]);
 
   useEffect(() => {
+    if (hideSavedPlans) return;
     void listContentPlans(getToken)
       .then(({ plans }) => setSavedPlans(plans))
       .catch(() => undefined);
-  }, [getToken]);
+  }, [getToken, hideSavedPlans]);
 
   useEffect(() => {
     if (!initialPlanId) return;
@@ -629,6 +639,7 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
     setError(null);
     try {
       let current = plan;
+      let createdNew = false;
       if (!current) {
         const created = await createContentPlan(getToken, {
           inputs,
@@ -636,6 +647,7 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
         });
         current = created.plan;
         setPlan(current);
+        createdNew = true;
       } else {
         const updated = await updateContentPlan(getToken, current.id, { inputs });
         current = updated.plan;
@@ -645,8 +657,12 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
       setPlan(generated.plan);
       setSection("brief");
       setStep(4);
-      const listed = await listContentPlans(getToken);
-      setSavedPlans(listed.plans);
+      if (createdNew) {
+        router.replace(`/content-plans/${current.id}`);
+      } else if (!hideSavedPlans) {
+        const listed = await listContentPlans(getToken);
+        setSavedPlans(listed.plans);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
@@ -826,13 +842,16 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
     setError(null);
     try {
       const { plan: next } = await cloneContentPlan(getToken, id);
-      const listed = await listContentPlans(getToken);
-      setSavedPlans(listed.plans);
+      if (!hideSavedPlans) {
+        const listed = await listContentPlans(getToken);
+        setSavedPlans(listed.plans);
+      }
       setPlan(next);
       setInputs(defaultContentPlanInputs(next.inputs));
       setProjectLinks(null);
       setStep(4);
       setSection("brief");
+      router.push(`/content-plans/${next.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not duplicate plan");
     } finally {
@@ -854,9 +873,15 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
         setProjectLinks(null);
         setStep(1);
         setInputs(defaultContentPlanInputs());
+        if (hideSavedPlans) {
+          router.push("/content-plans");
+          return;
+        }
       }
-      const listed = await listContentPlans(getToken);
-      setSavedPlans(listed.plans);
+      if (!hideSavedPlans) {
+        const listed = await listContentPlans(getToken);
+        setSavedPlans(listed.plans);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not delete plan");
     } finally {
@@ -866,6 +891,43 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
 
   return (
     <div className="space-y-4">
+      {hideSavedPlans ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Link
+            href="/content-plans"
+            className="inline-flex items-center text-sm font-medium text-sky-800 hover:underline"
+          >
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            All content plans
+          </Link>
+          {plan ? (
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void onClonePlan(plan.id)}
+                title="Duplicate plan"
+              >
+                <Copy className="mr-1 h-3.5 w-3.5" />
+                Duplicate
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void onDeletePlan(plan.id, plan.title)}
+                title="Delete plan"
+              >
+                <Trash2 className="mr-1 h-3.5 w-3.5" />
+                Delete
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
         <div className="flex items-start gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
@@ -1820,9 +1882,17 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
         </div>
       ) : null}
 
-      {savedPlans.length ? (
+      {!hideSavedPlans && savedPlans.length ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h4 className="text-sm font-semibold text-slate-900">Saved plans</h4>
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold text-slate-900">Saved plans</h4>
+            <Link
+              href="/content-plans"
+              className="text-xs font-medium text-sky-800 hover:underline"
+            >
+              View all
+            </Link>
+          </div>
           <ul className="mt-2 divide-y divide-slate-100">
             {savedPlans.slice(0, 8).map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-3 py-2">
@@ -1835,15 +1905,11 @@ export function ContentPlanDirector({ getToken, initialPlanId }: Props) {
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={() => void loadPlan(p.id)}
-                  >
-                    Open
-                  </Button>
+                  <Link href={`/content-plans/${p.id}`}>
+                    <Button type="button" size="sm" variant="secondary" disabled={busy}>
+                      Open
+                    </Button>
+                  </Link>
                   <Button
                     type="button"
                     size="sm"

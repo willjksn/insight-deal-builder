@@ -88,7 +88,7 @@ describe("getVisibleNavGroups", () => {
     const hrefs = itemHrefs(imgAdmin, "production");
     expect(hrefs).toContain("/ai-editor");
     expect(hrefs).toContain("/ai-editor/resolve-assistant");
-    expect(hrefs).toContain("/reel-prompts");
+    expect(hrefs).toContain("/content-plans");
   });
 
   it("drops empty groups (Content development is flagged off by default)", () => {

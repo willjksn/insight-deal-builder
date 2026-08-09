@@ -124,7 +124,7 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
           {error}
         </p>
         <Link
-          href="/reel-prompts"
+          href={`/content-plans/${planId}`}
           className="mt-4 inline-flex items-center text-sm font-medium text-sky-800 hover:underline"
         >
           <ArrowLeft className="mr-1.5 h-4 w-4" />
@@ -144,7 +144,7 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <Link
-            href="/reel-prompts"
+            href={`/content-plans/${plan.id}`}
             className="inline-flex items-center text-sm font-medium text-sky-800 hover:underline"
           >
             <ArrowLeft className="mr-1.5 h-4 w-4" />
