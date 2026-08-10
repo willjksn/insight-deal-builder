@@ -12,6 +12,8 @@ import {
   type AgentCopyVerifiedBatchFile,
   type AgentCopyVerifiedBatchResponse,
   type AgentFsRevealResponse,
+  type AgentFetchUrlRequest,
+  type AgentFetchUrlResponse,
   type AgentIngestCopyRequest,
   type AgentIngestCopyResponse,
   type AgentResolveDetectResponse,
@@ -251,6 +253,18 @@ export async function agentSafeDelete(
   }
 ) {
   return agentFetch<AgentSafeDeleteResponse>(baseUrl, token, "/media/safe-delete", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Download a staged phone-upload URL onto a local project path. */
+export async function agentFetchUrl(
+  baseUrl: string,
+  token: string,
+  body: AgentFetchUrlRequest
+) {
+  return agentFetch<AgentFetchUrlResponse>(baseUrl, token, "/media/fetch-url", {
     method: "POST",
     body: JSON.stringify(body),
   });

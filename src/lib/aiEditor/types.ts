@@ -12,7 +12,14 @@ export type StorageType =
   | "unknown";
 
 export type MediaOnlineStatus = "online" | "offline" | "unknown";
-export type MediaIngestStatus = "indexed" | "copying" | "verified" | "failed" | "in_place";
+export type MediaIngestStatus =
+  | "indexed"
+  | "copying"
+  | "verified"
+  | "failed"
+  | "in_place"
+  /** Uploaded from phone/browser; waiting to be pulled onto the edit PC. */
+  | "phone_upload";
 export type MediaAnalysisStatus = "none" | "queued" | "running" | "complete" | "failed";
 export type MediaType = "video" | "audio" | "image" | "other";
 
@@ -146,6 +153,10 @@ export interface MediaAsset {
   currentPath?: string;
   archivePath?: string;
   proxyPath?: string;
+  /** Firebase Storage object path for phone / browser uploads (temporary cloud staging). */
+  cloudStoragePath?: string;
+  /** Download URL used by Desktop Agent to pull the file onto the edit drive. */
+  cloudStorageUrl?: string;
   storageLocationId?: string;
   volumeIdentifier?: string;
   cameraAssignment?: string;

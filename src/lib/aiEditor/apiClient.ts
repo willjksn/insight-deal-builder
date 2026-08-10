@@ -612,6 +612,28 @@ export async function aiEditorIndexMedia(
   return parseJson<{ media: MediaAsset[]; job: AiEditorJob }>(res);
 }
 
+/** Register clips already uploaded to Firebase Storage (phone / browser). */
+export async function aiEditorRegisterPhoneIngest(
+  getToken: GetToken,
+  projectId: string,
+  body: {
+    files: Array<{
+      filename: string;
+      sizeBytes?: number;
+      cloudStoragePath: string;
+      cloudStorageUrl: string;
+      extension?: string;
+    }>;
+  }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/phone-ingest`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ media: MediaAsset[] }>(res);
+}
+
 export async function aiEditorCreateFoldersJob(
   getToken: GetToken,
   projectId: string,

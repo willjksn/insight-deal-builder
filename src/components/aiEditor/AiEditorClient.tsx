@@ -21,6 +21,7 @@ import {
 import { FolderPicker } from "@/components/aiEditor/FolderPicker";
 import { CameraLabelPicker } from "@/components/aiEditor/CameraLabelPicker";
 import { GuidedFootagePanel } from "@/components/aiEditor/GuidedFootagePanel";
+import { PhoneIngestPanel } from "@/components/aiEditor/PhoneIngestPanel";
 import {
   ManagedIngestReview,
   type ManagedIngestOptions,
@@ -42,6 +43,7 @@ import {
   agentCreateFolders,
   agentCreateProxy,
   agentDetectSources,
+  agentFetchUrl,
   agentIndexFolder,
   agentIngestCopy,
   agentMediaStreamUrl,
@@ -97,6 +99,7 @@ import {
   assessAgentVersion,
   isAgentVersionAtLeast,
   MIN_DESKTOP_AGENT_VERSION,
+  MIN_PHONE_FETCH_AGENT_VERSION,
   MIN_PROJECT_FOLDER_RENAME_AGENT_VERSION,
   MIN_RESOLVE_LAUNCH_AGENT_VERSION,
 } from "@/lib/aiEditor/agentVersion";
@@ -150,6 +153,7 @@ import {
   aiEditorLogManagedIngest,
   aiEditorLogResolveOpen,
   aiEditorMintAgentSession,
+  aiEditorRegisterPhoneIngest,
   aiEditorRenameSession,
   aiEditorPatchMedia,
   aiEditorRunMatch,
@@ -357,6 +361,7 @@ export function AiEditorClient({ projectId }: Props) {
   const [editingProjectName, setEditingProjectName] = useState(false);
   /** Guided Steps 2–3; advanced folder pickers stay collapsed. */
   const [showAdvancedFootage, setShowAdvancedFootage] = useState(false);
+  const [busyPhonePull, setBusyPhonePull] = useState(false);
   /** User override for guided destination drive root (e.g. H:\). */
   const [guidedDriveRoot, setGuidedDriveRoot] = useState<string | null>(null);
   const [projectNameDraft, setProjectNameDraft] = useState("");
@@ -758,6 +763,16 @@ export function AiEditorClient({ projectId }: Props) {
   const step7Done = Boolean(timeline && timeline.tracks.some((t) => t.clips.length));
   const step8Done = Boolean(timeline && timeline.version > 1);
   const step9Done = Boolean(timeline?.finishing);
+  const pendingPhoneMedia = useMemo(
+    () =>
+      media.filter(
+        (m) =>
+          m.ingestStatus === "phone_upload" &&
+          Boolean(m.cloudStorageUrl?.trim()) &&
+          !m.currentPath?.trim()
+      ),
+    [media]
+  );
   const liveProjectRoot = useMemo(() => {
     const mediaRoot = inferManagedProjectRootFromMedia(media);
     return resolveLiveProjectRoot({
@@ -1697,6 +1712,80 @@ export function AiEditorClient({ projectId }: Props) {
       setProgress(null);
       setBatchStopping(false);
       copyAbortRef.current = null;
+    }
+  }
+
+  async function pullPhoneUploadsToEditPc() {
+    const projectRoot = (liveProjectRoot || settings?.projectRootPath || storagePath || "").trim();
+    if (!projectRoot) {
+      setError("Save a project workspace folder first, then pull phone clips.");
+      return;
+    }
+    if (!agent.connected) {
+      setError("Connect this computer (Desktop Agent) to pull phone clips onto your edit drive.");
+      return;
+    }
+    if (!isAgentVersionAtLeast(agent.version, MIN_PHONE_FETCH_AGENT_VERSION)) {
+      setError(
+        `Update Desktop Agent to ${MIN_PHONE_FETCH_AGENT_VERSION}+ to pull phone uploads (you have ${agent.version || "unknown"}).`
+      );
+      return;
+    }
+    if (!pendingPhoneMedia.length) {
+      setStatusNote("No phone uploads waiting to pull.");
+      return;
+    }
+
+    setBusyPhonePull(true);
+    setError(null);
+    try {
+      const token = await ensureAgentSession();
+      const sep = projectRoot.includes("/") && !projectRoot.includes("\\") ? "/" : "\\";
+      const phoneDir = [projectRoot.replace(/[/\\]+$/, ""), "01_ORIGINAL_MEDIA", "PHONE"].join(
+        sep
+      );
+      const patches: Array<{ id: string } & Partial<MediaAsset>> = [];
+
+      for (const asset of pendingPhoneMedia) {
+        const url = asset.cloudStorageUrl?.trim();
+        if (!url) continue;
+        const baseName = (asset.filename || "phone-clip.mp4").replace(/[<>:"/\\|?*\u0000-\u001f]+/g, "_");
+        const destName = `${asset.id.slice(0, 8)}_${baseName}`;
+        const destPath = `${phoneDir}${sep}${destName}`;
+        const fetched = await agentFetchUrl(DEFAULT_AGENT_BASE_URL, token, {
+          url,
+          destPath,
+        });
+        patches.push({
+          id: asset.id,
+          currentPath: fetched.destPath,
+          relativeProjectPath: `01_ORIGINAL_MEDIA/PHONE/${destName}`,
+          sizeBytes: fetched.sizeBytes,
+          checksum: fetched.checksum,
+          checksumAlgorithm: "sha256",
+          ingestStatus: "verified",
+          onlineStatus: "online",
+          verifiedCopyCount: 1,
+          cameraAssignment: "PHONE",
+        });
+      }
+
+      if (patches.length) {
+        await aiEditorPatchMedia(getToken, projectId, patches);
+        setMedia((prev) =>
+          prev.map((m) => {
+            const p = patches.find((x) => x.id === m.id);
+            return p ? { ...m, ...p, updatedAt: new Date().toISOString() } : m;
+          })
+        );
+      }
+      setStatusNote(
+        `Pulled ${patches.length} phone clip${patches.length === 1 ? "" : "s"} into 01_ORIGINAL_MEDIA/PHONE. Ready for Match / rough cut.`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not pull phone uploads");
+    } finally {
+      setBusyPhonePull(false);
     }
   }
 
@@ -5649,13 +5738,54 @@ export function AiEditorClient({ projectId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Get footage in</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Plug in the camera card and your SSD. ShootSpine chooses where files go — nothing
-                uploads to the cloud.
+                Plug in the camera card and your SSD for cinema footage (stays on your drives). Or
+                upload phone clips below — those stage in the cloud briefly, then pull onto the edit
+                PC.
               </p>
             </div>
           </div>
 
           <div className="pl-10 space-y-4">
+            <PhoneIngestPanel
+              userId={user?.uid ?? null}
+              projectId={projectId}
+              pendingPhoneMedia={pendingPhoneMedia}
+              agentConnected={agent.connected}
+              canPull={
+                pendingPhoneMedia.length > 0 &&
+                agent.connected &&
+                Boolean((liveProjectRoot || settings?.projectRootPath || storagePath || "").trim()) &&
+                isAgentVersionAtLeast(agent.version, MIN_PHONE_FETCH_AGENT_VERSION)
+              }
+              pullBlockedReason={
+                !pendingPhoneMedia.length
+                  ? null
+                  : !agent.connected
+                    ? "Connect Desktop Agent on the edit PC to pull."
+                    : !(liveProjectRoot || settings?.projectRootPath || storagePath || "").trim()
+                      ? "Save a workspace folder first."
+                      : !isAgentVersionAtLeast(agent.version, MIN_PHONE_FETCH_AGENT_VERSION)
+                        ? `Update Desktop Agent to ${MIN_PHONE_FETCH_AGENT_VERSION}+.`
+                        : null
+              }
+              busyPulling={busyPhonePull}
+              onRegister={async (files) => {
+                const res = await aiEditorRegisterPhoneIngest(getToken, projectId, { files });
+                return res.media;
+              }}
+              onUploaded={(assets) => {
+                if (!assets.length) return;
+                setMedia((prev) => {
+                  const ids = new Set(prev.map((m) => m.id));
+                  return [...prev, ...assets.filter((a) => !ids.has(a.id))];
+                });
+                setStatusNote(
+                  `Uploaded ${assets.length} phone clip${assets.length === 1 ? "" : "s"}. On the edit PC, press Pull to edit PC.`
+                );
+              }}
+              onPullToEditPc={() => void pullPhoneUploadsToEditPc()}
+            />
+
             <GuidedFootagePanel
               agentConnected={agent.connected}
               scanning={detectScanning}

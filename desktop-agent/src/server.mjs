@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.17.14";
+const VERSION = "0.17.15";
 /** Set SHOOTSPINE_AGENT_DEV_OPEN=1 to accept any non-empty Bearer token (local agent testing). */
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN === "1";
 /** Optional: ShootSpine origin for verifying minted tokens (e.g. http://localhost:3000). */
@@ -246,8 +246,75 @@ function buildFolderPlan(cameraLabels = ["CAMERA_A"]) {
     ...unique.map((c) => path.join("01_ORIGINAL_MEDIA", c)),
     path.join("01_ORIGINAL_MEDIA", "AUDIO"),
     path.join("01_ORIGINAL_MEDIA", "DRONE"),
+    path.join("01_ORIGINAL_MEDIA", "PHONE"),
     path.join("01_ORIGINAL_MEDIA", "OTHER"),
   ];
+}
+
+const PHONE_FETCH_MAX_BYTES = 500 * 1024 * 1024;
+
+/**
+ * Download a phone-upload staging URL onto the edit drive.
+ * HTTPS only; never deletes the remote object.
+ */
+async function fetchUrlToFile(body) {
+  const url = String(body?.url || "").trim();
+  const destPath = String(body?.destPath || "").trim();
+  if (!url) throw new Error("url is required");
+  if (!destPath) throw new Error("destPath is required");
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Invalid url");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("Only https download URLs are allowed");
+  }
+  const host = parsed.hostname.toLowerCase();
+  const allowedHost =
+    host === "firebasestorage.googleapis.com" ||
+    host.endsWith(".firebasestorage.app") ||
+    host.endsWith(".googleapis.com");
+  if (!allowedHost) {
+    throw new Error("Download host not allowed");
+  }
+
+  assertSafePath(destPath);
+  const dest = path.resolve(destPath);
+  await fs.mkdir(path.dirname(dest), { recursive: true });
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Download failed (${res.status})`);
+  }
+  const lenHeader = res.headers.get("content-length");
+  if (lenHeader && Number(lenHeader) > PHONE_FETCH_MAX_BYTES) {
+    throw new Error("Remote file exceeds 500 MB limit");
+  }
+
+  const { Readable } = await import("node:stream");
+  const { pipeline } = await import("node:stream/promises");
+  if (!res.body) throw new Error("Empty download body");
+  const nodeReadable = Readable.fromWeb(res.body);
+  let transferred = 0;
+  nodeReadable.on("data", (chunk) => {
+    transferred += chunk.length;
+    if (transferred > PHONE_FETCH_MAX_BYTES) {
+      nodeReadable.destroy(new Error("Download exceeded 500 MB limit"));
+    }
+  });
+  await pipeline(nodeReadable, fssync.createWriteStream(dest));
+
+  const st = await fs.stat(dest);
+  const checksum = await sha256File(dest);
+  return {
+    ok: true,
+    destPath: dest,
+    sizeBytes: st.size,
+    checksum,
+    checksumAlgorithm: "sha256",
+  };
 }
 
 async function createFolders(projectRoot, cameraLabels) {
@@ -3288,6 +3355,12 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const deleted = await safeDeleteFiles(body);
       return json(res, 200, deleted);
+    }
+
+    if (req.method === "POST" && pathname === "/v1/media/fetch-url") {
+      const body = await readBody(req);
+      const result = await fetchUrlToFile(body);
+      return json(res, 200, result);
     }
 
     if (req.method === "POST" && pathname === "/v1/media/ingest-copy") {

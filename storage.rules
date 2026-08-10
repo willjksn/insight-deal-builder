@@ -92,6 +92,15 @@ service firebase.storage {
         );
     }
 
+    // AI Editor phone / browser clips — staged briefly, then pulled to the edit PC
+    match /ai-editor/{userId}/{projectId}/phone/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 500 * 1024 * 1024
+        && request.resource.contentType.matches('video/.*');
+    }
+
     // Content Plan director — reference frames for shot cards
     match /content-plans/{userId}/{allPaths=**} {
       allow read: if request.auth != null && request.auth.uid == userId;

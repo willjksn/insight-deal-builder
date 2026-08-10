@@ -212,6 +212,19 @@ export type AgentIngestCopyResponse = {
   results: AgentIngestCopyResult[];
 };
 
+export type AgentFetchUrlRequest = {
+  url: string;
+  destPath: string;
+};
+
+export type AgentFetchUrlResponse = {
+  ok: true;
+  destPath: string;
+  sizeBytes: number;
+  checksum: string;
+  checksumAlgorithm: "sha256";
+};
+
 export type AgentResolveDetectResponse = {
   ok: true;
   installed: boolean;
