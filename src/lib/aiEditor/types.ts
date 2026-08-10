@@ -193,6 +193,10 @@ export interface ProductionContextShot {
   contentPlanShotId?: string;
   subjectAction?: string;
   editNote?: string;
+  /** Take numbers checked in Shoot Mode (parsed from board notes). */
+  onSetTakes?: number[];
+  /** Freeform Shoot Mode notes (parsed from board notes). */
+  onSetNotes?: string;
   hasFrame: boolean;
 }
 
@@ -255,6 +259,9 @@ export interface CoverageShotRow {
   preferredMediaAssetId?: string;
   preferredScore?: number;
   preferredManual?: boolean;
+  /** From Shoot Mode via board notes. */
+  onSetTakes?: number[];
+  onSetNotes?: string;
 }
 
 export interface CoverageReport {

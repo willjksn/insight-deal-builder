@@ -6,6 +6,7 @@ import type {
   ProductionContextScene,
   ProductionContextShot,
 } from "@/lib/aiEditor/types";
+import { parseShootProgressFromNotes } from "@/lib/contentPlan/syncShootProgressToBoard";
 
 function scenesFromScript(script: ScriptDocument | null | undefined): ProductionContextScene[] {
   if (!script?.scenes?.length) return [];
@@ -49,6 +50,7 @@ export function buildProductionContext(input: {
   const shots: ProductionContextShot[] = [];
   for (const day of board?.productionDays ?? []) {
     for (const shot of day.shots ?? []) {
+      const shoot = parseShootProgressFromNotes(shot.notes);
       shots.push({
         id: shot.id,
         dayId: day.id,
@@ -58,13 +60,16 @@ export function buildProductionContext(input: {
         camera: shot.cameraBody,
         lens: shot.lens,
         movement: shot.cameraMovement,
-        description: [shot.description, shot.subjectAction, shot.notes, shot.editNote]
-          .filter(Boolean)
-          .join(" · ") || undefined,
+        description:
+          [shot.description, shot.subjectAction, shoot.otherNotes, shot.editNote]
+            .filter(Boolean)
+            .join(" · ") || undefined,
         scoutShotNumber: shot.scoutShotNumber,
         contentPlanShotId: shot.contentPlanShotId,
         subjectAction: shot.subjectAction,
         editNote: shot.editNote,
+        ...(shoot.takes.length ? { onSetTakes: shoot.takes } : {}),
+        ...(shoot.shootNotes ? { onSetNotes: shoot.shootNotes } : {}),
         hasFrame: Boolean(shot.referenceImageUrl),
       });
     }

@@ -5,6 +5,7 @@ import {
   jaccard,
   normalizeShotSize,
   scoreClipAgainstShot,
+  scoreOnSetTakeInClipText,
   scoreShotNumberInClipText,
   tokenize,
 } from "@/lib/aiEditor/matching";
@@ -36,6 +37,31 @@ describe("aiEditor matching", () => {
     expect(normalizeShotSize("CU")).toBe("close_up");
     expect(normalizeShotSize("Wide Shot")).toBe("wide");
     expect(normalizeShotSize("MCU")).toBe("medium");
+  });
+
+  it("scores on-set take hints in filenames", () => {
+    expect(scoreOnSetTakeInClipText("C001_take_02_camA.mp4", [2]).score).toBeGreaterThan(0.1);
+    expect(scoreOnSetTakeInClipText("clip_T03.mp4", [3]).reason).toMatch(/take 3/i);
+    expect(scoreOnSetTakeInClipText("random.mp4", [1]).score).toBe(0);
+
+    const m = media({
+      id: "m-take",
+      filename: "shot_01_take2_Approach.mp4",
+      durationSeconds: 4,
+    });
+    const { score, reasons } = scoreClipAgainstShot({
+      media: m,
+      shot: {
+        id: "board-uuid",
+        scene: "1",
+        shotName: "Approach",
+        scoutShotNumber: 1,
+        onSetTakes: [2],
+        hasFrame: false,
+      },
+    });
+    expect(score).toBeGreaterThan(0.2);
+    expect(reasons.some((r) => /on-set take/i.test(r))).toBe(true);
   });
 
   it("scores content-plan shot numbers and ids in filenames", () => {

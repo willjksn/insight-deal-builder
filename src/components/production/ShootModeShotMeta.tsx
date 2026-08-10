@@ -1,19 +1,22 @@
 import { parseShootProgressFromNotes } from "@/lib/contentPlan/syncShootProgressToBoard";
 import { cn } from "@/lib/utils/cn";
 
-/** Compact Shoot Mode takes / notes under a board shot (from synced `notes`). */
+/** Compact Shoot Mode takes / notes (from board `notes` or structured fields). */
 export function ShootModeShotMeta({
   notes,
+  takes,
+  shootNotes,
   className,
 }: {
   notes?: string | null;
+  takes?: number[];
+  shootNotes?: string;
   className?: string;
 }) {
   const parsed = parseShootProgressFromNotes(notes);
-  if (!parsed.hasShootModeBlock && !parsed.takes.length && !parsed.shootNotes) {
-    return null;
-  }
-  if (!parsed.takes.length && !parsed.shootNotes) return null;
+  const takeList = takes?.length ? takes : parsed.takes;
+  const noteText = shootNotes?.trim() || parsed.shootNotes;
+  if (!takeList.length && !noteText) return null;
 
   return (
     <div
@@ -23,13 +26,11 @@ export function ShootModeShotMeta({
       )}
     >
       <p className="font-medium text-amber-900/90">From Shoot Mode</p>
-      {parsed.takes.length ? (
-        <p className="mt-0.5 tabular-nums">
-          Takes: {parsed.takes.join(", ")}
-        </p>
+      {takeList.length ? (
+        <p className="mt-0.5 tabular-nums">Takes: {takeList.join(", ")}</p>
       ) : null}
-      {parsed.shootNotes ? (
-        <p className="mt-0.5 whitespace-pre-wrap text-amber-950/90">{parsed.shootNotes}</p>
+      {noteText ? (
+        <p className="mt-0.5 whitespace-pre-wrap text-amber-950/90">{noteText}</p>
       ) : null}
     </div>
   );

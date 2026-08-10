@@ -124,6 +124,42 @@ function clipTextBlob(media: MediaAsset): string {
  * Score filename/path hints for content-plan / scout shot numbers.
  * Prefers explicit `shot_01` / slate-like segments over bare digits.
  */
+/**
+ * Mild boost when filename hints match a take checked off in Shoot Mode.
+ * Kept small so it never dominates shot-number / name scoring.
+ */
+export function scoreOnSetTakeInClipText(
+  clipText: string,
+  onSetTakes?: number[]
+): { score: number; reason?: string } {
+  if (!onSetTakes?.length) return { score: 0 };
+  const lower = clipText.toLowerCase();
+  for (const raw of onSetTakes) {
+    const n = Math.trunc(raw);
+    if (n < 1 || n > 99) continue;
+    const padded = String(n).padStart(2, "0");
+    if (
+      lower.includes(`_t${padded}`) ||
+      lower.includes(`-t${padded}`) ||
+      lower.includes(`_tk${padded}`) ||
+      lower.includes(`-tk${padded}`)
+    ) {
+      return { score: 0.14, reason: `On-set take ${n} in filename` };
+    }
+    const patterns = [
+      new RegExp(`(?:^|[^a-z0-9])take[_\\s-]*0*${n}(?:[^a-z0-9]|$)`, "i"),
+      new RegExp(`(?:^|[^a-z0-9])tk[_]?0*${n}(?:[^a-z0-9]|$)`, "i"),
+      new RegExp(`(?:^|[^a-z0-9])t[_]?0*${n}(?:[^a-z0-9]|$)`, "i"),
+    ];
+    for (const re of patterns) {
+      if (re.test(lower)) {
+        return { score: 0.14, reason: `On-set take ${n} in filename` };
+      }
+    }
+  }
+  return { score: 0 };
+}
+
 export function scoreShotNumberInClipText(
   clipText: string,
   shotNumber?: number,
@@ -242,6 +278,12 @@ export function scoreClipAgainstShot(input: {
   if (numberHit.score > 0) {
     score += numberHit.score;
     if (numberHit.reason) reasons.push(numberHit.reason);
+  }
+
+  const takeHit = scoreOnSetTakeInClipText(clipBlob, shot.onSetTakes);
+  if (takeHit.score > 0) {
+    score += takeHit.score;
+    if (takeHit.reason) reasons.push(takeHit.reason);
   }
 
   const sceneToks = sceneNumberTokens(shot.scene);
@@ -387,6 +429,8 @@ export function buildCoverageReport(input: {
       shotType: shot.shotType,
       status,
       candidates: candidates.slice(0, 8),
+      ...(shot.onSetTakes?.length ? { onSetTakes: shot.onSetTakes } : {}),
+      ...(shot.onSetNotes ? { onSetNotes: shot.onSetNotes } : {}),
       ...pref,
     };
   });

@@ -27,6 +27,7 @@ import {
 import { MediaPreview, type PreviewItem } from "@/components/aiEditor/MediaPreview";
 import { PostIngestSafetyCallout } from "@/components/aiEditor/PostIngestSafetyCallout";
 import { ResolveCoachPanel } from "@/components/aiEditor/ResolveCoachPanel";
+import { ShootModeShotMeta } from "@/components/production/ShootModeShotMeta";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -5251,7 +5252,8 @@ export function AiEditorClient({ projectId }: Props) {
               <h2 className="text-lg font-semibold text-slate-900">Match to your shot list</h2>
               <p className="mt-1 text-sm text-slate-600">
                 Compare clips to coverage shots using filenames, camera labels, shot size, and
-                dialogue when a script is linked. Pick preferred takes anytime.
+                dialogue when a script is linked. Shoot Mode takes show here when synced from the
+                board. Pick preferred takes anytime.
               </p>
             </div>
           </div>
@@ -5346,6 +5348,13 @@ export function AiEditorClient({ projectId }: Props) {
                               ? ` - score ${(row.preferredScore * 100).toFixed(0)}%`
                               : ""}
                           </div>
+                          {row.onSetTakes?.length || row.onSetNotes ? (
+                            <ShootModeShotMeta
+                              className="mt-1.5"
+                              takes={row.onSetTakes}
+                              shootNotes={row.onSetNotes}
+                            />
+                          ) : null}
                         </div>
                         <Badge
                           variant={

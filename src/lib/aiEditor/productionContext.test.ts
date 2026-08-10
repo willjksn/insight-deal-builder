@@ -107,6 +107,43 @@ describe("aiEditor productionContext", () => {
     expect(ctx.shots[0]?.description).toContain("Opens door");
   });
 
+  it("parses Shoot Mode takes/notes off board notes", () => {
+    const project = {
+      id: "p1",
+      projectName: "Sip",
+      projectType: "Custom Project",
+      shootType: "Video Only",
+      status: "draft",
+    } as unknown as Project;
+    const board = {
+      id: "b1",
+      projectId: "p1",
+      productionDays: [
+        {
+          id: "d1",
+          dayNumber: 1,
+          shots: [
+            {
+              id: "board-1",
+              label: "1. Approach",
+              done: true,
+              sortOrder: 0,
+              scoutShotNumber: 1,
+              shotName: "Approach",
+              description: "Walks in",
+              notes: "DP: soft key\n\n— Shoot Mode —\nTakes: 1, 2\nCleaner slate",
+            },
+          ],
+        },
+      ],
+    } as unknown as ProductionBoard;
+    const ctx = buildProductionContext({ project, board, scriptSession: null });
+    expect(ctx.shots[0]?.onSetTakes).toEqual([1, 2]);
+    expect(ctx.shots[0]?.onSetNotes).toBe("Cleaner slate");
+    expect(ctx.shots[0]?.description).toContain("DP: soft key");
+    expect(ctx.shots[0]?.description).not.toContain("Shoot Mode");
+  });
+
   it("marks footage-only workspaces", () => {
     const project = {
       id: "p2",
