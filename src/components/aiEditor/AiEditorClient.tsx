@@ -2997,6 +2997,64 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  /** Duplicate a cut clip immediately after itself (Play review). */
+  async function onDuplicateCutClip(
+    clipId: string,
+    opts?: { quiet?: boolean }
+  ) {
+    if (!timeline) throw new Error("No timeline yet");
+    const track = timeline.tracks.find((t) => t.kind === "video");
+    const clip = track?.clips.find((c) => c.id === clipId);
+    if (!track || !clip) throw new Error("Clip not found");
+    const insertAt = clip.timelineStartFrame + clip.durationFrames;
+    if (!opts?.quiet) setBusy("rough_cut");
+    setError(null);
+    try {
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "apply_ops",
+        ops: [
+          {
+            type: "insert",
+            trackId: track.id,
+            mediaAssetId: clip.mediaAssetId,
+            timelineStartFrame: insertAt,
+            sourceInFrame: clip.sourceInFrame,
+            durationFrames: clip.durationFrames,
+            label: clip.label,
+            plannedShotId: clip.plannedShotId,
+          },
+        ],
+        note: "Duplicate from Play review",
+      });
+      setTimeline(res.timeline);
+      invalidateLocalCutExport();
+      setTimelineVersions(res.versions);
+      const nextTrack = res.timeline.tracks.find((t) => t.kind === "video");
+      const copy = nextTrack?.clips.find(
+        (c) =>
+          c.id !== clipId &&
+          c.mediaAssetId === clip.mediaAssetId &&
+          c.sourceInFrame === clip.sourceInFrame &&
+          c.durationFrames === clip.durationFrames &&
+          c.timelineStartFrame === insertAt
+      );
+      if (!copy) {
+        throw new Error("Duplicate saved, but couldn’t locate the copy — Play again.");
+      }
+      setStatusNote(
+        `Duplicated clip · cut is now v${res.summary.version} · ${res.summary.clipCount} clips`
+      );
+      return { res, copy, frameRate: res.timeline.frameRate };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not duplicate clip";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
+    } finally {
+      if (!opts?.quiet) setBusy(null);
+    }
+  }
+
   /**
    * Reorder visible Play-review clips while preserving any non-visible
    * reel/track clips in their relative slots.
@@ -5260,6 +5318,60 @@ export function AiEditorClient({ projectId }: Props) {
                 }
               : undefined
           }
+          onDuplicateClip={
+            preview.reviewCut
+              ? async ({ clipId }) => {
+                  const dup = await onDuplicateCutClip(clipId, { quiet: true });
+                  if (!dup) throw new Error("Could not duplicate clip");
+                  const prior = dup.res.versions.find(
+                    (v) => v.version === dup.res.timeline.version - 1
+                  );
+                  if (prior) pushReviewUndo(prior.id);
+                  const base = preview.items.find((i) => i.clipId === clipId);
+                  const fps = dup.frameRate;
+                  const startSeconds = framesToSeconds(dup.copy.sourceInFrame, fps);
+                  const endSeconds =
+                    startSeconds + framesToSeconds(dup.copy.durationFrames, fps);
+                  const copyItem: PreviewItem = {
+                    path: base?.path || "",
+                    clipId: dup.copy.id,
+                    mediaAssetId: dup.copy.mediaAssetId,
+                    plannedShotId: base?.plannedShotId ?? dup.copy.plannedShotId,
+                    shotLabel: base?.shotLabel,
+                    isPreferred: base?.isPreferred,
+                    thumbnailDataUrl: base?.thumbnailDataUrl,
+                    label: dup.copy.label || base?.label || dup.copy.id,
+                    startSeconds,
+                    endSeconds,
+                  };
+                  if (!copyItem.path) {
+                    throw new Error(
+                      "Duplicate saved, but preview path is missing — Play again."
+                    );
+                  }
+                  setPreview((prev) => {
+                    if (!prev) return null;
+                    const i = prev.items.findIndex((x) => x.clipId === clipId);
+                    const items =
+                      i < 0
+                        ? [...prev.items, copyItem]
+                        : [
+                            ...prev.items.slice(0, i + 1),
+                            copyItem,
+                            ...prev.items.slice(i + 1),
+                          ];
+                    return {
+                      ...prev,
+                      title: activeReelName
+                        ? `${activeReelName} - first cut v${dup.res.summary.version}`
+                        : `First cut v${dup.res.summary.version}`,
+                      items,
+                    };
+                  });
+                  return copyItem;
+                }
+              : undefined
+          }
           onPreferClip={
             preview.reviewCut
               ? async (item) => {
@@ -6391,7 +6503,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → In/Out · Slip/Roll · Split/Join · reorder · Prefer / Drop · Undo → Resolve.
+                Next: Play → In/Out · Slip/Roll · Split/Join · Duplicate · reorder · Prefer / Drop · Undo → Resolve.
               </p>
             </div>
 

@@ -5,6 +5,7 @@ import {
   ArrowLeftRight,
   Clapperboard,
   Combine,
+  Copy,
   Loader2,
   Scissors,
   SkipBack,
@@ -103,6 +104,10 @@ type Props = {
     deltaSeconds: number;
     leftMediaDurationSeconds?: number;
   }) => Promise<{ left: PreviewItem; right: PreviewItem } | void> | void;
+  /** Duplicate current clip immediately after itself. */
+  onDuplicateClip?: (input: {
+    clipId: string;
+  }) => Promise<PreviewItem | void> | void;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -127,6 +132,7 @@ export function MediaPreview({
   onJoinClip,
   onSlipClip,
   onRollClip,
+  onDuplicateClip,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
@@ -146,6 +152,7 @@ export function MediaPreview({
   const [joining, setJoining] = useState(false);
   const [slipping, setSlipping] = useState(false);
   const [rolling, setRolling] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [preferDirty, setPreferDirty] = useState(false);
   const [actionNote, setActionNote] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -164,7 +171,8 @@ export function MediaPreview({
       onSplitClip ||
       onJoinClip ||
       onSlipClip ||
-      onRollClip
+      onRollClip ||
+      onDuplicateClip
   );
   const busyAction =
     removing ||
@@ -176,7 +184,8 @@ export function MediaPreview({
     splitting ||
     joining ||
     slipping ||
-    rolling;
+    rolling ||
+    duplicating;
   const canTrim = Boolean(onTrimClip && item?.clipId && !asImage);
   const canSplit = Boolean(onSplitClip && item?.clipId && !asImage);
   const canJoin = Boolean(
@@ -186,6 +195,7 @@ export function MediaPreview({
   const canRoll = Boolean(
     onRollClip && item?.clipId && nextItem?.clipId && !asImage
   );
+  const canDuplicate = Boolean(onDuplicateClip && item?.clipId && !asImage);
   const canPrefer =
     Boolean(onPreferClip && item?.plannedShotId && item?.mediaAssetId) &&
     !item?.isPreferred;
@@ -284,6 +294,11 @@ export function MediaPreview({
       if (e.key === ">" && canRoll && !busyAction) {
         e.preventDefault();
         void rollBy(ROLL_STEP_SECONDS);
+        return;
+      }
+      if ((e.key === "d" || e.key === "D") && canDuplicate && !busyAction) {
+        e.preventDefault();
+        void duplicateCurrent();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -306,6 +321,7 @@ export function MediaPreview({
     onJoinClip,
     onSlipClip,
     onRollClip,
+    onDuplicateClip,
     index,
     items,
     canPrefer,
@@ -317,6 +333,7 @@ export function MediaPreview({
     canJoin,
     canSlip,
     canRoll,
+    canDuplicate,
     item,
   ]);
 
@@ -610,6 +627,34 @@ export function MediaPreview({
       setActionNote(null);
     } finally {
       setRolling(false);
+    }
+  }
+
+  async function duplicateCurrent() {
+    const clipId = item?.clipId;
+    if (!clipId || !onDuplicateClip || !canDuplicate || busyAction) return;
+    setDuplicating(true);
+    setError(null);
+    setActionNote("Duplicating…");
+    const el = videoRef.current;
+    if (el) el.pause();
+    try {
+      const copy = await onDuplicateClip({ clipId });
+      if (!copy?.clipId) throw new Error("Duplicate did not return a clip");
+      setItems((prev) => {
+        const i = prev.findIndex((x) => x.clipId === clipId);
+        if (i < 0) return prev;
+        const next = [...prev];
+        next.splice(i + 1, 0, copy);
+        setIndex(i + 1);
+        return next;
+      });
+      setActionNote("Duplicated · playing copy · U undoes");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not duplicate clip");
+      setActionNote(null);
+    } finally {
+      setDuplicating(false);
     }
   }
 
@@ -995,6 +1040,23 @@ export function MediaPreview({
           </Button>
         </>
       ) : null}
+      {canDuplicate ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busyAction}
+          onClick={() => void duplicateCurrent()}
+          title="Duplicate after this clip (D)"
+        >
+          {duplicating ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Copy className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          Duplicate
+        </Button>
+      ) : null}
       {item?.clipId && onRemoveClip ? (
         <Button
           type="button"
@@ -1050,6 +1112,7 @@ export function MediaPreview({
         {canRoll ? " · </> roll" : ""}
         {canSplit ? " · S split" : ""}
         {canJoin ? " · J join" : ""}
+        {canDuplicate ? " · D duplicate" : ""}
         {canReorder ? " · drag / [ ] reorder" : ""}
         {onPreferClip ? " · P prefer" : ""}
         {onRemoveClip ? " · Delete drops" : ""}
