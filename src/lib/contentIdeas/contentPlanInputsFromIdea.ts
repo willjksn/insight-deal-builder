@@ -4,6 +4,7 @@ import type {
 } from "@/lib/contentIdeas/types";
 import {
   defaultContentPlanInputs,
+  defaultOrientationForPlatform,
   type ContentDurationPreset,
   type ContentEnergy,
   type ContentPlanInputs,
@@ -128,14 +129,15 @@ export function contentPlanInputsFromIdea(
       : "",
   ].filter(Boolean);
 
+  const platform = mapPlatform(platformRaw);
   return defaultContentPlanInputs({
     idea: ideaSeedTextForContentPlan(idea),
     contentStyle: mapStyle(idea, sessionInputs),
-    platform: mapPlatform(platformRaw),
+    platform,
     durationPreset: duration.durationPreset,
     durationSeconds: duration.durationSeconds,
     energy: mapEnergy(sessionInputs),
-    orientation: "9:16",
+    orientation: defaultOrientationForPlatform(platform),
     dialogueMode: "direct_to_camera",
     location: idea.production?.recommendedLocation || undefined,
     wardrobe: idea.production?.wardrobe || undefined,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { ShootingKitEditor, shootingKitSummary } from "@/components/production/ShootingKitEditor";
 import {
   cloneContentPlan,
   createContentPlan,
@@ -39,6 +40,7 @@ import {
   ORIENTATION_OPTIONS,
   PLATFORM_OPTIONS,
   defaultContentPlanInputs,
+  defaultOrientationForPlatform,
   type ContentPlan,
   type ContentPlanGenerateSection,
   type ContentPlanInputs,
@@ -46,6 +48,12 @@ import {
   type ContentPlanSection,
   type ContentShot,
 } from "@/lib/contentPlan/types";
+import {
+  applyShootingKitToInputs,
+  equipmentOptionsByKitCategory,
+  kitFromContentPlanInputs,
+  kitFromEquipmentCatalog,
+} from "@/lib/contentPlan/gearKit";
 import { normalizeProductionStage } from "@/lib/contentPlan/productionStage";
 import {
   EditMapPanel,
@@ -65,6 +73,7 @@ import {
 } from "@/components/contentPlan/ContentPlanPhase3Panels";
 import { ContentPlanPhase5Bar } from "@/components/contentPlan/ContentPlanPhase5Bar";
 import { useAccessibleProjects } from "@/hooks/useAccessibleProjects";
+import { useEquipmentCatalog } from "@/hooks/useEquipmentCatalog";
 import { useLocationCatalog } from "@/hooks/useLocationCatalog";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -76,7 +85,6 @@ import { listCreators } from "@/lib/creators/apiClient";
 import type { Creator } from "@/lib/creators/types";
 import { getProductionBoardByProject } from "@/lib/firebase/productionFirestore";
 import {
-  flattenShootingKit,
   normalizeShootingKit,
   shootingKitFromLegacy,
   shootingKitHasGear,
@@ -521,6 +529,7 @@ export function ContentPlanDirector({
     data: locationCatalog,
     loading: locationsLoading,
   } = useLocationCatalog();
+  const { data: equipmentCatalog } = useEquipmentCatalog();
   const [step, setStep] = useState(1);
   const [inputs, setInputs] = useState<ContentPlanInputs>(() => defaultContentPlanInputs());
   const [plan, setPlan] = useState<ContentPlan | null>(null);
@@ -541,8 +550,15 @@ export function ContentPlanDirector({
     projectId: string;
     scriptSessionId: string;
   } | null>(null);
+  const catalogPrefillDone = useRef(false);
 
   const showCreatorCatalog = canManageCreators(appUser);
+
+  const equipmentByCategory = useMemo(
+    () => equipmentOptionsByKitCategory(equipmentCatalog),
+    [equipmentCatalog]
+  );
+  const planKit = useMemo(() => kitFromContentPlanInputs(inputs), [inputs]);
 
   useEffect(() => {
     if (!plan) {
@@ -558,6 +574,27 @@ export function ContentPlanDirector({
       .then(({ plans }) => setSavedPlans(plans))
       .catch(() => undefined);
   }, [getToken, hideSavedPlans]);
+
+  // Reset catalog prefill when switching plans / starting fresh.
+  useEffect(() => {
+    catalogPrefillDone.current = false;
+  }, [plan?.id]);
+
+  // Default kit = full active equipment catalog (same gear every time).
+  useEffect(() => {
+    if (catalogPrefillDone.current) return;
+    if (!equipmentCatalog.length) return;
+    setInputs((prev) => {
+      if (shootingKitHasGear(kitFromContentPlanInputs(prev))) {
+        catalogPrefillDone.current = true;
+        return prev;
+      }
+      const kit = kitFromEquipmentCatalog(equipmentCatalog);
+      if (!shootingKitHasGear(kit)) return prev;
+      catalogPrefillDone.current = true;
+      return applyShootingKitToInputs(prev, kit);
+    });
+  }, [equipmentCatalog]);
 
   useEffect(() => {
     if (!initialPlanId) return;
@@ -613,25 +650,16 @@ export function ContentPlanDirector({
         setError("No production board found for that project.");
         return;
       }
-      const kit = shootingKitFromLegacy(board.shootingKit, board.gearItems ?? []);
-      if (!shootingKitHasGear(normalizeShootingKit(kit))) {
+      const kit = normalizeShootingKit(
+        shootingKitFromLegacy(board.shootingKit, board.gearItems ?? [])
+      );
+      if (!shootingKitHasGear(kit)) {
         setError("That project’s shooting kit is empty. Add gear on the production board first.");
         return;
       }
-      const other = [
-        ...kit.supports,
-        ...kit.grip,
-        ...kit.audio,
-        ...kit.props,
-        ...kit.other,
-      ];
-      patchInputs({
-        camerasAvailable: kit.cameraBodies.join(", ") || inputs.camerasAvailable,
-        lensesAvailable: kit.lenses.join(", ") || inputs.lensesAvailable,
-        lightingAvailable: kit.lights.join(", ") || inputs.lightingAvailable,
-        equipmentAvailable: other.join(", ") || inputs.equipmentAvailable,
-        useAvailableGearOnly: true,
-      });
+      setInputs((prev) =>
+        applyShootingKitToInputs({ ...prev, useAvailableGearOnly: true }, kit)
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load shooting kit");
     } finally {
@@ -1058,9 +1086,13 @@ export function ContentPlanDirector({
               <Field label="Platform">
                 <Select
                   value={inputs.platform}
-                  onChange={(e) =>
-                    patchInputs({ platform: e.target.value as ContentPlanInputs["platform"] })
-                  }
+                  onChange={(e) => {
+                    const platform = e.target.value as ContentPlanInputs["platform"];
+                    patchInputs({
+                      platform,
+                      orientation: defaultOrientationForPlatform(platform),
+                    });
+                  }}
                   options={PLATFORM_OPTIONS}
                 />
               </Field>
@@ -1074,6 +1106,9 @@ export function ContentPlanDirector({
                   }
                   options={ORIENTATION_OPTIONS}
                 />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Auto-set from platform — change anytime.
+                </p>
               </Field>
               <Field label="Energy">
                 <Select
@@ -1249,106 +1284,88 @@ export function ContentPlanDirector({
                   className={textInputClassName()}
                 />
               </Field>
-              <Field label="Cameras available" className="sm:col-span-2">
-                <input
-                  value={inputs.camerasAvailable || ""}
-                  onChange={(e) => patchInputs({ camerasAvailable: e.target.value })}
-                  placeholder="e.g. Sony FX3"
-                  className={textInputClassName()}
-                />
-              </Field>
-              <Field label="Lenses available" className="sm:col-span-2">
-                <input
-                  value={inputs.lensesAvailable || ""}
-                  onChange={(e) => patchInputs({ lensesAvailable: e.target.value })}
-                  placeholder="e.g. 24mm, 35mm, 50mm"
-                  className={textInputClassName()}
-                />
-              </Field>
-              <Field label="Lights available" className="sm:col-span-2">
-                <input
-                  value={inputs.lightingAvailable || ""}
-                  onChange={(e) => patchInputs({ lightingAvailable: e.target.value })}
-                  placeholder="e.g. Aputure 300d, tube lights, practicals"
-                  className={textInputClassName()}
-                />
-              </Field>
-              <Field label="Other gear (support / grip / audio)" className="sm:col-span-2">
-                <input
-                  value={inputs.equipmentAvailable || ""}
-                  onChange={(e) => patchInputs({ equipmentAvailable: e.target.value })}
-                  placeholder="e.g. Tripod, gimbal, boom, lavs"
-                  className={textInputClassName()}
-                />
-              </Field>
-              <div className="sm:col-span-2 space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Load kit from project board
-                </p>
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="min-w-[200px] flex-1">
-                    <Select
-                      value={kitProjectId}
-                      onChange={(e) => setKitProjectId(e.target.value)}
-                      options={
-                        projectsLoading
-                          ? [{ value: "", label: "Loading projects…" }]
-                          : [
-                              { value: "", label: "Select a project…" },
-                              ...projects.map((p) => ({
-                                value: p.id,
-                                label: p.projectName || p.id,
-                              })),
-                            ]
-                      }
-                    />
+              <div className="sm:col-span-2 space-y-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Gear available
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-600">
+                      Defaults to your Equipment Catalog ({shootingKitSummary(planKit)}). Toggle
+                      chips to trim for this plan — no retyping.
+                    </p>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={kitBusy || !kitProjectId}
-                    onClick={() => void loadKitFromProject()}
-                  >
-                    {kitBusy ? (
-                      <>
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        Loading…
-                      </>
-                    ) : (
-                      "Fill from board kit"
-                    )}
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={!equipmentCatalog.length}
+                      onClick={() => {
+                        const kit = kitFromEquipmentCatalog(equipmentCatalog);
+                        if (!shootingKitHasGear(kit)) {
+                          setError("Equipment Catalog is empty — add gear under Equipment first.");
+                          return;
+                        }
+                        setInputs((prev) => applyShootingKitToInputs(prev, kit));
+                      }}
+                    >
+                      <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                      Reset to catalog
+                    </Button>
+                  </div>
                 </div>
+                <ShootingKitEditor
+                  kit={planKit}
+                  compact
+                  equipmentByCategory={equipmentByCategory}
+                  onChange={(kit) =>
+                    setInputs((prev) => applyShootingKitToInputs(prev, kit))
+                  }
+                  footerActions={
+                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end">
+                      <div className="min-w-[180px] flex-1">
+                        <Select
+                          value={kitProjectId}
+                          onChange={(e) => setKitProjectId(e.target.value)}
+                          options={
+                            projectsLoading
+                              ? [{ value: "", label: "Loading projects…" }]
+                              : [
+                                  { value: "", label: "Or load from project board…" },
+                                  ...projects.map((p) => ({
+                                    value: p.id,
+                                    label: p.projectName || p.id,
+                                  })),
+                                ]
+                          }
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={kitBusy || !kitProjectId}
+                        onClick={() => void loadKitFromProject()}
+                      >
+                        {kitBusy ? (
+                          <>
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            Loading…
+                          </>
+                        ) : (
+                          "Fill from board kit"
+                        )}
+                      </Button>
+                    </div>
+                  }
+                />
                 <p className="text-[11px] text-slate-500">
-                  Generation uses these lists (and a linked project’s board kit) when “Use available
-                  gear only” is on.
-                  {inputs.camerasAvailable || inputs.lensesAvailable || inputs.lightingAvailable
-                    ? ` Listed: ${flattenShootingKit(
-                        normalizeShootingKit({
-                          cameraBodies: (inputs.camerasAvailable || "")
-                            .split(/[,;\n]+/)
-                            .map((s) => s.trim())
-                            .filter(Boolean),
-                          lenses: (inputs.lensesAvailable || "")
-                            .split(/[,;\n]+/)
-                            .map((s) => s.trim())
-                            .filter(Boolean),
-                          lights: (inputs.lightingAvailable || "")
-                            .split(/[,;\n]+/)
-                            .map((s) => s.trim())
-                            .filter(Boolean),
-                          other: (inputs.equipmentAvailable || "")
-                            .split(/[,;\n]+/)
-                            .map((s) => s.trim())
-                            .filter(Boolean),
-                          supports: [],
-                          grip: [],
-                          audio: [],
-                          props: [],
-                        })
-                      ).length} items.`
-                    : ""}
+                  Manage the master list in{" "}
+                  <Link href="/equipment" className="font-medium text-sky-700 hover:underline">
+                    Equipment Catalog
+                  </Link>
+                  . Generation uses this kit when “Use available gear only” is on.
                 </p>
               </div>
               <Field label="Talking points / required phrases" className="sm:col-span-2">

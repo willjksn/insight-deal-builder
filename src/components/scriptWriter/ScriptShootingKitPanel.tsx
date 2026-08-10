@@ -7,27 +7,15 @@ import { ShootingKitEditor, shootingKitSummary } from "@/components/production/S
 import {
   normalizeShootingKit,
   ProductionShootingKit,
-  ShootingKitCategory,
   shootingKitFromLegacy,
   shootingKitHasGear,
 } from "@/lib/production/shootingKit";
 import { getProductionBoardByProject } from "@/lib/firebase/productionFirestore";
 import { scriptWriterUpdateShootingKit } from "@/lib/scriptWriter/apiClient";
 import { useCollection } from "@/hooks/useCollection";
+import { equipmentOptionsByKitCategory } from "@/lib/contentPlan/gearKit";
 import { EquipmentCatalogItem } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
-
-/** Map equipment-catalog categories onto shooting-kit categories. */
-const EQUIPMENT_CATEGORY_TO_KIT: Record<string, ShootingKitCategory> = {
-  Camera: "cameraBodies",
-  Lens: "lenses",
-  Support: "supports",
-  Lighting: "lights",
-  Grip: "grip",
-  Audio: "audio",
-  Monitor: "other",
-  Other: "other",
-};
 
 interface ScriptShootingKitPanelProps {
   sessionId: string;
@@ -57,21 +45,10 @@ export function ScriptShootingKitPanel({
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: equipment } = useCollection<EquipmentCatalogItem>("equipmentCatalog");
-  const equipmentByCategory = useMemo(() => {
-    const map: Partial<Record<ShootingKitCategory, string[]>> = {};
-    for (const item of equipment) {
-      if (item.active === false) continue;
-      const cat = EQUIPMENT_CATEGORY_TO_KIT[item.category] ?? "other";
-      const label = item.name?.trim();
-      if (!label) continue;
-      const list = (map[cat] ??= []);
-      if (!list.includes(label)) list.push(label);
-    }
-    for (const key of Object.keys(map) as ShootingKitCategory[]) {
-      map[key]!.sort((a, b) => a.localeCompare(b));
-    }
-    return map;
-  }, [equipment]);
+  const equipmentByCategory = useMemo(
+    () => equipmentOptionsByKitCategory(equipment),
+    [equipment]
+  );
 
   useEffect(() => {
     setKit(normalizeShootingKit(shootingKit));

@@ -1,5 +1,7 @@
 /** Production-ready content plan (upgraded Reel Prompt Director). */
 
+import type { ProductionShootingKit } from "@/lib/production/shootingKit";
+
 export type ContentStyle =
   | "ugc"
   | "cinematic_reel"
@@ -35,6 +37,26 @@ export type ContentPlatform =
   | "other";
 
 export type ContentOrientation = "9:16" | "16:9" | "1:1" | "4:5";
+
+/** Default frame for a platform; Orientation stays editable after. */
+export function defaultOrientationForPlatform(
+  platform: ContentPlatform
+): ContentOrientation {
+  switch (platform) {
+    case "instagram_reel":
+    case "tiktok":
+    case "youtube_short":
+    case "paid_social":
+      return "9:16";
+    case "youtube":
+    case "website":
+    case "commercial":
+      return "16:9";
+    case "other":
+    default:
+      return "9:16";
+  }
+}
 
 export type ContentEnergy =
   | "slow_elegant"
@@ -149,6 +171,11 @@ export type ContentPlanInputs = {
   camerasAvailable?: string;
   lensesAvailable?: string;
   lightingAvailable?: string;
+  /**
+   * Structured company kit (preferred). Legacy comma-separated fields above
+   * stay in sync for PDF / older prompt context.
+   */
+  shootingKit?: ProductionShootingKit;
   useAvailableGearOnly: boolean;
   teachMe: boolean;
 };

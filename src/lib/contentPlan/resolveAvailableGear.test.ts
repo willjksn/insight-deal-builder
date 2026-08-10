@@ -33,6 +33,27 @@ describe("resolveAvailableGear", () => {
     expect(kit.other).toEqual(["Tripod"]);
   });
 
+  it("prefers structured shootingKit over legacy strings", () => {
+    const kit = kitFromContentPlanInputs(
+      defaultContentPlanInputs({
+        camerasAvailable: "Ignored",
+        shootingKit: {
+          cameraBodies: ["FX3"],
+          lenses: ["35mm"],
+          supports: ["Tripod"],
+          lights: [],
+          grip: [],
+          audio: ["Lav"],
+          props: [],
+          other: [],
+        },
+      })
+    );
+    expect(kit.cameraBodies).toEqual(["FX3"]);
+    expect(kit.supports).toEqual(["Tripod"]);
+    expect(kit.audio).toEqual(["Lav"]);
+  });
+
   it("merges kits without dupes", () => {
     const merged = mergeShootingKits(
       { cameraBodies: ["FX3"], lenses: ["35mm"], supports: [], lights: [], grip: [], audio: [], props: [], other: [] },

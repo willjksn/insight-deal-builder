@@ -2,7 +2,6 @@ import type { Firestore } from "firebase-admin/firestore";
 import { PRODUCTION_BOARDS_COLLECTION } from "@/lib/firebase/productionFirestore";
 import {
   EMPTY_SHOOTING_KIT,
-  normalizeShootingKit,
   shootingKitFromLegacy,
   shootingKitHasGear,
   type ProductionShootingKit,
@@ -10,83 +9,21 @@ import {
 import type { ProductionBoard } from "@/lib/production/types";
 import { formatShootingKitForPrompt } from "@/lib/scriptWriter/shootingKitPrompt";
 import { loadProductionBoardForProject } from "@/lib/scriptWriter/resolveShootingKit";
-import type { ContentPlan, ContentPlanInputs } from "@/lib/contentPlan/types";
+import type { ContentPlan } from "@/lib/contentPlan/types";
+import {
+  kitFromContentPlanInputs,
+  mergeShootingKits,
+} from "@/lib/contentPlan/gearKit";
 
-export function splitGearList(raw?: string): string[] {
-  if (!raw?.trim()) return [];
-  return raw
-    .split(/[,;\n]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-export function kitFromContentPlanInputs(
-  inputs: ContentPlanInputs
-): ProductionShootingKit {
-  return normalizeShootingKit({
-    cameraBodies: splitGearList(inputs.camerasAvailable),
-    lenses: splitGearList(inputs.lensesAvailable),
-    lights: splitGearList(inputs.lightingAvailable),
-    other: [
-      ...splitGearList(inputs.equipmentAvailable),
-    ],
-  });
-}
-
-export function mergeShootingKits(
-  primary: ProductionShootingKit,
-  secondary: ProductionShootingKit
-): ProductionShootingKit {
-  const a = normalizeShootingKit(primary);
-  const b = normalizeShootingKit(secondary);
-  const merge = (x: string[], y: string[]) => {
-    const seen = new Set(x.map((s) => s.toLowerCase()));
-    const out = [...x];
-    for (const item of y) {
-      const key = item.toLowerCase();
-      if (seen.has(key)) continue;
-      out.push(item);
-      seen.add(key);
-    }
-    return out;
-  };
-  return {
-    cameraBodies: merge(a.cameraBodies, b.cameraBodies),
-    lenses: merge(a.lenses, b.lenses),
-    supports: merge(a.supports, b.supports),
-    lights: merge(a.lights, b.lights),
-    grip: merge(a.grip, b.grip),
-    audio: merge(a.audio, b.audio),
-    props: merge(a.props, b.props),
-    other: merge(a.other, b.other),
-    cameraSettingsNotes:
-      a.cameraSettingsNotes?.trim() || b.cameraSettingsNotes?.trim() || undefined,
-  };
-}
-
-export function hydrateInputsFromKit(
-  inputs: ContentPlanInputs,
-  kit: ProductionShootingKit
-): ContentPlanInputs {
-  const k = normalizeShootingKit(kit);
-  return {
-    ...inputs,
-    camerasAvailable:
-      inputs.camerasAvailable?.trim() ||
-      (k.cameraBodies.length ? k.cameraBodies.join(", ") : inputs.camerasAvailable),
-    lensesAvailable:
-      inputs.lensesAvailable?.trim() ||
-      (k.lenses.length ? k.lenses.join(", ") : inputs.lensesAvailable),
-    lightingAvailable:
-      inputs.lightingAvailable?.trim() ||
-      (k.lights.length ? k.lights.join(", ") : inputs.lightingAvailable),
-    equipmentAvailable:
-      inputs.equipmentAvailable?.trim() ||
-      ([...k.supports, ...k.grip, ...k.audio, ...k.other].length
-        ? [...k.supports, ...k.grip, ...k.audio, ...k.other].join(", ")
-        : inputs.equipmentAvailable),
-  };
-}
+export {
+  applyShootingKitToInputs,
+  equipmentOptionsByKitCategory,
+  hydrateInputsFromKit,
+  kitFromContentPlanInputs,
+  kitFromEquipmentCatalog,
+  mergeShootingKits,
+  splitGearList,
+} from "@/lib/contentPlan/gearKit";
 
 async function loadFallbackUserBoardKit(
   db: Firestore,
