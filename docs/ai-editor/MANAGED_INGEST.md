@@ -62,7 +62,8 @@ drive.connected (poll/watcher)
   → ingest.completed
 ```
 
-Phase A emits only: detect poll → review card (no ingest.started).
+Phase A emits: detect poll → review card.  
+Phase B (initial): **Ingest into project** → index card → verified copy → register MediaAssets (reuses existing progress/Stop; no `IngestSession` doc yet).
 
 ## E. Pipeline / job dependencies (Phase C+)
 
@@ -108,12 +109,12 @@ IDs stay independent of folder names.
 | Phase | UI |
 |-------|-----|
 | **A** | Detection banner + ingest review (camera, dest preview, preflight, options preview) |
-| B | Progress / cancel / failed retry |
+| **B** | **Ingest into project** CTA → scan card → `runManagedCopy` (verify + optional proxies) + progress/Stop |
 | C | Live media browser populate mid-ingest |
 | D–E | Proxy/analysis counts in same panel |
 | F | Safety copy + media safety status |
 
-Manual “Select existing folder” remains.
+Manual “Select existing folder” / **Use this drive as source** remains.
 
 ---
 
@@ -122,7 +123,7 @@ Manual “Select existing folder” remains.
 | Phase | Scope | Status |
 |-------|--------|--------|
 | **A** | Detect + review + naming preview + preflight | **Landed (initial)** |
-| B | Verified managed copy + MediaAsset + cancel | Next |
+| **B** | One-click verified managed copy + MediaAsset register + cancel | **Landed (initial)** — wires `ManagedIngestReview` → `agentIndexFolder` + `runManagedCopy`; full `IngestSession` collection still later |
 | C | Pipelined metadata/thumbnails | Later |
 | D | Proxy queue (not from card) | Later |
 | E | Analysis queue | Later |

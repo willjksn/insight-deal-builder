@@ -1165,9 +1165,9 @@ export function AiEditorClient({ projectId }: Props) {
     });
   }
 
-  async function onSaveWorkspace(pathOverride?: string) {
+  async function onSaveWorkspace(pathOverride?: string): Promise<string | null> {
     const pathToSave = (pathOverride ?? storagePath).trim();
-    if (!pathToSave) return;
+    if (!pathToSave) return null;
     if (pathOverride) setStoragePath(pathToSave);
     setBusy("storage");
     setStatusNote(null);
@@ -1240,8 +1240,10 @@ export function AiEditorClient({ projectId }: Props) {
       }
       await load();
       detectRemount(drives);
+      return root;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save workspace");
+      return null;
     } finally {
       setBusy(null);
     }
@@ -1875,6 +1877,96 @@ export function AiEditorClient({ projectId }: Props) {
     } finally {
       setBusy(null);
       setProgress(null);
+    }
+  }
+
+  /** Managed Ingest Phase B — one-click card → verified project copy. */
+  async function onManagedIngestIntoProject() {
+    const src =
+      detectedSources.find((s) => s.id === selectedSourceId) || detectedSources[0];
+    if (!src?.mediaRoot) {
+      setError("Select a detected camera card first.");
+      return;
+    }
+    if (!requireEditDisk()) return;
+
+    let destRoot = (settings?.projectRootPath || storagePath || "").trim();
+    if (!destRoot) {
+      setError("Pick a destination drive (or save a workspace) before ingesting.");
+      return;
+    }
+
+    const camera =
+      cameraLabel?.trim() ||
+      src.suggestedCameraAssignment ||
+      "CAMERA_A";
+
+    cancelBatchRef.current = false;
+    setBusy("index");
+    setError(null);
+    setStatusNote(null);
+    setAddMode("copy");
+    setIndexFolderPath(src.mediaRoot);
+    if (src.suggestedCameraAssignment && !cameraLabel.trim()) {
+      setCameraLabel(src.suggestedCameraAssignment);
+    }
+    setPrepareWhileCopying(ingestOptions.generateProxies);
+    // One-click ingest always verifies (agent SHA-256); keep UI in sync.
+    setIngestOptions((prev) => ({ ...prev, verifyCopy: true }));
+
+    try {
+      const health = await checkAgentHealth();
+      setAgent(health);
+      if (!health.connected) throw new Error("Connect this computer first");
+      const token = await ensureAgentSession();
+
+      if (!settings?.projectRootPath && storagePath.trim()) {
+        const saved = await onSaveWorkspace(storagePath.trim());
+        if (!saved) throw new Error("Could not save workspace before ingest.");
+        destRoot = saved;
+        setBusy("index");
+      }
+
+      setProgress({ pct: 2, label: "Scanning card for clips…" });
+      const indexed = await agentIndexFolder(
+        DEFAULT_AGENT_BASE_URL,
+        token,
+        src.mediaRoot,
+        true
+      );
+      const sourceFiles = filterIngestableFiles(indexed.files || []);
+      if (!sourceFiles.length) {
+        throw new Error("No video or audio files found on this card.");
+      }
+
+      setStatusNote(
+        `Ingesting ${sourceFiles.length} clip${sourceFiles.length === 1 ? "" : "s"} from card → project${
+          ingestOptions.generateProxies ? " (with proxies)" : ""
+        }…`
+      );
+
+      await runManagedCopy({
+        token,
+        sourceFiles,
+        camera,
+        prepare: ingestOptions.generateProxies,
+        projectRoot: destRoot,
+      });
+
+      setPendingCopyFiles(null);
+      setSelectedCopyPaths(new Set());
+      setStatusNote(
+        `Ingested ${sourceFiles.length} clip${sourceFiles.length === 1 ? "" : "s"} from ${
+          src.label || "card"
+        }. Review safety status before erasing the card.`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Managed ingest failed");
+    } finally {
+      setBusy(null);
+      setProgress(null);
+      setBatchStopping(false);
+      copyAbortRef.current = null;
     }
   }
 
@@ -4383,6 +4475,8 @@ export function AiEditorClient({ projectId }: Props) {
                   `Source folder set. Next: Review files to copy, then Copy & verify.`
                 );
               }}
+              onIngestIntoProject={() => void onManagedIngestIntoProject()}
+              ingesting={busy === "index"}
               disabled={!!busy || !agent.connected}
             />
 

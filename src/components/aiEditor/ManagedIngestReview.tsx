@@ -48,6 +48,9 @@ type Props = {
   scanning: boolean;
   onRescan: () => void;
   onUseSourceFolder: () => void;
+  /** One-click verified copy into the saved project workspace (Phase B). */
+  onIngestIntoProject?: () => void;
+  ingesting?: boolean;
   disabled?: boolean;
 };
 
@@ -71,6 +74,8 @@ export function ManagedIngestReview({
   scanning,
   onRescan,
   onUseSourceFolder,
+  onIngestIntoProject,
+  ingesting,
   disabled,
 }: Props) {
   if (!sources.length && !scanning) return null;
@@ -260,8 +265,8 @@ export function ManagedIngestReview({
                   </p>
                 ) : destPath ? (
                   <p className="mt-2 text-slate-500">
-                    Folder name is automatic. After you pick an SSD, save the workspace in Step 2,
-                    then use the source button below.
+                    Folder name is automatic. Pick an SSD (or use your saved workspace), then ingest
+                    below.
                   </p>
                 ) : null}
               </div>
@@ -276,41 +281,85 @@ export function ManagedIngestReview({
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
+                  onClick={() => onIngestIntoProject?.()}
+                  disabled={
+                    disabled ||
+                    ingesting ||
+                    !selected ||
+                    !spaceOk ||
+                    !onIngestIntoProject
+                  }
+                >
+                  {ingesting ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      Ingesting…
+                    </>
+                  ) : (
+                    "Ingest into project"
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={onUseSourceFolder}
-                  disabled={disabled || !selected}
+                  disabled={disabled || ingesting || !selected}
                 >
                   Use this drive as source
                 </Button>
               </div>
               <p className="text-xs leading-relaxed text-slate-600">
-                That fills the “Footage folder” field below with the card/drive path. Then click{" "}
-                <span className="font-medium">Review files to copy</span>, uncheck takes you don’t
-                need, and <span className="font-medium">Copy & verify</span> only the selection.
+                <span className="font-medium">Ingest into project</span> copies every clip on this
+                card into your workspace with checksum verify (and proxies if checked). Or use the
+                drive as source → Review files → Copy & verify for a selective pass.
               </p>
-              <p className="text-[11px] text-slate-500">
-                Full “Ingest” (auto-verify, proxies, analysis in one click) is the next build step.
-                Checkboxes for those options will matter then; they don’t start work yet.
-              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked
+                    disabled
+                    readOnly
+                  />
+                  <span>
+                    Verify copied media
+                    <span className="mt-0.5 block text-[11px] text-slate-500">
+                      Always on for one-click ingest (checksum).
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={options.generateProxies}
+                    disabled={disabled || ingesting}
+                    onChange={(e) =>
+                      onOptionsChange({ ...options, generateProxies: e.target.checked })
+                    }
+                  />
+                  <span>Generate proxies while ingesting</span>
+                </label>
+              </div>
               <details className="text-xs text-slate-600">
                 <summary className="cursor-pointer font-medium text-slate-700">
-                  Options for later (not active yet)
+                  Later pipeline options (not in one-click yet)
                 </summary>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   {(
                     [
-                      ["verifyCopy", "Verify copied media"],
-                      ["generateProxies", "Generate proxies"],
                       ["generateThumbnails", "Generate thumbnails"],
                       ["extractMetadata", "Extract technical metadata"],
                       ["analyzeDuringIngest", "Begin analysis automatically"],
                     ] as const
                   ).map(([key, label]) => (
-                    <label key={key} className="flex cursor-pointer items-start gap-2 opacity-80">
+                    <label key={key} className="flex cursor-pointer items-start gap-2 opacity-70">
                       <input
                         type="checkbox"
                         className="mt-0.5"
                         checked={options[key]}
-                        disabled={disabled}
+                        disabled
                         onChange={(e) =>
                           onOptionsChange({ ...options, [key]: e.target.checked })
                         }
