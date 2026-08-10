@@ -585,6 +585,26 @@ export function ShootModePanel({
         />
       </div>
 
+      {shot.setDesignIdeas || shot.setDressing?.length ? (
+        <div className="rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900">
+            Set design
+          </p>
+          {shot.setDesignIdeas ? (
+            <p className="mt-1.5 whitespace-pre-wrap text-sm text-slate-800">
+              {shot.setDesignIdeas}
+            </p>
+          ) : null}
+          {shot.setDressing?.length ? (
+            <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-slate-800">
+              {shot.setDressing.map((item, i) => (
+                <li key={`${shot.id}-sm-dress-${i}`}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-2.5">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900">
           How to shoot

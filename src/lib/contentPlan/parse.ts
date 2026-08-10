@@ -195,6 +195,11 @@ export function parseContentShots(raw: unknown): ContentShot[] {
       backlightStrategy: str(o.backlightStrategy) || undefined,
       practicals: str(o.practicals) || undefined,
       motivatedSource: str(o.motivatedSource) || undefined,
+      setDesignIdeas: str(o.setDesignIdeas) || undefined,
+      setDressing: (() => {
+        const items = strArr(o.setDressing).slice(0, 8);
+        return items.length ? items : undefined;
+      })(),
       performanceDirection: str(o.performanceDirection) || undefined,
       blocking: str(o.blocking) || undefined,
       propAction: str(o.propAction) || undefined,

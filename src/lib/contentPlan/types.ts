@@ -234,6 +234,13 @@ export type ContentShot = {
   backlightStrategy?: string;
   practicals?: string;
   motivatedSource?: string;
+  /**
+   * Optional art/set look for this shot (atmosphere, walls, furniture, palette).
+   * Omit when N/A (plain wall interview, pure B-roll, etc.).
+   */
+  setDesignIdeas?: string;
+  /** Optional short dressing / set-piece bullets for this shot. */
+  setDressing?: string[];
   performanceDirection?: string;
   blocking?: string;
   propAction?: string;

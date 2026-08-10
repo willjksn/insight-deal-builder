@@ -37,6 +37,8 @@ function contentShotToSuggested(shot: ContentShot): ScriptSuggestedShot {
     .join(" · ");
 
   const setupNotes = [
+    shot.setDesignIdeas && `Set: ${shot.setDesignIdeas}`,
+    shot.setDressing?.length && `Dressing: ${shot.setDressing.slice(0, 4).join("; ")}`,
     shot.howToShoot?.steps?.slice(0, 4).join(" → "),
     shot.cameraDistance && `Distance: ${shot.cameraDistance}`,
     shot.cameraAngle && `Angle: ${shot.cameraAngle}`,

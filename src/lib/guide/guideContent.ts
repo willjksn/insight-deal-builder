@@ -366,13 +366,14 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
               "Open Content plans → Pitch ideas for a package to generate one-liners, then Develop an idea into a plan.",
               "Or New plan: style → idea → parameters → generate.",
               "In the Director, work Phase 1 (Brief / Story / Script / Shots), Phase 2 (edit/look), and Phase 3 (Coverage / Shoot Order / Checklist).",
+              "Shot cards may include optional set design ideas and dressing bullets when the physical set matters (omit for plain interviews / pure B-roll).",
             ],
           },
           {
             heading: "Board, Shoot Mode, AI Editor",
             bullets: [
               "Create project + board when shots exist. After regenerating, Update board + script to keep the board and AI Editor aligned.",
-              "Shoot Mode: mark done, takes, and notes in shoot order; sync to / pull from the board.",
+              "Shoot Mode: mark done, takes, and notes in shoot order; sync to / pull from the board. Set design tips show when the plan has them.",
               "Open the linked project’s AI Editor to Match preferred takes and Play a first cut, then finish in Resolve.",
             ],
             tips: [

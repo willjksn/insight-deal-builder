@@ -17,6 +17,8 @@ export function slimShotsForPost(shots: ContentShot[]) {
     soundEffects: s.soundEffects,
     musicCue: s.musicCue,
     lightingIntent: s.lightingIntent,
+    setDesignIdeas: s.setDesignIdeas,
+    setDressing: s.setDressing,
     colorLook: s.colorLook,
   }));
 }

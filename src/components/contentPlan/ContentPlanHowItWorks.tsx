@@ -46,8 +46,10 @@ function ContentPlanHowItWorksGuideContent() {
           </li>
         </ol>
         <p>
-          Regenerate or refine sections as needed. Optional <span className="font-medium">Teach me</span>{" "}
-          expands on-set guidance for a shot or section.
+          Regenerate or refine sections as needed. Optional{" "}
+          <span className="font-medium">Teach me</span> expands on-set guidance. Shots may include
+          optional <span className="font-medium">set design</span> ideas and dressing bullets when
+          the physical set matters.
         </p>
       </section>
 

@@ -328,6 +328,23 @@ function ShotCard({
               .filter(Boolean)
               .join("\n")}
           />
+          {shot.setDesignIdeas || shot.setDressing?.length ? (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Set design
+              </p>
+              {shot.setDesignIdeas ? (
+                <p className="mt-1 whitespace-pre-wrap text-slate-800">{shot.setDesignIdeas}</p>
+              ) : null}
+              {shot.setDressing?.length ? (
+                <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-slate-800">
+                  {shot.setDressing.map((item, i) => (
+                    <li key={`${shot.id}-dress-${i}`}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
           <Block
             title="Performance"
             body={[

@@ -43,6 +43,8 @@ function slimShot(s: ContentShot) {
     composition: s.composition,
     lightingIntent: s.lightingIntent,
     keyLightDirection: s.keyLightDirection,
+    setDesignIdeas: s.setDesignIdeas,
+    setDressing: s.setDressing,
     performanceDirection: s.performanceDirection,
     cutTrigger: s.cutTrigger,
     howToShoot: s.howToShoot,

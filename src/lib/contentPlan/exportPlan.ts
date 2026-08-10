@@ -93,6 +93,11 @@ export function buildContentPlanPrintable(plan: ContentPlan): string {
         );
       }
       if (s.cutTrigger) lines.push(`Cut trigger: ${s.cutTrigger}`);
+      if (s.setDesignIdeas) lines.push(`Set design: ${s.setDesignIdeas}`);
+      if (s.setDressing?.length) {
+        lines.push("Set dressing:");
+        s.setDressing.forEach((item) => lines.push(`  - ${item}`));
+      }
       if (s.howToShoot?.steps?.length) {
         lines.push("How to shoot:");
         s.howToShoot.steps.forEach((step, i) => lines.push(`  ${i + 1}. ${step}`));

@@ -43,6 +43,8 @@ Include:
 - camera/lens/exposure/placement
 - composition + lighting (concrete)
 - performance/blocking
+- optional setDesignIdeas (1–3 short sentences: how the physical set should look — atmosphere, walls/floor, furniture, palette). Omit when N/A (plain wall interview, pure B-roll, etc.).
+- optional setDressing: 0–6 short bullets of dressing/set pieces when useful; omit or [] when N/A
 - cutTrigger + short transition notes
 - short productionAudio / foley / soundEffects / musicCue
 - howToShoot.steps: exactly 6 short steps

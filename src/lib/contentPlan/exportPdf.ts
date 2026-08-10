@@ -161,6 +161,11 @@ export function downloadContentPlanPdf(plan: ContentPlan): void {
         );
       }
       if (s.cutTrigger) addLines(`Cut: ${s.cutTrigger}`, 9, false, 2);
+      if (s.setDesignIdeas) addLines(`Set: ${s.setDesignIdeas}`, 9, false, 2);
+      if (s.setDressing?.length) {
+        addLines("Set dressing:", 9, true, 2);
+        s.setDressing.slice(0, 6).forEach((item) => addBullet(item));
+      }
       if (s.howToShoot?.steps?.length) {
         addLines("How to shoot:", 9, true, 2);
         s.howToShoot.steps.slice(0, 6).forEach((step, i) => {
