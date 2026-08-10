@@ -728,6 +728,8 @@ export function AiEditorClient({ projectId }: Props) {
   const step4Done = media.length > 0 && needsPrepare.length === 0;
   const step5Done = media.length > 0 && analyzedCount > 0;
   const step6Done = Boolean(coverage && coverage.updatedAt);
+  const preferredTakeCount =
+    coverage?.shots?.filter((s) => s.preferredMediaAssetId).length ?? 0;
   const step7Done = Boolean(timeline && timeline.tracks.some((t) => t.clips.length));
   const step8Done = Boolean(timeline && timeline.version > 1);
   const step9Done = Boolean(timeline?.finishing);
@@ -2438,11 +2440,18 @@ export function AiEditorClient({ projectId }: Props) {
       const res = await aiEditorRunMatch(getToken, projectId, coverage?.overrides);
       setCoverage(res.coverage);
       setJobs((prev) => [res.job, ...prev]);
-      setStatusNote(
-        res.coverage.plannedShotCount
-          ? `Coverage: ${res.coverage.coveredCount} covered, ${res.coverage.partialCount} partial, ${res.coverage.missingCount} missing.`
-          : "No planned shots on the board yet - matching saved for when coverage exists."
-      );
+      const preferredN =
+        res.coverage.shots?.filter((s) => s.preferredMediaAssetId).length ?? 0;
+      const coverageLine = res.coverage.plannedShotCount
+        ? `Coverage: ${res.coverage.coveredCount} covered, ${res.coverage.partialCount} partial, ${res.coverage.missingCount} missing.`
+        : "No planned shots on the board yet - matching saved for when coverage exists.";
+      const nextCue =
+        preferredN > 0
+          ? timeline
+            ? " Next: Rebuild first cut (or Play) to use preferred takes."
+            : " Next: Build a first cut below, then Play."
+          : "";
+      setStatusNote(`${coverageLine}${nextCue}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Matching failed");
     } finally {
@@ -2485,11 +2494,13 @@ export function AiEditorClient({ projectId }: Props) {
         res.coverage.shots.find((s) => s.plannedShotId === plannedShotId)?.shotName ||
         "shot";
       const take = opts?.label?.trim();
-      setStatusNote(
-        take
-          ? `Preferred for ${shot}: ${take}. Press R in the player (or Rebuild cut) to reshuffle.`
-          : `Preferred take updated for ${shot}. Press R in the player (or Rebuild cut) to reshuffle.`
-      );
+      const head = take
+        ? `Preferred for ${shot}: ${take}.`
+        : `Preferred take updated for ${shot}.`;
+      const next = timeline
+        ? " Press R in the player (or Rebuild first cut) to reshuffle."
+        : " Next: Build a first cut, then Play to review.";
+      setStatusNote(`${head}${next}`);
       return res;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not set preferred take";
@@ -6461,6 +6472,57 @@ export function AiEditorClient({ projectId }: Props) {
                   );
                 })}
               </ul>
+            ) : null}
+
+            {preferredTakeCount > 0 ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-950">
+                <p>
+                  <span className="font-medium">Preferred takes ready</span>
+                  {` — ${preferredTakeCount} shot${
+                    preferredTakeCount === 1 ? "" : "s"
+                  } with a preferred take.`}
+                </p>
+                <p className="mt-1 text-xs text-emerald-900/80">
+                  {timeline
+                    ? "Next: Rebuild first cut (or Play) so the assembly uses these preferences."
+                    : "Next: Line up a first cut, then Play to Prefer / Drop / trim."}
+                </p>
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => void onBuildRoughCut()}
+                    disabled={!!busy || !media.length}
+                  >
+                    {busy === "rough_cut" ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Clapperboard className="mr-1.5 h-4 w-4" />
+                    )}
+                    {timeline ? "Rebuild first cut" : "Build first cut"}
+                  </Button>
+                  {timeline && videoTrack?.clips?.length ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() => void previewRoughCut()}
+                      disabled={!!busy || !agent.connected}
+                    >
+                      <Play className="mr-1.5 h-4 w-4" />
+                      {activeReelName ? `Play ${activeReelName}` : "Play this cut"}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        document
+                          .getElementById("ai-step-7")
+                          ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                      }
+                      disabled={!!busy}
+                    >
+                      Go to first cut
+                    </Button>
+                  )}
+                </div>
+              </div>
             ) : null}
           </div>
         </CardBody>
