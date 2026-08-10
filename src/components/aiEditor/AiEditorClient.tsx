@@ -293,6 +293,10 @@ export function AiEditorClient({ projectId }: Props) {
   const [ingestDestFreeBytes, setIngestDestFreeBytes] = useState<number | null>(null);
   const [diskNote, setDiskNote] = useState<string | null>(null);
   const [ingestQueue, setIngestQueue] = useState<IngestQueueItem[]>([]);
+  /** Unmatched clip → planned shot id chosen for Prefer. */
+  const [unmatchedPreferShotByMedia, setUnmatchedPreferShotByMedia] = useState<
+    Record<string, string>
+  >({});
   /** Files found on a card/folder awaiting selective copy. */
   const [pendingCopyFiles, setPendingCopyFiles] = useState<
     Array<{ path: string; filename: string; sizeBytes: number }> | null
@@ -736,6 +740,21 @@ export function AiEditorClient({ projectId }: Props) {
     coverage?.unmatchedMediaIds
       ?.map((id) => media.find((m) => m.id === id))
       .filter((m): m is MediaAsset => Boolean(m)) ?? [];
+  const unmatchedPreferShotOptions = (() => {
+    const shots = coverage?.shots ?? [];
+    if (!shots.length) return [];
+    const rank = (status: string) =>
+      status === "missing" ? 0 : status === "partial" ? 1 : 2;
+    return [...shots]
+      .sort((a, b) => rank(a.status) - rank(b.status))
+      .map((s) => ({
+        id: s.plannedShotId,
+        label:
+          [s.scene, s.shotName || s.shotType || "Shot"].filter(Boolean).join(" - ") ||
+          s.plannedShotId,
+        status: s.status,
+      }));
+  })();
   const step7Done = Boolean(timeline && timeline.tracks.some((t) => t.clips.length));
   const step8Done = Boolean(timeline && timeline.version > 1);
   const step9Done = Boolean(timeline?.finishing);
@@ -6602,18 +6621,20 @@ export function AiEditorClient({ projectId }: Props) {
                   } not linked to any planned shot.`}
                 </p>
                 <p className="mt-1 text-xs text-amber-900/80">
-                  Watch to decide if they’re B-roll, junk, or a take that needs Prefer on a shot
-                  above. Filename-only first cut may still include them.
+                  Watch, then Prefer onto a shot (missing/partial listed first). That pulls the
+                  take into a preferred-take first cut.
                 </p>
-                <ul className="mt-2.5 max-h-48 space-y-1.5 overflow-y-auto">
+                <ul className="mt-2.5 max-h-64 space-y-1.5 overflow-y-auto">
                   {unmatchedClips.slice(0, 24).map((m) => {
                     const canPlay = Boolean(playbackPathForAsset(m));
+                    const shotId = unmatchedPreferShotByMedia[m.id] || "";
+                    const shotOpt = unmatchedPreferShotOptions.find((s) => s.id === shotId);
                     return (
                       <li
                         key={m.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-100/80 bg-white/70 px-2 py-1.5 text-xs"
+                        className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-100/80 bg-white/70 px-2 py-1.5 text-xs"
                       >
-                        <span className="min-w-0 truncate font-medium text-amber-950">
+                        <span className="min-w-0 flex-1 truncate font-medium text-amber-950">
                           {m.filename || m.id}
                         </span>
                         {canPlay ? (
@@ -6629,6 +6650,56 @@ export function AiEditorClient({ projectId }: Props) {
                         ) : (
                           <span className="shrink-0 text-amber-800/70">No preview path</span>
                         )}
+                        {unmatchedPreferShotOptions.length ? (
+                          <>
+                            <select
+                              className="max-w-[11rem] shrink-0 rounded-md border border-amber-200 bg-white px-1.5 py-1 text-[11px] text-slate-800"
+                              value={shotId}
+                              disabled={!!busy}
+                              aria-label={`Assign ${m.filename || "clip"} to a shot`}
+                              onChange={(e) =>
+                                setUnmatchedPreferShotByMedia((prev) => ({
+                                  ...prev,
+                                  [m.id]: e.target.value,
+                                }))
+                              }
+                            >
+                              <option value="">Assign to shot…</option>
+                              {unmatchedPreferShotOptions.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.label}
+                                  {s.status === "missing"
+                                    ? " (missing)"
+                                    : s.status === "partial"
+                                      ? " (partial)"
+                                      : ""}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="inline-flex shrink-0 items-center gap-1 text-sky-800 underline disabled:opacity-50"
+                              disabled={!!busy || !shotId}
+                              onClick={() => {
+                                void (async () => {
+                                  const res = await onPreferTake(shotId, m.id, {
+                                    label: m.filename,
+                                    shotLabel: shotOpt?.label,
+                                  });
+                                  if (!res) return;
+                                  setUnmatchedPreferShotByMedia((prev) => {
+                                    const next = { ...prev };
+                                    delete next[m.id];
+                                    return next;
+                                  });
+                                })();
+                              }}
+                            >
+                              <Star className="h-3 w-3" />
+                              Prefer
+                            </button>
+                          </>
+                        ) : null}
                       </li>
                     );
                   })}
