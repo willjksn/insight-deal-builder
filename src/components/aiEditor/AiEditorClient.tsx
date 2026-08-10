@@ -25,6 +25,7 @@ import {
   type ManagedIngestOptions,
 } from "@/components/aiEditor/ManagedIngestReview";
 import { MediaPreview, type PreviewItem } from "@/components/aiEditor/MediaPreview";
+import { PostIngestSafetyCallout } from "@/components/aiEditor/PostIngestSafetyCallout";
 import { ResolveCoachPanel } from "@/components/aiEditor/ResolveCoachPanel";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -197,7 +198,11 @@ import type {
 } from "@/lib/aiEditor/types";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 import { mockMediaEngine } from "@/lib/aiEditor/mediaEngine";
-import { summarizeMediaSafety } from "@/lib/aiEditor/mediaSafety";
+import {
+  describePostIngestCardWipe,
+  summarizeMediaSafety,
+  type PostIngestSafetyView,
+} from "@/lib/aiEditor/mediaSafety";
 import { framesToTimecode } from "@/lib/aiEditor/frames";
 import type {
   AgentStatus,
@@ -260,6 +265,10 @@ export function AiEditorClient({ projectId }: Props) {
   const [agentToken, setAgentToken] = useState<string | null>(null);
   const [agentExpiresAt, setAgentExpiresAt] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
+  /** Sticky wipe guidance after managed card ingest. */
+  const [postIngestSafety, setPostIngestSafety] = useState<PostIngestSafetyView | null>(
+    null
+  );
   const [createProjectFolders, setCreateProjectFolders] = useState(true);
   const [addMode, setAddMode] = useState<"in_place" | "copy">("in_place");
   const [cameraLabel, setCameraLabel] = useState("CAMERA_A");
@@ -1698,6 +1707,7 @@ export function AiEditorClient({ projectId }: Props) {
     const wantProxy = Boolean(opts.prepare);
     const wantAnalyze = Boolean(opts.analyze);
     const wantArchive = Boolean(opts.archive);
+    setPostIngestSafety(null);
     const trailingSteps = [wantProxy, wantAnalyze, wantArchive].filter(Boolean).length;
     // Reserve progress for trailing passes so card offload stays the priority.
     const copyPctCap =
@@ -2102,6 +2112,39 @@ export function AiEditorClient({ projectId }: Props) {
             archiveNote +
             " Camera cards are never erased by ShootSpine."
     );
+
+    const backupStatus = (() => {
+      if (!wantArchive) return "not_requested" as const;
+      if (archiveOk > 0 && archiveFailed > 0) return "partial" as const;
+      if (archiveOk > 0) return "done" as const;
+      if (archiveSkipNote.includes("no backup folder")) return "skipped_no_folder" as const;
+      if (archiveSkipNote.includes("not ready")) return "skipped_drive" as const;
+      if (
+        archiveSkipNote.includes("stopped") ||
+        copyStopped ||
+        proxyStopped ||
+        analyzeStopped
+      ) {
+        return "skipped_stopped" as const;
+      }
+      if (archiveFailed > 0 || archiveSkipNote.toLowerCase().includes("failed")) {
+        return "failed" as const;
+      }
+      if (archiveSkipNote.toLowerCase().includes("already")) return "done" as const;
+      return "not_requested" as const;
+    })();
+
+    setPostIngestSafety(
+      describePostIngestCardWipe({
+        copiedOk,
+        failed,
+        stopped,
+        cameraLabel: cam,
+        backup: backupStatus,
+        backupOk: archiveOk,
+        backupFailed: archiveFailed,
+      })
+    );
   }
 
   function requestStopBatch() {
@@ -2136,6 +2179,7 @@ export function AiEditorClient({ projectId }: Props) {
     setBusy("index");
     setError(null);
     setStatusNote(null);
+    setPostIngestSafety(null);
     try {
       const health = await checkAgentHealth();
       setAgent(health);
@@ -2198,6 +2242,7 @@ export function AiEditorClient({ projectId }: Props) {
     setBusy("index");
     setError(null);
     setStatusNote(null);
+    setPostIngestSafety(null);
     setAddMode("copy");
     setIndexFolderPath(src.mediaRoot);
     if (src.suggestedCameraAssignment && !cameraLabel.trim()) {
@@ -4349,6 +4394,13 @@ export function AiEditorClient({ projectId }: Props) {
             />
           </div>
         </div>
+      ) : null}
+
+      {!progress && postIngestSafety ? (
+        <PostIngestSafetyCallout
+          view={postIngestSafety}
+          onDismiss={() => setPostIngestSafety(null)}
+        />
       ) : null}
 
       {media.length > 0 ? (
