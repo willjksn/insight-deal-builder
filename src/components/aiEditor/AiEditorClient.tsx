@@ -250,6 +250,8 @@ export function AiEditorClient({ projectId }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const cancelBatchRef = useRef(false);
   const copyAbortRef = useRef<AbortController | null>(null);
+  /** Pre-Drop timeline version ids for Undo in Play review (session stack). */
+  const reviewUndoStackRef = useRef<string[]>([]);
   const [batchStopping, setBatchStopping] = useState(false);
   const [context, setContext] = useState<ProductionContext | null>(null);
   const [settings, setSettings] = useState<AiEditorProjectSettings | null>(null);
@@ -310,6 +312,7 @@ export function AiEditorClient({ projectId }: Props) {
     /** Rough-cut review: allow Drop from cut. */
     reviewCut?: boolean;
   } | null>(null);
+  const [reviewUndoDepth, setReviewUndoDepth] = useState(0);
   const [chatMessage, setChatMessage] = useState("");
   const [chatProposal, setChatProposal] = useState<{
     proposal: ChatEditProposalClient;
@@ -2658,8 +2661,27 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
-  async function onRestoreVersion(versionId: string) {
-    setBusy("rough_cut");
+  function clearReviewUndoStack() {
+    reviewUndoStackRef.current = [];
+    setReviewUndoDepth(0);
+  }
+
+  function pushReviewUndo(versionId: string) {
+    reviewUndoStackRef.current.push(versionId);
+    setReviewUndoDepth(reviewUndoStackRef.current.length);
+  }
+
+  function popReviewUndo(): string | undefined {
+    const id = reviewUndoStackRef.current.pop();
+    setReviewUndoDepth(reviewUndoStackRef.current.length);
+    return id;
+  }
+
+  async function onRestoreVersion(
+    versionId: string,
+    opts?: { quiet?: boolean }
+  ) {
+    if (!opts?.quiet) setBusy("rough_cut");
     setError(null);
     try {
       const res = await aiEditorTimelineAction(getToken, projectId, {
@@ -2670,10 +2692,14 @@ export function AiEditorClient({ projectId }: Props) {
       invalidateLocalCutExport();
       setTimelineVersions(res.versions);
       setStatusNote(`Restored timeline to a previous version (now v${res.summary.version}).`);
+      return res;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Restore failed");
+      const msg = e instanceof Error ? e.message : "Restore failed";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
     } finally {
-      setBusy(null);
+      if (!opts?.quiet) setBusy(null);
     }
   }
 
@@ -2900,6 +2926,7 @@ export function AiEditorClient({ projectId }: Props) {
   async function previewRoughCut() {
     if (!timeline || !visibleClips.length) return;
     try {
+      clearReviewUndoStack();
       await openRoughCutPreviewFromTimeline(timeline);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not play cut");
@@ -2908,9 +2935,29 @@ export function AiEditorClient({ projectId }: Props) {
 
   /** From Play review: rebuild assembly from preferred takes, then reopen the player. */
   async function rebuildCutAndReplayFromReview() {
+    clearReviewUndoStack();
     const res = await onBuildRoughCut({ skipConfirm: true, quiet: true });
     if (!res?.timeline) throw new Error("Could not rebuild cut");
     await openRoughCutPreviewFromTimeline(res.timeline);
+  }
+
+  /** Undo the last Drop in Play review by restoring the pre-drop timeline version. */
+  async function undoLastDropAndReplayFromReview() {
+    const versionId = popReviewUndo();
+    if (!versionId) throw new Error("Nothing to undo");
+    try {
+      const res = await onRestoreVersion(versionId, { quiet: true });
+      if (!res?.timeline) throw new Error("Could not undo drop");
+      setStatusNote(
+        `Undo drop · cut restored (now v${res.summary.version} · ${res.summary.clipCount} clips)`
+      );
+      await openRoughCutPreviewFromTimeline(res.timeline);
+    } catch (e) {
+      // Put the version back so the user can retry.
+      reviewUndoStackRef.current.push(versionId);
+      setReviewUndoDepth(reviewUndoStackRef.current.length);
+      throw e;
+    }
   }
 
   async function persistEditNotes(next: EditNote[]) {
@@ -4489,6 +4536,10 @@ export function AiEditorClient({ projectId }: Props) {
                     label: item?.label,
                   });
                   if (!res) return;
+                  const prior = res.versions.find(
+                    (v) => v.version === res.timeline.version - 1
+                  );
+                  if (prior) pushReviewUndo(prior.id);
                   setPreview((prev) =>
                     prev
                       ? {
@@ -4503,6 +4554,14 @@ export function AiEditorClient({ projectId }: Props) {
                 }
               : undefined
           }
+          onUndoDrop={
+            preview.reviewCut
+              ? async () => {
+                  await undoLastDropAndReplayFromReview();
+                }
+              : undefined
+          }
+          canUndoDrop={preview.reviewCut ? reviewUndoDepth > 0 : false}
           onPreferClip={
             preview.reviewCut
               ? async (item) => {
@@ -5634,7 +5693,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → Prefer (P) / Drop (Delete) → Rebuild cut (R) → Resolve.
+                Next: Play → Prefer (P) / Drop (Delete) / Undo (U) → Rebuild (R) → Resolve.
               </p>
             </div>
 

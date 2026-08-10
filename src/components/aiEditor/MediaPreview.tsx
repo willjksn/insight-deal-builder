@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Clapperboard, Loader2, SkipForward, Star, Trash2, X } from "lucide-react";
+import {
+  Clapperboard,
+  Loader2,
+  SkipForward,
+  Star,
+  Trash2,
+  Undo2,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 export type PreviewItem = {
@@ -35,6 +43,10 @@ type Props = {
   onPreferClip?: (item: PreviewItem) => Promise<void> | void;
   /** Rebuild assembly from preferred takes and reopen Play. */
   onRebuildCut?: () => Promise<void> | void;
+  /** Undo the last Drop (restore prior timeline version + replay). */
+  onUndoDrop?: () => Promise<void> | void;
+  /** Whether Undo is available for this Play session. */
+  canUndoDrop?: boolean;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -51,6 +63,8 @@ export function MediaPreview({
   onRemoveClip,
   onPreferClip,
   onRebuildCut,
+  onUndoDrop,
+  canUndoDrop = false,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const advancingRef = useRef(false);
@@ -61,17 +75,21 @@ export function MediaPreview({
   const [removing, setRemoving] = useState(false);
   const [preferring, setPreferring] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
+  const [undoing, setUndoing] = useState(false);
   const [preferDirty, setPreferDirty] = useState(false);
   const [actionNote, setActionNote] = useState<string | null>(null);
 
   const item = items[index];
   const src = item ? resolveUrl(item) : "";
   const asImage = item ? isImagePath(item.path) : false;
-  const reviewMode = Boolean(onRemoveClip || onPreferClip || onRebuildCut);
-  const busyAction = removing || preferring || rebuilding;
+  const reviewMode = Boolean(
+    onRemoveClip || onPreferClip || onRebuildCut || onUndoDrop
+  );
+  const busyAction = removing || preferring || rebuilding || undoing;
   const canPrefer =
     Boolean(onPreferClip && item?.plannedShotId && item?.mediaAssetId) &&
     !item?.isPreferred;
+  const showUndo = Boolean(onUndoDrop && canUndoDrop);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -79,7 +97,7 @@ export function MediaPreview({
         onClose();
         return;
       }
-      if (e.key === "ArrowRight") {
+      if (e.key === "ArrowRight" && item) {
         e.preventDefault();
         advance();
         return;
@@ -101,6 +119,15 @@ export function MediaPreview({
       if ((e.key === "r" || e.key === "R") && onRebuildCut && !busyAction) {
         e.preventDefault();
         void rebuildCut();
+        return;
+      }
+      if (
+        (e.key === "u" || e.key === "U" || ((e.ctrlKey || e.metaKey) && e.key === "z")) &&
+        showUndo &&
+        !busyAction
+      ) {
+        e.preventDefault();
+        void undoDrop();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -111,16 +138,28 @@ export function MediaPreview({
       document.body.style.overflow = prevOverflow;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- key handlers use latest via closures on each render
-  }, [onClose, onRemoveClip, onPreferClip, onRebuildCut, index, items, canPrefer, busyAction]);
+  }, [
+    onClose,
+    onRemoveClip,
+    onPreferClip,
+    onRebuildCut,
+    onUndoDrop,
+    index,
+    items,
+    canPrefer,
+    busyAction,
+    showUndo,
+    item,
+  ]);
 
   useEffect(() => {
     advancingRef.current = false;
   }, [index, src]);
 
   useEffect(() => {
-    if (asImage) return;
+    if (!item || asImage) return;
     const el = videoRef.current;
-    if (!el || !item) return;
+    if (!el) return;
     setLoading(true);
     setError(null);
 
@@ -178,13 +217,14 @@ export function MediaPreview({
       setItems((prev) => {
         const next = prev.filter((i) => i.clipId !== clipId);
         if (!next.length) {
-          onClose();
-          return prev;
+          setActionNote("Cut empty · U undoes the last drop");
+          setIndex(0);
+          return next;
         }
         setActionNote(
           next.length === 1
-            ? "Dropped · 1 clip left in cut"
-            : `Dropped · ${next.length} clips left in cut`
+            ? "Dropped · 1 clip left · U undoes"
+            : `Dropped · ${next.length} clips left · U undoes`
         );
         setIndex((i) => Math.min(i, next.length - 1));
         return next;
@@ -235,7 +275,6 @@ export function MediaPreview({
     if (el) el.pause();
     try {
       await onRebuildCut();
-      // Parent remounts preview with a new session; if not, clear spinner.
       setPreferDirty(false);
       setActionNote("Cut rebuilt · playing new assembly");
     } catch (e) {
@@ -246,7 +285,119 @@ export function MediaPreview({
     }
   }
 
-  if (!item) return null;
+  async function undoDrop() {
+    if (!onUndoDrop || !canUndoDrop || busyAction) return;
+    setUndoing(true);
+    setError(null);
+    setActionNote("Undoing last drop…");
+    const el = videoRef.current;
+    if (el) el.pause();
+    try {
+      await onUndoDrop();
+      setActionNote("Drop undone · playing restored cut");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not undo drop");
+      setActionNote(null);
+    } finally {
+      setUndoing(false);
+    }
+  }
+
+  const toolbar = reviewMode ? (
+    <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 px-3 py-2">
+      {item ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busyAction || index >= items.length - 1}
+          onClick={() => advance()}
+        >
+          <SkipForward className="mr-1.5 h-3.5 w-3.5" />
+          Skip
+        </Button>
+      ) : null}
+      {item && canPrefer ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busyAction}
+          onClick={() => void preferCurrent()}
+        >
+          {preferring ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Star className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          Prefer this take
+        </Button>
+      ) : item?.isPreferred ? (
+        <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-700/50 bg-emerald-950/40 px-2 py-1 text-[11px] text-emerald-300">
+          <Star className="h-3 w-3" />
+          Preferred
+        </span>
+      ) : null}
+      {item?.clipId && onRemoveClip ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busyAction}
+          onClick={() => void removeCurrent()}
+        >
+          {removing ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          Drop from cut
+        </Button>
+      ) : null}
+      {showUndo ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busyAction}
+          onClick={() => void undoDrop()}
+        >
+          {undoing ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Undo2 className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          Undo drop
+        </Button>
+      ) : null}
+      {onRebuildCut ? (
+        <Button
+          type="button"
+          size="sm"
+          variant={preferDirty ? "primary" : "secondary"}
+          disabled={busyAction}
+          onClick={() => void rebuildCut()}
+        >
+          {rebuilding ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Clapperboard className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          Rebuild cut
+        </Button>
+      ) : null}
+      <span className="text-[11px] text-slate-400">
+        {item ? "→ skip" : "Cut empty"}
+        {onPreferClip ? " · P prefer" : ""}
+        {onRemoveClip ? " · Delete drops" : ""}
+        {showUndo ? " · U undo" : ""}
+        {onRebuildCut ? " · R rebuild" : ""}
+      </span>
+      {actionNote ? (
+        <span className="ml-auto text-[11px] text-emerald-300">{actionNote}</span>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
     <div
@@ -263,10 +414,16 @@ export function MediaPreview({
           <div className="min-w-0">
             <div className="truncate font-medium">{title}</div>
             <div className="truncate text-xs text-slate-300">
-              {item.label}
-              {item.shotLabel ? ` · ${item.shotLabel}` : ""}
-              {item.isPreferred ? " · preferred" : ""}
-              {items.length > 1 ? ` · ${index + 1}/${items.length}` : ""}
+              {item ? (
+                <>
+                  {item.label}
+                  {item.shotLabel ? ` · ${item.shotLabel}` : ""}
+                  {item.isPreferred ? " · preferred" : ""}
+                  {items.length > 1 ? ` · ${index + 1}/${items.length}` : ""}
+                </>
+              ) : (
+                "No clips in cut"
+              )}
             </div>
           </div>
           <button
@@ -279,128 +436,83 @@ export function MediaPreview({
           </button>
         </div>
         <div className="relative aspect-video bg-black">
-          {loading ? (
-            <div className="absolute inset-0 z-10 flex items-center justify-center text-slate-400">
-              <Loader2 className="h-6 w-6 animate-spin" />
+          {!item ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+              <p className="text-sm text-slate-300">
+                Every clip was dropped from this cut.
+              </p>
+              {showUndo ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={busyAction}
+                  onClick={() => void undoDrop()}
+                >
+                  {undoing ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Undo2 className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Undo last drop
+                </Button>
+              ) : (
+                <p className="text-xs text-slate-500">
+                  Close and restore a version under Step 7, or rebuild the first cut.
+                </p>
+              )}
             </div>
-          ) : null}
-          {asImage ? (
-            // eslint-disable-next-line @next/next/no-img-element -- local agent stream URL
-            <img
-              key={`${src}_${index}`}
-              src={src}
-              alt={item.label}
-              className="h-full w-full object-contain"
-              onLoad={() => setLoading(false)}
-              onError={() => {
-                setLoading(false);
-                setError("Couldn’t load this still from the Desktop Agent.");
-              }}
-            />
           ) : (
-            <video
-              ref={videoRef}
-              key={`${src}_${index}`}
-              className="h-full w-full"
-              controls
-              playsInline
-              preload="metadata"
-              src={src}
-              onLoadedData={() => setLoading(false)}
-              onCanPlay={() => setLoading(false)}
-              onError={() => {
-                setLoading(false);
-                setError(
-                  "This camera original can’t play here (FX3 XAVC / 4K often fails in browsers and Windows Media Player). Close this, click Watch again to build a light preview, or open the file in DaVinci Resolve / VLC. Originals stay untouched for Resolve."
-                );
-              }}
-              onEnded={() => advance()}
-              onTimeUpdate={() => {
-                const el = videoRef.current;
-                if (!el || item.endSeconds == null || advancingRef.current) return;
-                if (el.currentTime >= item.endSeconds - 0.05) {
-                  advance();
-                }
-              }}
-            />
+            <>
+              {loading ? (
+                <div className="absolute inset-0 z-10 flex items-center justify-center text-slate-400">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : null}
+              {asImage ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local agent stream URL
+                <img
+                  key={`${src}_${index}`}
+                  src={src}
+                  alt={item.label}
+                  className="h-full w-full object-contain"
+                  onLoad={() => setLoading(false)}
+                  onError={() => {
+                    setLoading(false);
+                    setError("Couldn’t load this still from the Desktop Agent.");
+                  }}
+                />
+              ) : (
+                <video
+                  ref={videoRef}
+                  key={`${src}_${index}`}
+                  className="h-full w-full"
+                  controls
+                  playsInline
+                  preload="metadata"
+                  src={src}
+                  onLoadedData={() => setLoading(false)}
+                  onCanPlay={() => setLoading(false)}
+                  onError={() => {
+                    setLoading(false);
+                    setError(
+                      "This camera original can’t play here (FX3 XAVC / 4K often fails in browsers and Windows Media Player). Close this, click Watch again to build a light preview, or open the file in DaVinci Resolve / VLC. Originals stay untouched for Resolve."
+                    );
+                  }}
+                  onEnded={() => advance()}
+                  onTimeUpdate={() => {
+                    const el = videoRef.current;
+                    if (!el || item.endSeconds == null || advancingRef.current) return;
+                    if (el.currentTime >= item.endSeconds - 0.05) {
+                      advance();
+                    }
+                  }}
+                />
+              )}
+            </>
           )}
         </div>
-        {reviewMode ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 px-3 py-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={busyAction || index >= items.length - 1}
-              onClick={() => advance()}
-            >
-              <SkipForward className="mr-1.5 h-3.5 w-3.5" />
-              Skip
-            </Button>
-            {canPrefer ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                disabled={busyAction}
-                onClick={() => void preferCurrent()}
-              >
-                {preferring ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Star className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                Prefer this take
-              </Button>
-            ) : item.isPreferred ? (
-              <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-700/50 bg-emerald-950/40 px-2 py-1 text-[11px] text-emerald-300">
-                <Star className="h-3 w-3" />
-                Preferred
-              </span>
-            ) : null}
-            {item.clipId && onRemoveClip ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                disabled={busyAction}
-                onClick={() => void removeCurrent()}
-              >
-                {removing ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                Drop from cut
-              </Button>
-            ) : null}
-            {onRebuildCut ? (
-              <Button
-                type="button"
-                size="sm"
-                variant={preferDirty ? "primary" : "secondary"}
-                disabled={busyAction}
-                onClick={() => void rebuildCut()}
-              >
-                {rebuilding ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Clapperboard className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                Rebuild cut
-              </Button>
-            ) : null}
-            <span className="text-[11px] text-slate-400">
-              → skip
-              {onPreferClip ? " · P prefer" : ""}
-              {onRemoveClip ? " · Delete drops" : ""}
-              {onRebuildCut ? " · R rebuild" : ""}
-            </span>
-            {actionNote ? (
-              <span className="ml-auto text-[11px] text-emerald-300">{actionNote}</span>
-            ) : null}
-          </div>
-        ) : null}
+        {toolbar}
         {error ? <p className="px-3 py-2 text-xs text-amber-200">{error}</p> : null}
         <p className="px-3 py-2 text-[11px] text-slate-400">
           Playing from this computer — nothing uploads to the cloud. Esc or click outside to close.
