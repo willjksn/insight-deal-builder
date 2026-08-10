@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Clapperboard,
   Loader2,
+  SkipBack,
   SkipForward,
   Star,
   Trash2,
@@ -25,6 +26,8 @@ export type PreviewItem = {
   shotLabel?: string;
   /** Already the preferred take for plannedShotId. */
   isPreferred?: boolean;
+  /** Optional still for the clip strip. */
+  thumbnailDataUrl?: string;
   /** Source in-point (seconds) */
   startSeconds?: number;
   /** Source out-point (seconds) */
@@ -67,6 +70,7 @@ export function MediaPreview({
   canUndoDrop = false,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const stripRef = useRef<HTMLDivElement | null>(null);
   const advancingRef = useRef(false);
   const [items, setItems] = useState(initialItems);
   const [index, setIndex] = useState(0);
@@ -99,7 +103,12 @@ export function MediaPreview({
       }
       if (e.key === "ArrowRight" && item) {
         e.preventDefault();
-        advance();
+        goTo(index + 1);
+        return;
+      }
+      if (e.key === "ArrowLeft" && item) {
+        e.preventDefault();
+        goTo(index - 1);
         return;
       }
       if (
@@ -157,6 +166,13 @@ export function MediaPreview({
   }, [index, src]);
 
   useEffect(() => {
+    const root = stripRef.current;
+    if (!root) return;
+    const active = root.querySelector<HTMLElement>(`[data-strip-index="${index}"]`);
+    active?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [index, items.length]);
+
+  useEffect(() => {
     if (!item || asImage) return;
     const el = videoRef.current;
     if (!el) return;
@@ -196,13 +212,24 @@ export function MediaPreview({
     };
   }, [src, item, asImage]);
 
-  function advance() {
+  function goTo(nextIndex: number) {
+    if (busyAction) return;
+    if (nextIndex < 0 || nextIndex >= items.length) return;
+    if (nextIndex === index) return;
+    // Guard double-fire from ended + timeupdate on auto-advance.
     if (advancingRef.current) return;
-    if (index >= items.length - 1) return;
     advancingRef.current = true;
     const el = videoRef.current;
     if (el) el.pause();
-    setIndex((i) => i + 1);
+    setIndex(nextIndex);
+  }
+
+  function advance() {
+    goTo(index + 1);
+  }
+
+  function goPrev() {
+    goTo(index - 1);
   }
 
   async function removeCurrent() {
@@ -303,19 +330,80 @@ export function MediaPreview({
     }
   }
 
+  const clipStrip =
+    reviewMode && items.length > 1 ? (
+      <div
+        ref={stripRef}
+        className="flex gap-1.5 overflow-x-auto border-t border-slate-800 px-3 py-2 scrollbar-thin"
+        role="listbox"
+        aria-label="Clips in this cut"
+      >
+        {items.map((clip, i) => {
+          const active = i === index;
+          const label = clip.shotLabel || clip.label;
+          return (
+            <button
+              key={clip.clipId || `${clip.path}_${i}`}
+              type="button"
+              role="option"
+              aria-selected={active}
+              data-strip-index={i}
+              disabled={busyAction}
+              title={label}
+              onClick={() => goTo(i)}
+              className={`relative w-20 shrink-0 overflow-hidden rounded-lg border text-left transition ${
+                active
+                  ? "border-sky-400 ring-1 ring-sky-400/60"
+                  : "border-slate-700 hover:border-slate-500"
+              } ${busyAction ? "opacity-60" : ""}`}
+            >
+              {clip.thumbnailDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local data URL still
+                <img
+                  src={clip.thumbnailDataUrl}
+                  alt=""
+                  className="h-12 w-full object-cover bg-slate-900"
+                />
+              ) : (
+                <div className="flex h-12 items-center justify-center bg-slate-900 text-[10px] text-slate-500">
+                  {i + 1}
+                </div>
+              )}
+              <div className="truncate px-1 py-0.5 text-[10px] text-slate-300">
+                {clip.isPreferred ? "★ " : ""}
+                {label}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    ) : null;
+
   const toolbar = reviewMode ? (
     <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 px-3 py-2">
       {item ? (
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={busyAction || index >= items.length - 1}
-          onClick={() => advance()}
-        >
-          <SkipForward className="mr-1.5 h-3.5 w-3.5" />
-          Skip
-        </Button>
+        <>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busyAction || index <= 0}
+            onClick={() => goPrev()}
+          >
+            <SkipBack className="mr-1.5 h-3.5 w-3.5" />
+            Prev
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busyAction || index >= items.length - 1}
+            onClick={() => advance()}
+          >
+            <SkipForward className="mr-1.5 h-3.5 w-3.5" />
+            Next
+          </Button>
+        </>
       ) : null}
       {item && canPrefer ? (
         <Button
@@ -387,7 +475,7 @@ export function MediaPreview({
         </Button>
       ) : null}
       <span className="text-[11px] text-slate-400">
-        {item ? "→ skip" : "Cut empty"}
+        {item ? "← → jump" : "Cut empty"}
         {onPreferClip ? " · P prefer" : ""}
         {onRemoveClip ? " · Delete drops" : ""}
         {showUndo ? " · U undo" : ""}
@@ -512,6 +600,7 @@ export function MediaPreview({
             </>
           )}
         </div>
+        {clipStrip}
         {toolbar}
         {error ? <p className="px-3 py-2 text-xs text-amber-200">{error}</p> : null}
         <p className="px-3 py-2 text-[11px] text-slate-400">

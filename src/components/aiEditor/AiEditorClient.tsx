@@ -2898,6 +2898,7 @@ export function AiEditorClient({ projectId }: Props) {
         isPreferred: Boolean(
           shot?.preferredMediaAssetId && shot.preferredMediaAssetId === clip.mediaAssetId
         ),
+        thumbnailDataUrl: asset?.thumbnailDataUrl,
         label: clip.label || asset?.filename || clip.id,
         startSeconds,
         endSeconds,
@@ -5693,7 +5694,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → Prefer (P) / Drop (Delete) / Undo (U) → Rebuild (R) → Resolve.
+                Next: Play → jump clips (← → / strip) → Prefer / Drop / Undo → Rebuild → Resolve.
               </p>
             </div>
 
