@@ -2484,8 +2484,8 @@ export function AiEditorClient({ projectId }: Props) {
       const take = opts?.label?.trim();
       setStatusNote(
         take
-          ? `Preferred for ${shot}: ${take}. Rebuild first cut to use it in the assembly.`
-          : `Preferred take updated for ${shot}. Rebuild first cut to use it in the assembly.`
+          ? `Preferred for ${shot}: ${take}. Press R in the player (or Rebuild cut) to reshuffle.`
+          : `Preferred take updated for ${shot}. Press R in the player (or Rebuild cut) to reshuffle.`
       );
       return res;
     } catch (e) {
@@ -2566,20 +2566,20 @@ export function AiEditorClient({ projectId }: Props) {
     setResolvePackageStale(true);
   }
 
-  async function onBuildRoughCut() {
+  async function onBuildRoughCut(opts?: { skipConfirm?: boolean; quiet?: boolean }) {
     const hasCut = Boolean(videoTrack?.clips?.length);
     const multiReels = (timeline?.reels?.length ?? 0) > 1;
-    if (hasCut) {
+    if (hasCut && !opts?.skipConfirm) {
       const ok = window.confirm(
         multiReels
           ? "Rebuild replaces your current cut and act/reel layout with a new assembly from preferred takes. Earlier versions stay under Versions / Restore. Continue?"
           : "Rebuild replaces your current rough cut with a new assembly from preferred takes. Earlier versions stay under Versions / Restore. Continue?"
       );
-      if (!ok) return;
+      if (!ok) return undefined;
     }
-    setBusy("rough_cut");
+    if (!opts?.quiet) setBusy("rough_cut");
     setError(null);
-    setStatusNote(null);
+    if (!opts?.quiet) setStatusNote(null);
     try {
       const res = await aiEditorTimelineAction(getToken, projectId, {
         action: "build_rough_cut",
@@ -2592,10 +2592,14 @@ export function AiEditorClient({ projectId }: Props) {
       setStatusNote(
         `Rough cut v${res.summary.version}: ${res.summary.clipCount} clip placements - ${res.summary.durationTimecode}`
       );
+      return res;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not build rough cut");
+      const msg = e instanceof Error ? e.message : "Could not build rough cut";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
     } finally {
-      setBusy(null);
+      if (!opts?.quiet) setBusy(null);
     }
   }
 
@@ -2800,11 +2804,27 @@ export function AiEditorClient({ projectId }: Props) {
     })();
   }
 
-  async function previewRoughCut() {
-    if (!timeline || !visibleClips.length) return;
+  function visibleClipsFromTimeline(tl: Timeline) {
+    const track = tl.tracks.find((t) => t.kind === "video");
+    const clips = track?.clips ?? [];
+    const inReel =
+      !tl.activeReelId || !tl.reels?.length
+        ? clips
+        : clips.filter((c) => c.reelId === tl.activeReelId);
+    return inReel.filter((c) => {
+      const asset = media.find((m) => m.id === c.mediaAssetId);
+      return asset ? isRoughCutVideoAsset(asset) : true;
+    });
+  }
+
+  async function openRoughCutPreviewFromTimeline(tl: Timeline) {
     setError(null);
     cancelBatchRef.current = false;
-    const clips = [...visibleClips];
+    const clips = visibleClipsFromTimeline(tl);
+    if (!clips.length) {
+      setStatusNote("No clips in this cut to play after rebuild.");
+      return;
+    }
     const needPrep = clips.filter((clip) => {
       const asset = media.find((m) => m.id === clip.mediaAssetId);
       return asset ? assetNeedsBrowserProxy(asset) : false;
@@ -2812,73 +2832,85 @@ export function AiEditorClient({ projectId }: Props) {
     /** Fresh proxy paths (React media state may lag behind ensureProxyForWatch). */
     const proxyByAssetId = new Map<string, string>();
 
-    try {
-      // Prepare light proxies on demand (same path as Watch) so Play isn’t blocked on Step 4.
-      for (let i = 0; i < needPrep.length; i++) {
-        if (cancelBatchRef.current) break;
-        const clip = needPrep[i]!;
-        const asset = media.find((m) => m.id === clip.mediaAssetId);
-        if (!asset) continue;
-        setStatusNote(
-          `Preparing preview ${i + 1}/${needPrep.length} for Play: ${asset.filename}`
-        );
-        const proxyPath = await ensureProxyForWatch(asset);
-        if (proxyPath) proxyByAssetId.set(asset.id, proxyPath);
-      }
-      if (cancelBatchRef.current) {
-        setStatusNote("Stopped preparing previews — Play again when ready.");
-        return;
-      }
+    for (let i = 0; i < needPrep.length; i++) {
+      if (cancelBatchRef.current) break;
+      const clip = needPrep[i]!;
+      const asset = media.find((m) => m.id === clip.mediaAssetId);
+      if (!asset) continue;
+      setStatusNote(
+        `Preparing preview ${i + 1}/${needPrep.length} for Play: ${asset.filename}`
+      );
+      const proxyPath = await ensureProxyForWatch(asset);
+      if (proxyPath) proxyByAssetId.set(asset.id, proxyPath);
+    }
+    if (cancelBatchRef.current) {
+      setStatusNote("Stopped preparing previews — Play again when ready.");
+      return;
+    }
 
-      const items: PreviewItem[] = [];
-      let skipped = 0;
-      for (const clip of clips) {
-        const asset = media.find((m) => m.id === clip.mediaAssetId);
-        const path =
-          proxyByAssetId.get(clip.mediaAssetId) ??
-          (asset ? playbackPathForAsset(asset) : null);
-        if (!path) {
-          skipped += 1;
-          continue;
-        }
-        const startSeconds = framesToSeconds(clip.sourceInFrame, timeline.frameRate);
-        const endSeconds =
-          startSeconds + framesToSeconds(clip.durationFrames, timeline.frameRate);
-        const shot = coverageShotForMedia(clip.mediaAssetId);
-        items.push({
-          path,
-          clipId: clip.id,
-          mediaAssetId: clip.mediaAssetId,
-          plannedShotId: shot?.plannedShotId,
-          shotLabel: shot?.shotName || shot?.shotType || undefined,
-          isPreferred: Boolean(
-            shot?.preferredMediaAssetId && shot.preferredMediaAssetId === clip.mediaAssetId
-          ),
-          label: clip.label || asset?.filename || clip.id,
-          startSeconds,
-          endSeconds,
-        });
+    const items: PreviewItem[] = [];
+    let skipped = 0;
+    for (const clip of clips) {
+      const asset = media.find((m) => m.id === clip.mediaAssetId);
+      const path =
+        proxyByAssetId.get(clip.mediaAssetId) ??
+        (asset ? playbackPathForAsset(asset) : null);
+      if (!path) {
+        skipped += 1;
+        continue;
       }
-      if (!items.length) {
-        setStatusNote(
-          "No online clips to preview - reconnect media or prepare proxies, then try again."
-        );
-        return;
-      }
-      if (skipped > 0) {
-        setStatusNote(
-          `Preview skipped ${skipped} offline clip${skipped === 1 ? "" : "s"} - the full cut may be longer.`
-        );
-      } else {
-        setStatusNote(null);
-      }
-      const title = activeReelName
-        ? `${activeReelName} - rough cut v${timeline.version}`
-        : `Rough cut v${timeline.version}`;
-      await openPreview(title, items, { reviewCut: true });
+      const startSeconds = framesToSeconds(clip.sourceInFrame, tl.frameRate);
+      const endSeconds =
+        startSeconds + framesToSeconds(clip.durationFrames, tl.frameRate);
+      const shot = coverageShotForMedia(clip.mediaAssetId);
+      items.push({
+        path,
+        clipId: clip.id,
+        mediaAssetId: clip.mediaAssetId,
+        plannedShotId: shot?.plannedShotId,
+        shotLabel: shot?.shotName || shot?.shotType || undefined,
+        isPreferred: Boolean(
+          shot?.preferredMediaAssetId && shot.preferredMediaAssetId === clip.mediaAssetId
+        ),
+        label: clip.label || asset?.filename || clip.id,
+        startSeconds,
+        endSeconds,
+      });
+    }
+    if (!items.length) {
+      setStatusNote(
+        "No online clips to preview - reconnect media or prepare proxies, then try again."
+      );
+      return;
+    }
+    if (skipped > 0) {
+      setStatusNote(
+        `Preview skipped ${skipped} offline clip${skipped === 1 ? "" : "s"} - the full cut may be longer.`
+      );
+    } else {
+      setStatusNote(null);
+    }
+    const reelName = tl.reels?.find((r) => r.id === tl.activeReelId)?.name || null;
+    const title = reelName
+      ? `${reelName} - rough cut v${tl.version}`
+      : `Rough cut v${tl.version}`;
+    await openPreview(title, items, { reviewCut: true });
+  }
+
+  async function previewRoughCut() {
+    if (!timeline || !visibleClips.length) return;
+    try {
+      await openRoughCutPreviewFromTimeline(timeline);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not play cut");
     }
+  }
+
+  /** From Play review: rebuild assembly from preferred takes, then reopen the player. */
+  async function rebuildCutAndReplayFromReview() {
+    const res = await onBuildRoughCut({ skipConfirm: true, quiet: true });
+    if (!res?.timeline) throw new Error("Could not rebuild cut");
+    await openRoughCutPreviewFromTimeline(res.timeline);
   }
 
   async function persistEditNotes(next: EditNote[]) {
@@ -4501,6 +4533,13 @@ export function AiEditorClient({ projectId }: Props) {
                 }
               : undefined
           }
+          onRebuildCut={
+            preview.reviewCut
+              ? async () => {
+                  await rebuildCutAndReplayFromReview();
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -5595,7 +5634,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → Prefer (P) / Drop (Delete) → Rebuild if you changed preferred → Resolve.
+                Next: Play → Prefer (P) / Drop (Delete) → Rebuild cut (R) → Resolve.
               </p>
             </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, SkipForward, Star, Trash2, X } from "lucide-react";
+import { Clapperboard, Loader2, SkipForward, Star, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 export type PreviewItem = {
@@ -33,6 +33,8 @@ type Props = {
   onRemoveClip?: (clipId: string) => Promise<void> | void;
   /** Rough-cut review: mark current take preferred for its matched shot. */
   onPreferClip?: (item: PreviewItem) => Promise<void> | void;
+  /** Rebuild assembly from preferred takes and reopen Play. */
+  onRebuildCut?: () => Promise<void> | void;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -48,6 +50,7 @@ export function MediaPreview({
   onClose,
   onRemoveClip,
   onPreferClip,
+  onRebuildCut,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const advancingRef = useRef(false);
@@ -57,12 +60,15 @@ export function MediaPreview({
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState(false);
   const [preferring, setPreferring] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
+  const [preferDirty, setPreferDirty] = useState(false);
   const [actionNote, setActionNote] = useState<string | null>(null);
 
   const item = items[index];
   const src = item ? resolveUrl(item) : "";
   const asImage = item ? isImagePath(item.path) : false;
-  const reviewMode = Boolean(onRemoveClip || onPreferClip);
+  const reviewMode = Boolean(onRemoveClip || onPreferClip || onRebuildCut);
+  const busyAction = removing || preferring || rebuilding;
   const canPrefer =
     Boolean(onPreferClip && item?.plannedShotId && item?.mediaAssetId) &&
     !item?.isPreferred;
@@ -90,6 +96,11 @@ export function MediaPreview({
       if ((e.key === "p" || e.key === "P") && canPrefer) {
         e.preventDefault();
         void preferCurrent();
+        return;
+      }
+      if ((e.key === "r" || e.key === "R") && onRebuildCut && !busyAction) {
+        e.preventDefault();
+        void rebuildCut();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -100,7 +111,7 @@ export function MediaPreview({
       document.body.style.overflow = prevOverflow;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- key handlers use latest via closures on each render
-  }, [onClose, onRemoveClip, onPreferClip, index, items, canPrefer]);
+  }, [onClose, onRemoveClip, onPreferClip, onRebuildCut, index, items, canPrefer, busyAction]);
 
   useEffect(() => {
     advancingRef.current = false;
@@ -157,7 +168,7 @@ export function MediaPreview({
 
   async function removeCurrent() {
     const clipId = item?.clipId;
-    if (!clipId || !onRemoveClip || removing || preferring) return;
+    if (!clipId || !onRemoveClip || busyAction) return;
     setRemoving(true);
     setError(null);
     try {
@@ -186,7 +197,7 @@ export function MediaPreview({
   }
 
   async function preferCurrent() {
-    if (!item || !onPreferClip || !canPrefer || preferring || removing) return;
+    if (!item || !onPreferClip || !canPrefer || busyAction) return;
     setPreferring(true);
     setError(null);
     try {
@@ -202,15 +213,36 @@ export function MediaPreview({
           };
         })
       );
+      setPreferDirty(true);
       setActionNote(
         item.shotLabel
-          ? `Preferred for ${item.shotLabel} · Rebuild first cut to reshuffle`
-          : "Preferred · Rebuild first cut to reshuffle"
+          ? `Preferred for ${item.shotLabel} · R rebuilds the cut`
+          : "Preferred · R rebuilds the cut"
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not set preferred take");
     } finally {
       setPreferring(false);
+    }
+  }
+
+  async function rebuildCut() {
+    if (!onRebuildCut || busyAction) return;
+    setRebuilding(true);
+    setError(null);
+    setActionNote("Rebuilding cut from preferred takes…");
+    const el = videoRef.current;
+    if (el) el.pause();
+    try {
+      await onRebuildCut();
+      // Parent remounts preview with a new session; if not, clear spinner.
+      setPreferDirty(false);
+      setActionNote("Cut rebuilt · playing new assembly");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not rebuild cut");
+      setActionNote(null);
+    } finally {
+      setRebuilding(false);
     }
   }
 
@@ -299,7 +331,7 @@ export function MediaPreview({
               type="button"
               size="sm"
               variant="secondary"
-              disabled={removing || preferring || index >= items.length - 1}
+              disabled={busyAction || index >= items.length - 1}
               onClick={() => advance()}
             >
               <SkipForward className="mr-1.5 h-3.5 w-3.5" />
@@ -310,7 +342,7 @@ export function MediaPreview({
                 type="button"
                 size="sm"
                 variant="secondary"
-                disabled={preferring || removing}
+                disabled={busyAction}
                 onClick={() => void preferCurrent()}
               >
                 {preferring ? (
@@ -331,7 +363,7 @@ export function MediaPreview({
                 type="button"
                 size="sm"
                 variant="secondary"
-                disabled={removing || preferring}
+                disabled={busyAction}
                 onClick={() => void removeCurrent()}
               >
                 {removing ? (
@@ -342,10 +374,27 @@ export function MediaPreview({
                 Drop from cut
               </Button>
             ) : null}
+            {onRebuildCut ? (
+              <Button
+                type="button"
+                size="sm"
+                variant={preferDirty ? "primary" : "secondary"}
+                disabled={busyAction}
+                onClick={() => void rebuildCut()}
+              >
+                {rebuilding ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Clapperboard className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Rebuild cut
+              </Button>
+            ) : null}
             <span className="text-[11px] text-slate-400">
               → skip
               {onPreferClip ? " · P prefer" : ""}
               {onRemoveClip ? " · Delete drops" : ""}
+              {onRebuildCut ? " · R rebuild" : ""}
             </span>
             {actionNote ? (
               <span className="ml-auto text-[11px] text-emerald-300">{actionNote}</span>
