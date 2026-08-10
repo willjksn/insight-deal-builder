@@ -65,6 +65,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
               "Open the project → Prep. Link the script session and Apply so cast, locations, days, and shots seed the board.",
               "Open Coverage. Review the shot bible, upload or generate AI frames, then Sync from script if the script changed (your frames and day placement are kept).",
               "Open each shoot day’s Call sheet for logistics; print the denser one-pager for set. Use Day shots for list checkoff, storyboard, and crew packets.",
+              "After the shoot: open the project → AI Editor to ingest footage, Match preferred takes, Build a first cut, Play to trim/Drop, then hand off to DaVinci Resolve.",
               "Optional: use Stage planner for a lighting diagram.",
               "When the deal is ready, create an agreement from Quick quote or the full wizard, sign, and send to the client.",
             ],
@@ -73,7 +74,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
           {
             heading: "Where to find things",
             tips: [
-              "The project spine on each project page is your map — Script, Prep, Coverage, Stage, Reference, Agreement. Each card shows whether that step is linked yet.",
+              "The project spine on each project page is your map — Script, Prep, Coverage, AI Editor, Stage, Reference, Agreement. Each card shows whether that step is linked yet.",
               "The sidebar only shows areas your account can access. This guide uses the same rules, so you will not see instructions for tools you cannot open.",
             ],
           },
@@ -180,7 +181,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
         blocks: [
           {
             paragraphs: [
-              "Create a project from Projects → New. The project page shows the spine — Script, Prep, Coverage, Stage planner, Reference guide, and Agreement. Linked or ready states mean that step has data; open any card to work there.",
+              "Create a project from Projects → New. The project page shows the spine — Script, Prep, Coverage, AI Editor, Stage planner, Reference guide, and Agreement. Linked or ready states mean that step has data; open any card to work there.",
             ],
           },
           {
@@ -343,6 +344,52 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
             tips: [
               "Print after Coverage frames are filled so the call sheet shows useful thumbs on set.",
               "For a full visual bible print, use Day shots → Storyboard → Print storyboard instead of the call sheet.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "ai-editor",
+        title: "How to use AI Editor",
+        description:
+          "Ingest footage, Match preferred takes, Play a first cut, then finish in Resolve.",
+        canAccess: production,
+        blocks: [
+          {
+            paragraphs: [
+              "AI Editor turns camera footage into a strong first cut on a Windows workstation, then hands off to DaVinci Resolve (this PC or a Mac). Originals stay on your drives — ShootSpine does not upload camera cards to the cloud. Open it from the project spine, /ai-editor, or a footage-only workspace.",
+            ],
+          },
+          {
+            heading: "What you need",
+            bullets: [
+              "Desktop Agent connected (Step 1) — reads folders, copies, proxies, talks to Resolve.",
+              "FFmpeg for probe/proxies/analysis; optional Whisper for local speech-to-text.",
+              "Edit folder on an external SSD and optional backup folder on an HDD (guidance, not a hard rule).",
+            ],
+          },
+          {
+            heading: "Ingest → Match → first cut",
+            bullets: [
+              "Add footage with managed card ingest (detect → Ingest into project), catalog in place, or copy from a folder. Cards are never auto-erased; Step 3 keeps a recent ingest summary.",
+              "Prepare proxies for tough codecs, then run analysis when you want shot breaks / search.",
+              "Match to the plan: star preferred takes, Prefer unmatched clips onto a shot, then Build first cut.",
+              "Play the cut to Mark In/Out, Slip/Roll, Split/Join, Duplicate, reorder, Prefer / Drop, and Undo. Rebuild when preferences change.",
+            ],
+          },
+          {
+            heading: "Resolve handoff",
+            bullets: [
+              "Finish in Resolve writes a handoff package (EDL, media map, look notes). Bring edit into Resolve when scripting is ready, or take the package to a Mac.",
+              "After finishing, check what’s in Resolve, build a next-shoot checklist, and optionally send open items to board filming notes.",
+            ],
+            tips: [
+              "Use Continue · Step N inside a project to jump to the next incomplete step.",
+              "Footage-only edits skip Match and build a first cut from filename order.",
+            ],
+            links: [
+              { label: "AI Editor hub", href: "/ai-editor" },
+              { label: "Projects", href: "/projects" },
             ],
           },
         ],

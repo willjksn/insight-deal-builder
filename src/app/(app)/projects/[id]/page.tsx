@@ -164,7 +164,7 @@ export default function ProjectDetailPage() {
           <CardBody className="space-y-3 text-sm text-slate-600">
             <p>
               This workspace is for editing footage that was not planned as a full ShootSpine
-              production. Storage, media IDs, and future rough cuts live here the same way they do
+              production. Storage, media IDs, and first cuts live here the same way they do
               on production projects.
             </p>
             <p>

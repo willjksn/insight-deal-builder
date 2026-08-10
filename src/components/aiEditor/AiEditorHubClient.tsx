@@ -114,8 +114,9 @@ function HowItWorksGuideContent() {
             backup folders; optionally create organized project folders.
           </li>
           <li>
-            <span className="font-medium">Add footage</span> — catalog in place or copy into the
-            project (camera cards are never auto-erased).
+            <span className="font-medium">Add footage</span> — managed card ingest (detect → review →
+            Ingest into project), catalog in place, or copy from a folder. Cards are never
+            auto-erased; Step 3 shows a recent ingest summary after a managed offload.
           </li>
           <li>
             <span className="font-medium">Prepare clips</span> — light H.264 proxies for tough formats
@@ -126,12 +127,15 @@ function HowItWorksGuideContent() {
             breaks, optional transcription + search.
           </li>
           <li>
-            <span className="font-medium">Match to the plan</span> — when you have planned shots,
-            score coverage and preferred takes (skipped for pure footage-only).
+            <span className="font-medium">Match to the plan</span> — score clips to planned shots,
+            star preferred takes, Prefer unmatched leftovers onto a shot, then jump to Build first
+            cut (skipped for pure footage-only).
           </li>
           <li>
-            <span className="font-medium">Build a first cut</span> — assemble a timeline with
-            versions you can restore.
+            <span className="font-medium">Build a first cut</span> — assemble from preferred Match
+            takes (or filename order), then{" "}
+            <span className="font-medium">Play</span> to review: In/Out, Slip/Roll, Split/Join,
+            Duplicate, reorder, Prefer / Drop, Undo. Versions stay under Restore.
           </li>
           <li>
             <span className="font-medium">Edit by chat</span> — optional plain-language trims/moves
@@ -161,6 +165,20 @@ function HowItWorksGuideContent() {
       </section>
 
       <section className="space-y-2">
+        <h3 className="font-semibold text-slate-900">Play review (first cut)</h3>
+        <p>
+          After you build a first cut, <span className="font-medium">Play</span> opens a review
+          player with a clip strip. Shortcuts stay on the toolbar hint: I/O in/out, comma/period
+          slip, &lt;/&gt; roll, S split, J join, D duplicate, [ ] reorder, P prefer, Delete drop, U
+          undo, R rebuild.
+        </p>
+        <p>
+          Dropping or editing marks the Resolve package stale until you bring the cut into Resolve
+          again.
+        </p>
+      </section>
+
+      <section className="space-y-2">
         <h3 className="font-semibold text-slate-900">Resolve &amp; next shoot</h3>
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
@@ -171,6 +189,10 @@ function HowItWorksGuideContent() {
             After finishing, check what’s in Resolve, build a{" "}
             <span className="font-medium">next-shoot checklist</span>, and optionally send open
             items to the production board filming notes.
+          </li>
+          <li>
+            On full productions, Shoot Mode progress can sync both ways with the Content Plan /
+            board so on-set takes and notes stay aligned with Match.
           </li>
         </ul>
       </section>
@@ -226,7 +248,7 @@ function HowItWorksPanel() {
               How it works
             </div>
             <p className="mt-1 text-sm text-slate-600">
-              Full guide: drives, Desktop Agent, edit steps, Resolve, and privacy.
+              Full guide: drives, ingest, Match, Play first cut, Resolve, and privacy.
             </p>
           </div>
           <Button
@@ -261,7 +283,7 @@ function HowItWorksPanel() {
                   How AI Editor works
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Local footage · Windows workstation · Resolve finishing
+                  Local footage · Match &amp; Play first cut · Resolve finishing
                 </p>
               </div>
               <button
