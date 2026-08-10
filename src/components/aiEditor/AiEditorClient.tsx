@@ -5347,6 +5347,7 @@ export function AiEditorClient({ projectId }: Props) {
                             {typeof row.preferredScore === "number"
                               ? ` - score ${(row.preferredScore * 100).toFixed(0)}%`
                               : ""}
+                            {row.preferredReason ? ` · ${row.preferredReason}` : ""}
                           </div>
                           {row.onSetTakes?.length || row.onSetNotes ? (
                             <ShootModeShotMeta

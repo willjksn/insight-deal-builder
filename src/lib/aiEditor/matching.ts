@@ -344,10 +344,61 @@ export function scoreClipAgainstShot(input: {
   return { score: Math.max(0, Math.min(1, Number(score.toFixed(3)))), reasons };
 }
 
+/** Camera-style clip index from names like C0003.MP4 / A001C012_… */
+export function cameraClipSequence(filename: string | undefined): number | null {
+  const s = (filename || "").trim();
+  if (!s) return null;
+  // Prefer trailing camera index (Sony A001C012…); else standalone C0003.
+  const embedded = s.match(/c0*(\d{2,5})(?:[^a-z0-9]|$)/i);
+  if (embedded?.[1]) return parseInt(embedded[1], 10);
+  const clip = s.match(/(?:^|[^a-z0-9])clip[_-]?0*(\d{2,5})(?:[^a-z0-9]|$)/i);
+  if (clip?.[1]) return parseInt(clip[1], 10);
+  return null;
+}
+
+function timecodeToSortKey(tc: string | undefined): number {
+  if (!tc?.trim()) return 0;
+  const parts = tc.trim().split(/[:;]/).map((p) => parseInt(p, 10));
+  if (parts.some((n) => Number.isNaN(n))) return 0;
+  const [hh = 0, mm = 0, ss = 0, ff = 0] = parts;
+  return ((hh * 60 + mm) * 60 + ss) * 100 + ff;
+}
+
+/** Positive when `b` is later/more recent than `a` (for descending “prefer later”). */
+export function compareClipRecency(a: MediaAsset, b: MediaAsset): number {
+  const ta = Date.parse(a.creationTime || "") || 0;
+  const tb = Date.parse(b.creationTime || "") || 0;
+  if (tb !== ta) return tb - ta;
+  const tca = timecodeToSortKey(a.startTimecode);
+  const tcb = timecodeToSortKey(b.startTimecode);
+  if (tcb !== tca) return tcb - tca;
+  const sa =
+    cameraClipSequence(a.filename) ??
+    cameraClipSequence(a.originalFilename) ??
+    -1;
+  const sb =
+    cameraClipSequence(b.filename) ??
+    cameraClipSequence(b.originalFilename) ??
+    -1;
+  if (sb !== sa) return sb - sa;
+  return (b.durationSeconds || 0) - (a.durationSeconds || 0);
+}
+
+const ON_SET_TAKE_SCORE_BAND = 0.08;
+
 function pickPreferred(
   candidates: MatchCandidate[],
-  overrideMediaId?: string
-): { preferredMediaAssetId?: string; preferredScore?: number; preferredManual?: boolean } {
+  overrideMediaId?: string,
+  opts?: {
+    onSetTakes?: number[];
+    mediaById?: Map<string, MediaAsset>;
+  }
+): {
+  preferredMediaAssetId?: string;
+  preferredScore?: number;
+  preferredManual?: boolean;
+  preferredReason?: string;
+} {
   if (overrideMediaId) {
     const hit = candidates.find((c) => c.mediaAssetId === overrideMediaId);
     return {
@@ -362,6 +413,34 @@ function pickPreferred(
   });
   const top = ranked[0];
   if (!top || top.score < 0.12) return {};
+
+  const onSetTakes = opts?.onSetTakes;
+  const mediaById = opts?.mediaById;
+  if (onSetTakes?.length && mediaById && ranked.length > 1) {
+    const band = ranked.filter((c) => top.score - c.score <= ON_SET_TAKE_SCORE_BAND);
+    if (band.length > 1) {
+      const withMedia = band
+        .map((c) => ({ c, m: mediaById.get(c.mediaAssetId) }))
+        .filter((x): x is { c: MatchCandidate; m: MediaAsset } => Boolean(x.m));
+      if (withMedia.length > 1) {
+        withMedia.sort((a, b) => compareClipRecency(a.m, b.m));
+        const later = withMedia[0]!;
+        if (later.c.mediaAssetId !== top.mediaAssetId) {
+          return {
+            preferredMediaAssetId: later.c.mediaAssetId,
+            preferredScore: later.c.score,
+            preferredReason: "Later clip (on-set takes logged)",
+          };
+        }
+        return {
+          preferredMediaAssetId: top.mediaAssetId,
+          preferredScore: top.score,
+          preferredReason: "Later clip (on-set takes logged)",
+        };
+      }
+    }
+  }
+
   return { preferredMediaAssetId: top.mediaAssetId, preferredScore: top.score };
 }
 
@@ -391,6 +470,7 @@ export function buildCoverageReport(input: {
   );
 
   const videoMedia = media.filter((m) => isRoughCutVideoAsset(m));
+  const mediaById = new Map(videoMedia.map((m) => [m.id, m]));
 
   const shots: CoverageShotRow[] = (context.shots ?? []).map((shot) => {
     const dialogueLines = dialogueForShot(shot, dialMap);
@@ -414,7 +494,10 @@ export function buildCoverageReport(input: {
       }
     }
     candidates.sort((a, b) => b.score - a.score);
-    const pref = pickPreferred(candidates, overrideByShot.get(shot.id));
+    const pref = pickPreferred(candidates, overrideByShot.get(shot.id), {
+      onSetTakes: shot.onSetTakes,
+      mediaById,
+    });
     let status: CoverageShotRow["status"] = "missing";
     if (pref.preferredMediaAssetId) {
       status = candidates.length > 1 ? "multi_take" : "covered";

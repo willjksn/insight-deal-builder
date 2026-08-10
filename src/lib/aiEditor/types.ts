@@ -259,6 +259,8 @@ export interface CoverageShotRow {
   preferredMediaAssetId?: string;
   preferredScore?: number;
   preferredManual?: boolean;
+  /** Why auto-preferred (e.g. later take when on-set takes logged). */
+  preferredReason?: string;
   /** From Shoot Mode via board notes. */
   onSetTakes?: number[];
   onSetNotes?: string;

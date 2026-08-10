@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { ClipAnalysisBundle } from "@/lib/aiEditor/analysis";
 import {
   buildCoverageReport,
+  cameraClipSequence,
+  compareClipRecency,
   jaccard,
   normalizeShotSize,
   scoreClipAgainstShot,
@@ -37,6 +39,68 @@ describe("aiEditor matching", () => {
     expect(normalizeShotSize("CU")).toBe("close_up");
     expect(normalizeShotSize("Wide Shot")).toBe("wide");
     expect(normalizeShotSize("MCU")).toBe("medium");
+  });
+
+  it("reads camera clip sequence and prefers later clips", () => {
+    expect(cameraClipSequence("C0003.MP4")).toBe(3);
+    expect(cameraClipSequence("A001C012_240101.MXF")).toBe(12);
+    const early = media({
+      id: "e",
+      filename: "C0001.MP4",
+      creationTime: "2026-01-01T10:00:00.000Z",
+    });
+    const late = media({
+      id: "l",
+      filename: "C0004.MP4",
+      creationTime: "2026-01-01T10:05:00.000Z",
+    });
+    expect(compareClipRecency(early, late)).toBeGreaterThan(0);
+  });
+
+  it("prefers later near-tied clip when on-set takes are logged", () => {
+    const context: ProductionContext = {
+      projectId: "p1",
+      projectName: "Sip",
+      scenes: [],
+      characters: [],
+      locations: [],
+      people: [],
+      shootDays: [],
+      shots: [
+        {
+          id: "shot1",
+          scene: "1",
+          shotName: "Approach",
+          scoutShotNumber: 1,
+          onSetTakes: [1, 2],
+          hasFrame: false,
+        },
+      ],
+      shotCount: 1,
+      framedShotCount: 0,
+    };
+    const mediaList = [
+      media({
+        id: "m-early",
+        filename: "C0001_Approach.mp4",
+        durationSeconds: 5,
+        creationTime: "2026-01-01T10:00:00.000Z",
+      }),
+      media({
+        id: "m-late",
+        filename: "C0003_Approach.mp4",
+        durationSeconds: 5,
+        creationTime: "2026-01-01T10:03:00.000Z",
+      }),
+    ];
+    const report = buildCoverageReport({
+      projectId: "p1",
+      context,
+      media: mediaList,
+      analysis: [],
+    });
+    expect(report.shots[0]?.preferredMediaAssetId).toBe("m-late");
+    expect(report.shots[0]?.preferredReason).toMatch(/later clip/i);
   });
 
   it("scores on-set take hints in filenames", () => {
