@@ -2,8 +2,18 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, CalendarRange, FileStack, LayoutGrid, List, Printer, RefreshCw, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  CalendarRange,
+  Clapperboard,
+  FileStack,
+  LayoutGrid,
+  List,
+  Printer,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -16,6 +26,7 @@ import { StoryboardPrintView } from "@/components/production/StoryboardPrintView
 import { CrewPacketPrintView, scrollToCrewPacketSection } from "@/components/production/CrewPacketPrintView";
 import { useProductionDayPage } from "@/hooks/useProductionDayPage";
 import { useAuth } from "@/contexts/AuthContext";
+import { syncShootProgressFromBoard } from "@/lib/contentPlan/apiClient";
 import { generateCrewPacketForDay } from "@/lib/production/crewPacketClient";
 import { CREW_PACKET_ROLE_LABELS } from "@/lib/production/crewPacketTypes";
 import { scriptWriterGetSession } from "@/lib/scriptWriter/apiClient";
@@ -55,10 +66,14 @@ export default function ShotListDayPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [generatingPacket, setGeneratingPacket] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
+  const [syncingShootMode, setSyncingShootMode] = useState(false);
   const [draggingShotId, setDraggingShotId] = useState<string | null>(null);
   const [dragOverDayId, setDragOverDayId] = useState<string | null>(null);
   const [splitting, setSplitting] = useState(false);
   const packetPreviewRef = useRef<HTMLDivElement>(null);
+  const shootSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncingShootModeRef = useRef(false);
 
   const {
     project,
@@ -75,6 +90,72 @@ export default function ShotListDayPage() {
     addProductionDay,
     removeProductionDay,
   } = useProductionDayPage(projectId, dayId);
+
+  const getToken = useCallback(() => {
+    if (!user) return Promise.resolve(null);
+    return user.getIdToken();
+  }, [user]);
+
+  const scheduleAutoSyncToShootMode = useCallback(() => {
+    const planId = project?.sourceContentPlanId?.trim();
+    if (!planId) return;
+    if (shootSyncTimer.current) clearTimeout(shootSyncTimer.current);
+    shootSyncTimer.current = setTimeout(() => {
+      shootSyncTimer.current = null;
+      if (syncingShootModeRef.current) return;
+      syncingShootModeRef.current = true;
+      setSyncingShootMode(true);
+      void syncShootProgressFromBoard(getToken, planId)
+        .then((result) => {
+          if (result.updatedCount > 0) {
+            setStatusNote(
+              `Shoot Mode updated · ${result.updatedCount} shot${
+                result.updatedCount === 1 ? "" : "s"
+              }.`
+            );
+          }
+        })
+        .catch(() => {
+          /* quiet — manual Sync remains */
+        })
+        .finally(() => {
+          syncingShootModeRef.current = false;
+          setSyncingShootMode(false);
+        });
+    }, 1600);
+  }, [getToken, project?.sourceContentPlanId]);
+
+  useEffect(() => {
+    return () => {
+      if (shootSyncTimer.current) clearTimeout(shootSyncTimer.current);
+    };
+  }, []);
+
+  async function onSyncToShootMode() {
+    const planId = project?.sourceContentPlanId?.trim();
+    if (!planId) return;
+    if (shootSyncTimer.current) {
+      clearTimeout(shootSyncTimer.current);
+      shootSyncTimer.current = null;
+    }
+    syncingShootModeRef.current = true;
+    setSyncingShootMode(true);
+    setRefreshError(null);
+    setStatusNote(null);
+    try {
+      const result = await syncShootProgressFromBoard(getToken, planId);
+      setStatusNote(
+        result.updatedCount
+          ? `Synced ${result.updatedCount} shot${result.updatedCount === 1 ? "" : "s"} to Shoot Mode.`
+          : "Shoot Mode already matched day shots — nothing to update."
+      );
+    } catch (e) {
+      setRefreshError(e instanceof Error ? e.message : "Could not sync to Shoot Mode");
+    } finally {
+      syncingShootModeRef.current = false;
+      setSyncingShootMode(false);
+    }
+  }
 
   // Auto-seed required coverage once when a linked script exists but the day has none.
   const autoSeedAttempted = useRef(false);
@@ -252,10 +333,19 @@ export default function ShotListDayPage() {
   };
 
   const patchShots = (shots: typeof day.shots) => {
+    const prevById = new Map(day.shots.map((s) => [s.id, s]));
+    const shootRelevant =
+      shots.length !== day.shots.length ||
+      shots.some((s) => {
+        const prev = prevById.get(s.id);
+        if (!prev) return true;
+        return prev.done !== s.done || (prev.notes || "") !== (s.notes || "");
+      });
     patchDay({
       shots,
       coverageChecklists: syncCoverageChecklistWithShots(day.coverageChecklists, shots),
     });
+    if (shootRelevant) scheduleAutoSyncToShootMode();
   };
 
   const buildSceneFramesFromScript = async () => {
@@ -367,6 +457,20 @@ export default function ShotListDayPage() {
         action={
           <div className="flex flex-wrap gap-2">
             {saving && <span className="text-sm text-slate-400">Saving…</span>}
+            {project.sourceContentPlanId && canEditShots ? (
+              <Button
+                size="touch"
+                variant="outline"
+                disabled={syncingShootMode || refreshing || saving}
+                onClick={() => void onSyncToShootMode()}
+                title="Also runs automatically after you mark shots done or edit notes"
+              >
+                <Clapperboard
+                  className={`mr-2 h-5 w-5 ${syncingShootMode ? "animate-pulse" : ""}`}
+                />
+                {syncingShootMode ? "Syncing…" : "Sync to Shoot Mode"}
+              </Button>
+            ) : null}
             {scriptSessionId && canEditShots && (
               <Button
                 size="touch"
@@ -518,6 +622,11 @@ export default function ShotListDayPage() {
       {refreshError && (
         <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 print:hidden">
           {refreshError}
+        </p>
+      )}
+      {statusNote && (
+        <p className="mb-4 rounded-xl border border-sky-100 bg-sky-50 px-4 py-2 text-sm text-sky-900 print:hidden">
+          {statusNote}
         </p>
       )}
 
