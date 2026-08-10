@@ -42,7 +42,7 @@ export async function POST(
 
     if (!timeline) {
       return NextResponse.json(
-        { error: "Build a rough cut before exporting to Resolve" },
+        { error: "Build a first cut before exporting to Resolve" },
         { status: 400 }
       );
     }

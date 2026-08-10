@@ -44,7 +44,7 @@ export function summarizeResolveWorkflow(
     return {
       level: "ready",
       title: "Ready to bring your edit in",
-      detail: "Resolve is open with a project. We can place your rough cut automatically.",
+      detail: "Resolve is open with a project. We can place your first cut automatically.",
       canAutoImport: true,
     };
   }
@@ -139,18 +139,18 @@ export function importResultMessage(result: {
     const requested = result.mediaRequested ?? 0;
     if (linked > 0) {
       return {
-        title: "Your rough cut is in Resolve",
+        title: "Your first cut is in Resolve",
         detail: `${linked} clip${linked === 1 ? "" : "s"} linked in the “${bin}” media bin.${markerBit} Finish color on the Color page — nothing is baked.`,
       };
     }
     if (requested > 0) {
       return {
-        title: "Your rough cut is in Resolve",
+        title: "Your first cut is in Resolve",
         detail: `Timeline imported.${markerBit} If clips are offline, relink from your project media folder (bin “${bin}”).`,
       };
     }
     return {
-      title: "Your rough cut is in Resolve",
+      title: "Your first cut is in Resolve",
       detail: `${markerBit.trim() || "If clips look missing, point Resolve at your project’s media folder."}${markerBit ? " Finish color in Resolve — nothing is baked." : ""}`,
     };
   }

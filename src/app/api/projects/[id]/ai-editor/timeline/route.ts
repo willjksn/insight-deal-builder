@@ -185,7 +185,7 @@ export async function POST(
       };
     } else if (action === "setup_feature_reels") {
       if (!timeline) {
-        return NextResponse.json({ error: "Build a rough cut first" }, { status: 400 });
+        return NextResponse.json({ error: "Build a first cut first" }, { status: 400 });
       }
       const structured = setupFeatureReels(timeline, {
         mode: body.reelMode || "acts",
@@ -204,7 +204,7 @@ export async function POST(
       await saveTimelineVersion(versionRecord);
     } else if (action === "set_active_reel") {
       if (!timeline) {
-        return NextResponse.json({ error: "Build a rough cut first" }, { status: 400 });
+        return NextResponse.json({ error: "Build a first cut first" }, { status: 400 });
       }
       if (!body.reelId) {
         return NextResponse.json({ error: "reelId required" }, { status: 400 });
@@ -214,7 +214,7 @@ export async function POST(
       await upsertTimeline(timeline);
     } else if (action === "apply_finishing") {
       if (!timeline) {
-        return NextResponse.json({ error: "Build a rough cut first" }, { status: 400 });
+        return NextResponse.json({ error: "Build a first cut first" }, { status: 400 });
       }
       if (!body.moodId || !body.transitionStyle) {
         return NextResponse.json(

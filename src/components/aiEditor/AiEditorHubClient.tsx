@@ -130,7 +130,7 @@ function HowItWorksGuideContent() {
             score coverage and preferred takes (skipped for pure footage-only).
           </li>
           <li>
-            <span className="font-medium">Build a rough cut</span> — assemble a first timeline with
+            <span className="font-medium">Build a first cut</span> — assemble a timeline with
             versions you can restore.
           </li>
           <li>

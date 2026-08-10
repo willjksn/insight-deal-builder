@@ -2576,7 +2576,7 @@ export function AiEditorClient({ projectId }: Props) {
       const ok = window.confirm(
         multiReels
           ? "Rebuild replaces your current cut and act/reel layout with a new assembly from preferred takes. Earlier versions stay under Versions / Restore. Continue?"
-          : "Rebuild replaces your current rough cut with a new assembly from preferred takes. Earlier versions stay under Versions / Restore. Continue?"
+          : "Rebuild replaces your current first cut with a new assembly from preferred takes. Earlier versions stay under Versions / Restore. Continue?"
       );
       if (!ok) return undefined;
     }
@@ -2586,18 +2586,18 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const res = await aiEditorTimelineAction(getToken, projectId, {
         action: "build_rough_cut",
-        note: "Rough cut from preferred takes",
+        note: "First cut from preferred takes",
       });
       setTimeline(res.timeline);
       invalidateLocalCutExport();
       setTimelineVersions(res.versions);
       setJobs((prev) => [res.job, ...prev]);
       setStatusNote(
-        `Rough cut v${res.summary.version}: ${res.summary.clipCount} clip placements - ${res.summary.durationTimecode}`
+        `First cut v${res.summary.version}: ${res.summary.clipCount} clip placements - ${res.summary.durationTimecode}`
       );
       return res;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Could not build rough cut";
+      const msg = e instanceof Error ? e.message : "Could not build first cut";
       if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
       setError(msg);
       return undefined;
@@ -3059,7 +3059,7 @@ export function AiEditorClient({ projectId }: Props) {
     try {
       const res = await aiEditorTimelineAction(getToken, projectId, {
         action: "strip_non_video",
-        note: "Remove camera stills from rough cut",
+        note: "Remove camera stills from first cut",
       });
       setTimeline(res.timeline);
       invalidateLocalCutExport();
@@ -3332,8 +3332,8 @@ export function AiEditorClient({ projectId }: Props) {
     }
     const reelName = tl.reels?.find((r) => r.id === tl.activeReelId)?.name || null;
     const title = reelName
-      ? `${reelName} - rough cut v${tl.version}`
-      : `Rough cut v${tl.version}`;
+      ? `${reelName} - first cut v${tl.version}`
+      : `First cut v${tl.version}`;
     await openPreview(title, items, { reviewCut: true });
   }
 
@@ -3546,7 +3546,7 @@ export function AiEditorClient({ projectId }: Props) {
 
   async function onApplyFinishing() {
     if (!timeline) {
-      setError("Build a rough cut first");
+      setError("Build a first cut first");
       return;
     }
     setBusy("finishing");
@@ -3634,7 +3634,7 @@ export function AiEditorClient({ projectId }: Props) {
       const ok = window.confirm(
         multiReels
           ? "Import replaces your current ShootSpine cut and act/reel layout with what's open in Resolve. Earlier versions stay under Versions / Restore. Continue?"
-          : "Import replaces your current ShootSpine rough cut with what's open in Resolve. Earlier versions stay under Versions / Restore. Continue?"
+          : "Import replaces your current ShootSpine first cut with what's open in Resolve. Earlier versions stay under Versions / Restore. Continue?"
       );
       if (!ok) return;
     }
@@ -3868,13 +3868,13 @@ export function AiEditorClient({ projectId }: Props) {
       if (!health.connected) throw new Error(AGENT_CONNECT_MSG);
       const projectRoot = liveProjectRoot?.trim();
       if (!projectRoot) throw new Error("Set your project folder in step 2 first");
-      if (!timeline) throw new Error("Build a rough cut before saving for Resolve");
+      if (!timeline) throw new Error("Build a first cut before saving for Resolve");
       if (!requireEditDisk()) return;
 
       const token = await ensureAgentSession();
       const { files } = await ensureExportFiles(true);
       if (!files?.[RESOLVE_HANDOFF_FILES.edl]) {
-        throw new Error("Could not build the timeline file — rebuild the rough cut, then try again.");
+        throw new Error("Could not build the timeline file — rebuild the first cut, then try again.");
       }
       const written = await agentWriteResolveHandoff(DEFAULT_AGENT_BASE_URL, token, {
         projectRoot,
@@ -4747,7 +4747,7 @@ export function AiEditorClient({ projectId }: Props) {
         subtitle={
           context?.aiEditorOnly
             ? "Bring in footage and get a strong first edit"
-            : "From your ShootSpine plan to a rough cut"
+            : "From your ShootSpine plan to a first cut"
         }
         action={
           <Link href="/ai-editor">
@@ -4959,8 +4959,8 @@ export function AiEditorClient({ projectId }: Props) {
                       ? {
                           ...prev,
                           title: activeReelName
-                            ? `${activeReelName} - rough cut v${res.summary.version}`
-                            : `Rough cut v${res.summary.version}`,
+                            ? `${activeReelName} - first cut v${res.summary.version}`
+                            : `First cut v${res.summary.version}`,
                           items: prev.items.filter((i) => i.clipId !== clipId),
                         }
                       : null
@@ -4992,8 +4992,8 @@ export function AiEditorClient({ projectId }: Props) {
                       ? {
                           ...prev,
                           title: activeReelName
-                            ? `${activeReelName} - rough cut v${res.summary.version}`
-                            : `Rough cut v${res.summary.version}`,
+                            ? `${activeReelName} - first cut v${res.summary.version}`
+                            : `First cut v${res.summary.version}`,
                         }
                       : null
                   );
@@ -5019,8 +5019,8 @@ export function AiEditorClient({ projectId }: Props) {
                       ? {
                           ...prev,
                           title: activeReelName
-                            ? `${activeReelName} - rough cut v${res.summary.version}`
-                            : `Rough cut v${res.summary.version}`,
+                            ? `${activeReelName} - first cut v${res.summary.version}`
+                            : `First cut v${res.summary.version}`,
                           items: prev.items.map((i) =>
                             i.clipId === clipId
                               ? { ...i, startSeconds, endSeconds }
@@ -5085,8 +5085,8 @@ export function AiEditorClient({ projectId }: Props) {
                       ? {
                           ...prev,
                           title: activeReelName
-                            ? `${activeReelName} - rough cut v${split.res.summary.version}`
-                            : `Rough cut v${split.res.summary.version}`,
+                            ? `${activeReelName} - first cut v${split.res.summary.version}`
+                            : `First cut v${split.res.summary.version}`,
                           items: prev.items.flatMap((i) =>
                             i.clipId === clipId ? [leftItem, rightItem] : [i]
                           ),
@@ -5134,8 +5134,8 @@ export function AiEditorClient({ projectId }: Props) {
                       ? {
                           ...prev,
                           title: activeReelName
-                            ? `${activeReelName} - rough cut v${join.res.summary.version}`
-                            : `Rough cut v${join.res.summary.version}`,
+                            ? `${activeReelName} - first cut v${join.res.summary.version}`
+                            : `First cut v${join.res.summary.version}`,
                           items: prev.items
                             .filter((i) => i.clipId !== rightClipId)
                             .map((i) => (i.clipId === leftClipId ? joinedItem : i)),
@@ -5163,8 +5163,8 @@ export function AiEditorClient({ projectId }: Props) {
                       ? {
                           ...prev,
                           title: activeReelName
-                            ? `${activeReelName} - rough cut v${slip.res.summary.version}`
-                            : `Rough cut v${slip.res.summary.version}`,
+                            ? `${activeReelName} - first cut v${slip.res.summary.version}`
+                            : `First cut v${slip.res.summary.version}`,
                           items: prev.items.map((i) =>
                             i.clipId === clipId
                               ? {
@@ -5246,8 +5246,8 @@ export function AiEditorClient({ projectId }: Props) {
                       ? {
                           ...prev,
                           title: activeReelName
-                            ? `${activeReelName} - rough cut v${roll.res.summary.version}`
-                            : `Rough cut v${roll.res.summary.version}`,
+                            ? `${activeReelName} - first cut v${roll.res.summary.version}`
+                            : `First cut v${roll.res.summary.version}`,
                           items: prev.items.map((i) => {
                             if (i.clipId === leftClipId) return leftItem;
                             if (i.clipId === rightClipId) return rightItem;
@@ -6591,7 +6591,7 @@ export function AiEditorClient({ projectId }: Props) {
             ) : videoTrack?.clips?.length ? (
               <p className="text-sm text-slate-500">
                 {stillClipsOnCut.length
-                  ? "Only camera stills were on this reel — remove them or rebuild the rough cut."
+                  ? "Only camera stills were on this reel — remove them or rebuild the first cut."
                   : "No clips in this reel yet - pick another act/reel."}
               </p>
             ) : null}
@@ -6710,7 +6710,7 @@ export function AiEditorClient({ projectId }: Props) {
               </ul>
             ) : (
               <p className="text-sm text-slate-500">
-                No notes yet - add one anytime (even before the rough cut).
+                No notes yet - add one anytime (even before the first cut).
               </p>
             )}
           </div>
@@ -6728,7 +6728,7 @@ export function AiEditorClient({ projectId }: Props) {
                 Describe an edit in plain language. ShootSpine proposes clear edit steps -
                 you review, then apply. Saved edit notes are included as the creative brief.
                 {activeReelName
-                  ? ` Focused on -${activeReelName}- (switch acts/reels in Rough cut).`
+                  ? ` Focused on -${activeReelName}- (switch acts/reels under the first cut).`
                   : ""}
               </p>
             </div>
@@ -7134,7 +7134,7 @@ export function AiEditorClient({ projectId }: Props) {
 
                 {resolveImported && !resolvePackageStale ? (
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
-                    <p className="font-semibold text-emerald-950">Your rough cut is in Resolve</p>
+                    <p className="font-semibold text-emerald-950">Your first cut is in Resolve</p>
                     <p className="mt-1 text-sm text-emerald-900/80">
                       Clips are linked in the ShootSpine media bin when possible. Finish color and
                       sound in Resolve - look tips are saved with your project folder.
@@ -7245,7 +7245,7 @@ export function AiEditorClient({ projectId }: Props) {
                     <div>
                       <p className="font-medium text-slate-900">Prepare the edit on this PC</p>
                       <p className="mt-0.5 text-slate-600">
-                        Saves your rough cut into the project folder (with your footage).
+                        Saves your first cut into the project folder (with your footage).
                       </p>
                     </div>
                   </li>
@@ -7270,7 +7270,7 @@ export function AiEditorClient({ projectId }: Props) {
                       <p className="mt-0.5 text-slate-600">
                         Start a project, then{" "}
                         <span className="font-medium">File → Import → Timeline</span> and pick the
-                        rough-cut file from the folder we prepared.
+                        first-cut file from the folder we prepared.
                       </p>
                     </div>
                   </li>
@@ -7319,7 +7319,7 @@ export function AiEditorClient({ projectId }: Props) {
                     </p>
                   </div>
                 ) : !timeline ? (
-                  <p className="text-sm text-slate-500">Build a rough cut above first.</p>
+                  <p className="text-sm text-slate-500">Build a first cut above first.</p>
                 ) : null}
               </div>
             )}
@@ -7330,8 +7330,8 @@ export function AiEditorClient({ projectId }: Props) {
                 <p className="font-semibold text-slate-900">After you finish in Resolve</p>
                 <p className="mt-1 text-sm text-slate-600">
                   {finishWhere === "mac"
-                    ? "When this project folder is back on this computer with Resolve open, read the timeline for notes or import that cut as a new ShootSpine version (your previous rough cut stays in Versions / Restore)."
-                    : "Read the open timeline back for notes, or import that cut into ShootSpine as a new version (your previous rough cut stays in Versions / Restore)."}
+                    ? "When this project folder is back on this computer with Resolve open, read the timeline for notes or import that cut as a new ShootSpine version (your previous first cut stays in Versions / Restore)."
+                    : "Read the open timeline back for notes, or import that cut into ShootSpine as a new version (your previous first cut stays in Versions / Restore)."}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <Button

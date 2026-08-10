@@ -40,6 +40,7 @@ describe("getWorkflowNextStep", () => {
       { showPrepare: false, showPlanSteps: false }
     );
     expect(next?.id).toBe("rough_cut");
+    expect(next?.title).toBe("Build a first cut");
     expect(next?.n).toBe(3);
     expect(next?.anchor).toBe("ai-step-7");
   });

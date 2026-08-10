@@ -41,7 +41,7 @@ export function emptyTimeline(input: {
   return {
     id: newId("tl"),
     projectId: input.projectId,
-    name: input.name || "Rough cut",
+    name: input.name || "First cut",
     frameRate: input.frameRate || DEFAULT_TIMELINE_FPS,
     tracks: [video, audio],
     version: 1,

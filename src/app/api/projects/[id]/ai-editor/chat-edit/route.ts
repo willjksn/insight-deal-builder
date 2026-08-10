@@ -108,7 +108,7 @@ export async function POST(
 
     if (!timeline) {
       return NextResponse.json(
-        { error: "Build a rough cut before editing by chat" },
+        { error: "Build a first cut before editing by chat" },
         { status: 400 }
       );
     }

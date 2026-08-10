@@ -29,7 +29,7 @@ export const RESOLVE_COACH_SECTIONS: ResolveCoachSection[] = [
       {
         heading: "Why the name matters",
         paragraphs: [
-          "ShootSpine can bring your rough cut into the project that is currently open. Using the same name as ShootSpine keeps folders and handoffs easy to find later.",
+          "ShootSpine can bring your first cut into the project that is currently open. Using the same name as ShootSpine keeps folders and handoffs easy to find later.",
         ],
         tips: [
           "Studio users: Preferences → System → General → External scripting using → Local, then restart Resolve, so ShootSpine can auto-import.",
@@ -42,19 +42,20 @@ export const RESOLVE_COACH_SECTIONS: ResolveCoachSection[] = [
     id: "project-shootspine-bring",
     page: "project",
     level: "beginner",
-    title: "Bring a ShootSpine rough cut into Resolve",
+    title: "Bring a ShootSpine first cut into Resolve",
     summary: "How ShootSpine’s edit lands in Resolve (auto-import or manual).",
     keywords: [
       "bring edit",
       "import edl",
       "shootspine",
+      "first cut",
       "rough cut",
       "handoff",
       "import timeline",
       "media offline",
     ],
     steps: [
-      "In ShootSpine: build a rough cut, then Finish in DaVinci Resolve → On this computer.",
+      "In ShootSpine: build a first cut, then Finish in DaVinci Resolve → On this computer.",
       "Open Resolve with your project open (Edit page visible).",
       "Press Bring edit into Resolve (Studio + scripting Local).",
       "Or manually: import clips from 01_ORIGINAL_MEDIA, then File → Import → Timeline → shootspine_rough_cut.edl (or .xml).",
@@ -280,7 +281,7 @@ export const RESOLVE_COACH_SECTIONS: ResolveCoachSection[] = [
     body: [
       {
         paragraphs: [
-          "Cut is ideal for a first assembly. Your ShootSpine rough cut often lands on the Edit page — use Cut if you want a quicker second pass.",
+          "Cut is ideal for a first assembly. Your ShootSpine first cut often lands on the Edit page — use Cut if you want a quicker second pass.",
         ],
       },
     ],
@@ -350,7 +351,7 @@ export const RESOLVE_COACH_SECTIONS: ResolveCoachSection[] = [
     body: [
       {
         tips: [
-          "Your ShootSpine rough cut usually appears as a timeline after Bring edit into Resolve.",
+          "Your ShootSpine first cut usually appears as a timeline after Bring edit into Resolve.",
         ],
       },
     ],

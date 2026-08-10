@@ -109,7 +109,7 @@ export function parseEditCommandRules(
 
   if (!clips.length) {
     return {
-      summary: "No clips on the timeline yet — build a rough cut first.",
+      summary: "No clips on the timeline yet — build a first cut first.",
       ops: [],
       confidence: 0.9,
       source: "rules",

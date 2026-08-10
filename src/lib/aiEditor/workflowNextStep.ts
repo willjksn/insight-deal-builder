@@ -68,7 +68,7 @@ const STEP_COPY: Record<
     done: (f) => f.matchDone,
   },
   rough_cut: {
-    title: "Build a rough cut",
+    title: "Build a first cut",
     detail: "Assemble a first timeline from coverage or selects.",
     done: (f) => f.roughCutDone,
   },

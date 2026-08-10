@@ -34,7 +34,7 @@ export function buildResolvePreflightTips(input: {
     tips.push({
       id: "need_cut",
       level: "action",
-      text: "Build a rough cut before sending this edit to Resolve.",
+      text: "Build a first cut before sending this edit to Resolve.",
     });
     return tips;
   }
