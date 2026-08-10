@@ -14,17 +14,20 @@ import {
   Plus,
   MessageSquare,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   aiEditorCreateSession,
   aiEditorCrossProjectInsights,
+  aiEditorDeleteSession,
   aiEditorListSessions,
   type AiEditorOrgInsights,
   type AiEditorRecommendation,
@@ -32,6 +35,7 @@ import {
 } from "@/lib/aiEditor/apiClient";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 import {
+  clearResumeBookmark,
   readResumeBookmark,
   type AiEditorResumeBookmark,
 } from "@/lib/aiEditor/workflowNextStep";
@@ -334,6 +338,8 @@ export function AiEditorHubClient() {
   );
   const [name, setName] = useState("");
   const [resume, setResume] = useState<AiEditorResumeBookmark | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AiEditorSessionListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -396,6 +402,23 @@ export function AiEditorHubClient() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create edit");
       setCreating(false);
+    }
+  }
+
+  async function confirmDeleteSession() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await aiEditorDeleteSession(getToken, deleteTarget.id);
+      clearResumeBookmark(deleteTarget.id);
+      setSessions((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      setResume((prev) => (prev?.projectId === deleteTarget.id ? null : prev));
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete edit");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -670,17 +693,47 @@ export function AiEditorHubClient() {
                     <div className="truncate font-medium text-zinc-900">{s.projectName}</div>
                     <div className="text-xs text-zinc-500">Footage-only · {s.status}</div>
                   </div>
-                  <Link href={`/projects/${s.id}/ai-editor`}>
-                    <Button size="sm" variant="secondary">
-                      Open
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Link href={`/projects/${s.id}/ai-editor`}>
+                      <Button size="sm" variant="secondary">
+                        Open
+                      </Button>
+                    </Link>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Delete ${s.projectName}`}
+                      title="Delete edit"
+                      disabled={deleting}
+                      onClick={() => setDeleteTarget(s)}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
-                  </Link>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </CardBody>
       </Card>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete this edit?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.projectName}" will be removed from ShootSpine (cut, match, and settings). Files already on your drives are not deleted.`
+            : ""
+        }
+        confirmLabel="Delete edit"
+        cancelLabel="Keep edit"
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+        onConfirm={() => void confirmDeleteSession()}
+      />
 
       <Card>
         <CardBody className="space-y-3">

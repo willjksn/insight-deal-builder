@@ -6,7 +6,10 @@ import {
   requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
-import { upsertAiEditorProjectSettings } from "@/lib/aiEditor/server";
+import {
+  deleteAiEditorProjectData,
+  upsertAiEditorProjectSettings,
+} from "@/lib/aiEditor/server";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { hasProjectAreaAccess } from "@/lib/projectAccess/server";
@@ -150,6 +153,60 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true, projectId, projectName });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to rename project";
+    return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
+  }
+}
+
+/** Delete a footage-only AI Editor workspace (project + AI Editor metadata). Disk media stays. */
+export async function DELETE(request: NextRequest) {
+  try {
+    if (!isAiEditorEnabled()) {
+      return NextResponse.json({ error: "AI Editor is disabled" }, { status: 404 });
+    }
+    const { uid, appUser } = await requireApprovedAuthUser(request);
+    assertCanUseProductionTools(appUser);
+
+    let projectId = request.nextUrl.searchParams.get("projectId")?.trim() || "";
+    if (!projectId) {
+      try {
+        const body = (await request.json()) as { projectId?: string };
+        projectId = body.projectId?.trim() || "";
+      } catch {
+        /* no JSON body */
+      }
+    }
+    if (!projectId) {
+      return NextResponse.json({ error: "projectId is required" }, { status: 400 });
+    }
+
+    const db = getAdminDb();
+    if (!db) throw new Error("Firebase Admin is not configured");
+
+    const ref = db.collection("projects").doc(projectId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      return NextResponse.json({ error: "Edit not found" }, { status: 404 });
+    }
+    const data = snap.data() || {};
+    if (!data.aiEditorOnly) {
+      return NextResponse.json(
+        { error: "Only footage-only edits can be deleted here. Use Projects for full productions." },
+        { status: 400 }
+      );
+    }
+    const allowed =
+      data.ownerUserId === uid ||
+      (await hasProjectAreaAccess(db, projectId, uid, appUser, "production"));
+    if (!allowed) {
+      return NextResponse.json({ error: "Not allowed to delete this edit" }, { status: 403 });
+    }
+
+    await deleteAiEditorProjectData(projectId);
+    await ref.delete();
+
+    return NextResponse.json({ ok: true, projectId });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to delete edit";
     return NextResponse.json({ error: message }, { status: apiErrorStatus(message) });
   }
 }

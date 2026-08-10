@@ -55,6 +55,46 @@ export async function getAiEditorProjectSettings(
   return serializeDoc<AiEditorProjectSettings>(snap.id, snap.data()!);
 }
 
+/** Delete AI Editor metadata for a project (does not touch files on disk). */
+export async function deleteAiEditorProjectData(projectId: string): Promise<number> {
+  const db = requireDb();
+  const collections = [
+    AI_EDITOR_MEDIA_COLLECTION,
+    AI_EDITOR_JOBS_COLLECTION,
+    AI_EDITOR_ANALYSIS_COLLECTION,
+    AI_EDITOR_MATCHING_COLLECTION,
+    AI_EDITOR_TIMELINES_COLLECTION,
+    AI_EDITOR_TIMELINE_VERSIONS_COLLECTION,
+    AI_EDITOR_AGENT_SESSIONS_COLLECTION,
+    AI_EDITOR_STORAGE_COLLECTION,
+  ];
+  let deleted = 0;
+  for (const col of collections) {
+    for (;;) {
+      const snap = await db
+        .collection(col)
+        .where("projectId", "==", projectId)
+        .limit(400)
+        .get();
+      if (snap.empty) break;
+      const batch = db.batch();
+      for (const doc of snap.docs) {
+        batch.delete(doc.ref);
+        deleted += 1;
+      }
+      await batch.commit();
+      if (snap.size < 400) break;
+    }
+  }
+  const settingsRef = db.collection(AI_EDITOR_PROJECT_SETTINGS_COLLECTION).doc(projectId);
+  const settingsSnap = await settingsRef.get();
+  if (settingsSnap.exists) {
+    await settingsRef.delete();
+    deleted += 1;
+  }
+  return deleted;
+}
+
 export async function upsertAiEditorProjectSettings(
   projectId: string,
   patch: Partial<AiEditorProjectSettings>

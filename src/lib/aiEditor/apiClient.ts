@@ -128,6 +128,17 @@ export async function aiEditorRenameSession(
   return parseJson<{ ok: true; projectId: string; projectName: string }>(res);
 }
 
+export async function aiEditorDeleteSession(getToken: GetToken, projectId: string) {
+  const res = await fetch(
+    `/api/ai-editor/sessions?projectId=${encodeURIComponent(projectId)}`,
+    {
+      method: "DELETE",
+      headers: await authHeaders(getToken),
+    }
+  );
+  return parseJson<{ ok: true; projectId: string }>(res);
+}
+
 export async function aiEditorLaunchAgent(
   getToken: GetToken,
   opts?: { restart?: boolean }

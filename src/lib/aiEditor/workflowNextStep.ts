@@ -159,3 +159,19 @@ export function writeResumeBookmark(bookmark: AiEditorResumeBookmark): void {
     /* private mode / quota */
   }
 }
+
+export function clearResumeBookmark(projectId?: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (!projectId) {
+      window.localStorage.removeItem(AI_EDITOR_RESUME_KEY);
+      return;
+    }
+    const current = readResumeBookmark();
+    if (current?.projectId === projectId) {
+      window.localStorage.removeItem(AI_EDITOR_RESUME_KEY);
+    }
+  } catch {
+    /* private mode / quota */
+  }
+}
