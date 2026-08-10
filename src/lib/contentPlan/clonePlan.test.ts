@@ -67,6 +67,7 @@ describe("buildClonedContentPlanPayload", () => {
     expect(cloned.title).toBe("The First Sip (copy)");
     expect(cloned.shots).toHaveLength(1);
     expect(cloned.teachMe).toBe(true);
+    expect(cloned.productionStage).toBe("planning");
     expect("projectId" in cloned).toBe(false);
     expect("scriptSessionId" in cloned).toBe(false);
   });

@@ -1,18 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, MonitorSmartphone } from "lucide-react";
+import { ArrowLeft, Download, Loader2, MonitorSmartphone } from "lucide-react";
 import {
   CompletionBar,
   ShootModePanel,
 } from "@/components/contentPlan/ContentPlanPhase3Panels";
+import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getContentPlan,
   updateContentPlan,
 } from "@/lib/contentPlan/apiClient";
+import { downloadContentPlanOnePagerPdf } from "@/lib/contentPlan/exportPdf";
+import {
+  allShotsCompleted,
+  countCompletedShots,
+  normalizeProductionStage,
+  productionStageLabel,
+} from "@/lib/contentPlan/productionStage";
 import type { ContentPlan, ContentShot } from "@/lib/contentPlan/types";
 
 export function ContentPlanShootModeClient({ planId }: { planId: string }) {
@@ -22,6 +30,7 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wakeLockActive, setWakeLockActive] = useState(false);
+  const stagePromoted = useRef(false);
 
   const getToken = useCallback(() => {
     if (!user) return Promise.resolve(null);
@@ -33,6 +42,7 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    stagePromoted.current = false;
     void getContentPlan(getToken, planId)
       .then(({ plan: next }) => {
         if (!cancelled) setPlan(next);
@@ -49,6 +59,20 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
       cancelled = true;
     };
   }, [user, appUser, getToken, planId]);
+
+  // Promote planning / ready → shooting when Shoot Mode opens.
+  useEffect(() => {
+    if (!plan || stagePromoted.current) return;
+    const stage = normalizeProductionStage(plan.productionStage);
+    if (stage === "shooting" || stage === "wrapped") {
+      stagePromoted.current = true;
+      return;
+    }
+    stagePromoted.current = true;
+    void updateContentPlan(getToken, plan.id, { productionStage: "shooting" })
+      .then(({ plan: next }) => setPlan(next))
+      .catch(() => undefined);
+  }, [plan, getToken]);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("wakeLock" in navigator)) {
@@ -101,6 +125,22 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
     }
   }
 
+  async function onMarkWrapped() {
+    if (!plan) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const { plan: next } = await updateContentPlan(getToken, plan.id, {
+        productionStage: "wrapped",
+      });
+      setPlan(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not mark wrapped");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (authLoading || loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -138,6 +178,9 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
 
   const title =
     plan.creativeBrief?.workingTitle || plan.title || "Content plan";
+  const stage = normalizeProductionStage(plan.productionStage);
+  const { done, total } = countCompletedShots(plan.shots);
+  const canWrap = allShotsCompleted(plan) && stage !== "wrapped";
 
   return (
     <div className="mx-auto max-w-lg px-4 py-4 sm:px-6 sm:py-6">
@@ -153,7 +196,10 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
           <h1 className="mt-2 truncate text-xl font-semibold text-slate-900">
             {title}
           </h1>
-          <p className="text-sm text-slate-600">Shoot Mode — on-set shot tracker</p>
+          <p className="text-sm text-slate-600">
+            Shoot Mode · {productionStageLabel(stage)}
+            {total ? ` · ${done}/${total} done` : ""}
+          </p>
           {wakeLockActive ? (
             <p className="mt-1 inline-flex items-center gap-1 text-xs text-emerald-700">
               <MonitorSmartphone className="h-3.5 w-3.5" />
@@ -165,6 +211,39 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
           <span className="inline-flex items-center gap-1 text-xs text-slate-500">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             Saving
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mb-3 flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            try {
+              downloadContentPlanOnePagerPdf(plan);
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "One-pager failed");
+            }
+          }}
+        >
+          <Download className="mr-1.5 h-3.5 w-3.5" />
+          One-pager
+        </Button>
+        {canWrap ? (
+          <Button
+            type="button"
+            size="sm"
+            disabled={saving}
+            onClick={() => void onMarkWrapped()}
+          >
+            Mark wrapped
+          </Button>
+        ) : null}
+        {stage === "wrapped" ? (
+          <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
+            Wrapped
           </span>
         ) : null}
       </div>

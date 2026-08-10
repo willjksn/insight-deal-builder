@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,9 +8,11 @@ import {
   Copy,
   Loader2,
   Plus,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import { EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,8 +20,19 @@ import {
   cloneContentPlan,
   deleteContentPlan,
   listContentPlans,
+  updateContentPlan,
 } from "@/lib/contentPlan/apiClient";
-import type { ContentPlan } from "@/lib/contentPlan/types";
+import {
+  countCompletedShots,
+  normalizeProductionStage,
+  productionStageLabel,
+} from "@/lib/contentPlan/productionStage";
+import {
+  CONTENT_PLAN_PRODUCTION_STAGES,
+  type ContentPlan,
+  type ContentPlanProductionStage,
+} from "@/lib/contentPlan/types";
+import { cn } from "@/lib/utils/cn";
 
 function formatWhen(value: unknown): string {
   if (!value) return "";
@@ -48,6 +61,10 @@ export function ContentPlanLibrary() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stageFilter, setStageFilter] = useState<"all" | ContentPlanProductionStage>(
+    "all"
+  );
+  const [query, setQuery] = useState("");
 
   const getToken = useCallback(() => {
     if (!user) return Promise.resolve(null);
@@ -72,6 +89,31 @@ export function ContentPlanLibrary() {
     if (!user || !appUser) return;
     void refresh();
   }, [user, appUser, refresh]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return plans.filter((p) => {
+      const stage = normalizeProductionStage(p.productionStage);
+      if (stageFilter !== "all" && stage !== stageFilter) return false;
+      if (!q) return true;
+      const title = (p.creativeBrief?.workingTitle || p.title || "").toLowerCase();
+      const idea = (p.inputs?.idea || "").toLowerCase();
+      return title.includes(q) || idea.includes(q);
+    });
+  }, [plans, stageFilter, query]);
+
+  async function onSetStage(id: string, productionStage: ContentPlanProductionStage) {
+    setBusyId(id);
+    setError(null);
+    try {
+      const { plan } = await updateContentPlan(getToken, id, { productionStage });
+      setPlans((prev) => prev.map((p) => (p.id === id ? plan : p)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update stage");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function onClone(id: string) {
     setBusyId(id);
@@ -124,12 +166,20 @@ export function ContentPlanLibrary() {
         title="Content plans"
         subtitle="Saved production plans — brief, shots, shoot order, and AI Editor handoff."
         action={
-          <Link href="/content-plans/new">
-            <Button type="button">
-              <Plus className="mr-1.5 h-4 w-4" />
-              New plan
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/content-plans/pitch">
+              <Button type="button" variant="secondary">
+                <Sparkles className="mr-1.5 h-4 w-4" />
+                Pitch ideas for a package
+              </Button>
+            </Link>
+            <Link href="/content-plans/new">
+              <Button type="button">
+                <Plus className="mr-1.5 h-4 w-4" />
+                New plan
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -149,33 +199,91 @@ export function ContentPlanLibrary() {
           />
         </div>
       ) : (
-        <ul className="mt-6 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
-          {plans.map((p) => {
+        <>
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search plans…"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ring-sky-200 focus:ring-2 sm:max-w-xs"
+            />
+            <Select
+              value={stageFilter}
+              onChange={(e) =>
+                setStageFilter(e.target.value as "all" | ContentPlanProductionStage)
+              }
+              options={[
+                { value: "all", label: "All stages" },
+                ...CONTENT_PLAN_PRODUCTION_STAGES.map((s) => ({
+                  value: s.value,
+                  label: s.label,
+                })),
+              ]}
+            />
+          </div>
+          {!loading && filtered.length === 0 ? (
+            <p className="mt-6 text-sm text-slate-600">No plans match this filter.</p>
+          ) : null}
+          <ul className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
+          {filtered.map((p) => {
             const title =
               p.creativeBrief?.workingTitle || p.title || "Untitled content plan";
             const when = formatWhen(p.updatedAt) || formatWhen(p.createdAt);
             const busy = busyId === p.id;
+            const stage = normalizeProductionStage(p.productionStage);
+            const { done, total } = countCompletedShots(p.shots);
             return (
               <li
                 key={p.id}
                 className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5"
               >
                 <div className="min-w-0 flex-1">
-                  <Link
-                    href={`/content-plans/${p.id}`}
-                    className="block truncate text-sm font-semibold text-slate-900 hover:text-sky-800"
-                  >
-                    {title}
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={`/content-plans/${p.id}`}
+                      className="truncate text-sm font-semibold text-slate-900 hover:text-sky-800"
+                    >
+                      {title}
+                    </Link>
+                    <span
+                      className={cn(
+                        "rounded-md px-1.5 py-0.5 text-[11px] font-medium",
+                        stage === "wrapped"
+                          ? "bg-emerald-50 text-emerald-800"
+                          : stage === "shooting"
+                            ? "bg-amber-50 text-amber-900"
+                            : stage === "ready_to_shoot"
+                              ? "bg-sky-50 text-sky-800"
+                              : "bg-slate-100 text-slate-700"
+                      )}
+                    >
+                      {productionStageLabel(stage)}
+                    </span>
+                  </div>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    {p.status}
-                    {p.inputs?.contentStyle ? ` · ${p.inputs.contentStyle}` : ""}
-                    {p.shots?.length ? ` · ${p.shots.length} shots` : ""}
+                    {p.inputs?.contentStyle ? `${p.inputs.contentStyle} · ` : ""}
+                    {total ? `${done}/${total} shots done` : "No shots yet"}
                     {when ? ` · ${when}` : ""}
                     {p.projectId ? " · linked project" : ""}
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                  <div className="min-w-[140px]">
+                    <Select
+                      value={stage}
+                      onChange={(e) =>
+                        void onSetStage(
+                          p.id,
+                          e.target.value as ContentPlanProductionStage
+                        )
+                      }
+                      options={CONTENT_PLAN_PRODUCTION_STAGES.map((s) => ({
+                        value: s.value,
+                        label: s.label,
+                      }))}
+                      disabled={busy}
+                    />
+                  </div>
                   <Link href={`/content-plans/${p.id}`}>
                     <Button type="button" size="sm" variant="secondary" disabled={busy}>
                       Open
@@ -218,6 +326,7 @@ export function ContentPlanLibrary() {
             );
           })}
         </ul>
+        </>
       )}
     </div>
   );

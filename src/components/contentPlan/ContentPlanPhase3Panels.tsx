@@ -471,7 +471,8 @@ export function ShootModePanel({
   const list = ordered.length ? ordered : plan.shots;
 
   const [index, setIndex] = useState(0);
-  const shot = list[Math.min(index, Math.max(list.length - 1, 0))];
+  const safeIndex = Math.min(index, Math.max(list.length - 1, 0));
+  const shot = list[safeIndex];
   if (!shot) {
     return <p className="py-6 text-center text-sm text-slate-600">No shots yet.</p>;
   }
@@ -479,6 +480,7 @@ export function ShootModePanel({
   const takes = shot.takesRecommended || 3;
   const completed = new Set(shot.takesCompleted || []);
   const checks = shot.coverageChecks || {};
+  const doneCount = list.filter((s) => s.status === "completed").length;
 
   function patchShot(partial: Partial<ContentShot>) {
     onUpdateShots(
@@ -491,13 +493,38 @@ export function ShootModePanel({
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-800">
-            Shoot mode · {index + 1}/{list.length}
+            Shoot mode · {safeIndex + 1}/{list.length} · {doneCount} done
           </p>
           <h4 className="text-lg font-semibold text-slate-900">
             Shot {String(shot.shotNumber).padStart(2, "0")} — {shot.shotName}
           </h4>
         </div>
         <ClipboardList className="h-5 w-5 text-slate-400" />
+      </div>
+
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        {list.map((s, i) => {
+          const done = s.status === "completed";
+          const active = i === safeIndex;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setIndex(i)}
+              className={cn(
+                "shrink-0 rounded-lg border px-2.5 py-1.5 text-left text-xs font-medium",
+                active
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : done
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                    : "border-slate-200 bg-white text-slate-700"
+              )}
+              title={s.shotName}
+            >
+              S{String(s.shotNumber).padStart(2, "0")}
+            </button>
+          );
+        })}
       </div>
 
       {shot.referenceImageUrl ? (

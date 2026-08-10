@@ -273,6 +273,23 @@ export type ContentPlanStatus =
   | "partial"
   | "error";
 
+/** Ops lifecycle separate from generation `status`. */
+export type ContentPlanProductionStage =
+  | "planning"
+  | "ready_to_shoot"
+  | "shooting"
+  | "wrapped";
+
+export const CONTENT_PLAN_PRODUCTION_STAGES: {
+  value: ContentPlanProductionStage;
+  label: string;
+}[] = [
+  { value: "planning", label: "Planning" },
+  { value: "ready_to_shoot", label: "Ready to shoot" },
+  { value: "shooting", label: "Shooting" },
+  { value: "wrapped", label: "Wrapped" },
+];
+
 export type EditInstruction = {
   id: string;
   fromShotId: string;
@@ -481,8 +498,13 @@ export type ContentPlan = {
   /** Weekly Idea Engine provenance when developed from an idea. */
   sourceIdeaSessionId?: string | null;
   sourceIdeaId?: string | null;
+  /** Package pitch session provenance. */
+  sourcePitchSessionId?: string | null;
+  sourcePitchIdeaId?: string | null;
   title: string;
   status: ContentPlanStatus;
+  /** Ops stage: planning → ready → shooting → wrapped. */
+  productionStage?: ContentPlanProductionStage;
   inputs: ContentPlanInputs;
   creativeBrief?: CreativeBrief | null;
   beats: StoryBeat[];

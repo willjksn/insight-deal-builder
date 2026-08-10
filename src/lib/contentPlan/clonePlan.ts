@@ -29,6 +29,7 @@ export function buildClonedContentPlanPayload(source: ContentPlan): Omit<
     progress: source.progress,
     lastError: null,
     teachMe: Boolean(source.teachMe ?? source.inputs?.teachMe),
+    productionStage: "planning",
     sourceIdeaSessionId: source.sourceIdeaSessionId ?? null,
     sourceIdeaId: source.sourceIdeaId ?? null,
   };

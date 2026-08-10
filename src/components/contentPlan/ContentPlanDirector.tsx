@@ -30,6 +30,7 @@ import {
   updateContentPlan,
 } from "@/lib/contentPlan/apiClient";
 import {
+  CONTENT_PLAN_PRODUCTION_STAGES,
   CONTENT_STYLE_OPTIONS,
   CTA_OPTIONS,
   DIALOGUE_OPTIONS,
@@ -41,9 +42,11 @@ import {
   type ContentPlan,
   type ContentPlanGenerateSection,
   type ContentPlanInputs,
+  type ContentPlanProductionStage,
   type ContentPlanSection,
   type ContentShot,
 } from "@/lib/contentPlan/types";
+import { normalizeProductionStage } from "@/lib/contentPlan/productionStage";
 import {
   EditMapPanel,
   LightingPanel,
@@ -1390,24 +1393,53 @@ export function ContentPlanDirector({
 
         {step === 4 && plan ? (
           <div className="mt-4 space-y-3">
-            <div className="flex flex-col gap-1.5 sm:max-w-xl">
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Plan title
-              </label>
-              <input
-                value={titleDraft}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                onBlur={() => void onSaveTitle()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    (e.target as HTMLInputElement).blur();
-                  }
-                }}
-                disabled={saving || busy}
-                className={textInputClassName()}
-                placeholder="Working title"
-              />
+            <div className="grid gap-3 sm:max-w-xl sm:grid-cols-[1fr_160px]">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Plan title
+                </label>
+                <input
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onBlur={() => void onSaveTitle()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
+                  disabled={saving || busy}
+                  className={textInputClassName()}
+                  placeholder="Working title"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Stage
+                </label>
+                <Select
+                  value={normalizeProductionStage(plan.productionStage)}
+                  disabled={saving || busy}
+                  onChange={(e) => {
+                    const productionStage = e.target
+                      .value as ContentPlanProductionStage;
+                    setPlan((p) => (p ? { ...p, productionStage } : p));
+                    void updateContentPlan(getToken, plan.id, { productionStage })
+                      .then(({ plan: next }) => setPlan(next))
+                      .catch((err) =>
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : "Could not update stage"
+                        )
+                      );
+                  }}
+                  options={CONTENT_PLAN_PRODUCTION_STAGES.map((s) => ({
+                    value: s.value,
+                    label: s.label,
+                  }))}
+                />
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" size="sm" variant="secondary" onClick={() => setStep(3)}>

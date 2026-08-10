@@ -342,6 +342,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Content Plan package pitch sessions — server-only (Admin SDK)
+    match /contentPlanPitchSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
     // Revenue & Opportunities — server-only (Admin SDK) — Phase 1 stubs
     match /revenueCampaigns/{docId} {
       allow read, write: if false;

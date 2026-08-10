@@ -8,10 +8,12 @@ import {
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { CONTENT_PLANS_COLLECTION } from "@/lib/contentPlan/collections";
+import { normalizeProductionStage } from "@/lib/contentPlan/productionStage";
 import {
   defaultContentPlanInputs,
   DURATION_OPTIONS,
   type ContentPlanInputs,
+  type ContentPlanProductionStage,
   type ContentShot,
   type CoveragePlan,
   type EditPlan,
@@ -91,6 +93,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       inputs?: Partial<ContentPlanInputs>;
       title?: string;
       teachMe?: boolean;
+      productionStage?: ContentPlanProductionStage;
       shots?: ContentShot[];
       editPlan?: EditPlan;
       coveragePlan?: CoveragePlan;
@@ -142,6 +145,9 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       });
       patch.inputs = inputs;
       patch.teachMe = inputs.teachMe;
+    }
+    if (body.productionStage !== undefined) {
+      patch.productionStage = normalizeProductionStage(body.productionStage);
     }
     if (Array.isArray(body.shots)) patch.shots = body.shots;
     if (body.editPlan) patch.editPlan = body.editPlan;

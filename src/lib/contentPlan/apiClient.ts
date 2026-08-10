@@ -67,6 +67,7 @@ export async function updateContentPlan(
       | "inputs"
       | "title"
       | "teachMe"
+      | "productionStage"
       | "shots"
       | "editPlan"
       | "coveragePlan"
