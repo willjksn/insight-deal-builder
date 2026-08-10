@@ -2885,6 +2885,118 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  /** Roll shared edit between two neighbor clips (Play review). */
+  async function onRollCutClips(
+    leftClipId: string,
+    rightClipId: string,
+    deltaSeconds: number,
+    opts?: { quiet?: boolean; leftMediaDurationSeconds?: number }
+  ) {
+    if (!timeline) throw new Error("No timeline yet");
+    const track = timeline.tracks.find((t) => t.kind === "video");
+    const left = track?.clips.find((c) => c.id === leftClipId);
+    const right = track?.clips.find((c) => c.id === rightClipId);
+    if (!track || !left || !right) throw new Error("Clips not found");
+    if (left.timelineStartFrame + left.durationFrames !== right.timelineStartFrame) {
+      throw new Error("Clips aren’t neighbors on the cut — can’t roll");
+    }
+    const fps = timeline.frameRate;
+    const deltaFrames = secondsToFrames(deltaSeconds, fps);
+    if (deltaFrames === 0) throw new Error("Roll a little farther");
+
+    const minDur = Math.max(1, secondsToFrames(0.08, fps));
+    const leftNextDur = left.durationFrames + deltaFrames;
+    const rightNextDur = right.durationFrames - deltaFrames;
+    const rightNextIn = right.sourceInFrame + deltaFrames;
+    if (leftNextDur < minDur) {
+      throw new Error("Can’t roll earlier — current clip is already short");
+    }
+    if (rightNextDur < minDur) {
+      throw new Error("Can’t roll later — next clip is already short");
+    }
+    if (rightNextIn < 0) {
+      throw new Error("Can’t roll earlier — next take has no earlier media");
+    }
+
+    const leftAsset = media.find((m) => m.id === left.mediaAssetId);
+    const leftMediaDurSec =
+      (typeof opts?.leftMediaDurationSeconds === "number" &&
+      opts.leftMediaDurationSeconds > 0
+        ? opts.leftMediaDurationSeconds
+        : undefined) ??
+      (typeof leftAsset?.durationSeconds === "number" &&
+      leftAsset.durationSeconds > 0
+        ? leftAsset.durationSeconds
+        : undefined);
+    if (leftMediaDurSec != null) {
+      const leftMediaFrames = secondsToFrames(leftMediaDurSec, fps);
+      if (left.sourceInFrame + leftNextDur > leftMediaFrames) {
+        throw new Error("Can’t roll later — current take ends");
+      }
+    } else if (deltaFrames > 0) {
+      throw new Error("Wait for the clip to load, then Roll");
+    }
+
+    const rightAsset = media.find((m) => m.id === right.mediaAssetId);
+    if (
+      typeof rightAsset?.durationSeconds === "number" &&
+      rightAsset.durationSeconds > 0
+    ) {
+      const rightMediaFrames = secondsToFrames(rightAsset.durationSeconds, fps);
+      if (rightNextIn + rightNextDur > rightMediaFrames) {
+        throw new Error("Can’t roll earlier — next take ends");
+      }
+    }
+
+    if (!opts?.quiet) setBusy("rough_cut");
+    setError(null);
+    try {
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "apply_ops",
+        ops: [
+          {
+            type: "trim",
+            clipId: leftClipId,
+            sourceInFrame: left.sourceInFrame,
+            durationFrames: leftNextDur,
+          },
+          {
+            type: "trim",
+            clipId: rightClipId,
+            sourceInFrame: rightNextIn,
+            durationFrames: rightNextDur,
+          },
+          {
+            type: "reorder",
+            trackId: track.id,
+            clipIds: track.clips.map((c) => c.id),
+          },
+        ],
+        note: "Roll from Play review",
+      });
+      setTimeline(res.timeline);
+      invalidateLocalCutExport();
+      setTimelineVersions(res.versions);
+      const nextTrack = res.timeline.tracks.find((t) => t.kind === "video");
+      const leftClip = nextTrack?.clips.find((c) => c.id === leftClipId);
+      const rightClip = nextTrack?.clips.find((c) => c.id === rightClipId);
+      if (!leftClip || !rightClip) {
+        throw new Error("Roll saved, but couldn’t locate clips — Play again.");
+      }
+      setStatusNote(
+        `Rolled edit · cut is now v${res.summary.version} · ${res.summary.clipCount} clips`
+      );
+      return { res, left: leftClip, right: rightClip, frameRate: fps };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not roll edit";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
+    } finally {
+      if (!opts?.quiet) setBusy(null);
+    }
+  }
+
   /**
    * Reorder visible Play-review clips while preserving any non-visible
    * reel/track clips in their relative slots.
@@ -5072,6 +5184,82 @@ export function AiEditorClient({ projectId }: Props) {
                 }
               : undefined
           }
+          onRollClip={
+            preview.reviewCut
+              ? async ({
+                  leftClipId,
+                  rightClipId,
+                  deltaSeconds,
+                  leftMediaDurationSeconds,
+                }) => {
+                  const roll = await onRollCutClips(
+                    leftClipId,
+                    rightClipId,
+                    deltaSeconds,
+                    { quiet: true, leftMediaDurationSeconds }
+                  );
+                  if (!roll) throw new Error("Could not roll edit");
+                  const prior = roll.res.versions.find(
+                    (v) => v.version === roll.res.timeline.version - 1
+                  );
+                  if (prior) pushReviewUndo(prior.id);
+                  const leftBase = preview.items.find((i) => i.clipId === leftClipId);
+                  const rightBase = preview.items.find(
+                    (i) => i.clipId === rightClipId
+                  );
+                  const fps = roll.frameRate;
+                  const leftStart = framesToSeconds(roll.left.sourceInFrame, fps);
+                  const leftEnd =
+                    leftStart + framesToSeconds(roll.left.durationFrames, fps);
+                  const rightStart = framesToSeconds(roll.right.sourceInFrame, fps);
+                  const rightEnd =
+                    rightStart + framesToSeconds(roll.right.durationFrames, fps);
+                  const leftItem: PreviewItem = {
+                    path: leftBase?.path || "",
+                    clipId: roll.left.id,
+                    mediaAssetId: roll.left.mediaAssetId,
+                    plannedShotId: leftBase?.plannedShotId,
+                    shotLabel: leftBase?.shotLabel,
+                    isPreferred: leftBase?.isPreferred,
+                    thumbnailDataUrl: leftBase?.thumbnailDataUrl,
+                    label: roll.left.label || leftBase?.label || roll.left.id,
+                    startSeconds: leftStart,
+                    endSeconds: leftEnd,
+                  };
+                  const rightItem: PreviewItem = {
+                    path: rightBase?.path || "",
+                    clipId: roll.right.id,
+                    mediaAssetId: roll.right.mediaAssetId,
+                    plannedShotId: rightBase?.plannedShotId,
+                    shotLabel: rightBase?.shotLabel,
+                    isPreferred: rightBase?.isPreferred,
+                    thumbnailDataUrl: rightBase?.thumbnailDataUrl,
+                    label: roll.right.label || rightBase?.label || roll.right.id,
+                    startSeconds: rightStart,
+                    endSeconds: rightEnd,
+                  };
+                  if (!leftItem.path || !rightItem.path) {
+                    throw new Error("Roll saved, but preview path is missing — Play again.");
+                  }
+                  setPreview((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          title: activeReelName
+                            ? `${activeReelName} - rough cut v${roll.res.summary.version}`
+                            : `Rough cut v${roll.res.summary.version}`,
+                          items: prev.items.map((i) => {
+                            if (i.clipId === leftClipId) return leftItem;
+                            if (i.clipId === rightClipId) return rightItem;
+                            return i;
+                          }),
+                        }
+                      : null
+                  );
+                  return { left: leftItem, right: rightItem };
+                }
+              : undefined
+          }
           onPreferClip={
             preview.reviewCut
               ? async (item) => {
@@ -6203,7 +6391,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → In/Out · Slip · Split/Join · reorder · Prefer / Drop · Undo → Resolve.
+                Next: Play → In/Out · Slip/Roll · Split/Join · reorder · Prefer / Drop · Undo → Resolve.
               </p>
             </div>
 

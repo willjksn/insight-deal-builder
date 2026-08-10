@@ -12,6 +12,7 @@ import {
   Star,
   Trash2,
   Undo2,
+  UnfoldHorizontal,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -20,8 +21,9 @@ const MIN_TRIM_SECONDS = 0.05;
 const MIN_SPLIT_PAD_SECONDS = 0.08;
 /** Source ends must touch within this window to Join. */
 const JOIN_TOUCH_SECONDS = 0.05;
-/** Slip step — keep cut length, slide the source window. */
+/** Slip / Roll step size. */
 const SLIP_STEP_SECONDS = 0.25;
+const ROLL_STEP_SECONDS = 0.25;
 
 function canJoinPreviewItems(
   left: PreviewItem | undefined,
@@ -94,6 +96,13 @@ type Props = {
     deltaSeconds: number;
     mediaDurationSeconds?: number;
   }) => Promise<{ startSeconds: number; endSeconds: number } | void> | void;
+  /** Roll the edit between current clip and the next (total length stays fixed). */
+  onRollClip?: (input: {
+    leftClipId: string;
+    rightClipId: string;
+    deltaSeconds: number;
+    leftMediaDurationSeconds?: number;
+  }) => Promise<{ left: PreviewItem; right: PreviewItem } | void> | void;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -117,6 +126,7 @@ export function MediaPreview({
   onSplitClip,
   onJoinClip,
   onSlipClip,
+  onRollClip,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
@@ -135,6 +145,7 @@ export function MediaPreview({
   const [splitting, setSplitting] = useState(false);
   const [joining, setJoining] = useState(false);
   const [slipping, setSlipping] = useState(false);
+  const [rolling, setRolling] = useState(false);
   const [preferDirty, setPreferDirty] = useState(false);
   const [actionNote, setActionNote] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -152,7 +163,8 @@ export function MediaPreview({
       onTrimClip ||
       onSplitClip ||
       onJoinClip ||
-      onSlipClip
+      onSlipClip ||
+      onRollClip
   );
   const busyAction =
     removing ||
@@ -163,13 +175,17 @@ export function MediaPreview({
     trimming ||
     splitting ||
     joining ||
-    slipping;
+    slipping ||
+    rolling;
   const canTrim = Boolean(onTrimClip && item?.clipId && !asImage);
   const canSplit = Boolean(onSplitClip && item?.clipId && !asImage);
   const canJoin = Boolean(
     onJoinClip && !asImage && canJoinPreviewItems(item, nextItem)
   );
   const canSlip = Boolean(onSlipClip && item?.clipId && !asImage);
+  const canRoll = Boolean(
+    onRollClip && item?.clipId && nextItem?.clipId && !asImage
+  );
   const canPrefer =
     Boolean(onPreferClip && item?.plannedShotId && item?.mediaAssetId) &&
     !item?.isPreferred;
@@ -258,6 +274,16 @@ export function MediaPreview({
       if (e.key === "." && canSlip && !busyAction) {
         e.preventDefault();
         void slipBy(SLIP_STEP_SECONDS);
+        return;
+      }
+      if (e.key === "<" && canRoll && !busyAction) {
+        e.preventDefault();
+        void rollBy(-ROLL_STEP_SECONDS);
+        return;
+      }
+      if (e.key === ">" && canRoll && !busyAction) {
+        e.preventDefault();
+        void rollBy(ROLL_STEP_SECONDS);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -279,6 +305,7 @@ export function MediaPreview({
     onSplitClip,
     onJoinClip,
     onSlipClip,
+    onRollClip,
     index,
     items,
     canPrefer,
@@ -289,6 +316,7 @@ export function MediaPreview({
     canSplit,
     canJoin,
     canSlip,
+    canRoll,
     item,
   ]);
 
@@ -543,6 +571,45 @@ export function MediaPreview({
       setActionNote(null);
     } finally {
       setSlipping(false);
+    }
+  }
+
+  async function rollBy(deltaSeconds: number) {
+    const leftId = item?.clipId;
+    const rightId = nextItem?.clipId;
+    if (!leftId || !rightId || !onRollClip || !canRoll || busyAction) return;
+    const el = videoRef.current;
+    const leftMediaDurationSeconds =
+      el && Number.isFinite(el.duration) && el.duration > 0 ? el.duration : undefined;
+    setRolling(true);
+    setError(null);
+    setActionNote(
+      deltaSeconds < 0 ? "Rolling edit earlier…" : "Rolling edit later…"
+    );
+    if (el) el.pause();
+    try {
+      const parts = await onRollClip({
+        leftClipId: leftId,
+        rightClipId: rightId,
+        deltaSeconds,
+        leftMediaDurationSeconds,
+      });
+      if (!parts?.left?.clipId || !parts?.right?.clipId) {
+        throw new Error("Roll did not return both clips");
+      }
+      setItems((prev) =>
+        prev.map((i) => {
+          if (i.clipId === leftId) return parts.left;
+          if (i.clipId === rightId) return parts.right;
+          return i;
+        })
+      );
+      setActionNote("Rolled edit · U undoes");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not roll edit");
+      setActionNote(null);
+    } finally {
+      setRolling(false);
     }
   }
 
@@ -899,6 +966,35 @@ export function MediaPreview({
           </Button>
         </>
       ) : null}
+      {canRoll ? (
+        <>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busyAction}
+            onClick={() => void rollBy(-ROLL_STEP_SECONDS)}
+            title="Roll edit earlier (<)"
+          >
+            {rolling ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <UnfoldHorizontal className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Roll ←
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busyAction}
+            onClick={() => void rollBy(ROLL_STEP_SECONDS)}
+            title="Roll edit later (>)"
+          >
+            Roll →
+          </Button>
+        </>
+      ) : null}
       {item?.clipId && onRemoveClip ? (
         <Button
           type="button"
@@ -951,6 +1047,7 @@ export function MediaPreview({
         {item ? "← → jump" : "Cut empty"}
         {canTrim ? " · I/O in/out" : ""}
         {canSlip ? " · ,/. slip" : ""}
+        {canRoll ? " · </> roll" : ""}
         {canSplit ? " · S split" : ""}
         {canJoin ? " · J join" : ""}
         {canReorder ? " · drag / [ ] reorder" : ""}
