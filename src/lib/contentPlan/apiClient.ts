@@ -154,9 +154,28 @@ export async function syncShootProgressToBoard(getToken: GetToken, id: string) {
   const res = await fetch(`/api/content-plans/${id}/sync-shoot-progress`, {
     method: "POST",
     headers: await authHeaders(getToken),
+    body: JSON.stringify({ direction: "to_board" }),
   });
   return parseJson<{
     ok: true;
+    direction: "to_board";
+    projectId: string;
+    productionBoardId: string;
+    updatedCount: number;
+    plan: ContentPlan;
+  }>(res);
+}
+
+/** Pull board Shoot Mode notes / done flags back onto Content Plan shots. */
+export async function syncShootProgressFromBoard(getToken: GetToken, id: string) {
+  const res = await fetch(`/api/content-plans/${id}/sync-shoot-progress`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ direction: "from_board" }),
+  });
+  return parseJson<{
+    ok: true;
+    direction: "from_board";
     projectId: string;
     productionBoardId: string;
     updatedCount: number;

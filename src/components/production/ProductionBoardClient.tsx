@@ -37,6 +37,7 @@ import { PersonAvatar } from "@/components/production/PersonAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgreements } from "@/hooks/useAgreements";
 import { useCollection } from "@/hooks/useCollection";
+import { syncShootProgressFromBoard } from "@/lib/contentPlan/apiClient";
 import { Project, CrewMember } from "@/lib/types";
 import {
   ProductionBoard,
@@ -89,10 +90,37 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
+  const [syncingShootMode, setSyncingShootMode] = useState(false);
   const [shootDateDismissed, setShootDateDismissed] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localEditRef = useRef(false);
   const savingRef = useRef(false);
+
+  const getToken = useCallback(() => {
+    if (!user) return Promise.resolve(null);
+    return user.getIdToken();
+  }, [user]);
+
+  async function onSyncToShootMode() {
+    const planId = project.sourceContentPlanId?.trim();
+    if (!planId) return;
+    setSyncingShootMode(true);
+    setError(null);
+    setStatusNote(null);
+    try {
+      const result = await syncShootProgressFromBoard(getToken, planId);
+      setStatusNote(
+        result.updatedCount
+          ? `Synced ${result.updatedCount} shot${result.updatedCount === 1 ? "" : "s"} to Shoot Mode.`
+          : "Shoot Mode already matched this board — nothing to update."
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not sync to Shoot Mode");
+    } finally {
+      setSyncingShootMode(false);
+    }
+  }
 
   useEffect(() => {
     savingRef.current = saving;
@@ -195,6 +223,15 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
             )}
             {project.sourceContentPlanId ? (
               <>
+                <Button
+                  size="touch"
+                  variant="outline"
+                  disabled={syncingShootMode || saving}
+                  onClick={() => void onSyncToShootMode()}
+                  title="Push board takes, notes, and done flags into Shoot Mode"
+                >
+                  {syncingShootMode ? "Syncing…" : "Sync to Shoot Mode"}
+                </Button>
                 <Link href={`/content-plans/${project.sourceContentPlanId}/shoot`}>
                   <Button size="touch" variant="outline">
                     Shoot Mode
@@ -220,6 +257,11 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
       {error && (
         <p className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
           {error}
+        </p>
+      )}
+      {statusNote && (
+        <p className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm text-sky-950">
+          {statusNote}
         </p>
       )}
 

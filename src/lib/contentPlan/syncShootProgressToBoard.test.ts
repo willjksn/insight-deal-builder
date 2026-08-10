@@ -3,6 +3,7 @@ import type { ContentShot } from "@/lib/contentPlan/types";
 import type { ProductionDay } from "@/lib/production/types";
 import {
   SHOOT_MODE_NOTE_MARKER,
+  applyBoardShootProgressToContentShots,
   applyContentPlanShootProgressToDays,
   buildShootProgressNote,
   mergeShootProgressNotes,
@@ -137,5 +138,61 @@ describe("applyContentPlanShootProgressToDays", () => {
     expect(next[0]?.shots[0]?.done).toBe(true);
     expect(next[0]?.shots[0]?.contentPlanShotId).toBe("shot_03");
     expect(next[0]?.shots[0]?.notes).toContain("Wrapped");
+  });
+});
+
+describe("applyBoardShootProgressToContentShots", () => {
+  it("pulls takes, notes, and done onto the content plan", () => {
+    const days = [
+      day([
+        {
+          id: "b1",
+          label: "1",
+          done: true,
+          sortOrder: 0,
+          contentPlanShotId: "shot_01",
+          scoutShotNumber: 1,
+          notes: `${SHOOT_MODE_NOTE_MARKER}\nTakes: 2, 3\nBoard note`,
+        },
+      ]),
+    ];
+    const { shots, updatedCount } = applyBoardShootProgressToContentShots(days, [
+      planShot({
+        id: "shot_01",
+        shotNumber: 1,
+        status: "planned",
+        takesCompleted: [1],
+        shootNotes: "Old",
+      }),
+    ]);
+    expect(updatedCount).toBe(1);
+    expect(shots[0]?.status).toBe("completed");
+    expect(shots[0]?.takesCompleted).toEqual([2, 3]);
+    expect(shots[0]?.shootNotes).toBe("Board note");
+  });
+
+  it("never unsets completed when board is not done", () => {
+    const days = [
+      day([
+        {
+          id: "b1",
+          label: "1",
+          done: false,
+          sortOrder: 0,
+          contentPlanShotId: "shot_01",
+          notes: `${SHOOT_MODE_NOTE_MARKER}\nTakes: 1`,
+        },
+      ]),
+    ];
+    const { shots } = applyBoardShootProgressToContentShots(days, [
+      planShot({
+        id: "shot_01",
+        shotNumber: 1,
+        status: "completed",
+        takesCompleted: [1, 2],
+      }),
+    ]);
+    expect(shots[0]?.status).toBe("completed");
+    expect(shots[0]?.takesCompleted).toEqual([1]);
   });
 });

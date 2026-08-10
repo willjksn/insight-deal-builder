@@ -155,3 +155,96 @@ export function applyContentPlanShootProgressToDays(
 
   return { days: nextDays, updatedCount };
 }
+
+function takesEqual(a?: number[], b?: number[]): boolean {
+  const as = [...(a ?? [])].sort((x, y) => x - y);
+  const bs = [...(b ?? [])].sort((x, y) => x - y);
+  if (as.length !== bs.length) return false;
+  return as.every((n, i) => n === bs[i]);
+}
+
+function findBoardShotsForContent(
+  contentShot: ContentShot,
+  days: ProductionDay[]
+): ProductionDayShot[] {
+  const hits: ProductionDayShot[] = [];
+  for (const day of days) {
+    for (const boardShot of day.shots ?? []) {
+      const byId =
+        Boolean(contentShot.id) &&
+        boardShot.contentPlanShotId?.trim() === contentShot.id;
+      const byNumber =
+        !boardShot.contentPlanShotId?.trim() &&
+        boardShot.scoutShotNumber != null &&
+        boardShot.scoutShotNumber === contentShot.shotNumber;
+      if (byId || byNumber) hits.push(boardShot);
+    }
+  }
+  return hits;
+}
+
+/**
+ * Pull Shoot Mode takes/notes/done from the production board onto Content Plan shots.
+ * - Matches by contentPlanShotId, then scoutShotNumber === ContentShot.shotNumber
+ * - Replaces takes/shootNotes when a Shoot Mode block exists on the board
+ * - Sets status completed when board.done (never unsets completed / dropped)
+ */
+export function applyBoardShootProgressToContentShots(
+  days: ProductionDay[],
+  contentShots: ContentShot[]
+): { shots: ContentShot[]; updatedCount: number } {
+  let updatedCount = 0;
+  const shots = contentShots.map((planShot) => {
+    const boardHits = findBoardShotsForContent(planShot, days);
+    if (!boardHits.length) return planShot;
+
+    let next = planShot;
+    let changed = false;
+
+    const takeSet = new Set<number>();
+    let shootNotes: string | undefined;
+    let sawBlock = false;
+    let anyDone = false;
+
+    for (const boardShot of boardHits) {
+      if (boardShot.done) anyDone = true;
+      const parsed = parseShootProgressFromNotes(boardShot.notes);
+      if (!parsed.hasShootModeBlock) continue;
+      sawBlock = true;
+      for (const t of parsed.takes) takeSet.add(t);
+      if (parsed.shootNotes?.trim()) {
+        // Prefer the longest freeform note when multiple board rows match.
+        if (!shootNotes || parsed.shootNotes.trim().length > shootNotes.length) {
+          shootNotes = parsed.shootNotes.trim();
+        }
+      }
+    }
+
+    if (sawBlock) {
+      const takes = [...takeSet].sort((a, b) => a - b);
+      if (!takesEqual(next.takesCompleted, takes)) {
+        next = { ...next, takesCompleted: takes.length ? takes : undefined };
+        changed = true;
+      }
+      const noteVal = shootNotes || undefined;
+      if ((next.shootNotes?.trim() || undefined) !== noteVal) {
+        next = { ...next, shootNotes: noteVal };
+        changed = true;
+      }
+    }
+
+    if (
+      anyDone &&
+      next.status !== "completed" &&
+      next.status !== "dropped"
+    ) {
+      next = { ...next, status: "completed" };
+      changed = true;
+    }
+
+    if (changed) updatedCount += 1;
+    return next;
+  });
+
+  return { shots, updatedCount };
+}

@@ -19,6 +19,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getContentPlan,
+  syncShootProgressFromBoard,
   syncShootProgressToBoard,
   updateContentPlan,
 } from "@/lib/contentPlan/apiClient";
@@ -201,6 +202,32 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
     }
   }
 
+  async function onPullFromBoard() {
+    if (!plan?.projectId) return;
+    if (autoSyncTimer.current) {
+      clearTimeout(autoSyncTimer.current);
+      autoSyncTimer.current = null;
+    }
+    syncingBoardRef.current = true;
+    setSyncingBoard(true);
+    setError(null);
+    setStatusNote(null);
+    try {
+      const result = await syncShootProgressFromBoard(getToken, plan.id);
+      setPlan(result.plan);
+      setStatusNote(
+        result.updatedCount
+          ? `Pulled ${result.updatedCount} shot${result.updatedCount === 1 ? "" : "s"} from the production board.`
+          : "Shoot Mode already matched the board — nothing to update."
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not pull from board");
+    } finally {
+      syncingBoardRef.current = false;
+      setSyncingBoard(false);
+    }
+  }
+
   async function onMarkWrapped() {
     if (!plan) return;
     setSaving(true);
@@ -340,6 +367,21 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
               )}
               Sync to board
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={saving || syncingBoard}
+              onClick={() => void onPullFromBoard()}
+              title="Bring board takes, notes, and done flags back into Shoot Mode"
+            >
+              {syncingBoard ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Pull from board
             </Button>
             <Link href={`/projects/${plan.projectId}/production`}>
               <Button type="button" size="sm" variant="secondary">
