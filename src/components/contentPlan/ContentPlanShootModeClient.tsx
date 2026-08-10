@@ -41,6 +41,8 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const stagePromoted = useRef(false);
+  const autoSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncingBoardRef = useRef(false);
 
   const getToken = useCallback(() => {
     if (!user) return Promise.resolve(null);
@@ -67,8 +69,44 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
       });
     return () => {
       cancelled = true;
+      if (autoSyncTimer.current) {
+        clearTimeout(autoSyncTimer.current);
+        autoSyncTimer.current = null;
+      }
     };
   }, [user, appUser, getToken, planId]);
+
+  /** Debounced overlay to the production board after on-set edits (linked plans only). */
+  const scheduleAutoSyncToBoard = useCallback(
+    (id: string, projectId: string | undefined | null) => {
+      if (!projectId?.trim()) return;
+      if (autoSyncTimer.current) clearTimeout(autoSyncTimer.current);
+      autoSyncTimer.current = setTimeout(() => {
+        autoSyncTimer.current = null;
+        if (syncingBoardRef.current) return;
+        syncingBoardRef.current = true;
+        setSyncingBoard(true);
+        void syncShootProgressToBoard(getToken, id)
+          .then((result) => {
+            if (result.updatedCount > 0) {
+              setStatusNote(
+                `Board updated · ${result.updatedCount} shot${
+                  result.updatedCount === 1 ? "" : "s"
+                }.`
+              );
+            }
+          })
+          .catch(() => {
+            /* quiet — manual Sync to board remains */
+          })
+          .finally(() => {
+            syncingBoardRef.current = false;
+            setSyncingBoard(false);
+          });
+      }, 1600);
+    },
+    [getToken]
+  );
 
   // Promote planning / ready → shooting when Shoot Mode opens.
   useEffect(() => {
@@ -128,6 +166,7 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
     try {
       const { plan: next } = await updateContentPlan(getToken, plan.id, { shots });
       setPlan(next);
+      scheduleAutoSyncToBoard(next.id, next.projectId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save shot updates");
     } finally {
@@ -137,6 +176,11 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
 
   async function onSyncToBoard() {
     if (!plan?.projectId) return;
+    if (autoSyncTimer.current) {
+      clearTimeout(autoSyncTimer.current);
+      autoSyncTimer.current = null;
+    }
+    syncingBoardRef.current = true;
     setSyncingBoard(true);
     setError(null);
     setStatusNote(null);
@@ -152,6 +196,7 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not sync to board");
     } finally {
+      syncingBoardRef.current = false;
       setSyncingBoard(false);
     }
   }
@@ -246,6 +291,7 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
           <p className="text-sm text-slate-600">
             Shoot Mode · {productionStageLabel(stage)}
             {total ? ` · ${done}/${total} done` : ""}
+            {plan.projectId ? " · board syncs as you check shots" : ""}
           </p>
           {wakeLockActive ? (
             <p className="mt-1 inline-flex items-center gap-1 text-xs text-emerald-700">
@@ -286,6 +332,7 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
               variant="secondary"
               disabled={saving || syncingBoard}
               onClick={() => void onSyncToBoard()}
+              title="Also runs automatically a moment after you update shots"
             >
               {syncingBoard ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />

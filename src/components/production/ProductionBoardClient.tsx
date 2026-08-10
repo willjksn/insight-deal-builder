@@ -194,11 +194,18 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
               <span className="text-sm text-slate-500">Saving…</span>
             )}
             {project.sourceContentPlanId ? (
-              <Link href={`/content-plans/${project.sourceContentPlanId}`}>
-                <Button size="touch" variant="outline">
-                  Content plan
-                </Button>
-              </Link>
+              <>
+                <Link href={`/content-plans/${project.sourceContentPlanId}/shoot`}>
+                  <Button size="touch" variant="outline">
+                    Shoot Mode
+                  </Button>
+                </Link>
+                <Link href={`/content-plans/${project.sourceContentPlanId}`}>
+                  <Button size="touch" variant="outline">
+                    Content plan
+                  </Button>
+                </Link>
+              </>
             ) : null}
             <Link href={`/projects/${project.id}`}>
               <Button size="touch" variant="outline">
