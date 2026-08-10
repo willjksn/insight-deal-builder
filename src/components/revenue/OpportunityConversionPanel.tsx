@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { Sparkles } from "lucide-react";
 import type { RevenueOpportunity } from "@/lib/revenueOpportunities/types/opportunity";
 import type { RevenueOpportunityProposal } from "@/lib/revenueOpportunities/types/proposal";
 import {
@@ -11,6 +12,13 @@ import {
   inferShootType,
   opportunityLocation,
 } from "@/lib/revenueOpportunities/opportunityToProjectPayload";
+import { resolvePackageForSuggestion } from "@/lib/agreement/applyScopeSuggestion";
+import {
+  buildBusinessContextFromParts,
+  buildContentPlanPitchHref,
+  encodeDeliverablesForQuery,
+} from "@/lib/contentPlan/pitchPrefill";
+import { useServicePackages } from "@/hooks/useServicePackages";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -33,12 +41,45 @@ export function OpportunityConversionPanel({
     productionBoardId?: string;
   }>;
 }) {
+  const { data: servicePackages } = useServicePackages();
   const converted = opportunity.projectConversion?.status === "converted";
   const projectId = opportunity.projectConversion?.shootSpineProjectId;
   const [projectName, setProjectName] = useState(
     latestProposal?.title ?? opportunity.subject.name
   );
   const [message, setMessage] = useState<string | null>(null);
+
+  const pitchHref = useMemo(() => {
+    const pkg = resolvePackageForSuggestion(
+      {
+        recommendedPackageId: null,
+        recommendedPackageName: opportunity.recommendation?.serviceName ?? null,
+        estimatedTotalFee: opportunity.recommendation?.estimatedMinimumValue || 0,
+      },
+      servicePackages
+    );
+    if (!pkg?.deliverables?.length) return null;
+    return buildContentPlanPitchHref({
+      packageId: pkg.id.startsWith("preset-") ? null : pkg.id,
+      packageName: pkg.name,
+      clientName: opportunity.subject?.name || "",
+      clientId: opportunity.clientId || null,
+      opportunityId: opportunity.id,
+      proposalId: latestProposal?.id || null,
+      agreementId: latestProposal?.agreementId || null,
+      businessContext: buildBusinessContextFromParts([
+        opportunity.campaignConcept?.coreConcept,
+        opportunity.campaignConcept?.hook,
+        opportunity.recommendation?.rationale,
+        latestProposal?.executiveSummary,
+        opportunity.recommendation?.serviceName
+          ? `Recommended service: ${opportunity.recommendation.serviceName}`
+          : null,
+      ]),
+      brand: opportunity.subject?.name || undefined,
+      deliverablesJson: encodeDeliverablesForQuery(pkg.deliverables),
+    });
+  }, [opportunity, latestProposal, servicePackages]);
 
   const preview = useMemo(() => {
     const dates = extractTimelineDates(latestProposal?.timelineNotes);
@@ -102,6 +143,14 @@ export function OpportunityConversionPanel({
                 View linked agreement →
               </Link>
             )}
+            {pitchHref ? (
+              <Link href={pitchHref}>
+                <Button size="sm" variant="outline">
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  Pitch content ideas
+                </Button>
+              </Link>
+            ) : null}
           </div>
         ) : (
           <>
@@ -149,6 +198,14 @@ export function OpportunityConversionPanel({
             >
               Create ShootSpine project
             </Button>
+            {pitchHref ? (
+              <Link href={pitchHref}>
+                <Button size="sm" variant="outline">
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  Pitch content ideas for package
+                </Button>
+              </Link>
+            ) : null}
             {message && <p className="text-xs text-emerald-700">{message}</p>}
           </>
         )}

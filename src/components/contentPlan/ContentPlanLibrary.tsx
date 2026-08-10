@@ -22,6 +22,8 @@ import {
   listContentPlans,
   updateContentPlan,
 } from "@/lib/contentPlan/apiClient";
+import { listContentPlanPitchSessions } from "@/lib/contentPlan/pitchApiClient";
+import type { ContentPlanPitchSession } from "@/lib/contentPlan/pitchTypes";
 import {
   countCompletedShots,
   normalizeProductionStage,
@@ -58,6 +60,7 @@ export function ContentPlanLibrary() {
   const router = useRouter();
   const { user, appUser, loading: authLoading } = useAuth();
   const [plans, setPlans] = useState<ContentPlan[]>([]);
+  const [pitchSessions, setPitchSessions] = useState<ContentPlanPitchSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +79,12 @@ export function ContentPlanLibrary() {
     setLoading(true);
     setError(null);
     try {
-      const { plans: next } = await listContentPlans(getToken);
+      const [{ plans: next }, pitch] = await Promise.all([
+        listContentPlans(getToken),
+        listContentPlanPitchSessions(getToken).catch(() => ({ sessions: [] })),
+      ]);
       setPlans(next);
+      setPitchSessions(pitch.sessions.slice(0, 6));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load plans");
     } finally {
@@ -187,6 +194,50 @@ export function ContentPlanLibrary() {
         <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
           {error}
         </p>
+      ) : null}
+
+      {pitchSessions.length ? (
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-900">Recent package pitches</h3>
+            <Link
+              href="/content-plans/pitch"
+              className="text-xs font-medium text-sky-800 hover:underline"
+            >
+              New pitch
+            </Link>
+          </div>
+          <ul className="mt-2 divide-y divide-slate-100">
+            {pitchSessions.map((s) => {
+              const ideaCount = (s.ideas || []).filter(
+                (i) => i.status !== "dismissed"
+              ).length;
+              const developed = (s.ideas || []).filter((i) => i.contentPlanId).length;
+              return (
+                <li key={s.id} className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/content-plans/pitch/${s.id}`}
+                      className="truncate text-sm font-medium text-slate-900 hover:text-sky-800"
+                    >
+                      {s.clientName || s.packageName}
+                    </Link>
+                    <p className="text-xs text-slate-500">
+                      {s.packageName}
+                      {ideaCount ? ` · ${ideaCount} ideas` : ""}
+                      {developed ? ` · ${developed} plans` : ""}
+                    </p>
+                  </div>
+                  <Link href={`/content-plans/pitch/${s.id}`}>
+                    <Button type="button" size="sm" variant="secondary">
+                      Open
+                    </Button>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ) : null}
 
       {!loading && plans.length === 0 ? (

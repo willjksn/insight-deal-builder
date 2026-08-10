@@ -31,9 +31,15 @@ import {
   canEmailQuotes,
   canEditQuotes,
   canDuplicateQuotes,
+  canUseProductionTools,
 } from "@/lib/utils/permissions";
 import { Agreement, AgreementStatus } from "@/lib/types";
-import { ArrowLeft, Download, PenLine, Pencil, Files, Send } from "lucide-react";
+import { ArrowLeft, Download, PenLine, Pencil, Files, Send, Sparkles } from "lucide-react";
+import {
+  buildBusinessContextFromParts,
+  buildContentPlanPitchHref,
+  encodeDeliverablesForQuery,
+} from "@/lib/contentPlan/pitchPrefill";
 import { SendToClientPanel } from "@/components/agreements/SendToClientPanel";
 import { PartyIdentitySection } from "@/components/identity/PartyIdentitySection";
 import { PaymentTrackingSection } from "@/components/agreements/PaymentTrackingSection";
@@ -192,6 +198,46 @@ export default function AgreementDetailPage() {
           <Field label="Total Fee" value={`$${agreement.paymentTerms.totalFee.toLocaleString()}`} />
           <Field label="Deliverables" value={agreement.deliverables.map((d) => `${d.quantity}x ${d.name}`).join(", ")} />
           {linkedPackage && <Field label="Package" value={`${linkedPackage.name} ($${linkedPackage.price.toLocaleString()})`} />}
+          {canUseProductionTools(appUser) &&
+          (linkedPackage || agreement.deliverables?.length) ? (
+            <Link
+              href={buildContentPlanPitchHref({
+                packageId: linkedPackage?.id || agreement.servicePackageId,
+                packageName: linkedPackage?.name || "Agreement package",
+                clientName:
+                  agreement.projectDetails?.clientName ||
+                  agreement.parties?.find((p) =>
+                    /client/i.test(p.roleInAgreement || p.type || "")
+                  )?.name ||
+                  "",
+                businessContext: buildBusinessContextFromParts([
+                  agreement.projectDetails?.projectOverview,
+                  agreement.projectDetails?.projectName
+                    ? `Project: ${agreement.projectDetails.projectName}`
+                    : null,
+                  agreement.deliverables?.length
+                    ? `Deliverables: ${agreement.deliverables
+                        .map((d) => `${d.quantity}× ${d.name}`)
+                        .join(", ")}`
+                    : null,
+                ]),
+                agreementId: agreement.id,
+                deliverablesJson: encodeDeliverablesForQuery(
+                  linkedPackage?.deliverables?.length
+                    ? linkedPackage.deliverables
+                    : agreement.deliverables.map((d) => ({
+                        name: d.name,
+                        quantity: d.quantity,
+                      }))
+                ),
+              })}
+            >
+              <Button size="sm" variant="outline">
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                Pitch ideas for this package
+              </Button>
+            </Link>
+          ) : null}
           {agreement.payoutDetails && agreement.agreementType === "internal_collaboration" && (
             <Field label="Insight Payout" value={`$${(agreement.payoutDetails.insightFeeAmount || 0).toLocaleString()} (${agreement.payoutDetails.insightFeePercentage || 0}%)`} />
           )}

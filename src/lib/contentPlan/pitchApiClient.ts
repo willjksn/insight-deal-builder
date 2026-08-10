@@ -41,6 +41,10 @@ export async function createContentPlanPitchSession(
     businessContext: string;
     brand?: string;
     product?: string;
+    agreementId?: string | null;
+    opportunityId?: string | null;
+    proposalId?: string | null;
+    clientId?: string | null;
   }
 ) {
   const res = await fetch("/api/content-plans/pitch", {
@@ -82,4 +86,18 @@ export async function developPitchIdea(
     alreadyDeveloped: boolean;
     session?: ContentPlanPitchSession;
   }>(res);
+}
+
+export async function updatePitchIdeaStatus(
+  getToken: GetToken,
+  sessionId: string,
+  ideaId: string,
+  status: "new" | "developed" | "dismissed"
+) {
+  const res = await fetch(`/api/content-plans/pitch/${sessionId}/ideas/${ideaId}`, {
+    method: "PATCH",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ status }),
+  });
+  return parseJson<{ session: ContentPlanPitchSession }>(res);
 }

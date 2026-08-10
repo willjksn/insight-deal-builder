@@ -15,7 +15,7 @@ export type ContentPlanPitchIdea = {
   /** Suggested content style for the plan wizard. */
   contentStyleHint?: ContentStyle;
   contentPlanId?: string | null;
-  status?: "new" | "developed";
+  status?: "new" | "developed" | "dismissed";
 };
 
 export type ContentPlanPitchSession = {
@@ -28,6 +28,11 @@ export type ContentPlanPitchSession = {
   businessContext: string;
   brand?: string;
   product?: string;
+  /** Commercial provenance (optional). */
+  agreementId?: string | null;
+  opportunityId?: string | null;
+  proposalId?: string | null;
+  clientId?: string | null;
   ideas: ContentPlanPitchIdea[];
   createdAt?: unknown;
   updatedAt?: unknown;

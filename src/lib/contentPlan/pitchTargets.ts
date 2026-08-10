@@ -12,6 +12,7 @@ export function remainingPitchTargets(
 ): PitchDeliverableTarget[] {
   const counts = new Map<string, number>();
   for (const idea of existingIdeas) {
+    if (idea.status === "dismissed") continue;
     const key = idea.deliverableName.trim() || "Content";
     counts.set(key, (counts.get(key) || 0) + 1);
   }

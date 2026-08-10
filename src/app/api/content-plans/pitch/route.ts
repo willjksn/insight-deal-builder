@@ -77,6 +77,10 @@ export async function POST(request: NextRequest) {
       businessContext?: string;
       brand?: string;
       product?: string;
+      agreementId?: string | null;
+      opportunityId?: string | null;
+      proposalId?: string | null;
+      clientId?: string | null;
     };
 
     const packageName = String(body.packageName || "").trim();
@@ -123,6 +127,10 @@ export async function POST(request: NextRequest) {
         businessContext,
         brand: body.brand?.trim() || null,
         product: body.product?.trim() || null,
+        agreementId: body.agreementId?.trim() || null,
+        opportunityId: body.opportunityId?.trim() || null,
+        proposalId: body.proposalId?.trim() || null,
+        clientId: body.clientId?.trim() || null,
         ideas,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),

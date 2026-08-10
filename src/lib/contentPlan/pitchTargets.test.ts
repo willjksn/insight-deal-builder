@@ -15,6 +15,12 @@ describe("pitchTargets", () => {
       [
         { id: "1", oneLiner: "a", deliverableName: "Edited reels" },
         { id: "2", oneLiner: "b", deliverableName: "Edited reels" },
+        {
+          id: "3",
+          oneLiner: "c",
+          deliverableName: "Edited reels",
+          status: "dismissed",
+        },
       ]
     );
     expect(remaining).toEqual([
