@@ -305,6 +305,10 @@ export function AiEditorClient({ projectId }: Props) {
     title: string;
     items: PreviewItem[];
     token: string;
+    /** Remount key when opening a new Play session. */
+    sessionKey: string;
+    /** Rough-cut review: allow Drop from cut. */
+    reviewCut?: boolean;
   } | null>(null);
   const [chatMessage, setChatMessage] = useState("");
   const [chatProposal, setChatProposal] = useState<{
@@ -2617,7 +2621,11 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
-  async function openPreview(title: string, items: PreviewItem[]) {
+  async function openPreview(
+    title: string,
+    items: PreviewItem[],
+    opts?: { reviewCut?: boolean }
+  ) {
     if (!items.length) {
       setError("Nothing to play - clip has no local path on this PC.");
       return;
@@ -2627,7 +2635,13 @@ export function AiEditorClient({ projectId }: Props) {
       setAgent(health);
       if (!health.connected) throw new Error("Connect this computer first to preview footage");
       const token = await ensureAgentSession();
-      setPreview({ title, items, token });
+      setPreview({
+        title,
+        items,
+        token,
+        sessionKey: `${Date.now()}`,
+        reviewCut: opts?.reviewCut,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open preview");
     }
@@ -2734,55 +2748,78 @@ export function AiEditorClient({ projectId }: Props) {
     })();
   }
 
-  function previewRoughCut() {
+  async function previewRoughCut() {
     if (!timeline || !visibleClips.length) return;
-    const needPrep = visibleClips.filter((clip) => {
+    setError(null);
+    cancelBatchRef.current = false;
+    const clips = [...visibleClips];
+    const needPrep = clips.filter((clip) => {
       const asset = media.find((m) => m.id === clip.mediaAssetId);
       return asset ? assetNeedsBrowserProxy(asset) : false;
-    }).length;
-    if (needPrep > 0) {
-      setError(
-        `${needPrep} clip${needPrep === 1 ? "" : "s"} still need a light preview for browser play (FX3 originals won’t play in Windows Media Player). Use Step 4 · Prepare clips, then Play again.`
-      );
-      document.getElementById("ai-step-4")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-      return;
-    }
-    const items: PreviewItem[] = [];
-    let skipped = 0;
-    for (const clip of visibleClips) {
-      const asset = media.find((m) => m.id === clip.mediaAssetId);
-      const path = asset ? playbackPathForAsset(asset) : null;
-      if (!path) {
-        skipped += 1;
-        continue;
+    });
+    /** Fresh proxy paths (React media state may lag behind ensureProxyForWatch). */
+    const proxyByAssetId = new Map<string, string>();
+
+    try {
+      // Prepare light proxies on demand (same path as Watch) so Play isn’t blocked on Step 4.
+      for (let i = 0; i < needPrep.length; i++) {
+        if (cancelBatchRef.current) break;
+        const clip = needPrep[i]!;
+        const asset = media.find((m) => m.id === clip.mediaAssetId);
+        if (!asset) continue;
+        setStatusNote(
+          `Preparing preview ${i + 1}/${needPrep.length} for Play: ${asset.filename}`
+        );
+        const proxyPath = await ensureProxyForWatch(asset);
+        if (proxyPath) proxyByAssetId.set(asset.id, proxyPath);
       }
-      const startSeconds = framesToSeconds(clip.sourceInFrame, timeline.frameRate);
-      const endSeconds = startSeconds + framesToSeconds(clip.durationFrames, timeline.frameRate);
-      items.push({
-        path,
-        label: clip.label || asset?.filename || clip.id,
-        startSeconds,
-        endSeconds,
-      });
+      if (cancelBatchRef.current) {
+        setStatusNote("Stopped preparing previews — Play again when ready.");
+        return;
+      }
+
+      const items: PreviewItem[] = [];
+      let skipped = 0;
+      for (const clip of clips) {
+        const asset = media.find((m) => m.id === clip.mediaAssetId);
+        const path =
+          proxyByAssetId.get(clip.mediaAssetId) ??
+          (asset ? playbackPathForAsset(asset) : null);
+        if (!path) {
+          skipped += 1;
+          continue;
+        }
+        const startSeconds = framesToSeconds(clip.sourceInFrame, timeline.frameRate);
+        const endSeconds =
+          startSeconds + framesToSeconds(clip.durationFrames, timeline.frameRate);
+        items.push({
+          path,
+          clipId: clip.id,
+          label: clip.label || asset?.filename || clip.id,
+          startSeconds,
+          endSeconds,
+        });
+      }
+      if (!items.length) {
+        setStatusNote(
+          "No online clips to preview - reconnect media or prepare proxies, then try again."
+        );
+        return;
+      }
+      if (skipped > 0) {
+        setStatusNote(
+          `Preview skipped ${skipped} offline clip${skipped === 1 ? "" : "s"} - the full cut may be longer.`
+        );
+      } else {
+        setStatusNote(null);
+      }
+      const title = activeReelName
+        ? `${activeReelName} - rough cut v${timeline.version}`
+        : `Rough cut v${timeline.version}`;
+      await openPreview(title, items, { reviewCut: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not play cut");
     }
-    if (!items.length) {
-      setStatusNote(
-        "No online clips to preview - reconnect media or prepare proxies, then try again."
-      );
-      return;
-    }
-    if (skipped > 0) {
-      setStatusNote(
-        `Preview skipped ${skipped} offline clip${skipped === 1 ? "" : "s"} - the full cut may be longer.`
-      );
-    }
-    const title = activeReelName
-      ? `${activeReelName} - rough cut v${timeline.version}`
-      : `Rough cut v${timeline.version}`;
-    void openPreview(title, items);
   }
 
   async function persistEditNotes(next: EditNote[]) {
@@ -4341,6 +4378,7 @@ export function AiEditorClient({ projectId }: Props) {
 
       {preview ? (
         <MediaPreview
+          key={preview.sessionKey}
           title={preview.title}
           items={preview.items}
           resolveUrl={(item) =>
@@ -4350,6 +4388,13 @@ export function AiEditorClient({ projectId }: Props) {
             })
           }
           onClose={() => setPreview(null)}
+          onRemoveClip={
+            preview.reviewCut
+              ? async (clipId) => {
+                  await onRippleDeleteClip(clipId);
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -5422,9 +5467,10 @@ export function AiEditorClient({ projectId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Line up a first cut</h2>
               <p className="mt-1 text-sm text-slate-600">
-                This is not the final edit. It lines up preferred Match takes so you can watch them,
-                drop bad ones, then send that order to DaVinci Resolve. When clips were analyzed,
-                uses local shot breaks for in/out instead of starting at the head of each file.
+                This is not the final edit. It lines up preferred Match takes so you can Play the
+                cut, Drop junk in the player, then hand that order to DaVinci Resolve. When clips
+                were analyzed, uses local shot breaks for in/out instead of starting at the head of
+                each file.
               </p>
             </div>
           </div>
@@ -5443,7 +5489,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: watch → Remove junk → Play → hand off to Resolve.
+                Next: Play → Drop junk in the player (Delete) → hand off to Resolve.
               </p>
             </div>
 
@@ -5489,7 +5535,7 @@ export function AiEditorClient({ projectId }: Props) {
               {videoTrack?.clips?.length ? (
                 <Button
                   variant="secondary"
-                  onClick={() => previewRoughCut()}
+                  onClick={() => void previewRoughCut()}
                   disabled={!!busy || !agent.connected}
                 >
                   <Play className="mr-1.5 h-4 w-4" />

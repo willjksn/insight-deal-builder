@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { Loader2, SkipForward, Trash2, X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export type PreviewItem = {
   path: string;
   label: string;
+  /** Timeline clip id when reviewing a rough cut (for Drop). */
+  clipId?: string;
   /** Source in-point (seconds) */
   startSeconds?: number;
   /** Source out-point (seconds) */
@@ -18,6 +21,8 @@ type Props = {
   /** Fully resolved stream URL builder for the current item */
   resolveUrl: (item: PreviewItem) => string;
   onClose: () => void;
+  /** Rough-cut review: remove current clip from the cut (ripple delete). */
+  onRemoveClip?: (clipId: string) => Promise<void> | void;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -26,31 +31,45 @@ function isImagePath(path: string): boolean {
   return IMAGE_EXT.test(path.split(/[?#]/)[0] || "");
 }
 
-export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
+export function MediaPreview({
+  title,
+  items: initialItems,
+  resolveUrl,
+  onClose,
+  onRemoveClip,
+}: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const advancingRef = useRef(false);
+  const [items, setItems] = useState(initialItems);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [removing, setRemoving] = useState(false);
 
   const item = items[index];
   const src = item ? resolveUrl(item) : "";
   const asImage = item ? isImagePath(item.path) : false;
-
-  useEffect(() => {
-    setIndex(0);
-    setError(null);
-    setLoading(true);
-    advancingRef.current = false;
-  }, [items]);
-
-  useEffect(() => {
-    advancingRef.current = false;
-  }, [index, src]);
+  const reviewMode = Boolean(onRemoveClip);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        advance();
+        return;
+      }
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        onRemoveClip &&
+        items[index]?.clipId
+      ) {
+        e.preventDefault();
+        void removeCurrent();
+      }
     };
     window.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
@@ -59,7 +78,12 @@ export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key handlers use latest via closures on each render
+  }, [onClose, onRemoveClip, index, items]);
+
+  useEffect(() => {
+    advancingRef.current = false;
+  }, [index, src]);
 
   useEffect(() => {
     if (asImage) return;
@@ -108,6 +132,31 @@ export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
     const el = videoRef.current;
     if (el) el.pause();
     setIndex((i) => i + 1);
+  }
+
+  async function removeCurrent() {
+    const clipId = item?.clipId;
+    if (!clipId || !onRemoveClip || removing) return;
+    setRemoving(true);
+    setError(null);
+    try {
+      await onRemoveClip(clipId);
+      const el = videoRef.current;
+      if (el) el.pause();
+      setItems((prev) => {
+        const next = prev.filter((i) => i.clipId !== clipId);
+        if (!next.length) {
+          onClose();
+          return prev;
+        }
+        setIndex((i) => Math.min(i, next.length - 1));
+        return next;
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove clip from cut");
+    } finally {
+      setRemoving(false);
+    }
   }
 
   if (!item) return null;
@@ -187,6 +236,39 @@ export function MediaPreview({ title, items, resolveUrl, onClose }: Props) {
             />
           )}
         </div>
+        {reviewMode ? (
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 px-3 py-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={removing || index >= items.length - 1}
+              onClick={() => advance()}
+            >
+              <SkipForward className="mr-1.5 h-3.5 w-3.5" />
+              Skip
+            </Button>
+            {item.clipId ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={removing}
+                onClick={() => void removeCurrent()}
+              >
+                {removing ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Drop from cut
+              </Button>
+            ) : null}
+            <span className="text-[11px] text-slate-400">
+              → skip · Delete drops from cut
+            </span>
+          </div>
+        ) : null}
         {error ? <p className="px-3 py-2 text-xs text-amber-200">{error}</p> : null}
         <p className="px-3 py-2 text-[11px] text-slate-400">
           Playing from this computer — nothing uploads to the cloud. Esc or click outside to close.
