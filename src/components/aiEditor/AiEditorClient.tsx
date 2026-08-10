@@ -2639,6 +2639,61 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  /**
+   * Reorder visible Play-review clips while preserving any non-visible
+   * reel/track clips in their relative slots.
+   */
+  async function onReorderCutClips(
+    visibleOrderedIds: string[],
+    opts?: { quiet?: boolean }
+  ) {
+    if (!timeline) throw new Error("No timeline yet");
+    const track = timeline.tracks.find((t) => t.kind === "video");
+    if (!track) throw new Error("No video track");
+    const visibleSet = new Set(visibleOrderedIds);
+    const clipIds: string[] = [];
+    let vi = 0;
+    for (const c of track.clips) {
+      if (visibleSet.has(c.id)) {
+        const nextId = visibleOrderedIds[vi++];
+        if (nextId) clipIds.push(nextId);
+      } else {
+        clipIds.push(c.id);
+      }
+    }
+    while (vi < visibleOrderedIds.length) {
+      clipIds.push(visibleOrderedIds[vi++]!);
+    }
+    const unchanged =
+      clipIds.length === track.clips.length &&
+      clipIds.every((id, i) => id === track.clips[i]?.id);
+    if (unchanged) return undefined;
+
+    if (!opts?.quiet) setBusy("rough_cut");
+    setError(null);
+    try {
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "apply_ops",
+        ops: [{ type: "reorder", trackId: track.id, clipIds }],
+        note: "Reorder from Play review",
+      });
+      setTimeline(res.timeline);
+      invalidateLocalCutExport();
+      setTimelineVersions(res.versions);
+      setStatusNote(
+        `Reordered cut · now v${res.summary.version} · ${res.summary.clipCount} clips`
+      );
+      return res;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not reorder cut";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
+    } finally {
+      if (!opts?.quiet) setBusy(null);
+    }
+  }
+
   async function onStripNonVideoFromCut() {
     if (!stillClipsOnCut.length) return;
     setBusy("rough_cut");
@@ -4563,6 +4618,30 @@ export function AiEditorClient({ projectId }: Props) {
               : undefined
           }
           canUndoDrop={preview.reviewCut ? reviewUndoDepth > 0 : false}
+          onReorderClips={
+            preview.reviewCut
+              ? async (orderedClipIds) => {
+                  const res = await onReorderCutClips(orderedClipIds, {
+                    quiet: true,
+                  });
+                  if (!res) return;
+                  const prior = res.versions.find(
+                    (v) => v.version === res.timeline.version - 1
+                  );
+                  if (prior) pushReviewUndo(prior.id);
+                  setPreview((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          title: activeReelName
+                            ? `${activeReelName} - rough cut v${res.summary.version}`
+                            : `Rough cut v${res.summary.version}`,
+                        }
+                      : null
+                  );
+                }
+              : undefined
+          }
           onPreferClip={
             preview.reviewCut
               ? async (item) => {
@@ -5694,7 +5773,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → jump clips (← → / strip) → Prefer / Drop / Undo → Rebuild → Resolve.
+                Next: Play → jump / drag-reorder strip → Prefer / Drop / Undo → Rebuild → Resolve.
               </p>
             </div>
 

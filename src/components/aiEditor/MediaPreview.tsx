@@ -46,10 +46,12 @@ type Props = {
   onPreferClip?: (item: PreviewItem) => Promise<void> | void;
   /** Rebuild assembly from preferred takes and reopen Play. */
   onRebuildCut?: () => Promise<void> | void;
-  /** Undo the last Drop (restore prior timeline version + replay). */
+  /** Undo the last Drop/reorder (restore prior timeline version + replay). */
   onUndoDrop?: () => Promise<void> | void;
   /** Whether Undo is available for this Play session. */
   canUndoDrop?: boolean;
+  /** Persist a new visible-clip order (drag or [ ]). */
+  onReorderClips?: (orderedClipIds: string[]) => Promise<void> | void;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -68,10 +70,12 @@ export function MediaPreview({
   onRebuildCut,
   onUndoDrop,
   canUndoDrop = false,
+  onReorderClips,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const advancingRef = useRef(false);
+  const dragFromRef = useRef<number | null>(null);
   const [items, setItems] = useState(initialItems);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -80,20 +84,23 @@ export function MediaPreview({
   const [preferring, setPreferring] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
   const [undoing, setUndoing] = useState(false);
+  const [reordering, setReordering] = useState(false);
   const [preferDirty, setPreferDirty] = useState(false);
   const [actionNote, setActionNote] = useState<string | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const item = items[index];
   const src = item ? resolveUrl(item) : "";
   const asImage = item ? isImagePath(item.path) : false;
   const reviewMode = Boolean(
-    onRemoveClip || onPreferClip || onRebuildCut || onUndoDrop
+    onRemoveClip || onPreferClip || onRebuildCut || onUndoDrop || onReorderClips
   );
-  const busyAction = removing || preferring || rebuilding || undoing;
+  const busyAction = removing || preferring || rebuilding || undoing || reordering;
   const canPrefer =
     Boolean(onPreferClip && item?.plannedShotId && item?.mediaAssetId) &&
     !item?.isPreferred;
   const showUndo = Boolean(onUndoDrop && canUndoDrop);
+  const canReorder = Boolean(onReorderClips && items.length > 1);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -137,6 +144,16 @@ export function MediaPreview({
       ) {
         e.preventDefault();
         void undoDrop();
+        return;
+      }
+      if (e.key === "[" && canReorder && !busyAction) {
+        e.preventDefault();
+        void moveClip(index, index - 1);
+        return;
+      }
+      if (e.key === "]" && canReorder && !busyAction) {
+        e.preventDefault();
+        void moveClip(index, index + 1);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -153,11 +170,13 @@ export function MediaPreview({
     onPreferClip,
     onRebuildCut,
     onUndoDrop,
+    onReorderClips,
     index,
     items,
     canPrefer,
     busyAction,
     showUndo,
+    canReorder,
     item,
   ]);
 
@@ -232,6 +251,41 @@ export function MediaPreview({
     goTo(index - 1);
   }
 
+  async function moveClip(from: number, to: number) {
+    if (!onReorderClips || busyAction) return;
+    if (from < 0 || to < 0 || from >= items.length || to >= items.length) return;
+    if (from === to) return;
+    const prev = items;
+    const prevIndex = index;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    if (!moved?.clipId) return;
+    next.splice(to, 0, moved);
+    const orderedIds = next.map((i) => i.clipId).filter((id): id is string => Boolean(id));
+    if (orderedIds.length !== next.length) {
+      setError("Can’t reorder — a clip is missing its id.");
+      return;
+    }
+    setReordering(true);
+    setError(null);
+    setItems(next);
+    setIndex(to);
+    setActionNote("Saving new order…");
+    try {
+      await onReorderClips(orderedIds);
+      setActionNote("Reordered · U undoes");
+    } catch (e) {
+      setItems(prev);
+      setIndex(prevIndex);
+      setError(e instanceof Error ? e.message : "Could not reorder cut");
+      setActionNote(null);
+    } finally {
+      setReordering(false);
+      dragFromRef.current = null;
+      setDragOverIndex(null);
+    }
+  }
+
   async function removeCurrent() {
     const clipId = item?.clipId;
     if (!clipId || !onRemoveClip || busyAction) return;
@@ -244,7 +298,7 @@ export function MediaPreview({
       setItems((prev) => {
         const next = prev.filter((i) => i.clipId !== clipId);
         if (!next.length) {
-          setActionNote("Cut empty · U undoes the last drop");
+          setActionNote("Cut empty · U undoes the last edit");
           setIndex(0);
           return next;
         }
@@ -316,12 +370,12 @@ export function MediaPreview({
     if (!onUndoDrop || !canUndoDrop || busyAction) return;
     setUndoing(true);
     setError(null);
-    setActionNote("Undoing last drop…");
+    setActionNote("Undoing last edit…");
     const el = videoRef.current;
     if (el) el.pause();
     try {
       await onUndoDrop();
-      setActionNote("Drop undone · playing restored cut");
+      setActionNote("Undone · playing restored cut");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not undo drop");
       setActionNote(null);
@@ -336,11 +390,12 @@ export function MediaPreview({
         ref={stripRef}
         className="flex gap-1.5 overflow-x-auto border-t border-slate-800 px-3 py-2 scrollbar-thin"
         role="listbox"
-        aria-label="Clips in this cut"
+        aria-label="Clips in this cut — drag to reorder"
       >
         {items.map((clip, i) => {
           const active = i === index;
           const label = clip.shotLabel || clip.label;
+          const dropTarget = dragOverIndex === i && dragFromRef.current !== i;
           return (
             <button
               key={clip.clipId || `${clip.path}_${i}`}
@@ -349,12 +404,44 @@ export function MediaPreview({
               aria-selected={active}
               data-strip-index={i}
               disabled={busyAction}
-              title={label}
+              draggable={canReorder && !busyAction}
+              title={canReorder ? `${label} — drag to reorder` : label}
               onClick={() => goTo(i)}
-              className={`relative w-20 shrink-0 overflow-hidden rounded-lg border text-left transition ${
+              onDragStart={(e) => {
+                if (!canReorder || busyAction) return;
+                dragFromRef.current = i;
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(i));
+              }}
+              onDragEnd={() => {
+                dragFromRef.current = null;
+                setDragOverIndex(null);
+              }}
+              onDragOver={(e) => {
+                if (!canReorder || busyAction) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                setDragOverIndex(i);
+              }}
+              onDragLeave={() => {
+                setDragOverIndex((cur) => (cur === i ? null : cur));
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const from =
+                  dragFromRef.current ??
+                  Number.parseInt(e.dataTransfer.getData("text/plain"), 10);
+                setDragOverIndex(null);
+                dragFromRef.current = null;
+                if (!Number.isFinite(from)) return;
+                void moveClip(from, i);
+              }}
+              className={`relative w-20 shrink-0 cursor-grab overflow-hidden rounded-lg border text-left transition active:cursor-grabbing ${
                 active
                   ? "border-sky-400 ring-1 ring-sky-400/60"
-                  : "border-slate-700 hover:border-slate-500"
+                  : dropTarget
+                    ? "border-amber-400 ring-1 ring-amber-400/50"
+                    : "border-slate-700 hover:border-slate-500"
               } ${busyAction ? "opacity-60" : ""}`}
             >
               {clip.thumbnailDataUrl ? (
@@ -362,7 +449,8 @@ export function MediaPreview({
                 <img
                   src={clip.thumbnailDataUrl}
                   alt=""
-                  className="h-12 w-full object-cover bg-slate-900"
+                  className="pointer-events-none h-12 w-full object-cover bg-slate-900"
+                  draggable={false}
                 />
               ) : (
                 <div className="flex h-12 items-center justify-center bg-slate-900 text-[10px] text-slate-500">
@@ -455,7 +543,7 @@ export function MediaPreview({
           ) : (
             <Undo2 className="mr-1.5 h-3.5 w-3.5" />
           )}
-          Undo drop
+          Undo
         </Button>
       ) : null}
       {onRebuildCut ? (
@@ -476,6 +564,7 @@ export function MediaPreview({
       ) : null}
       <span className="text-[11px] text-slate-400">
         {item ? "← → jump" : "Cut empty"}
+        {canReorder ? " · drag / [ ] reorder" : ""}
         {onPreferClip ? " · P prefer" : ""}
         {onRemoveClip ? " · Delete drops" : ""}
         {showUndo ? " · U undo" : ""}
@@ -542,7 +631,7 @@ export function MediaPreview({
                   ) : (
                     <Undo2 className="mr-1.5 h-3.5 w-3.5" />
                   )}
-                  Undo last drop
+                  Undo last edit
                 </Button>
               ) : (
                 <p className="text-xs text-slate-500">
