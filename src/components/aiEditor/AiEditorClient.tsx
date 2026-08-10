@@ -14,6 +14,7 @@ import {
   Play,
   RefreshCw,
   Sparkles,
+  Star,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -6441,29 +6442,47 @@ export function AiEditorClient({ projectId }: Props) {
                       </div>
                       {row.candidates.length ? (
                         <ul className="mt-2 space-y-1.5">
-                          {row.candidates.slice(0, 4).map((c) => (
-                            <li
-                              key={c.mediaAssetId}
-                              className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600"
-                            >
-                              <span className="truncate">
-                                {c.filename} - {(c.score * 100).toFixed(0)}%
-                                {c.reasons[0] ? ` - ${c.reasons[0]}` : ""}
-                              </span>
-                              {row.preferredMediaAssetId !== c.mediaAssetId ? (
-                                <button
-                                  type="button"
-                                  className="shrink-0 text-sky-800 underline disabled:opacity-50"
-                                  disabled={!!busy}
-                                  onClick={() => void onPreferTake(row.plannedShotId, c.mediaAssetId)}
-                                >
-                                  Prefer
-                                </button>
-                              ) : (
-                                <span className="shrink-0 text-emerald-700">Preferred</span>
-                              )}
-                            </li>
-                          ))}
+                          {row.candidates.slice(0, 4).map((c) => {
+                            const isPreferred =
+                              row.preferredMediaAssetId === c.mediaAssetId;
+                            return (
+                              <li
+                                key={c.mediaAssetId}
+                                className={
+                                  isPreferred
+                                    ? "flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-2 py-1.5 text-xs text-emerald-950"
+                                    : "flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600"
+                                }
+                              >
+                                <span className="flex min-w-0 items-center gap-1.5 truncate">
+                                  {isPreferred ? (
+                                    <Star className="h-3 w-3 shrink-0 fill-emerald-600 text-emerald-700" />
+                                  ) : null}
+                                  <span className="truncate">
+                                    {c.filename} - {(c.score * 100).toFixed(0)}%
+                                    {c.reasons[0] ? ` - ${c.reasons[0]}` : ""}
+                                  </span>
+                                </span>
+                                {isPreferred ? (
+                                  <span className="inline-flex shrink-0 items-center gap-1 font-medium text-emerald-800">
+                                    Preferred
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="inline-flex shrink-0 items-center gap-1 text-sky-800 underline disabled:opacity-50"
+                                    disabled={!!busy}
+                                    onClick={() =>
+                                      void onPreferTake(row.plannedShotId, c.mediaAssetId)
+                                    }
+                                  >
+                                    <Star className="h-3 w-3" />
+                                    Prefer
+                                  </button>
+                                )}
+                              </li>
+                            );
+                          })}
                         </ul>
                       ) : (
                         <p className="mt-2 text-xs text-slate-500">No clip candidates yet.</p>
