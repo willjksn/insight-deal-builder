@@ -132,7 +132,7 @@ import {
   type ResolveWorkflowStatus,
 } from "@/lib/aiEditor/resolveWorkflow";
 import type { FinishingMoodId, TransitionStyleId } from "@/lib/aiEditor/types";
-import { framesToSeconds } from "@/lib/aiEditor/frames";
+import { framesToSeconds, secondsToFrames } from "@/lib/aiEditor/frames";
 import type { ClipAnalysisBundle } from "@/lib/aiEditor/analysis";
 import { formatBytes } from "@/lib/aiEditor/checksum";
 import { assetNeedsBrowserProxy } from "@/lib/aiEditor/codecs";
@@ -2639,6 +2639,57 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  /** Trim a cut clip’s source in/out from Play review (compacts the track after). */
+  async function onTrimCutClip(
+    clipId: string,
+    startSeconds: number,
+    endSeconds: number,
+    opts?: { quiet?: boolean }
+  ) {
+    if (!timeline) throw new Error("No timeline yet");
+    const track = timeline.tracks.find((t) => t.kind === "video");
+    if (!track) throw new Error("No video track");
+    if (!(endSeconds > startSeconds + 0.04)) {
+      throw new Error("Out point must be after in point");
+    }
+    const sourceInFrame = secondsToFrames(startSeconds, timeline.frameRate);
+    const durationFrames = Math.max(
+      1,
+      secondsToFrames(endSeconds - startSeconds, timeline.frameRate)
+    );
+    if (!opts?.quiet) setBusy("rough_cut");
+    setError(null);
+    try {
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "apply_ops",
+        ops: [
+          { type: "trim", clipId, sourceInFrame, durationFrames },
+          // Compact so shortening a take doesn’t leave a hole in the assembly.
+          {
+            type: "reorder",
+            trackId: track.id,
+            clipIds: track.clips.map((c) => c.id),
+          },
+        ],
+        note: "Trim from Play review",
+      });
+      setTimeline(res.timeline);
+      invalidateLocalCutExport();
+      setTimelineVersions(res.versions);
+      setStatusNote(
+        `Trimmed clip · cut is now v${res.summary.version} · ${res.summary.durationTimecode}`
+      );
+      return res;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not trim clip";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
+    } finally {
+      if (!opts?.quiet) setBusy(null);
+    }
+  }
+
   /**
    * Reorder visible Play-review clips while preserving any non-visible
    * reel/track clips in their relative slots.
@@ -4642,6 +4693,38 @@ export function AiEditorClient({ projectId }: Props) {
                 }
               : undefined
           }
+          onTrimClip={
+            preview.reviewCut
+              ? async ({ clipId, startSeconds, endSeconds }) => {
+                  const res = await onTrimCutClip(
+                    clipId,
+                    startSeconds,
+                    endSeconds,
+                    { quiet: true }
+                  );
+                  if (!res) return;
+                  const prior = res.versions.find(
+                    (v) => v.version === res.timeline.version - 1
+                  );
+                  if (prior) pushReviewUndo(prior.id);
+                  setPreview((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          title: activeReelName
+                            ? `${activeReelName} - rough cut v${res.summary.version}`
+                            : `Rough cut v${res.summary.version}`,
+                          items: prev.items.map((i) =>
+                            i.clipId === clipId
+                              ? { ...i, startSeconds, endSeconds }
+                              : i
+                          ),
+                        }
+                      : null
+                  );
+                }
+              : undefined
+          }
           onPreferClip={
             preview.reviewCut
               ? async (item) => {
@@ -5773,7 +5856,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → jump / drag-reorder strip → Prefer / Drop / Undo → Rebuild → Resolve.
+                Next: Play → In/Out · reorder · Prefer / Drop · Undo → Rebuild → Resolve.
               </p>
             </div>
 

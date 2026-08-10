@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
+const MIN_TRIM_SECONDS = 0.05;
+
 export type PreviewItem = {
   path: string;
   label: string;
@@ -52,6 +54,12 @@ type Props = {
   canUndoDrop?: boolean;
   /** Persist a new visible-clip order (drag or [ ]). */
   onReorderClips?: (orderedClipIds: string[]) => Promise<void> | void;
+  /** Trim current clip source in/out from the playhead. */
+  onTrimClip?: (input: {
+    clipId: string;
+    startSeconds: number;
+    endSeconds: number;
+  }) => Promise<void> | void;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -71,6 +79,7 @@ export function MediaPreview({
   onUndoDrop,
   canUndoDrop = false,
   onReorderClips,
+  onTrimClip,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
@@ -85,6 +94,7 @@ export function MediaPreview({
   const [rebuilding, setRebuilding] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [trimming, setTrimming] = useState(false);
   const [preferDirty, setPreferDirty] = useState(false);
   const [actionNote, setActionNote] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -93,9 +103,16 @@ export function MediaPreview({
   const src = item ? resolveUrl(item) : "";
   const asImage = item ? isImagePath(item.path) : false;
   const reviewMode = Boolean(
-    onRemoveClip || onPreferClip || onRebuildCut || onUndoDrop || onReorderClips
+    onRemoveClip ||
+      onPreferClip ||
+      onRebuildCut ||
+      onUndoDrop ||
+      onReorderClips ||
+      onTrimClip
   );
-  const busyAction = removing || preferring || rebuilding || undoing || reordering;
+  const busyAction =
+    removing || preferring || rebuilding || undoing || reordering || trimming;
+  const canTrim = Boolean(onTrimClip && item?.clipId && !asImage);
   const canPrefer =
     Boolean(onPreferClip && item?.plannedShotId && item?.mediaAssetId) &&
     !item?.isPreferred;
@@ -154,6 +171,16 @@ export function MediaPreview({
       if (e.key === "]" && canReorder && !busyAction) {
         e.preventDefault();
         void moveClip(index, index + 1);
+        return;
+      }
+      if ((e.key === "i" || e.key === "I") && canTrim && !busyAction) {
+        e.preventDefault();
+        void markIn();
+        return;
+      }
+      if ((e.key === "o" || e.key === "O") && canTrim && !busyAction) {
+        e.preventDefault();
+        void markOut();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -171,12 +198,14 @@ export function MediaPreview({
     onRebuildCut,
     onUndoDrop,
     onReorderClips,
+    onTrimClip,
     index,
     items,
     canPrefer,
     busyAction,
     showUndo,
     canReorder,
+    canTrim,
     item,
   ]);
 
@@ -249,6 +278,70 @@ export function MediaPreview({
 
   function goPrev() {
     goTo(index - 1);
+  }
+
+  async function applyTrim(startSeconds: number, endSeconds: number) {
+    const clipId = item?.clipId;
+    if (!clipId || !onTrimClip || busyAction) return;
+    if (!(endSeconds > startSeconds + MIN_TRIM_SECONDS)) {
+      setError("Out point must be after in point.");
+      return;
+    }
+    setTrimming(true);
+    setError(null);
+    setActionNote("Saving trim…");
+    const el = videoRef.current;
+    if (el) el.pause();
+    try {
+      await onTrimClip({ clipId, startSeconds, endSeconds });
+      setItems((prev) =>
+        prev.map((i) =>
+          i.clipId === clipId ? { ...i, startSeconds, endSeconds } : i
+        )
+      );
+      setActionNote(
+        `In ${startSeconds.toFixed(1)}s · Out ${endSeconds.toFixed(1)}s · U undoes`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not trim clip");
+      setActionNote(null);
+    } finally {
+      setTrimming(false);
+    }
+  }
+
+  async function markIn() {
+    const el = videoRef.current;
+    if (!el || !canTrim) return;
+    const t = el.currentTime;
+    const end =
+      item?.endSeconds ??
+      (Number.isFinite(el.duration) ? el.duration : undefined);
+    if (!Number.isFinite(t) || end == null || !Number.isFinite(end)) {
+      setError("Wait for the clip to load, then Mark In.");
+      return;
+    }
+    if (t >= end - MIN_TRIM_SECONDS) {
+      setError("Scrub earlier than the out point, then Mark In (I).");
+      return;
+    }
+    await applyTrim(Math.max(0, t), end);
+  }
+
+  async function markOut() {
+    const el = videoRef.current;
+    if (!el || !canTrim) return;
+    const t = el.currentTime;
+    const start = item?.startSeconds ?? 0;
+    if (!Number.isFinite(t)) {
+      setError("Wait for the clip to load, then Mark Out.");
+      return;
+    }
+    if (t <= start + MIN_TRIM_SECONDS) {
+      setError("Scrub later than the in point, then Mark Out (O).");
+      return;
+    }
+    await applyTrim(start, t);
   }
 
   async function moveClip(from: number, to: number) {
@@ -514,6 +607,33 @@ export function MediaPreview({
           Preferred
         </span>
       ) : null}
+      {canTrim ? (
+        <>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busyAction}
+            onClick={() => void markIn()}
+            title="Set in point at playhead (I)"
+          >
+            {trimming ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : null}
+            Mark In
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busyAction}
+            onClick={() => void markOut()}
+            title="Set out point at playhead (O)"
+          >
+            Mark Out
+          </Button>
+        </>
+      ) : null}
       {item?.clipId && onRemoveClip ? (
         <Button
           type="button"
@@ -564,6 +684,7 @@ export function MediaPreview({
       ) : null}
       <span className="text-[11px] text-slate-400">
         {item ? "← → jump" : "Cut empty"}
+        {canTrim ? " · I/O in/out" : ""}
         {canReorder ? " · drag / [ ] reorder" : ""}
         {onPreferClip ? " · P prefer" : ""}
         {onRemoveClip ? " · Delete drops" : ""}
