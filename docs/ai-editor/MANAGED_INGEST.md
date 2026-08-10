@@ -113,7 +113,7 @@ IDs stay independent of folder names.
 | **C** | Live media browser populate mid-ingest (per-clip register after verify/thumb) |
 | **D** | Proxies after copy from project paths (card offload not starved) |
 | **E** | Opt-in analyze after copy (technical + shots; no Whisper) |
-| F | Safety copy + media safety status |
+| **F** | Opt-in verified backup after ingest (reuses V1H archive) |
 
 Manual “Select existing folder” / **Use this drive as source** remains.
 
@@ -128,4 +128,4 @@ Manual “Select existing folder” / **Use this drive as source** remains.
 | **C** | Live library populate mid-ingest | **Landed (thin)** — `runManagedCopy` registers each clip as it finishes; concurrent pipeline jobs still Later |
 | **D** | Proxy queue (not from card) | **Landed (thin)** — `generateProxies: false` on ingest-copy; trailing `agentCreateProxy` pass on registered project files when “Prepare proxies after copy” is on |
 | **E** | Analysis queue | **Landed (thin)** — opt-in “Analyze after copy” (default off); `agentAnalyze` with `transcribe: false` after offload/proxies; Stop honored; Whisper stays on Step 5 only |
-| F | Safety copy / dual dest | Later |
+| **F** | Safety copy / dual dest | **Landed (thin)** — opt-in “Also back up after ingest” via `planArchiveBatch` + `agentCopyVerifiedBatch` after project offload; not dual-write from the card; soft-skip if no archive folder |

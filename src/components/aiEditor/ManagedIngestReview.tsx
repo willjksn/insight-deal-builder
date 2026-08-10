@@ -18,6 +18,8 @@ export type ManagedIngestOptions = {
   generateThumbnails: boolean;
   extractMetadata: boolean;
   analyzeDuringIngest: boolean;
+  /** Phase F — verified copy to archive root after project offload. */
+  copyToArchive: boolean;
 };
 
 export type DestinationDriveOption = {
@@ -45,6 +47,8 @@ type Props = {
   freeBytes?: number | null;
   options: ManagedIngestOptions;
   onOptionsChange: (next: ManagedIngestOptions) => void;
+  /** Saved backup/archive folder — needed for “Also back up after ingest”. */
+  archiveRootPath?: string | null;
   scanning: boolean;
   onRescan: () => void;
   onUseSourceFolder: () => void;
@@ -71,6 +75,7 @@ export function ManagedIngestReview({
   freeBytes,
   options,
   onOptionsChange,
+  archiveRootPath,
   scanning,
   onRescan,
   onUseSourceFolder,
@@ -78,6 +83,7 @@ export function ManagedIngestReview({
   ingesting,
   disabled,
 }: Props) {
+  const hasArchiveRoot = Boolean(archiveRootPath?.trim());
   if (!sources.length && !scanning) return null;
 
   const selected = sources.find((s) => s.id === selectedSourceId) || sources[0] || null;
@@ -311,9 +317,9 @@ export function ManagedIngestReview({
               <p className="text-xs leading-relaxed text-slate-600">
                 <span className="font-medium">Ingest into project</span> copies every clip on this
                 card into your workspace with checksum verify. Clips appear in the media library as
-                each one finishes; optional proxies and analysis run afterward from the project (not
-                the card). Or use the drive as source → Review files → Copy & verify for a selective
-                pass.
+                each one finishes; optional proxies, analysis, and backup run afterward from the
+                project (not the card). Or use the drive as source → Review files → Copy & verify for
+                a selective pass.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
@@ -365,6 +371,28 @@ export function ManagedIngestReview({
                     Analyze after copy
                     <span className="mt-0.5 block text-[11px] text-slate-500">
                       Technical + shot breaks only — no speech transcription.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700 sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={options.copyToArchive}
+                    disabled={disabled || ingesting}
+                    onChange={(e) =>
+                      onOptionsChange({
+                        ...options,
+                        copyToArchive: e.target.checked,
+                      })
+                    }
+                  />
+                  <span>
+                    Also back up after ingest
+                    <span className="mt-0.5 block text-[11px] text-slate-500">
+                      {hasArchiveRoot
+                        ? `Verified copy to backup folder after project offload (${archiveRootPath}).`
+                        : "Set a backup folder in Step 2 (Backup & safety) first — ingest still works without it."}
                     </span>
                   </span>
                 </label>

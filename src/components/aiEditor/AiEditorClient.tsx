@@ -114,6 +114,7 @@ import {
 } from "@/lib/aiEditor/resolveBridge";
 import {
   canReclaimActiveCopy,
+  planArchiveBatch,
   SAFE_DELETE_CONFIRM_PHRASE,
   summarizeArchiveState,
 } from "@/lib/aiEditor/archive";
@@ -273,6 +274,7 @@ export function AiEditorClient({ projectId }: Props) {
     generateThumbnails: true,
     extractMetadata: true,
     analyzeDuringIngest: false,
+    copyToArchive: false,
   });
   const [ingestDestFreeBytes, setIngestDestFreeBytes] = useState<number | null>(null);
   const [diskNote, setDiskNote] = useState<string | null>(null);
@@ -1659,6 +1661,8 @@ export function AiEditorClient({ projectId }: Props) {
     prepare: boolean;
     /** Phase E — technical + shot breaks after offload (no Whisper). */
     analyze?: boolean;
+    /** Phase F — verified backup to archive root after offload. */
+    archive?: boolean;
     projectRoot?: string;
   }) {
     const projectRoot = (opts.projectRoot || settings?.projectRootPath || "").trim();
@@ -1693,11 +1697,21 @@ export function AiEditorClient({ projectId }: Props) {
     const registeredAssets: MediaAsset[] = [];
     const wantProxy = Boolean(opts.prepare);
     const wantAnalyze = Boolean(opts.analyze);
+    const wantArchive = Boolean(opts.archive);
+    const trailingSteps = [wantProxy, wantAnalyze, wantArchive].filter(Boolean).length;
     // Reserve progress for trailing passes so card offload stays the priority.
-    const copyPctCap = wantProxy || wantAnalyze ? (wantProxy && wantAnalyze ? 55 : 70) : 96;
-    const proxyPctStart = copyPctCap;
-    const proxyPctSpan = wantProxy && wantAnalyze ? 20 : wantProxy ? 30 : 0;
-    const analyzePctStart = proxyPctStart + proxyPctSpan;
+    const copyPctCap =
+      trailingSteps === 0 ? 96 : trailingSteps === 1 ? 70 : trailingSteps === 2 ? 55 : 45;
+    const trailSpan = trailingSteps ? Math.floor((100 - copyPctCap) / trailingSteps) : 0;
+    let trailCursor = copyPctCap;
+    const proxyPctStart = trailCursor;
+    const proxyPctSpan = wantProxy ? trailSpan : 0;
+    if (wantProxy) trailCursor += trailSpan;
+    const analyzePctStart = trailCursor;
+    const analyzePctSpan = wantAnalyze ? trailSpan : 0;
+    if (wantAnalyze) trailCursor += trailSpan;
+    const archivePctStart = trailCursor;
+    const archivePctSpan = wantArchive ? 100 - archivePctStart : 0;
     copyAbortRef.current?.abort();
     const abort = new AbortController();
     copyAbortRef.current = abort;
@@ -1828,6 +1842,9 @@ export function AiEditorClient({ projectId }: Props) {
     let proxyFailed = 0;
     let analyzeOk = 0;
     let analyzeFailed = 0;
+    let archiveOk = 0;
+    let archiveFailed = 0;
+    let archiveSkipNote = "";
     const copyStopped = cancelBatchRef.current || abort.signal.aborted;
 
     // Phase D thin — proxies from project files after card offload (not while copying).
@@ -1901,7 +1918,7 @@ export function AiEditorClient({ projectId }: Props) {
           setProgress({
             pct:
               analyzePctStart +
-              Math.round(((i + 1) / toAnalyze.length) * (100 - analyzePctStart)),
+              Math.round(((i + 1) / toAnalyze.length) * Math.max(analyzePctSpan, 1)),
             label: `Analyzing ${i + 1}/${toAnalyze.length}: ${m.filename} · ${cam}`,
           });
           try {
@@ -1946,6 +1963,102 @@ export function AiEditorClient({ projectId }: Props) {
       }
     }
 
+    const analyzeStopped = cancelBatchRef.current || abort.signal.aborted;
+
+    // Phase F thin — verified backup to archive after project offload (not dual-write from card).
+    if (wantArchive && registeredAssets.length && !copyStopped && !proxyStopped && !analyzeStopped) {
+      const archiveRoot = (settings?.archiveRootPath || archivePath || "").trim();
+      if (!archiveRoot) {
+        archiveSkipNote =
+          " Backup skipped (set a backup folder in Step 2, then use Backup & safety).";
+      } else if (!diskGates.archiveDiskReady) {
+        archiveSkipNote =
+          " Backup skipped (backup drive not ready — check Backup & safety).";
+      } else {
+        setStatusNote(
+          `Offload done (${copiedOk}). Backing up to archive with checksum verify…`
+        );
+        const plan = planArchiveBatch({
+          media: registeredAssets,
+          projectRoot,
+          archiveRoot,
+          projectSlug: context?.projectName || "project",
+        });
+        if (!plan.items.length) {
+          archiveSkipNote = plan.skipped.length
+            ? " Backup skipped (clips already backed up or missing paths)."
+            : " Backup skipped (nothing to archive).";
+        } else {
+          try {
+            setProgress({
+              pct: archivePctStart + 2,
+              label: `Backing up ${plan.items.length} clip(s)…`,
+            });
+            const batchCopy = await agentCopyVerifiedBatch(
+              DEFAULT_AGENT_BASE_URL,
+              opts.token,
+              plan.items.map((i) => ({
+                id: i.mediaAssetId,
+                sourcePath: i.sourcePath,
+                destPath: i.destPath,
+              }))
+            );
+            const okResults = batchCopy.results.filter((r) => r.ok);
+            archiveFailed =
+              batchCopy.failedCount ?? batchCopy.results.filter((r) => !r.ok).length;
+            archiveOk = okResults.length;
+            setProgress({
+              pct: archivePctStart + Math.max(archivePctSpan - 2, 5),
+              label: `Saving backup records (${archiveOk})…`,
+            });
+            const byId = new Map(okResults.map((r) => [r.id, r]));
+            const patches = plan.items
+              .map((item) => {
+                const r = byId.get(item.mediaAssetId);
+                if (!r || !r.ok) return null;
+                const prev =
+                  registeredAssets.find((m) => m.id === item.mediaAssetId) ||
+                  media.find((m) => m.id === item.mediaAssetId);
+                const prevCount =
+                  prev?.verifiedCopyCount ?? (prev?.ingestStatus === "verified" ? 1 : 0);
+                return {
+                  id: item.mediaAssetId,
+                  archivePath: r.destPath,
+                  checksum: r.checksum,
+                  checksumAlgorithm: "sha256" as const,
+                  verifiedCopyCount: Math.max(prevCount, 1) + (prev?.archivePath ? 0 : 1),
+                  sizeBytes: r.sizeBytes,
+                };
+              })
+              .filter(Boolean) as Array<{ id: string } & Partial<MediaAsset>>;
+            if (patches.length) {
+              await aiEditorPatchMedia(getToken, projectId, patches);
+              setMedia((prev) =>
+                prev.map((m) => {
+                  const p = patches.find((x) => x.id === m.id);
+                  return p ? { ...m, ...p } : m;
+                })
+              );
+              const log = await aiEditorArchiveAction(getToken, projectId, {
+                action: "log",
+                type: "archive",
+                count: patches.length,
+                mediaIds: patches.map((p) => p.id),
+                message:
+                  `Archived ${patches.length} clip(s) after managed ingest` +
+                  (archiveFailed ? ` (${archiveFailed} failed)` : ""),
+              });
+              if (log.job) setJobs((prev) => [log.job!, ...prev]);
+            }
+          } catch {
+            archiveFailed = plan.items.length;
+            archiveOk = 0;
+            archiveSkipNote = " Backup failed — try Backup & safety later.";
+          }
+        }
+      }
+    }
+
     const stopped = cancelBatchRef.current || abort.signal.aborted;
     const proxyNote =
       wantProxy && registeredAssets.length && !copyStopped
@@ -1967,14 +2080,26 @@ export function AiEditorClient({ projectId }: Props) {
         : wantAnalyze && (copyStopped || proxyStopped)
           ? " Analysis skipped (stopped earlier)."
           : "";
+    const archiveNote =
+      archiveSkipNote ||
+      (wantArchive && registeredAssets.length && !copyStopped && !proxyStopped && !analyzeStopped
+        ? archiveOk || archiveFailed
+          ? ` Backup: ${archiveOk}` +
+            (archiveFailed ? `, ${archiveFailed} failed` : "") +
+            "."
+          : ""
+        : wantArchive && (copyStopped || proxyStopped || analyzeStopped)
+          ? " Backup skipped (stopped earlier)."
+          : "");
     setStatusNote(
       stopped
-        ? `Stopped — saved ${copiedOk} clip(s) that finished copying into ${cam}.${proxyNote}${analyzeNote}`
+        ? `Stopped — saved ${copiedOk} clip(s) that finished copying into ${cam}.${proxyNote}${analyzeNote}${archiveNote}`
         : `Copied and verified ${copiedOk} clip(s) into ${cam}` +
             (failed ? ` (${failed} failed)` : "") +
             "." +
             proxyNote +
             analyzeNote +
+            archiveNote +
             " Camera cards are never erased by ShootSpine."
     );
   }
@@ -2110,6 +2235,7 @@ export function AiEditorClient({ projectId }: Props) {
       const trailing: string[] = [];
       if (ingestOptions.generateProxies) trailing.push("proxies");
       if (ingestOptions.analyzeDuringIngest) trailing.push("analyze");
+      if (ingestOptions.copyToArchive) trailing.push("backup");
       setStatusNote(
         `Ingesting ${sourceFiles.length} clip${sourceFiles.length === 1 ? "" : "s"} from card → project${
           trailing.length ? ` (${trailing.join(" + ")} after copy)` : ""
@@ -2122,6 +2248,7 @@ export function AiEditorClient({ projectId }: Props) {
         camera,
         prepare: ingestOptions.generateProxies,
         analyze: ingestOptions.analyzeDuringIngest,
+        archive: ingestOptions.copyToArchive,
         projectRoot: destRoot,
       });
 
@@ -4623,6 +4750,7 @@ export function AiEditorClient({ projectId }: Props) {
               freeBytes={ingestDestFreeBytes}
               options={ingestOptions}
               onOptionsChange={setIngestOptions}
+              archiveRootPath={settings?.archiveRootPath || archivePath || null}
               scanning={detectScanning}
               onRescan={() => void scanDetectedSources({ quiet: false })}
               onUseSourceFolder={() => {
