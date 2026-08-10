@@ -2639,6 +2639,59 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  /** Split a cut clip at a source-seconds playhead (Play review). */
+  async function onSplitCutClip(
+    clipId: string,
+    atSourceSeconds: number,
+    opts?: { quiet?: boolean }
+  ) {
+    if (!timeline) throw new Error("No timeline yet");
+    const track = timeline.tracks.find((t) => t.kind === "video");
+    const clip = track?.clips.find((c) => c.id === clipId);
+    if (!track || !clip) throw new Error("Clip not found");
+    const fps = timeline.frameRate;
+    const sourceInSec = framesToSeconds(clip.sourceInFrame, fps);
+    const relFrames = secondsToFrames(atSourceSeconds - sourceInSec, fps);
+    if (relFrames <= 0 || relFrames >= clip.durationFrames) {
+      throw new Error("Scrub inside the take, then Split");
+    }
+    const atTimelineFrame = clip.timelineStartFrame + relFrames;
+    if (!opts?.quiet) setBusy("rough_cut");
+    setError(null);
+    try {
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "apply_ops",
+        ops: [{ type: "split", clipId, atTimelineFrame }],
+        note: "Split from Play review",
+      });
+      setTimeline(res.timeline);
+      invalidateLocalCutExport();
+      setTimelineVersions(res.versions);
+      const nextTrack = res.timeline.tracks.find((t) => t.kind === "video");
+      const left = nextTrack?.clips.find((c) => c.id === clipId);
+      const right = nextTrack?.clips.find(
+        (c) =>
+          c.id !== clipId &&
+          c.mediaAssetId === clip.mediaAssetId &&
+          c.sourceInFrame === (left?.sourceInFrame ?? 0) + (left?.durationFrames ?? 0)
+      );
+      if (!left || !right) {
+        throw new Error("Split saved, but couldn’t locate both halves — Play again.");
+      }
+      setStatusNote(
+        `Split clip · cut is now v${res.summary.version} · ${res.summary.clipCount} clips`
+      );
+      return { res, left, right, frameRate: res.timeline.frameRate };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not split clip";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
+    } finally {
+      if (!opts?.quiet) setBusy(null);
+    }
+  }
+
   /** Trim a cut clip’s source in/out from Play review (compacts the track after). */
   async function onTrimCutClip(
     clipId: string,
@@ -4725,6 +4778,71 @@ export function AiEditorClient({ projectId }: Props) {
                 }
               : undefined
           }
+          onSplitClip={
+            preview.reviewCut
+              ? async ({ clipId, atSourceSeconds }) => {
+                  const split = await onSplitCutClip(clipId, atSourceSeconds, {
+                    quiet: true,
+                  });
+                  if (!split) {
+                    throw new Error("Could not split clip");
+                  }
+                  const prior = split.res.versions.find(
+                    (v) => v.version === split.res.timeline.version - 1
+                  );
+                  if (prior) pushReviewUndo(prior.id);
+                  const base = preview.items.find((i) => i.clipId === clipId);
+                  const fps = split.frameRate;
+                  const leftStart = framesToSeconds(split.left.sourceInFrame, fps);
+                  const leftEnd =
+                    leftStart + framesToSeconds(split.left.durationFrames, fps);
+                  const rightStart = framesToSeconds(split.right.sourceInFrame, fps);
+                  const rightEnd =
+                    rightStart + framesToSeconds(split.right.durationFrames, fps);
+                  const leftItem: PreviewItem = {
+                    path: base?.path || "",
+                    clipId: split.left.id,
+                    mediaAssetId: split.left.mediaAssetId,
+                    plannedShotId: base?.plannedShotId,
+                    shotLabel: base?.shotLabel,
+                    isPreferred: base?.isPreferred,
+                    thumbnailDataUrl: base?.thumbnailDataUrl,
+                    label: split.left.label || base?.label || split.left.id,
+                    startSeconds: leftStart,
+                    endSeconds: leftEnd,
+                  };
+                  const rightItem: PreviewItem = {
+                    path: base?.path || "",
+                    clipId: split.right.id,
+                    mediaAssetId: split.right.mediaAssetId,
+                    plannedShotId: base?.plannedShotId,
+                    shotLabel: base?.shotLabel,
+                    isPreferred: false,
+                    thumbnailDataUrl: base?.thumbnailDataUrl,
+                    label: split.right.label || base?.label || split.right.id,
+                    startSeconds: rightStart,
+                    endSeconds: rightEnd,
+                  };
+                  if (!leftItem.path) {
+                    throw new Error("Split saved, but preview path is missing — Play again.");
+                  }
+                  setPreview((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          title: activeReelName
+                            ? `${activeReelName} - rough cut v${split.res.summary.version}`
+                            : `Rough cut v${split.res.summary.version}`,
+                          items: prev.items.flatMap((i) =>
+                            i.clipId === clipId ? [leftItem, rightItem] : [i]
+                          ),
+                        }
+                      : null
+                  );
+                  return { left: leftItem, right: rightItem };
+                }
+              : undefined
+          }
           onPreferClip={
             preview.reviewCut
               ? async (item) => {
@@ -5856,7 +5974,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → In/Out · reorder · Prefer / Drop · Undo → Rebuild → Resolve.
+                Next: Play → In/Out · Split · reorder · Prefer / Drop · Undo → Rebuild → Resolve.
               </p>
             </div>
 

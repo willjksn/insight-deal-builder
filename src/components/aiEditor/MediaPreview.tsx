@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Clapperboard,
   Loader2,
+  Scissors,
   SkipBack,
   SkipForward,
   Star,
@@ -14,6 +15,7 @@ import {
 import { Button } from "@/components/ui/Button";
 
 const MIN_TRIM_SECONDS = 0.05;
+const MIN_SPLIT_PAD_SECONDS = 0.08;
 
 export type PreviewItem = {
   path: string;
@@ -60,6 +62,11 @@ type Props = {
     startSeconds: number;
     endSeconds: number;
   }) => Promise<void> | void;
+  /** Split current clip at the playhead into two cut placements. */
+  onSplitClip?: (input: {
+    clipId: string;
+    atSourceSeconds: number;
+  }) => Promise<{ left: PreviewItem; right: PreviewItem } | void> | void;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -80,6 +87,7 @@ export function MediaPreview({
   canUndoDrop = false,
   onReorderClips,
   onTrimClip,
+  onSplitClip,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
@@ -95,6 +103,7 @@ export function MediaPreview({
   const [undoing, setUndoing] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [trimming, setTrimming] = useState(false);
+  const [splitting, setSplitting] = useState(false);
   const [preferDirty, setPreferDirty] = useState(false);
   const [actionNote, setActionNote] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -108,11 +117,19 @@ export function MediaPreview({
       onRebuildCut ||
       onUndoDrop ||
       onReorderClips ||
-      onTrimClip
+      onTrimClip ||
+      onSplitClip
   );
   const busyAction =
-    removing || preferring || rebuilding || undoing || reordering || trimming;
+    removing ||
+    preferring ||
+    rebuilding ||
+    undoing ||
+    reordering ||
+    trimming ||
+    splitting;
   const canTrim = Boolean(onTrimClip && item?.clipId && !asImage);
+  const canSplit = Boolean(onSplitClip && item?.clipId && !asImage);
   const canPrefer =
     Boolean(onPreferClip && item?.plannedShotId && item?.mediaAssetId) &&
     !item?.isPreferred;
@@ -181,6 +198,11 @@ export function MediaPreview({
       if ((e.key === "o" || e.key === "O") && canTrim && !busyAction) {
         e.preventDefault();
         void markOut();
+        return;
+      }
+      if ((e.key === "s" || e.key === "S") && canSplit && !busyAction) {
+        e.preventDefault();
+        void splitAtPlayhead();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -199,6 +221,7 @@ export function MediaPreview({
     onUndoDrop,
     onReorderClips,
     onTrimClip,
+    onSplitClip,
     index,
     items,
     canPrefer,
@@ -206,6 +229,7 @@ export function MediaPreview({
     showUndo,
     canReorder,
     canTrim,
+    canSplit,
     item,
   ]);
 
@@ -342,6 +366,47 @@ export function MediaPreview({
       return;
     }
     await applyTrim(start, t);
+  }
+
+  async function splitAtPlayhead() {
+    const el = videoRef.current;
+    const clipId = item?.clipId;
+    if (!el || !clipId || !onSplitClip || busyAction) return;
+    const t = el.currentTime;
+    const start = item?.startSeconds ?? 0;
+    const end = item?.endSeconds;
+    if (!Number.isFinite(t) || end == null || !Number.isFinite(end)) {
+      setError("Wait for the clip to load, then Split.");
+      return;
+    }
+    if (t <= start + MIN_SPLIT_PAD_SECONDS || t >= end - MIN_SPLIT_PAD_SECONDS) {
+      setError("Scrub inside the take (not at the ends), then Split (S).");
+      return;
+    }
+    setSplitting(true);
+    setError(null);
+    setActionNote("Splitting…");
+    el.pause();
+    try {
+      const parts = await onSplitClip({ clipId, atSourceSeconds: t });
+      if (!parts?.left || !parts?.right) {
+        throw new Error("Split did not return both halves");
+      }
+      setItems((prev) => {
+        const i = prev.findIndex((x) => x.clipId === clipId);
+        if (i < 0) return prev;
+        const next = [...prev];
+        next.splice(i, 1, parts.left, parts.right);
+        setIndex(i);
+        return next;
+      });
+      setActionNote("Split · playing left half · U undoes");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not split clip");
+      setActionNote(null);
+    } finally {
+      setSplitting(false);
+    }
   }
 
   async function moveClip(from: number, to: number) {
@@ -634,6 +699,23 @@ export function MediaPreview({
           </Button>
         </>
       ) : null}
+      {canSplit ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busyAction}
+          onClick={() => void splitAtPlayhead()}
+          title="Split at playhead (S)"
+        >
+          {splitting ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Scissors className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          Split
+        </Button>
+      ) : null}
       {item?.clipId && onRemoveClip ? (
         <Button
           type="button"
@@ -685,6 +767,7 @@ export function MediaPreview({
       <span className="text-[11px] text-slate-400">
         {item ? "← → jump" : "Cut empty"}
         {canTrim ? " · I/O in/out" : ""}
+        {canSplit ? " · S split" : ""}
         {canReorder ? " · drag / [ ] reorder" : ""}
         {onPreferClip ? " · P prefer" : ""}
         {onRemoveClip ? " · Delete drops" : ""}
