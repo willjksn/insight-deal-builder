@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Loader2, MonitorSmartphone } from "lucide-react";
+import { ArrowLeft, Download, FolderKanban, Loader2, MonitorSmartphone } from "lucide-react";
 import {
   CompletionBar,
   ShootModePanel,
@@ -231,6 +231,14 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
           <Download className="mr-1.5 h-3.5 w-3.5" />
           One-pager
         </Button>
+        {plan.projectId ? (
+          <Link href={`/projects/${plan.projectId}/production`}>
+            <Button type="button" size="sm" variant="secondary">
+              <FolderKanban className="mr-1.5 h-3.5 w-3.5" />
+              Production board
+            </Button>
+          </Link>
+        ) : null}
         {canWrap ? (
           <Button
             type="button"

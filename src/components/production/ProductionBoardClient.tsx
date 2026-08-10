@@ -193,6 +193,13 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
             {saving && (
               <span className="text-sm text-slate-500">Saving…</span>
             )}
+            {project.sourceContentPlanId ? (
+              <Link href={`/content-plans/${project.sourceContentPlanId}`}>
+                <Button size="touch" variant="outline">
+                  Content plan
+                </Button>
+              </Link>
+            ) : null}
             <Link href={`/projects/${project.id}`}>
               <Button size="touch" variant="outline">
                 <ArrowLeft className="mr-2 h-5 w-5" />

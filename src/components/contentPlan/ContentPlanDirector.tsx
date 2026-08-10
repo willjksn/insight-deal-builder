@@ -736,7 +736,7 @@ export function ContentPlanDirector({
   async function onCreateProject() {
     if (!plan) return;
     if (!plan.shots?.length) {
-      setError("Generate shots before creating a project.");
+      setError("Generate shots before creating a production board.");
       return;
     }
     setCreatingProject(true);
@@ -753,8 +753,9 @@ export function ContentPlanDirector({
       });
       const listed = await listContentPlans(getToken);
       setSavedPlans(listed.plans);
+      router.push(`/projects/${result.projectId}/production`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Create project failed");
+      setError(e instanceof Error ? e.message : "Could not create production board");
     } finally {
       setCreatingProject(false);
     }
@@ -762,11 +763,11 @@ export function ContentPlanDirector({
 
   async function onSyncLinkedProject() {
     if (!plan?.projectId && !projectLinks?.projectId) {
-      setError("Link a project first (Create project from plan).");
+      setError("Link a production board first (Create project + board).");
       return;
     }
     if (!plan?.shots?.length) {
-      setError("Generate shots before updating the linked project.");
+      setError("Generate shots before updating the production board.");
       return;
     }
     setSyncingProject(true);
@@ -780,7 +781,7 @@ export function ContentPlanDirector({
         scriptSessionId: result.scriptSessionId,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Update linked project failed");
+      setError(e instanceof Error ? e.message : "Could not update production board");
     } finally {
       setSyncingProject(false);
     }
@@ -1496,12 +1497,12 @@ export function ContentPlanDirector({
                 {creatingProject ? (
                   <>
                     <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    Creating project…
+                    Creating board…
                   </>
                 ) : (
                   <>
                     <FolderKanban className="mr-1.5 h-3.5 w-3.5" />
-                    Create project from plan
+                    Create project + board
                   </>
                 )}
               </Button>
@@ -1540,10 +1541,10 @@ export function ContentPlanDirector({
             </p>
             {(plan.projectId || projectLinks?.projectId) && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-sm text-emerald-950">
-                <p className="font-medium">Linked to ShootSpine project</p>
+                <p className="font-medium">Linked to production board</p>
                 <p className="mt-0.5 text-xs text-emerald-900/80">
-                  After refine or regenerate, update the project so the board and AI Editor stay in
-                  sync. Board shot IDs are kept when shot numbers match.
+                  After refine or regenerate, update the board so shots and AI Editor stay in sync.
+                  Existing board shot IDs are kept when shot numbers match.
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Button
@@ -1556,26 +1557,26 @@ export function ContentPlanDirector({
                     {syncingProject ? (
                       <>
                         <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        Updating project…
+                        Updating board…
                       </>
                     ) : (
                       <>
                         <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                        Update linked project
+                        Update board + script
                       </>
                     )}
                   </Button>
                   <Link
+                    href={`/projects/${plan.projectId || projectLinks?.projectId}/production`}
+                    className="text-sm font-semibold text-sky-800 hover:underline"
+                  >
+                    Open production board
+                  </Link>
+                  <Link
                     href={`/projects/${plan.projectId || projectLinks?.projectId}`}
                     className="text-sm font-medium text-sky-800 hover:underline"
                   >
-                    Open project
-                  </Link>
-                  <Link
-                    href={`/projects/${plan.projectId || projectLinks?.projectId}/production`}
-                    className="text-sm font-medium text-sky-800 hover:underline"
-                  >
-                    Production board
+                    Project
                   </Link>
                   <Link
                     href={`/projects/${plan.projectId || projectLinks?.projectId}/ai-editor`}

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Clapperboard,
   Copy,
+  FolderKanban,
   Loader2,
   Plus,
   Sparkles,
@@ -315,7 +316,7 @@ export function ContentPlanLibrary() {
                     {p.inputs?.contentStyle ? `${p.inputs.contentStyle} · ` : ""}
                     {total ? `${done}/${total} shots done` : "No shots yet"}
                     {when ? ` · ${when}` : ""}
-                    {p.projectId ? " · linked project" : ""}
+                    {p.projectId ? " · linked board" : ""}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
@@ -345,6 +346,14 @@ export function ContentPlanLibrary() {
                       <Button type="button" size="sm" variant="secondary" disabled={busy}>
                         <Clapperboard className="mr-1 h-3.5 w-3.5" />
                         Shoot
+                      </Button>
+                    </Link>
+                  ) : null}
+                  {p.projectId ? (
+                    <Link href={`/projects/${p.projectId}/production`}>
+                      <Button type="button" size="sm" variant="secondary" disabled={busy}>
+                        <FolderKanban className="mr-1 h-3.5 w-3.5" />
+                        Board
                       </Button>
                     </Link>
                   ) : null}

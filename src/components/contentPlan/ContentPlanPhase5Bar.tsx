@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Download, Loader2, Sparkles, FolderInput } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -51,6 +52,7 @@ export function ContentPlanPhase5Bar({
   onPlanUpdated: (plan: ContentPlan, links?: { projectId: string; scriptSessionId: string }) => void;
   onError: (message: string) => void;
 }) {
+  const router = useRouter();
   const { projects, loading: projectsLoading } = useAccessibleProjects();
   const [instruction, setInstruction] = useState("");
   const [target, setTarget] = useState<RefineTarget>(
@@ -144,7 +146,7 @@ export function ContentPlanPhase5Bar({
       return;
     }
     if (!plan.shots?.length) {
-      onError("Generate shots before applying to a project.");
+      onError("Generate shots before applying to a production board.");
       return;
     }
     setBusyApply(true);
@@ -157,8 +159,9 @@ export function ContentPlanPhase5Bar({
         projectId: result.projectId,
         scriptSessionId: result.scriptSessionId,
       });
+      router.push(`/projects/${result.projectId}/production`);
     } catch (e) {
-      onError(e instanceof Error ? e.message : "Apply failed");
+      onError(e instanceof Error ? e.message : "Apply to board failed");
     } finally {
       setBusyApply(false);
     }
@@ -227,7 +230,7 @@ export function ContentPlanPhase5Bar({
       <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
         <div className="min-w-[200px] flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Apply to existing project
+            Apply to existing production board
           </p>
           <Select
             value={existingProjectId}
@@ -239,7 +242,8 @@ export function ContentPlanPhase5Bar({
             }
           />
           <p className="mt-1 text-[11px] text-slate-500">
-            Seeds the board shot list only if that project has no shots yet.
+            Merges plan shots onto the board (keeps board shot IDs when shot numbers match), then
+            opens the board.
           </p>
         </div>
         <Button
@@ -257,7 +261,7 @@ export function ContentPlanPhase5Bar({
           ) : (
             <>
               <FolderInput className="mr-1.5 h-3.5 w-3.5" />
-              Apply to project
+              Apply to board
             </>
           )}
         </Button>
