@@ -272,7 +272,7 @@ export function AiEditorClient({ projectId }: Props) {
     generateProxies: true,
     generateThumbnails: true,
     extractMetadata: true,
-    analyzeDuringIngest: true,
+    analyzeDuringIngest: false,
   });
   const [ingestDestFreeBytes, setIngestDestFreeBytes] = useState<number | null>(null);
   const [diskNote, setDiskNote] = useState<string | null>(null);
@@ -1657,6 +1657,8 @@ export function AiEditorClient({ projectId }: Props) {
     sourceFiles: Array<{ path: string; filename: string; sizeBytes: number }>;
     camera: string;
     prepare: boolean;
+    /** Phase E — technical + shot breaks after offload (no Whisper). */
+    analyze?: boolean;
     projectRoot?: string;
   }) {
     const projectRoot = (opts.projectRoot || settings?.projectRootPath || "").trim();
@@ -1689,8 +1691,13 @@ export function AiEditorClient({ projectId }: Props) {
     let copiedOk = 0;
     let failed = 0;
     const registeredAssets: MediaAsset[] = [];
-    // Phase D: copy/verify first (0–70% when proxies follow); proxies from project files after.
-    const copyPctCap = opts.prepare ? 70 : 96;
+    const wantProxy = Boolean(opts.prepare);
+    const wantAnalyze = Boolean(opts.analyze);
+    // Reserve progress for trailing passes so card offload stays the priority.
+    const copyPctCap = wantProxy || wantAnalyze ? (wantProxy && wantAnalyze ? 55 : 70) : 96;
+    const proxyPctStart = copyPctCap;
+    const proxyPctSpan = wantProxy && wantAnalyze ? 20 : wantProxy ? 30 : 0;
+    const analyzePctStart = proxyPctStart + proxyPctSpan;
     copyAbortRef.current?.abort();
     const abort = new AbortController();
     copyAbortRef.current = abort;
@@ -1819,10 +1826,12 @@ export function AiEditorClient({ projectId }: Props) {
 
     let proxyOk = 0;
     let proxyFailed = 0;
+    let analyzeOk = 0;
+    let analyzeFailed = 0;
     const copyStopped = cancelBatchRef.current || abort.signal.aborted;
 
     // Phase D thin — proxies from project files after card offload (not while copying).
-    if (opts.prepare && registeredAssets.length && !copyStopped) {
+    if (wantProxy && registeredAssets.length && !copyStopped) {
       const toProxy = registeredAssets.filter(
         (m) => assetNeedsBrowserProxy(m) && sourcePathForProxy(m)
       );
@@ -1835,7 +1844,7 @@ export function AiEditorClient({ projectId }: Props) {
           if (cancelBatchRef.current || abort.signal.aborted) break;
           const m = toProxy[i]!;
           setProgress({
-            pct: 70 + Math.round(((i + 1) / toProxy.length) * 30),
+            pct: proxyPctStart + Math.round(((i + 1) / toProxy.length) * proxyPctSpan),
             label: `Preparing proxy ${i + 1}/${toProxy.length}: ${m.filename} · ${cam}`,
           });
           const sourcePath = sourcePathForProxy(m);
@@ -1861,28 +1870,111 @@ export function AiEditorClient({ projectId }: Props) {
               return p ? { ...m, proxyPath: p.proxyPath } : m;
             })
           );
+          for (const p of patches) {
+            const idx = registeredAssets.findIndex((x) => x.id === p.id);
+            if (idx >= 0) {
+              registeredAssets[idx] = {
+                ...registeredAssets[idx]!,
+                proxyPath: p.proxyPath,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    const proxyStopped = cancelBatchRef.current || abort.signal.aborted;
+
+    // Phase E thin — analyze after offload (+ proxies); technical + shots only, no Whisper.
+    if (wantAnalyze && registeredAssets.length && !copyStopped && !proxyStopped) {
+      const toAnalyze = registeredAssets
+        .map((m) => ({ m, path: playbackPathForAsset(m) }))
+        .filter((x): x is { m: MediaAsset; path: string } => Boolean(x.path));
+      if (toAnalyze.length) {
+        setStatusNote(
+          `Offload done (${copiedOk}). Analyzing clips (technical + shot breaks, no speech)…`
+        );
+        const results = [];
+        for (let i = 0; i < toAnalyze.length; i++) {
+          if (cancelBatchRef.current || abort.signal.aborted) break;
+          const { m, path } = toAnalyze[i]!;
+          setProgress({
+            pct:
+              analyzePctStart +
+              Math.round(((i + 1) / toAnalyze.length) * (100 - analyzePctStart)),
+            label: `Analyzing ${i + 1}/${toAnalyze.length}: ${m.filename} · ${cam}`,
+          });
+          try {
+            const analyzed = await agentAnalyze(DEFAULT_AGENT_BASE_URL, opts.token, path, {
+              transcribe: false,
+            });
+            results.push({
+              mediaAssetId: m.id,
+              technical: {
+                mediaAssetId: m.id,
+                ...analyzed.technical,
+                analyzedAt: new Date().toISOString(),
+              },
+              shots: analyzed.shots.map((s, idx) => ({
+                id: `${m.id}_shot_${idx}`,
+                mediaAssetId: m.id,
+                ...s,
+              })),
+              transcript: [] as [],
+            });
+            analyzeOk += 1;
+          } catch (e) {
+            results.push({
+              mediaAssetId: m.id,
+              error: e instanceof Error ? e.message : "analyze failed",
+              shots: [],
+              transcript: [],
+            });
+            analyzeFailed += 1;
+          }
+        }
+        if (results.length) {
+          try {
+            const saved = await aiEditorSaveAnalysis(getToken, projectId, results);
+            setAnalysis(saved.analysis);
+            setJobs((prev) => [saved.job, ...prev]);
+          } catch {
+            analyzeFailed += results.length;
+            analyzeOk = 0;
+          }
         }
       }
     }
 
     const stopped = cancelBatchRef.current || abort.signal.aborted;
     const proxyNote =
-      opts.prepare && registeredAssets.length && !copyStopped
+      wantProxy && registeredAssets.length && !copyStopped
         ? proxyOk || proxyFailed
           ? ` Proxies: ${proxyOk} ready` +
             (proxyFailed ? `, ${proxyFailed} failed` : "") +
             "."
           : " Proxies skipped (formats already browser-friendly)."
-        : opts.prepare && copyStopped
+        : wantProxy && copyStopped
           ? " Proxies skipped (stopped during copy)."
+          : "";
+    const analyzeNote =
+      wantAnalyze && registeredAssets.length && !copyStopped && !proxyStopped
+        ? analyzeOk || analyzeFailed
+          ? ` Analyzed: ${analyzeOk}` +
+            (analyzeFailed ? `, ${analyzeFailed} failed` : "") +
+            " (no speech)."
+          : " Analysis skipped (no playable paths)."
+        : wantAnalyze && (copyStopped || proxyStopped)
+          ? " Analysis skipped (stopped earlier)."
           : "";
     setStatusNote(
       stopped
-        ? `Stopped — saved ${copiedOk} clip(s) that finished copying into ${cam}.${proxyNote}`
+        ? `Stopped — saved ${copiedOk} clip(s) that finished copying into ${cam}.${proxyNote}${analyzeNote}`
         : `Copied and verified ${copiedOk} clip(s) into ${cam}` +
             (failed ? ` (${failed} failed)` : "") +
             "." +
             proxyNote +
+            analyzeNote +
             " Camera cards are never erased by ShootSpine."
     );
   }
@@ -2015,9 +2107,12 @@ export function AiEditorClient({ projectId }: Props) {
         throw new Error("No video or audio files found on this card.");
       }
 
+      const trailing: string[] = [];
+      if (ingestOptions.generateProxies) trailing.push("proxies");
+      if (ingestOptions.analyzeDuringIngest) trailing.push("analyze");
       setStatusNote(
         `Ingesting ${sourceFiles.length} clip${sourceFiles.length === 1 ? "" : "s"} from card → project${
-          ingestOptions.generateProxies ? " (proxies after copy)" : ""
+          trailing.length ? ` (${trailing.join(" + ")} after copy)` : ""
         }…`
       );
 
@@ -2026,16 +2121,12 @@ export function AiEditorClient({ projectId }: Props) {
         sourceFiles,
         camera,
         prepare: ingestOptions.generateProxies,
+        analyze: ingestOptions.analyzeDuringIngest,
         projectRoot: destRoot,
       });
 
       setPendingCopyFiles(null);
       setSelectedCopyPaths(new Set());
-      setStatusNote(
-        `Ingested ${sourceFiles.length} clip${sourceFiles.length === 1 ? "" : "s"} from ${
-          src.label || "card"
-        }. Review safety status before erasing the card.`
-      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Managed ingest failed");
     } finally {

@@ -311,8 +311,9 @@ export function ManagedIngestReview({
               <p className="text-xs leading-relaxed text-slate-600">
                 <span className="font-medium">Ingest into project</span> copies every clip on this
                 card into your workspace with checksum verify. Clips appear in the media library as
-                each one finishes; optional proxies run afterward from the project (not the card).
-                Or use the drive as source → Review files → Copy & verify for a selective pass.
+                each one finishes; optional proxies and analysis run afterward from the project (not
+                the card). Or use the drive as source → Review files → Copy & verify for a selective
+                pass.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
@@ -347,6 +348,26 @@ export function ManagedIngestReview({
                     </span>
                   </span>
                 </label>
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={options.analyzeDuringIngest}
+                    disabled={disabled || ingesting}
+                    onChange={(e) =>
+                      onOptionsChange({
+                        ...options,
+                        analyzeDuringIngest: e.target.checked,
+                      })
+                    }
+                  />
+                  <span>
+                    Analyze after copy
+                    <span className="mt-0.5 block text-[11px] text-slate-500">
+                      Technical + shot breaks only — no speech transcription.
+                    </span>
+                  </span>
+                </label>
               </div>
               <details className="text-xs text-slate-600">
                 <summary className="cursor-pointer font-medium text-slate-700">
@@ -357,7 +378,6 @@ export function ManagedIngestReview({
                     [
                       ["generateThumbnails", "Generate thumbnails"],
                       ["extractMetadata", "Extract technical metadata"],
-                      ["analyzeDuringIngest", "Begin analysis automatically"],
                     ] as const
                   ).map(([key, label]) => (
                     <label key={key} className="flex cursor-pointer items-start gap-2 opacity-70">

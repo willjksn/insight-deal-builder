@@ -112,7 +112,7 @@ IDs stay independent of folder names.
 | **B** | **Ingest into project** CTA → scan card → `runManagedCopy` (verify + optional proxies) + progress/Stop |
 | **C** | Live media browser populate mid-ingest (per-clip register after verify/thumb) |
 | **D** | Proxies after copy from project paths (card offload not starved) |
-| E | Analysis counts / auto-queue in same panel |
+| **E** | Opt-in analyze after copy (technical + shots; no Whisper) |
 | F | Safety copy + media safety status |
 
 Manual “Select existing folder” / **Use this drive as source** remains.
@@ -127,5 +127,5 @@ Manual “Select existing folder” / **Use this drive as source** remains.
 | **B** | One-click verified managed copy + MediaAsset register + cancel | **Landed (initial)** — wires `ManagedIngestReview` → `agentIndexFolder` + `runManagedCopy`; full `IngestSession` collection still later |
 | **C** | Live library populate mid-ingest | **Landed (thin)** — `runManagedCopy` registers each clip as it finishes; concurrent pipeline jobs still Later |
 | **D** | Proxy queue (not from card) | **Landed (thin)** — `generateProxies: false` on ingest-copy; trailing `agentCreateProxy` pass on registered project files when “Prepare proxies after copy” is on |
-| E | Analysis queue | Later |
+| **E** | Analysis queue | **Landed (thin)** — opt-in “Analyze after copy” (default off); `agentAnalyze` with `transcribe: false` after offload/proxies; Stop honored; Whisper stays on Step 5 only |
 | F | Safety copy / dual dest | Later |
