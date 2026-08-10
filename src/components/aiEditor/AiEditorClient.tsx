@@ -1688,6 +1688,9 @@ export function AiEditorClient({ projectId }: Props) {
     const cam = opts.camera.replace(/_/g, " ");
     let copiedOk = 0;
     let failed = 0;
+    const registeredAssets: MediaAsset[] = [];
+    // Phase D: copy/verify first (0–70% when proxies follow); proxies from project files after.
+    const copyPctCap = opts.prepare ? 70 : 96;
     copyAbortRef.current?.abort();
     const abort = new AbortController();
     copyAbortRef.current = abort;
@@ -1695,7 +1698,10 @@ export function AiEditorClient({ projectId }: Props) {
     /** Phase C thin — show each clip in the media browser as soon as it lands. */
     async function registerClipInLibrary(file: IndexedFile, doneCount: number) {
       setProgress({
-        pct: Math.min(96, Math.round((doneCount / Math.max(1, batch.length)) * 95)),
+        pct: Math.min(
+          copyPctCap,
+          Math.round((doneCount / Math.max(1, batch.length)) * copyPctCap)
+        ),
         label: `In library ${doneCount}/${batch.length}: ${file.filename} · ${cam}`,
       });
       const res = await aiEditorIndexMedia(getToken, projectId, {
@@ -1708,13 +1714,18 @@ export function AiEditorClient({ projectId }: Props) {
         return [...byId.values()].sort((a, b) => a.filename.localeCompare(b.filename));
       });
       setJobs((prev) => [res.job as AiEditorJob, ...prev.filter((j) => j.id !== res.job.id)]);
+      for (const m of res.media) {
+        const idx = registeredAssets.findIndex((x) => x.id === m.id);
+        if (idx >= 0) registeredAssets[idx] = m;
+        else registeredAssets.push(m);
+      }
     }
 
     for (let i = 0; i < batch.length; i += chunkSize) {
       if (cancelBatchRef.current || abort.signal.aborted) break;
       const slice = batch.slice(i, i + chunkSize);
       const fileLabel = slice[0]?.filename || "clip";
-      const pct = Math.round((i / Math.max(1, batch.length)) * 90);
+      const pct = Math.round((i / Math.max(1, batch.length)) * (copyPctCap - 5));
       setProgress({
         pct,
         label: cancelBatchRef.current
@@ -1733,8 +1744,8 @@ export function AiEditorClient({ projectId }: Props) {
               filename: f.filename,
               sizeBytes: f.sizeBytes,
             })),
-            // Don't start heavy proxies if user already hit Stop
-            generateProxies: opts.prepare && !cancelBatchRef.current,
+            // Phase D — never proxy inside card copy; offload first, then project-side proxies.
+            generateProxies: false,
           },
           { signal: abort.signal }
         );
@@ -1744,7 +1755,7 @@ export function AiEditorClient({ projectId }: Props) {
         for (const r of copied.results) {
           if (cancelBatchRef.current || abort.signal.aborted) break;
           setProgress({
-            pct: Math.min(95, pct + 2),
+            pct: Math.min(copyPctCap - 1, pct + 2),
             label: `Checking ${r.filename} · ${cam}`,
           });
           let probe: Partial<MediaAsset> = {
@@ -1752,14 +1763,12 @@ export function AiEditorClient({ projectId }: Props) {
             checksumAlgorithm: "sha256",
             cameraAssignment: r.cameraAssignment,
             relativeProjectPath: r.relativeProjectPath,
-            proxyPath: r.proxyPath,
             sizeBytes: r.sizeBytes,
             needsProxy: true,
           };
           try {
             const probed = await agentProbe(DEFAULT_AGENT_BASE_URL, opts.token, r.destPath);
             probe = { ...probe, ...(probed.probe as Partial<MediaAsset>) };
-            if (r.proxyPath) probe.proxyPath = r.proxyPath;
           } catch {
             probe = { ...probe, ...(await mockMediaEngine.probe(r.destPath)) };
           }
@@ -1786,7 +1795,7 @@ export function AiEditorClient({ projectId }: Props) {
             const thumb = await agentThumbnail(
               DEFAULT_AGENT_BASE_URL,
               opts.token,
-              r.proxyPath || r.destPath
+              r.destPath
             );
             if (thumb.dataUrl) probe = { ...probe, thumbnailDataUrl: thumb.dataUrl };
             entry.probe = probe;
@@ -1808,13 +1817,73 @@ export function AiEditorClient({ projectId }: Props) {
       }
     }
 
+    let proxyOk = 0;
+    let proxyFailed = 0;
+    const copyStopped = cancelBatchRef.current || abort.signal.aborted;
+
+    // Phase D thin — proxies from project files after card offload (not while copying).
+    if (opts.prepare && registeredAssets.length && !copyStopped) {
+      const toProxy = registeredAssets.filter(
+        (m) => assetNeedsBrowserProxy(m) && sourcePathForProxy(m)
+      );
+      if (toProxy.length) {
+        setStatusNote(
+          `Card offload done (${copiedOk}). Preparing proxies from project files…`
+        );
+        const patches: Array<{ id: string; proxyPath: string; needsProxy: boolean }> = [];
+        for (let i = 0; i < toProxy.length; i++) {
+          if (cancelBatchRef.current || abort.signal.aborted) break;
+          const m = toProxy[i]!;
+          setProgress({
+            pct: 70 + Math.round(((i + 1) / toProxy.length) * 30),
+            label: `Preparing proxy ${i + 1}/${toProxy.length}: ${m.filename} · ${cam}`,
+          });
+          const sourcePath = sourcePathForProxy(m);
+          if (!sourcePath) {
+            proxyFailed += 1;
+            continue;
+          }
+          try {
+            const res = await agentCreateProxy(DEFAULT_AGENT_BASE_URL, opts.token, sourcePath, {
+              profile: "ai_720p",
+            });
+            patches.push({ id: m.id, proxyPath: res.proxyPath, needsProxy: true });
+            proxyOk += 1;
+          } catch {
+            proxyFailed += 1;
+          }
+        }
+        if (patches.length) {
+          await aiEditorPatchMedia(getToken, projectId, patches);
+          setMedia((prev) =>
+            prev.map((m) => {
+              const p = patches.find((x) => x.id === m.id);
+              return p ? { ...m, proxyPath: p.proxyPath } : m;
+            })
+          );
+        }
+      }
+    }
+
     const stopped = cancelBatchRef.current || abort.signal.aborted;
+    const proxyNote =
+      opts.prepare && registeredAssets.length && !copyStopped
+        ? proxyOk || proxyFailed
+          ? ` Proxies: ${proxyOk} ready` +
+            (proxyFailed ? `, ${proxyFailed} failed` : "") +
+            "."
+          : " Proxies skipped (formats already browser-friendly)."
+        : opts.prepare && copyStopped
+          ? " Proxies skipped (stopped during copy)."
+          : "";
     setStatusNote(
       stopped
-        ? `Stopped — saved ${copiedOk} clip(s) that finished copying into ${cam}.`
+        ? `Stopped — saved ${copiedOk} clip(s) that finished copying into ${cam}.${proxyNote}`
         : `Copied and verified ${copiedOk} clip(s) into ${cam}` +
             (failed ? ` (${failed} failed)` : "") +
-            ". Camera cards are never erased by ShootSpine."
+            "." +
+            proxyNote +
+            " Camera cards are never erased by ShootSpine."
     );
   }
 
@@ -1948,7 +2017,7 @@ export function AiEditorClient({ projectId }: Props) {
 
       setStatusNote(
         `Ingesting ${sourceFiles.length} clip${sourceFiles.length === 1 ? "" : "s"} from card → project${
-          ingestOptions.generateProxies ? " (with proxies)" : ""
+          ingestOptions.generateProxies ? " (proxies after copy)" : ""
         }…`
       );
 
@@ -4552,9 +4621,12 @@ export function AiEditorClient({ projectId }: Props) {
                     onChange={(e) => setPrepareWhileCopying(e.target.checked)}
                   />
                   <span>
-                    <span className="font-medium text-slate-800">Prepare previews while copying</span>
+                    <span className="font-medium text-slate-800">
+                      Prepare previews after copy
+                    </span>
                     <span className="mt-0.5 block text-xs text-slate-500">
-                      Makes lighter edit copies for tough camera formats. Originals stay intact.
+                      Copy & verify finishes first, then lighter proxies from project files.
+                      Originals stay intact.
                     </span>
                   </span>
                 </label>

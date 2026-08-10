@@ -310,9 +310,9 @@ export function ManagedIngestReview({
               </div>
               <p className="text-xs leading-relaxed text-slate-600">
                 <span className="font-medium">Ingest into project</span> copies every clip on this
-                card into your workspace with checksum verify (and proxies if checked). Clips appear
-                in the media library as each one finishes. Or use the drive as source → Review files
-                → Copy & verify for a selective pass.
+                card into your workspace with checksum verify. Clips appear in the media library as
+                each one finishes; optional proxies run afterward from the project (not the card).
+                Or use the drive as source → Review files → Copy & verify for a selective pass.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
@@ -340,7 +340,12 @@ export function ManagedIngestReview({
                       onOptionsChange({ ...options, generateProxies: e.target.checked })
                     }
                   />
-                  <span>Generate proxies while ingesting</span>
+                  <span>
+                    Prepare proxies after copy
+                    <span className="mt-0.5 block text-[11px] text-slate-500">
+                      Card offload finishes first; proxies run from project files.
+                    </span>
+                  </span>
                 </label>
               </div>
               <details className="text-xs text-slate-600">
