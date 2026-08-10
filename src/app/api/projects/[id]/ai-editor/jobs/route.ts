@@ -74,7 +74,6 @@ export async function POST(
         startedAt: summary.at,
         completedAt: new Date().toISOString(),
         message,
-        payload: { ingestSummary: summary },
       });
       const settings = await upsertAiEditorProjectSettings(projectId, {
         lastManagedIngest: summary,
