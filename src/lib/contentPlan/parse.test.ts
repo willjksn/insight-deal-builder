@@ -43,11 +43,15 @@ describe("contentPlan parse", () => {
             commonMistakes: ["Cutting too early"],
             continuity: ["Same hand"],
           },
+          setDesignIdeas: "Warm kitchen, soft morning light, tidy counters",
+          setDressing: ["Fruit bowl", "Linen towel"],
         },
       ],
     });
     expect(shots[0]?.howToShoot.steps).toHaveLength(2);
     expect(shots[0]?.status).toBe("planned");
+    expect(shots[0]?.setDesignIdeas).toMatch(/kitchen/i);
+    expect(shots[0]?.setDressing).toEqual(["Fruit bowl", "Linen towel"]);
   });
 
   it("parses script lines", () => {
