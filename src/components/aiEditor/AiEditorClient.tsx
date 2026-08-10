@@ -323,6 +323,8 @@ export function AiEditorClient({ projectId }: Props) {
   const [exportFiles, setExportFiles] = useState<Record<string, string> | null>(null);
   /** Invalidate cached Resolve export when the timeline changes. */
   const [exportStamp, setExportStamp] = useState<string | null>(null);
+  /** Cut changed after a Resolve package was saved/imported this session. */
+  const [resolvePackageStale, setResolvePackageStale] = useState(false);
   const [handoffDirOnDisk, setHandoffDirOnDisk] = useState<string | null>(null);
   const [finishWhere, setFinishWhere] = useState<"here" | "mac">("here");
   const [moodId, setMoodId] = useState<FinishingMoodId>("natural");
@@ -2524,6 +2526,13 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  /** Clear cached Resolve export; flag Step 10 if a package may be out of date. */
+  function invalidateLocalCutExport() {
+    setExportFiles(null);
+    setExportStamp(null);
+    setResolvePackageStale(true);
+  }
+
   async function onBuildRoughCut() {
     const hasCut = Boolean(videoTrack?.clips?.length);
     const multiReels = (timeline?.reels?.length ?? 0) > 1;
@@ -2544,8 +2553,7 @@ export function AiEditorClient({ projectId }: Props) {
         note: "Rough cut from preferred takes",
       });
       setTimeline(res.timeline);
-      setExportFiles(null);
-      setExportStamp(null);
+      invalidateLocalCutExport();
       setTimelineVersions(res.versions);
       setJobs((prev) => [res.job, ...prev]);
       setStatusNote(
@@ -2558,8 +2566,11 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
-  async function onRippleDeleteClip(clipId: string) {
-    setBusy("rough_cut");
+  async function onRippleDeleteClip(
+    clipId: string,
+    opts?: { quiet?: boolean; label?: string }
+  ) {
+    if (!opts?.quiet) setBusy("rough_cut");
     setError(null);
     try {
       const res = await aiEditorTimelineAction(getToken, projectId, {
@@ -2568,13 +2579,23 @@ export function AiEditorClient({ projectId }: Props) {
         note: "Ripple delete",
       });
       setTimeline(res.timeline);
-      setExportFiles(null);
-      setExportStamp(null);
+      invalidateLocalCutExport();
       setTimelineVersions(res.versions);
+      const n = res.summary.clipCount;
+      const name = opts?.label?.trim();
+      setStatusNote(
+        name
+          ? `Dropped “${name}” · cut is now v${res.summary.version} · ${n} clip${n === 1 ? "" : "s"}`
+          : `Removed from cut · v${res.summary.version} · ${n} clip${n === 1 ? "" : "s"}`
+      );
+      return res;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Edit failed");
+      const msg = e instanceof Error ? e.message : "Edit failed";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
     } finally {
-      setBusy(null);
+      if (!opts?.quiet) setBusy(null);
     }
   }
 
@@ -2588,8 +2609,7 @@ export function AiEditorClient({ projectId }: Props) {
         note: "Remove camera stills from rough cut",
       });
       setTimeline(res.timeline);
-      setExportFiles(null);
-      setExportStamp(null);
+      invalidateLocalCutExport();
       setTimelineVersions(res.versions);
       setStatusNote(
         `Removed camera stills / non-video from the cut (v${res.timeline.version}).`
@@ -2610,8 +2630,7 @@ export function AiEditorClient({ projectId }: Props) {
         versionId,
       });
       setTimeline(res.timeline);
-      setExportFiles(null);
-      setExportStamp(null);
+      invalidateLocalCutExport();
       setTimelineVersions(res.versions);
       setStatusNote(`Restored timeline to a previous version (now v${res.summary.version}).`);
     } catch (e) {
@@ -2908,8 +2927,7 @@ export function AiEditorClient({ projectId }: Props) {
             : "Feature reels (~20 min each)",
       });
       setTimeline(res.timeline);
-      setExportFiles(null);
-      setExportStamp(null);
+      invalidateLocalCutExport();
       setTimelineVersions(res.versions);
       setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
       setStatusNote(
@@ -2956,8 +2974,7 @@ export function AiEditorClient({ projectId }: Props) {
       });
       if (res.timeline) {
         setTimeline(res.timeline);
-        setExportFiles(null);
-        setExportStamp(null);
+        invalidateLocalCutExport();
       }
       if (res.versions) setTimelineVersions(res.versions);
       if (res.job) setJobs((prev) => [res.job!, ...prev]);
@@ -2981,8 +2998,7 @@ export function AiEditorClient({ projectId }: Props) {
       });
       if (res.timeline) {
         setTimeline(res.timeline);
-        setExportFiles(null);
-        setExportStamp(null);
+        invalidateLocalCutExport();
       }
       if (res.versions) setTimelineVersions(res.versions);
       if (res.job) setJobs((prev) => [res.job!, ...prev]);
@@ -3010,8 +3026,7 @@ export function AiEditorClient({ projectId }: Props) {
         transitionStyle,
       });
       setTimeline(res.timeline);
-      setExportFiles(null);
-      setExportStamp(null);
+      invalidateLocalCutExport();
       setTimelineVersions(res.versions);
       if (res.job) setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
       setStatusNote(
@@ -3142,6 +3157,7 @@ export function AiEditorClient({ projectId }: Props) {
       setJobs((prev) => [res.job, ...prev.filter((j) => j.id !== res.job.id)]);
       setExportFiles(null);
       setExportStamp(null);
+      setResolvePackageStale(false);
       const unmatched = res.importMeta?.unmatchedNames ?? [];
       const unmatchedNote = unmatched.length
         ? ` Unmatched: ${unmatched.slice(0, 8).join(", ")}${unmatched.length > 8 ? "-" : ""}`
@@ -3287,6 +3303,7 @@ export function AiEditorClient({ projectId }: Props) {
         relativeDir: RESOLVE_HANDOFF_REL_DIR,
       });
       setHandoffDirOnDisk(written.handoffDir);
+      setResolvePackageStale(false);
       const log = await aiEditorLogResolveOpen(getToken, projectId, {
         message: `Wrote Resolve handoff ? ${written.handoffDir}`,
         launched: false,
@@ -3332,6 +3349,7 @@ export function AiEditorClient({ projectId }: Props) {
         relativeDir: RESOLVE_HANDOFF_REL_DIR,
       });
       setHandoffDirOnDisk(written.handoffDir);
+      setResolvePackageStale(false);
 
       await agentRevealPath(DEFAULT_AGENT_BASE_URL, token, written.handoffDir);
       const sep = written.handoffDir.includes("\\") ? "\\" : "/";
@@ -3669,6 +3687,7 @@ export function AiEditorClient({ projectId }: Props) {
         });
         handoffDir = written.handoffDir;
         setHandoffDirOnDisk(written.handoffDir);
+        setResolvePackageStale(false);
       } catch (e) {
         handoffWriteError =
           e instanceof Error ? e.message : "Could not save the Resolve timeline file";
@@ -3716,6 +3735,7 @@ export function AiEditorClient({ projectId }: Props) {
         relativeDir: RESOLVE_HANDOFF_REL_DIR,
       });
       setHandoffDirOnDisk(written.handoffDir);
+      setResolvePackageStale(false);
 
       setProgress({ pct: 55, label: "Checking Resolve…" });
       let probe = await refreshResolveWorkflow(token);
@@ -4391,7 +4411,23 @@ export function AiEditorClient({ projectId }: Props) {
           onRemoveClip={
             preview.reviewCut
               ? async (clipId) => {
-                  await onRippleDeleteClip(clipId);
+                  const item = preview.items.find((i) => i.clipId === clipId);
+                  const res = await onRippleDeleteClip(clipId, {
+                    quiet: true,
+                    label: item?.label,
+                  });
+                  if (!res) return;
+                  setPreview((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          title: activeReelName
+                            ? `${activeReelName} - rough cut v${res.summary.version}`
+                            : `Rough cut v${res.summary.version}`,
+                          items: prev.items.filter((i) => i.clipId !== clipId),
+                        }
+                      : null
+                  );
                 }
               : undefined
           }
@@ -6216,7 +6252,21 @@ export function AiEditorClient({ projectId }: Props) {
                   </p>
                 ) : null}
 
-                {resolveImported ? (
+                {resolvePackageStale && (resolveHandoffDir || resolveImported) ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3">
+                    <p className="font-semibold text-amber-950">
+                      Cut changed since last Resolve save
+                      {timeline ? ` (now v${timeline.version})` : ""}
+                    </p>
+                    <p className="mt-1 text-sm text-amber-900/90">
+                      Drop/edit updated the first cut. Use{" "}
+                      <span className="font-medium">Bring edit into Resolve</span> again (or Show
+                      me the folder) so Resolve gets the latest version — the old package is stale.
+                    </p>
+                  </div>
+                ) : null}
+
+                {resolveImported && !resolvePackageStale ? (
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
                     <p className="font-semibold text-emerald-950">Your rough cut is in Resolve</p>
                     <p className="mt-1 text-sm text-emerald-900/80">
@@ -6224,7 +6274,7 @@ export function AiEditorClient({ projectId }: Props) {
                       sound in Resolve - look tips are saved with your project folder.
                     </p>
                   </div>
-                ) : resolveHandoffDir ? (
+                ) : resolveHandoffDir && !resolvePackageStale ? (
                   <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-white px-4 py-4 shadow-sm shadow-sky-100/50">
                     <div className="flex items-start gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700">

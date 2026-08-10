@@ -45,6 +45,7 @@ export function MediaPreview({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState(false);
+  const [dropNote, setDropNote] = useState<string | null>(null);
 
   const item = items[index];
   const src = item ? resolveUrl(item) : "";
@@ -149,6 +150,11 @@ export function MediaPreview({
           onClose();
           return prev;
         }
+        setDropNote(
+          next.length === 1
+            ? "Dropped · 1 clip left in cut"
+            : `Dropped · ${next.length} clips left in cut`
+        );
         setIndex((i) => Math.min(i, next.length - 1));
         return next;
       });
@@ -267,6 +273,9 @@ export function MediaPreview({
             <span className="text-[11px] text-slate-400">
               → skip · Delete drops from cut
             </span>
+            {dropNote ? (
+              <span className="ml-auto text-[11px] text-emerald-300">{dropNote}</span>
+            ) : null}
           </div>
         ) : null}
         {error ? <p className="px-3 py-2 text-xs text-amber-200">{error}</p> : null}
