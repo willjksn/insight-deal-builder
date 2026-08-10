@@ -94,17 +94,60 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
   const [syncingShootMode, setSyncingShootMode] = useState(false);
   const [shootDateDismissed, setShootDateDismissed] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shootSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localEditRef = useRef(false);
   const savingRef = useRef(false);
+  const syncingShootModeRef = useRef(false);
 
   const getToken = useCallback(() => {
     if (!user) return Promise.resolve(null);
     return user.getIdToken();
   }, [user]);
 
+  /** Debounced board → Shoot Mode after shot list edits (linked plans only). */
+  const scheduleAutoSyncToShootMode = useCallback(() => {
+    const planId = project.sourceContentPlanId?.trim();
+    if (!planId) return;
+    if (shootSyncTimer.current) clearTimeout(shootSyncTimer.current);
+    shootSyncTimer.current = setTimeout(() => {
+      shootSyncTimer.current = null;
+      if (syncingShootModeRef.current) return;
+      syncingShootModeRef.current = true;
+      setSyncingShootMode(true);
+      void syncShootProgressFromBoard(getToken, planId)
+        .then((result) => {
+          if (result.updatedCount > 0) {
+            setStatusNote(
+              `Shoot Mode updated · ${result.updatedCount} shot${
+                result.updatedCount === 1 ? "" : "s"
+              }.`
+            );
+          }
+        })
+        .catch(() => {
+          /* quiet — manual Sync to Shoot Mode remains */
+        })
+        .finally(() => {
+          syncingShootModeRef.current = false;
+          setSyncingShootMode(false);
+        });
+    }, 1600);
+  }, [getToken, project.sourceContentPlanId]);
+
+  useEffect(() => {
+    return () => {
+      if (shootSyncTimer.current) clearTimeout(shootSyncTimer.current);
+    };
+  }, []);
+
   async function onSyncToShootMode() {
     const planId = project.sourceContentPlanId?.trim();
     if (!planId) return;
+    if (shootSyncTimer.current) {
+      clearTimeout(shootSyncTimer.current);
+      shootSyncTimer.current = null;
+    }
+    syncingShootModeRef.current = true;
     setSyncingShootMode(true);
     setError(null);
     setStatusNote(null);
@@ -118,6 +161,7 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not sync to Shoot Mode");
     } finally {
+      syncingShootModeRef.current = false;
       setSyncingShootMode(false);
     }
   }
@@ -228,7 +272,7 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
                   variant="outline"
                   disabled={syncingShootMode || saving}
                   onClick={() => void onSyncToShootMode()}
-                  title="Push board takes, notes, and done flags into Shoot Mode"
+                  title="Also runs automatically a moment after you edit shots"
                 >
                   {syncingShootMode ? "Syncing…" : "Sync to Shoot Mode"}
                 </Button>
@@ -403,7 +447,10 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
               budgetLink={board.budgetLink ?? ""}
               budgetLines={budgetLines}
               agreementTitle={primaryAgreement?.title}
-              onChangeDays={(productionDays) => patch({ productionDays })}
+              onChangeDays={(productionDays) => {
+                patch({ productionDays });
+                scheduleAutoSyncToShootMode();
+              }}
               onChangeNotes={(filmingNotes) => patch({ filmingNotes })}
               onChangeMusicLink={(musicLink) => patch({ musicLink })}
               onChangeBudgetLink={(budgetLink) => patch({ budgetLink })}

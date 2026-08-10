@@ -42,6 +42,7 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const stagePromoted = useRef(false);
+  const pulledFromBoardOnOpen = useRef(false);
   const autoSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncingBoardRef = useRef(false);
 
@@ -108,6 +109,33 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
     },
     [getToken]
   );
+
+  /** Once per open: pull board takes/notes/done so Shoot Mode isn’t stale. */
+  useEffect(() => {
+    if (!plan?.projectId || pulledFromBoardOnOpen.current) return;
+    pulledFromBoardOnOpen.current = true;
+    if (syncingBoardRef.current) return;
+    syncingBoardRef.current = true;
+    setSyncingBoard(true);
+    void syncShootProgressFromBoard(getToken, plan.id)
+      .then((result) => {
+        if (result.updatedCount > 0) {
+          setPlan(result.plan);
+          setStatusNote(
+            `Pulled ${result.updatedCount} shot${
+              result.updatedCount === 1 ? "" : "s"
+            } from the production board.`
+          );
+        }
+      })
+      .catch(() => {
+        /* quiet — Pull from board remains */
+      })
+      .finally(() => {
+        syncingBoardRef.current = false;
+        setSyncingBoard(false);
+      });
+  }, [plan?.id, plan?.projectId, getToken]);
 
   // Promote planning / ready → shooting when Shoot Mode opens.
   useEffect(() => {
@@ -318,7 +346,9 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
           <p className="text-sm text-slate-600">
             Shoot Mode · {productionStageLabel(stage)}
             {total ? ` · ${done}/${total} done` : ""}
-            {plan.projectId ? " · board syncs as you check shots" : ""}
+            {plan.projectId
+              ? " · syncs both ways with the production board"
+              : ""}
           </p>
           {wakeLockActive ? (
             <p className="mt-1 inline-flex items-center gap-1 text-xs text-emerald-700">
