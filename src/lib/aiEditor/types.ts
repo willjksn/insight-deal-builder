@@ -98,9 +98,37 @@ export interface AiEditorProjectSettings {
   lastBoardHandoffAt?: string;
   /** Edit notes from set / client / look — fed into Edit by Chat. */
   editNotes?: EditNote[];
+  /**
+   * Thin IngestSession stub — last managed card→project ingest summary.
+   * Full IngestSession history collection still later.
+   */
+  lastManagedIngest?: ManagedIngestSummary;
   createdAt: string;
   updatedAt: string;
 }
+
+/** Persisted summary of one managed ingest pass (history stub). */
+export type ManagedIngestSummary = {
+  at: string;
+  cameraLabel: string;
+  copiedOk: number;
+  failed: number;
+  stopped: boolean;
+  proxiesOk?: number;
+  proxiesFailed?: number;
+  analyzedOk?: number;
+  analyzedFailed?: number;
+  backupOk?: number;
+  backupFailed?: number;
+  backupStatus?:
+    | "done"
+    | "partial"
+    | "skipped_no_folder"
+    | "skipped_drive"
+    | "skipped_stopped"
+    | "failed"
+    | "not_requested";
+};
 
 export interface MediaAsset {
   id: string;

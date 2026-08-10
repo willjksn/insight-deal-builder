@@ -11,7 +11,7 @@ import {
   updateJob,
   upsertAiEditorProjectSettings,
 } from "@/lib/aiEditor/server";
-import type { AiEditorJobType } from "@/lib/aiEditor/types";
+import type { AiEditorJobType, ManagedIngestSummary } from "@/lib/aiEditor/types";
 
 export const runtime = "nodejs";
 
@@ -45,7 +45,42 @@ export async function POST(
       message?: string;
       launched?: boolean;
       handoffDir?: string;
+      ingestSummary?: ManagedIngestSummary;
     };
+
+    if (body.type === "ingest_copy") {
+      const summary = body.ingestSummary;
+      if (!summary?.at || !summary.cameraLabel) {
+        return NextResponse.json(
+          { error: "ingestSummary with at + cameraLabel is required" },
+          { status: 400 }
+        );
+      }
+      const cam = summary.cameraLabel.replace(/_/g, " ").trim() || "camera";
+      const created = await createJob(access.appUser, projectId, "ingest_copy", {
+        ingestSummary: summary,
+      });
+      const status = summary.copiedOk <= 0 && !summary.stopped ? "failed" : "completed";
+      const message =
+        body.message ||
+        (summary.stopped
+          ? `Managed ingest stopped — ${summary.copiedOk} ${cam} clip(s) saved` +
+            (summary.failed ? ` (${summary.failed} failed)` : "")
+          : `Managed ingest — ${summary.copiedOk} ${cam} clip(s) verified` +
+            (summary.failed ? ` (${summary.failed} failed)` : ""));
+      const job = await updateJob(created.id, {
+        status,
+        progress: 100,
+        startedAt: summary.at,
+        completedAt: new Date().toISOString(),
+        message,
+        payload: { ingestSummary: summary },
+      });
+      const settings = await upsertAiEditorProjectSettings(projectId, {
+        lastManagedIngest: summary,
+      });
+      return NextResponse.json({ ok: true, job, settings });
+    }
 
     if (body.type === "resolve_open" || body.type === "resolve_import") {
       const created = await createJob(access.appUser, projectId, body.type, {

@@ -147,6 +147,7 @@ import {
   aiEditorGetDashboard,
   aiEditorIndexMedia,
   aiEditorLaunchAgent,
+  aiEditorLogManagedIngest,
   aiEditorLogResolveOpen,
   aiEditorMintAgentSession,
   aiEditorRenameSession,
@@ -2162,6 +2163,33 @@ export function AiEditorClient({ projectId }: Props) {
         backupFailed: archiveFailed,
       })
     );
+
+    // Thin IngestSession stub — persist last pass + activity job (full history later).
+    try {
+      const logged = await aiEditorLogManagedIngest(getToken, projectId, {
+        ingestSummary: {
+          at: new Date().toISOString(),
+          cameraLabel: cam,
+          copiedOk,
+          failed,
+          stopped,
+          ...(wantProxy
+            ? { proxiesOk: proxyOk, proxiesFailed: proxyFailed }
+            : {}),
+          ...(wantAnalyze
+            ? { analyzedOk: analyzeOk, analyzedFailed: analyzeFailed }
+            : {}),
+          backupStatus,
+          ...(wantArchive
+            ? { backupOk: archiveOk, backupFailed: archiveFailed }
+            : {}),
+        },
+      });
+      setSettings(logged.settings);
+      setJobs((prev) => [logged.job, ...prev.filter((j) => j.id !== logged.job.id)]);
+    } catch {
+      /* non-fatal — ingest already landed */
+    }
   }
 
   function requestStopBatch() {
@@ -5907,6 +5935,61 @@ export function AiEditorClient({ projectId }: Props) {
               ingesting={busy === "index"}
               disabled={!!busy || !agent.connected}
             />
+
+            {settings?.lastManagedIngest ||
+            jobs.some((j) => j.type === "ingest_copy") ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
+                <p className="font-medium text-slate-900">Recent ingest</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Last managed offload on this project (full IngestSession history later).
+                </p>
+                {settings?.lastManagedIngest ? (
+                  <p className="mt-2 text-sm text-slate-800">
+                    <span className="font-medium">
+                      {settings.lastManagedIngest.cameraLabel.replace(/_/g, " ")}
+                    </span>
+                    {" · "}
+                    {settings.lastManagedIngest.copiedOk} verified
+                    {settings.lastManagedIngest.failed
+                      ? `, ${settings.lastManagedIngest.failed} failed`
+                      : ""}
+                    {settings.lastManagedIngest.stopped ? " · stopped" : ""}
+                    {typeof settings.lastManagedIngest.proxiesOk === "number"
+                      ? ` · proxies ${settings.lastManagedIngest.proxiesOk}`
+                      : ""}
+                    {typeof settings.lastManagedIngest.analyzedOk === "number"
+                      ? ` · analyzed ${settings.lastManagedIngest.analyzedOk}`
+                      : ""}
+                    {settings.lastManagedIngest.backupStatus &&
+                    settings.lastManagedIngest.backupStatus !== "not_requested"
+                      ? ` · backup ${settings.lastManagedIngest.backupStatus.replace(
+                          /_/g,
+                          " "
+                        )}`
+                      : ""}
+                    <span className="text-slate-500">
+                      {" · "}
+                      {new Date(settings.lastManagedIngest.at).toLocaleString()}
+                    </span>
+                  </p>
+                ) : null}
+                {jobs.filter((j) => j.type === "ingest_copy").length > 0 ? (
+                  <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                    {jobs
+                      .filter((j) => j.type === "ingest_copy")
+                      .slice(0, 5)
+                      .map((j) => (
+                        <li key={j.id} className="flex flex-wrap items-center gap-2">
+                          <Badge variant="default">{j.status}</Badge>
+                          <span className="min-w-0 truncate">
+                            {j.message || "Managed ingest"}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="grid gap-2 sm:grid-cols-2">
               <button

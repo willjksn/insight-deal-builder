@@ -8,6 +8,7 @@ import type {
   FinishingFeedback,
   FinishingFeedbackOutcome,
   FinishingMoodId,
+  ManagedIngestSummary,
   MediaAsset,
   EditNote,
   NextShootChecklist,
@@ -453,6 +454,31 @@ export async function aiEditorLogResolveOpen(
     }),
   });
   return parseJson<{ ok: true; job: AiEditorJob }>(res);
+}
+
+/** Thin IngestSession stub — log one managed ingest + persist lastManagedIngest. */
+export async function aiEditorLogManagedIngest(
+  getToken: GetToken,
+  projectId: string,
+  body: {
+    ingestSummary: ManagedIngestSummary;
+    message?: string;
+  }
+) {
+  const res = await fetch(`/api/projects/${projectId}/ai-editor/jobs`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({
+      type: "ingest_copy",
+      ingestSummary: body.ingestSummary,
+      message: body.message,
+    }),
+  });
+  return parseJson<{
+    ok: true;
+    job: AiEditorJob;
+    settings: AiEditorProjectSettings;
+  }>(res);
 }
 
 export async function aiEditorArchiveAction(
