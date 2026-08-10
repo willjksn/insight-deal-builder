@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Clapperboard,
+  Combine,
   Loader2,
   Scissors,
   SkipBack,
@@ -16,6 +17,18 @@ import { Button } from "@/components/ui/Button";
 
 const MIN_TRIM_SECONDS = 0.05;
 const MIN_SPLIT_PAD_SECONDS = 0.08;
+/** Source ends must touch within this window to Join. */
+const JOIN_TOUCH_SECONDS = 0.05;
+
+function canJoinPreviewItems(
+  left: PreviewItem | undefined,
+  right: PreviewItem | undefined
+): boolean {
+  if (!left?.clipId || !right?.clipId) return false;
+  if (!left.mediaAssetId || left.mediaAssetId !== right.mediaAssetId) return false;
+  if (left.endSeconds == null || right.startSeconds == null) return false;
+  return Math.abs(left.endSeconds - right.startSeconds) <= JOIN_TOUCH_SECONDS;
+}
 
 export type PreviewItem = {
   path: string;
@@ -67,6 +80,11 @@ type Props = {
     clipId: string;
     atSourceSeconds: number;
   }) => Promise<{ left: PreviewItem; right: PreviewItem } | void> | void;
+  /** Join current clip with the next when they are contiguous same-media halves. */
+  onJoinClip?: (input: {
+    leftClipId: string;
+    rightClipId: string;
+  }) => Promise<PreviewItem | void> | void;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -88,6 +106,7 @@ export function MediaPreview({
   onReorderClips,
   onTrimClip,
   onSplitClip,
+  onJoinClip,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
@@ -104,11 +123,13 @@ export function MediaPreview({
   const [reordering, setReordering] = useState(false);
   const [trimming, setTrimming] = useState(false);
   const [splitting, setSplitting] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [preferDirty, setPreferDirty] = useState(false);
   const [actionNote, setActionNote] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const item = items[index];
+  const nextItem = items[index + 1];
   const src = item ? resolveUrl(item) : "";
   const asImage = item ? isImagePath(item.path) : false;
   const reviewMode = Boolean(
@@ -118,7 +139,8 @@ export function MediaPreview({
       onUndoDrop ||
       onReorderClips ||
       onTrimClip ||
-      onSplitClip
+      onSplitClip ||
+      onJoinClip
   );
   const busyAction =
     removing ||
@@ -127,9 +149,13 @@ export function MediaPreview({
     undoing ||
     reordering ||
     trimming ||
-    splitting;
+    splitting ||
+    joining;
   const canTrim = Boolean(onTrimClip && item?.clipId && !asImage);
   const canSplit = Boolean(onSplitClip && item?.clipId && !asImage);
+  const canJoin = Boolean(
+    onJoinClip && !asImage && canJoinPreviewItems(item, nextItem)
+  );
   const canPrefer =
     Boolean(onPreferClip && item?.plannedShotId && item?.mediaAssetId) &&
     !item?.isPreferred;
@@ -203,6 +229,11 @@ export function MediaPreview({
       if ((e.key === "s" || e.key === "S") && canSplit && !busyAction) {
         e.preventDefault();
         void splitAtPlayhead();
+        return;
+      }
+      if ((e.key === "j" || e.key === "J") && canJoin && !busyAction) {
+        e.preventDefault();
+        void joinWithNext();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -222,6 +253,7 @@ export function MediaPreview({
     onReorderClips,
     onTrimClip,
     onSplitClip,
+    onJoinClip,
     index,
     items,
     canPrefer,
@@ -230,6 +262,7 @@ export function MediaPreview({
     canReorder,
     canTrim,
     canSplit,
+    canJoin,
     item,
   ]);
 
@@ -406,6 +439,39 @@ export function MediaPreview({
       setActionNote(null);
     } finally {
       setSplitting(false);
+    }
+  }
+
+  async function joinWithNext() {
+    const leftId = item?.clipId;
+    const rightId = nextItem?.clipId;
+    if (!leftId || !rightId || !onJoinClip || !canJoin || busyAction) return;
+    setJoining(true);
+    setError(null);
+    setActionNote("Joining…");
+    const el = videoRef.current;
+    if (el) el.pause();
+    try {
+      const joined = await onJoinClip({
+        leftClipId: leftId,
+        rightClipId: rightId,
+      });
+      if (!joined?.clipId) throw new Error("Join did not return a clip");
+      setItems((prev) => {
+        const i = prev.findIndex((x) => x.clipId === leftId);
+        if (i < 0) return prev;
+        const next = prev.filter((x) => x.clipId !== rightId);
+        const at = next.findIndex((x) => x.clipId === leftId);
+        if (at >= 0) next[at] = joined;
+        setIndex(Math.max(0, at >= 0 ? at : i));
+        return next;
+      });
+      setActionNote("Joined · U undoes");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not join clips");
+      setActionNote(null);
+    } finally {
+      setJoining(false);
     }
   }
 
@@ -716,6 +782,23 @@ export function MediaPreview({
           Split
         </Button>
       ) : null}
+      {canJoin ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busyAction}
+          onClick={() => void joinWithNext()}
+          title="Join with next clip (J)"
+        >
+          {joining ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Combine className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          Join
+        </Button>
+      ) : null}
       {item?.clipId && onRemoveClip ? (
         <Button
           type="button"
@@ -768,6 +851,7 @@ export function MediaPreview({
         {item ? "← → jump" : "Cut empty"}
         {canTrim ? " · I/O in/out" : ""}
         {canSplit ? " · S split" : ""}
+        {canJoin ? " · J join" : ""}
         {canReorder ? " · drag / [ ] reorder" : ""}
         {onPreferClip ? " · P prefer" : ""}
         {onRemoveClip ? " · Delete drops" : ""}

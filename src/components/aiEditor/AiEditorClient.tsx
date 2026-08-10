@@ -2639,6 +2639,66 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  /** Join two contiguous same-media clips (Play review — reverse of Split). */
+  async function onJoinCutClips(
+    leftClipId: string,
+    rightClipId: string,
+    opts?: { quiet?: boolean }
+  ) {
+    if (!timeline) throw new Error("No timeline yet");
+    const track = timeline.tracks.find((t) => t.kind === "video");
+    const left = track?.clips.find((c) => c.id === leftClipId);
+    const right = track?.clips.find((c) => c.id === rightClipId);
+    if (!track || !left || !right) throw new Error("Clips not found");
+    if (left.mediaAssetId !== right.mediaAssetId) {
+      throw new Error("Only join two pieces of the same take");
+    }
+    if (left.sourceInFrame + left.durationFrames !== right.sourceInFrame) {
+      throw new Error("Clips aren’t contiguous in the source — can’t join");
+    }
+    if (left.timelineStartFrame + left.durationFrames !== right.timelineStartFrame) {
+      throw new Error("Clips aren’t neighbors on the cut — can’t join");
+    }
+    const durationFrames = left.durationFrames + right.durationFrames;
+    if (!opts?.quiet) setBusy("rough_cut");
+    setError(null);
+    try {
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "apply_ops",
+        ops: [
+          {
+            type: "trim",
+            clipId: leftClipId,
+            sourceInFrame: left.sourceInFrame,
+            durationFrames,
+          },
+          { type: "rippleDelete", clipId: rightClipId },
+        ],
+        note: "Join from Play review",
+      });
+      setTimeline(res.timeline);
+      invalidateLocalCutExport();
+      setTimelineVersions(res.versions);
+      const joined = res.timeline.tracks
+        .find((t) => t.kind === "video")
+        ?.clips.find((c) => c.id === leftClipId);
+      if (!joined) {
+        throw new Error("Join saved, but couldn’t locate the clip — Play again.");
+      }
+      setStatusNote(
+        `Joined clips · cut is now v${res.summary.version} · ${res.summary.clipCount} clips`
+      );
+      return { res, joined, frameRate: res.timeline.frameRate };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not join clips";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
+    } finally {
+      if (!opts?.quiet) setBusy(null);
+    }
+  }
+
   /** Split a cut clip at a source-seconds playhead (Play review). */
   async function onSplitCutClip(
     clipId: string,
@@ -4843,6 +4903,55 @@ export function AiEditorClient({ projectId }: Props) {
                 }
               : undefined
           }
+          onJoinClip={
+            preview.reviewCut
+              ? async ({ leftClipId, rightClipId }) => {
+                  const join = await onJoinCutClips(leftClipId, rightClipId, {
+                    quiet: true,
+                  });
+                  if (!join) throw new Error("Could not join clips");
+                  const prior = join.res.versions.find(
+                    (v) => v.version === join.res.timeline.version - 1
+                  );
+                  if (prior) pushReviewUndo(prior.id);
+                  const base = preview.items.find((i) => i.clipId === leftClipId);
+                  const fps = join.frameRate;
+                  const startSeconds = framesToSeconds(join.joined.sourceInFrame, fps);
+                  const endSeconds =
+                    startSeconds +
+                    framesToSeconds(join.joined.durationFrames, fps);
+                  const joinedItem: PreviewItem = {
+                    path: base?.path || "",
+                    clipId: join.joined.id,
+                    mediaAssetId: join.joined.mediaAssetId,
+                    plannedShotId: base?.plannedShotId,
+                    shotLabel: base?.shotLabel,
+                    isPreferred: base?.isPreferred,
+                    thumbnailDataUrl: base?.thumbnailDataUrl,
+                    label: join.joined.label || base?.label || join.joined.id,
+                    startSeconds,
+                    endSeconds,
+                  };
+                  if (!joinedItem.path) {
+                    throw new Error("Join saved, but preview path is missing — Play again.");
+                  }
+                  setPreview((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          title: activeReelName
+                            ? `${activeReelName} - rough cut v${join.res.summary.version}`
+                            : `Rough cut v${join.res.summary.version}`,
+                          items: prev.items
+                            .filter((i) => i.clipId !== rightClipId)
+                            .map((i) => (i.clipId === leftClipId ? joinedItem : i)),
+                        }
+                      : null
+                  );
+                  return joinedItem;
+                }
+              : undefined
+          }
           onPreferClip={
             preview.reviewCut
               ? async (item) => {
@@ -5974,7 +6083,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → In/Out · Split · reorder · Prefer / Drop · Undo → Rebuild → Resolve.
+                Next: Play → In/Out · Split/Join · reorder · Prefer / Drop · Undo → Resolve.
               </p>
             </div>
 
