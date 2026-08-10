@@ -6,6 +6,8 @@ import type { ProductionDayShot, ProductionInspirationImage } from "@/lib/produc
 import { generateCoverageFrame } from "@/lib/production/coverageApiClient";
 import { formatShotTypeLabel } from "@/lib/production/shotLabels";
 import { uploadProductionImage } from "@/lib/production/storage";
+import { ShootModeShotMeta } from "@/components/production/ShootModeShotMeta";
+import { parseShootProgressFromNotes } from "@/lib/contentPlan/syncShootProgressToBoard";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/Button";
 
@@ -166,10 +168,11 @@ export function CoverageBoardView({
       >
         {sorted.map((shot) => {
           const expanded = expandedId === shot.id;
+          const shootParsed = parseShootProgressFromNotes(shot.notes);
           const caption =
             shot.description?.trim() ||
             shot.subjectAction?.trim() ||
-            shot.notes?.split("\n")[0] ||
+            shootParsed.otherNotes?.split("\n")[0] ||
             "";
           return (
             <article
@@ -248,6 +251,7 @@ export function CoverageBoardView({
                 {caption ? (
                   <p className="line-clamp-3 text-sm text-slate-600">{caption}</p>
                 ) : null}
+                <ShootModeShotMeta notes={shot.notes} />
                 {shot.audioCue ? (
                   <p className="text-xs text-slate-500">
                     <span className="font-medium text-slate-700">Audio:</span> {shot.audioCue}

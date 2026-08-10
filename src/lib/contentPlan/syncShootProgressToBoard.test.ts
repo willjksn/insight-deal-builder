@@ -6,6 +6,7 @@ import {
   applyContentPlanShootProgressToDays,
   buildShootProgressNote,
   mergeShootProgressNotes,
+  parseShootProgressFromNotes,
 } from "@/lib/contentPlan/syncShootProgressToBoard";
 
 function planShot(partial: Partial<ContentShot> & Pick<ContentShot, "id" | "shotNumber">): ContentShot {
@@ -50,6 +51,24 @@ describe("buildShootProgressNote", () => {
 
   it("returns undefined when empty", () => {
     expect(buildShootProgressNote(planShot({ id: "s1", shotNumber: 1 }))).toBeUndefined();
+  });
+});
+
+describe("parseShootProgressFromNotes", () => {
+  it("extracts takes and shoot notes from marker block", () => {
+    const parsed = parseShootProgressFromNotes(
+      `DP: soft key\n\n${SHOOT_MODE_NOTE_MARKER}\nTakes: 1, 3\nNeed cleaner slate`
+    );
+    expect(parsed.hasShootModeBlock).toBe(true);
+    expect(parsed.takes).toEqual([1, 3]);
+    expect(parsed.shootNotes).toBe("Need cleaner slate");
+    expect(parsed.otherNotes).toBe("DP: soft key");
+  });
+
+  it("treats plain notes as otherNotes", () => {
+    const parsed = parseShootProgressFromNotes("Just a note");
+    expect(parsed.hasShootModeBlock).toBe(false);
+    expect(parsed.otherNotes).toBe("Just a note");
   });
 });
 

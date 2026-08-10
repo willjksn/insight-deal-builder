@@ -11,6 +11,7 @@ import {
   SHOT_TYPE_LABELS,
 } from "@/lib/production/shotLabels";
 import { PRODUCTION_SHOT_DRAG_MIME } from "@/components/production/ProductionDayNav";
+import { ShootModeShotMeta } from "@/components/production/ShootModeShotMeta";
 import { cn } from "@/lib/utils/cn";
 
 const SHOT_TYPE_OPTIONS = Object.keys(SHOT_TYPE_LABELS);
@@ -206,6 +207,7 @@ export function ProductionShotListEditor({
                       {shot.framing && (
                         <p className="text-xs text-slate-400">Frame: {shot.framing}</p>
                       )}
+                      <ShootModeShotMeta notes={shot.notes} className="mt-1" />
                     </div>
                   </td>
                   <td className="min-w-[11rem] py-2 pr-2">
