@@ -22,6 +22,7 @@ import type { ScriptDocument, ScriptWriterSession } from "@/lib/scriptWriter/typ
 import { useDocument } from "@/hooks/useDocument";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useAuth } from "@/contexts/AuthContext";
+import { syncShootProgressFromBoard } from "@/lib/contentPlan/apiClient";
 import { canManageProjects, canUseProductionTools } from "@/lib/utils/permissions";
 import type { Project } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -55,10 +56,80 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
   const [dayFilter, setDayFilter] = useState<string>(dayFromUrl || "all");
   const [migrateNote, setMigrateNote] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
+  const [syncingShootMode, setSyncingShootMode] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shootSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localEditRef = useRef(false);
   const savingRef = useRef(false);
   const migratedRef = useRef(false);
+  const syncingShootModeRef = useRef(false);
+
+  const getToken = useCallback(() => {
+    if (!user) return Promise.resolve(null);
+    return user.getIdToken();
+  }, [user]);
+
+  const scheduleAutoSyncToShootMode = useCallback(() => {
+    const planId = project?.sourceContentPlanId?.trim();
+    if (!planId) return;
+    if (shootSyncTimer.current) clearTimeout(shootSyncTimer.current);
+    shootSyncTimer.current = setTimeout(() => {
+      shootSyncTimer.current = null;
+      if (syncingShootModeRef.current) return;
+      syncingShootModeRef.current = true;
+      setSyncingShootMode(true);
+      void syncShootProgressFromBoard(getToken, planId)
+        .then((result) => {
+          if (result.updatedCount > 0) {
+            setStatusNote(
+              `Shoot Mode updated · ${result.updatedCount} shot${
+                result.updatedCount === 1 ? "" : "s"
+              }.`
+            );
+          }
+        })
+        .catch(() => {
+          /* quiet — manual Sync remains */
+        })
+        .finally(() => {
+          syncingShootModeRef.current = false;
+          setSyncingShootMode(false);
+        });
+    }, 1600);
+  }, [getToken, project?.sourceContentPlanId]);
+
+  useEffect(() => {
+    return () => {
+      if (shootSyncTimer.current) clearTimeout(shootSyncTimer.current);
+    };
+  }, []);
+
+  async function onSyncToShootMode() {
+    const planId = project?.sourceContentPlanId?.trim();
+    if (!planId) return;
+    if (shootSyncTimer.current) {
+      clearTimeout(shootSyncTimer.current);
+      shootSyncTimer.current = null;
+    }
+    syncingShootModeRef.current = true;
+    setSyncingShootMode(true);
+    setRefreshError(null);
+    setStatusNote(null);
+    try {
+      const result = await syncShootProgressFromBoard(getToken, planId);
+      setStatusNote(
+        result.updatedCount
+          ? `Synced ${result.updatedCount} shot${result.updatedCount === 1 ? "" : "s"} to Shoot Mode.`
+          : "Shoot Mode already matched coverage — nothing to update."
+      );
+    } catch (e) {
+      setRefreshError(e instanceof Error ? e.message : "Could not sync to Shoot Mode");
+    } finally {
+      syncingShootModeRef.current = false;
+      setSyncingShootMode(false);
+    }
+  }
 
   const allowed =
     canUseProductionTools(appUser) ||
@@ -192,6 +263,9 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
         return next;
       }),
     });
+    if ("done" in patch || "notes" in patch) {
+      scheduleAutoSyncToShootMode();
+    }
   };
 
   const addShot = (dayId: string) => {
@@ -455,6 +529,20 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
                 {refreshing ? "Syncing…" : "Sync from script"}
               </Button>
             )}
+            {project?.sourceContentPlanId && canEdit ? (
+              <Button
+                size="touch"
+                variant="outline"
+                disabled={syncingShootMode || saving || refreshing}
+                onClick={() => void onSyncToShootMode()}
+                title="Also runs automatically after you mark shots done or edit notes"
+              >
+                <Clapperboard
+                  className={`mr-2 h-4 w-4 ${syncingShootMode ? "animate-pulse" : ""}`}
+                />
+                {syncingShootMode ? "Syncing…" : "Sync to Shoot Mode"}
+              </Button>
+            ) : null}
             {board.scriptSessionId && canEdit && !anyChecklistsOnBoard && (
               <Button
                 size="touch"
@@ -537,6 +625,11 @@ export function CoverageDeskClient({ projectId }: { projectId: string }) {
       {migrateNote && (
         <p className="mb-4 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-900">
           {migrateNote}
+        </p>
+      )}
+      {statusNote && (
+        <p className="mb-4 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          {statusNote}
         </p>
       )}
       {board.scriptSessionId ? (
