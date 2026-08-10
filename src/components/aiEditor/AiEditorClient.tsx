@@ -5422,8 +5422,9 @@ export function AiEditorClient({ projectId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Line up a first cut</h2>
               <p className="mt-1 text-sm text-slate-600">
-                This is not the final edit. It puts your clips in order so you can watch them, drop
-                bad takes, then send that order to DaVinci Resolve.
+                This is not the final edit. It lines up preferred Match takes so you can watch them,
+                drop bad ones, then send that order to DaVinci Resolve. When clips were analyzed,
+                uses local shot breaks for in/out instead of starting at the head of each file.
               </p>
             </div>
           </div>

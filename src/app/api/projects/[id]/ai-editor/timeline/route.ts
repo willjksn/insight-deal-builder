@@ -25,6 +25,7 @@ import {
   getAiEditorProjectSettings,
   getCoverageReport,
   getTimeline,
+  listAnalysisBundles,
   listMediaAssets,
   listTimelineVersions,
   saveTimelineVersion,
@@ -233,9 +234,10 @@ export async function POST(
       await upsertTimeline(timeline);
       await saveTimelineVersion(versionRecord);
     } else if (action === "build_rough_cut") {
-      const [coverage, media] = await Promise.all([
+      const [coverage, media, analysis] = await Promise.all([
         getCoverageReport(projectId),
         listMediaAssets(projectId),
+        listAnalysisBundles(projectId),
       ]);
       if (!coverage && !media.length) {
         await updateJob(job.id, {
@@ -262,6 +264,7 @@ export async function POST(
           overrides: [],
         },
         media,
+        analysis,
         name: body.name,
       });
       const existing = await getTimeline(projectId);

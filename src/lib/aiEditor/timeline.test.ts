@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ClipAnalysisBundle } from "@/lib/aiEditor/analysis";
 import type { CoverageReport, MediaAsset } from "@/lib/aiEditor/types";
 import {
   applyTimelineOp,
@@ -69,6 +70,69 @@ describe("aiEditor timeline", () => {
     expect(video.clips[0].plannedShotId).toBe("s1");
     expect(timelineDurationFrames(tl)).toBeGreaterThan(0);
     expect(summarizeTimeline(tl).clipCount).toBe(4); // video + audio copies
+  });
+
+  it("uses analysis shot breaks for source in/out", () => {
+    const coverage: CoverageReport = {
+      projectId: "p1",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      plannedShotCount: 1,
+      coveredCount: 1,
+      partialCount: 0,
+      missingCount: 0,
+      unmatchedMediaIds: [],
+      overrides: [],
+      shots: [
+        {
+          plannedShotId: "s1",
+          scene: "1",
+          shotName: "CU",
+          shotType: "close_up",
+          status: "covered",
+          candidates: [],
+          preferredMediaAssetId: "m1",
+          preferredScore: 0.5,
+        },
+      ],
+    };
+    const analysis: ClipAnalysisBundle[] = [
+      {
+        mediaAssetId: "m1",
+        shots: [
+          {
+            id: "a0",
+            mediaAssetId: "m1",
+            index: 0,
+            startSeconds: 0,
+            endSeconds: 1,
+            confidence: 0.5,
+            shotSize: "unknown",
+          },
+          {
+            id: "a1",
+            mediaAssetId: "m1",
+            index: 1,
+            startSeconds: 5,
+            endSeconds: 11,
+            confidence: 0.85,
+            shotSize: "close_up",
+          },
+        ],
+        transcript: [],
+        analysisStatus: "complete",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    const tl = buildRoughCutFromCoverage({
+      projectId: "p1",
+      coverage,
+      media: [media("m1", "take.mp4", 20)],
+      analysis,
+      frameRate: 24,
+    });
+    const clip = tl.tracks.find((t) => t.kind === "video")!.clips[0]!;
+    expect(clip.sourceInFrame).toBeGreaterThan(0);
+    expect(clip.durationFrames).toBeGreaterThan(24);
   });
 
   it("skips camera JPG stills in footage-only rough cut", () => {

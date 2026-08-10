@@ -1,7 +1,9 @@
 /** Internal NLE-independent timeline model + deterministic ops (V1E). */
 
+import type { ClipAnalysisBundle } from "@/lib/aiEditor/analysis";
 import { framesToSeconds, framesToTimecode, secondsToFrames } from "@/lib/aiEditor/frames";
 import { isRoughCutVideoAsset } from "@/lib/aiEditor/mediaFormats";
+import { selectWindowFromAnalysis } from "@/lib/aiEditor/selectsFromAnalysis";
 import type {
   CoverageReport,
   MediaAsset,
@@ -82,6 +84,8 @@ export function buildRoughCutFromCoverage(input: {
   projectId: string;
   coverage: CoverageReport;
   media: MediaAsset[];
+  /** Local shot-break analysis — used for source in/out when present. */
+  analysis?: ClipAnalysisBundle[];
   name?: string;
   frameRate?: number;
   defaultClipSeconds?: number;
@@ -89,6 +93,7 @@ export function buildRoughCutFromCoverage(input: {
   const fps = input.frameRate || DEFAULT_TIMELINE_FPS;
   const fallbackDur = input.defaultClipSeconds ?? 4;
   const mediaById = new Map(input.media.map((m) => [m.id, m]));
+  const analysisById = new Map((input.analysis || []).map((a) => [a.mediaAssetId, a]));
   const timeline = emptyTimeline({
     projectId: input.projectId,
     name: input.name || "Rough cut v1",
@@ -103,19 +108,21 @@ export function buildRoughCutFromCoverage(input: {
     if (!mediaId) continue;
     const asset = mediaById.get(mediaId);
     if (!asset || !isRoughCutVideoAsset(asset)) continue;
-    const durSec = Math.max(
-      0.5,
-      asset.durationSeconds && asset.durationSeconds > 0
-        ? Math.min(asset.durationSeconds, 12)
-        : fallbackDur
-    );
-    const durationFrames = Math.max(1, secondsToFrames(durSec, fps));
+    const bundle = analysisById.get(mediaId);
+    const window = selectWindowFromAnalysis({
+      assetDurationSeconds: asset.durationSeconds,
+      plannedShotType: row.shotType,
+      segments: bundle?.shots,
+      fallbackSeconds: fallbackDur,
+    });
+    const durationFrames = Math.max(1, secondsToFrames(window.durationSeconds, fps));
+    const sourceInFrame = Math.max(0, secondsToFrames(window.sourceInSeconds, fps));
     const clip: TimelineClip = {
       id: newId("clip"),
       mediaAssetId: mediaId,
       trackId: video.id,
       timelineStartFrame: cursor,
-      sourceInFrame: 0,
+      sourceInFrame,
       durationFrames,
       label: [row.scene, row.shotName || asset.filename].filter(Boolean).join(" · "),
       plannedShotId: row.plannedShotId,
@@ -133,14 +140,20 @@ export function buildRoughCutFromCoverage(input: {
   const videoAssets = input.media.filter((m) => isRoughCutVideoAsset(m));
   if (!video.clips.length && videoAssets.length) {
     for (const asset of videoAssets) {
-      const durSec = Math.max(0.5, asset.durationSeconds || fallbackDur);
-      const durationFrames = Math.max(1, secondsToFrames(Math.min(durSec, 12), fps));
+      const bundle = analysisById.get(asset.id);
+      const window = selectWindowFromAnalysis({
+        assetDurationSeconds: asset.durationSeconds,
+        segments: bundle?.shots,
+        fallbackSeconds: fallbackDur,
+      });
+      const durationFrames = Math.max(1, secondsToFrames(window.durationSeconds, fps));
+      const sourceInFrame = Math.max(0, secondsToFrames(window.sourceInSeconds, fps));
       const clip: TimelineClip = {
         id: newId("clip"),
         mediaAssetId: asset.id,
         trackId: video.id,
         timelineStartFrame: cursor,
-        sourceInFrame: 0,
+        sourceInFrame,
         durationFrames,
         label: asset.filename,
       };
