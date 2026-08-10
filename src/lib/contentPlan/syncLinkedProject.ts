@@ -12,6 +12,7 @@ import {
   mergeContentPlanEditNotes,
 } from "@/lib/contentPlan/planToScript";
 import type { ContentPlan } from "@/lib/contentPlan/types";
+import { syncShootProgressFromContentPlan } from "@/lib/contentPlan/syncShootProgressToBoardServer";
 import { applyScriptToProject } from "@/lib/scriptWriter/adminApply";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
 import { inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
@@ -20,6 +21,7 @@ import { inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
  * Push the latest Content Plan into its linked project:
  * - refresh script session
  * - merge board shots by scoutShotNumber (keeps board shot ids for AI Editor)
+ * - overlay Shoot Mode done / takes / notes onto the board
  * - replace Content Plan edit notes in AI Editor settings
  */
 export async function syncLinkedProjectFromContentPlan(params: {
@@ -128,6 +130,12 @@ export async function syncLinkedProjectFromContentPlan(params: {
     script,
     projectId,
   });
+
+  try {
+    await syncShootProgressFromContentPlan({ db, uid, planId });
+  } catch {
+    // Non-fatal — script/board merge already landed; shoot overlay can retry.
+  }
 
   try {
     const existing = await getAiEditorProjectSettings(projectId);

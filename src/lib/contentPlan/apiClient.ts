@@ -149,6 +149,21 @@ export async function syncLinkedProjectFromContentPlan(
   }>(res);
 }
 
+/** Overlay Shoot Mode done/takes/notes onto the linked production board only. */
+export async function syncShootProgressToBoard(getToken: GetToken, id: string) {
+  const res = await fetch(`/api/content-plans/${id}/sync-shoot-progress`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    ok: true;
+    projectId: string;
+    productionBoardId: string;
+    updatedCount: number;
+    plan: ContentPlan;
+  }>(res);
+}
+
 export async function refineContentPlan(
   getToken: GetToken,
   id: string,

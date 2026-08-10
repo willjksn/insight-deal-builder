@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, FolderKanban, Loader2, MonitorSmartphone } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  FolderKanban,
+  Loader2,
+  MonitorSmartphone,
+  RefreshCw,
+} from "lucide-react";
 import {
   CompletionBar,
   ShootModePanel,
@@ -12,6 +19,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getContentPlan,
+  syncShootProgressToBoard,
   updateContentPlan,
 } from "@/lib/contentPlan/apiClient";
 import { downloadContentPlanOnePagerPdf } from "@/lib/contentPlan/exportPdf";
@@ -28,6 +36,8 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
   const [plan, setPlan] = useState<ContentPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncingBoard, setSyncingBoard] = useState(false);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const stagePromoted = useRef(false);
@@ -125,15 +135,52 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
     }
   }
 
+  async function onSyncToBoard() {
+    if (!plan?.projectId) return;
+    setSyncingBoard(true);
+    setError(null);
+    setStatusNote(null);
+    try {
+      // Persist latest take checkoffs before overlaying the board.
+      await updateContentPlan(getToken, plan.id, { shots: plan.shots });
+      const result = await syncShootProgressToBoard(getToken, plan.id);
+      setStatusNote(
+        result.updatedCount
+          ? `Synced ${result.updatedCount} shot${result.updatedCount === 1 ? "" : "s"} to the production board.`
+          : "Board already matched Shoot Mode — nothing to update."
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not sync to board");
+    } finally {
+      setSyncingBoard(false);
+    }
+  }
+
   async function onMarkWrapped() {
     if (!plan) return;
     setSaving(true);
     setError(null);
+    setStatusNote(null);
     try {
       const { plan: next } = await updateContentPlan(getToken, plan.id, {
         productionStage: "wrapped",
+        shots: plan.shots,
       });
       setPlan(next);
+      if (next.projectId) {
+        try {
+          const result = await syncShootProgressToBoard(getToken, next.id);
+          setStatusNote(
+            result.updatedCount
+              ? `Wrapped · synced ${result.updatedCount} shot${
+                  result.updatedCount === 1 ? "" : "s"
+                } to the board.`
+              : "Wrapped · board already up to date."
+          );
+        } catch {
+          setStatusNote("Wrapped · board sync failed — use Sync to board.");
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not mark wrapped");
     } finally {
@@ -232,18 +279,34 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
           One-pager
         </Button>
         {plan.projectId ? (
-          <Link href={`/projects/${plan.projectId}/production`}>
-            <Button type="button" size="sm" variant="secondary">
-              <FolderKanban className="mr-1.5 h-3.5 w-3.5" />
-              Production board
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={saving || syncingBoard}
+              onClick={() => void onSyncToBoard()}
+            >
+              {syncingBoard ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Sync to board
             </Button>
-          </Link>
+            <Link href={`/projects/${plan.projectId}/production`}>
+              <Button type="button" size="sm" variant="secondary">
+                <FolderKanban className="mr-1.5 h-3.5 w-3.5" />
+                Production board
+              </Button>
+            </Link>
+          </>
         ) : null}
         {canWrap ? (
           <Button
             type="button"
             size="sm"
-            disabled={saving}
+            disabled={saving || syncingBoard}
             onClick={() => void onMarkWrapped()}
           >
             Mark wrapped
@@ -255,6 +318,12 @@ export function ContentPlanShootModeClient({ planId }: { planId: string }) {
           </span>
         ) : null}
       </div>
+
+      {statusNote ? (
+        <p className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          {statusNote}
+        </p>
+      ) : null}
 
       {error ? (
         <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">

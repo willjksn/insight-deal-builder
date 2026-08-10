@@ -1544,7 +1544,8 @@ export function ContentPlanDirector({
                 <p className="font-medium">Linked to production board</p>
                 <p className="mt-0.5 text-xs text-emerald-900/80">
                   After refine or regenerate, update the board so shots and AI Editor stay in sync.
-                  Existing board shot IDs are kept when shot numbers match.
+                  Existing board shot IDs are kept when shot numbers match. Shoot Mode completion
+                  (done / takes / notes) is included.
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Button
