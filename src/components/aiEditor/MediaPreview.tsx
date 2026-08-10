@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  ArrowLeftRight,
   Clapperboard,
   Combine,
   Loader2,
@@ -19,6 +20,8 @@ const MIN_TRIM_SECONDS = 0.05;
 const MIN_SPLIT_PAD_SECONDS = 0.08;
 /** Source ends must touch within this window to Join. */
 const JOIN_TOUCH_SECONDS = 0.05;
+/** Slip step — keep cut length, slide the source window. */
+const SLIP_STEP_SECONDS = 0.25;
 
 function canJoinPreviewItems(
   left: PreviewItem | undefined,
@@ -85,6 +88,12 @@ type Props = {
     leftClipId: string;
     rightClipId: string;
   }) => Promise<PreviewItem | void> | void;
+  /** Slip source window by delta seconds (cut length stays fixed). */
+  onSlipClip?: (input: {
+    clipId: string;
+    deltaSeconds: number;
+    mediaDurationSeconds?: number;
+  }) => Promise<{ startSeconds: number; endSeconds: number } | void> | void;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -107,6 +116,7 @@ export function MediaPreview({
   onTrimClip,
   onSplitClip,
   onJoinClip,
+  onSlipClip,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
@@ -124,6 +134,7 @@ export function MediaPreview({
   const [trimming, setTrimming] = useState(false);
   const [splitting, setSplitting] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [slipping, setSlipping] = useState(false);
   const [preferDirty, setPreferDirty] = useState(false);
   const [actionNote, setActionNote] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -140,7 +151,8 @@ export function MediaPreview({
       onReorderClips ||
       onTrimClip ||
       onSplitClip ||
-      onJoinClip
+      onJoinClip ||
+      onSlipClip
   );
   const busyAction =
     removing ||
@@ -150,12 +162,14 @@ export function MediaPreview({
     reordering ||
     trimming ||
     splitting ||
-    joining;
+    joining ||
+    slipping;
   const canTrim = Boolean(onTrimClip && item?.clipId && !asImage);
   const canSplit = Boolean(onSplitClip && item?.clipId && !asImage);
   const canJoin = Boolean(
     onJoinClip && !asImage && canJoinPreviewItems(item, nextItem)
   );
+  const canSlip = Boolean(onSlipClip && item?.clipId && !asImage);
   const canPrefer =
     Boolean(onPreferClip && item?.plannedShotId && item?.mediaAssetId) &&
     !item?.isPreferred;
@@ -234,6 +248,16 @@ export function MediaPreview({
       if ((e.key === "j" || e.key === "J") && canJoin && !busyAction) {
         e.preventDefault();
         void joinWithNext();
+        return;
+      }
+      if (e.key === "," && canSlip && !busyAction) {
+        e.preventDefault();
+        void slipBy(-SLIP_STEP_SECONDS);
+        return;
+      }
+      if (e.key === "." && canSlip && !busyAction) {
+        e.preventDefault();
+        void slipBy(SLIP_STEP_SECONDS);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -254,6 +278,7 @@ export function MediaPreview({
     onTrimClip,
     onSplitClip,
     onJoinClip,
+    onSlipClip,
     index,
     items,
     canPrefer,
@@ -263,6 +288,7 @@ export function MediaPreview({
     canTrim,
     canSplit,
     canJoin,
+    canSlip,
     item,
   ]);
 
@@ -472,6 +498,51 @@ export function MediaPreview({
       setActionNote(null);
     } finally {
       setJoining(false);
+    }
+  }
+
+  async function slipBy(deltaSeconds: number) {
+    const clipId = item?.clipId;
+    if (!clipId || !onSlipClip || !canSlip || busyAction) return;
+    const el = videoRef.current;
+    const mediaDurationSeconds =
+      el && Number.isFinite(el.duration) && el.duration > 0 ? el.duration : undefined;
+    setSlipping(true);
+    setError(null);
+    setActionNote(deltaSeconds < 0 ? "Slipping earlier…" : "Slipping later…");
+    if (el) el.pause();
+    try {
+      const slipped = await onSlipClip({
+        clipId,
+        deltaSeconds,
+        mediaDurationSeconds,
+      });
+      if (
+        !slipped ||
+        !Number.isFinite(slipped.startSeconds) ||
+        !Number.isFinite(slipped.endSeconds)
+      ) {
+        throw new Error("Slip did not return new in/out");
+      }
+      setItems((prev) =>
+        prev.map((i) =>
+          i.clipId === clipId
+            ? {
+                ...i,
+                startSeconds: slipped.startSeconds,
+                endSeconds: slipped.endSeconds,
+              }
+            : i
+        )
+      );
+      setActionNote(
+        `Slipped · In ${slipped.startSeconds.toFixed(1)}s · Out ${slipped.endSeconds.toFixed(1)}s · U undoes`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not slip clip");
+      setActionNote(null);
+    } finally {
+      setSlipping(false);
     }
   }
 
@@ -799,6 +870,35 @@ export function MediaPreview({
           Join
         </Button>
       ) : null}
+      {canSlip ? (
+        <>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busyAction}
+            onClick={() => void slipBy(-SLIP_STEP_SECONDS)}
+            title="Slip earlier in the take (,)"
+          >
+            {slipping ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Slip ←
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busyAction}
+            onClick={() => void slipBy(SLIP_STEP_SECONDS)}
+            title="Slip later in the take (.)"
+          >
+            Slip →
+          </Button>
+        </>
+      ) : null}
       {item?.clipId && onRemoveClip ? (
         <Button
           type="button"
@@ -850,6 +950,7 @@ export function MediaPreview({
       <span className="text-[11px] text-slate-400">
         {item ? "← → jump" : "Cut empty"}
         {canTrim ? " · I/O in/out" : ""}
+        {canSlip ? " · ,/. slip" : ""}
         {canSplit ? " · S split" : ""}
         {canJoin ? " · J join" : ""}
         {canReorder ? " · drag / [ ] reorder" : ""}

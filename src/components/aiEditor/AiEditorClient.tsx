@@ -2803,6 +2803,88 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
+  /** Slip source window while keeping cut duration (Play review). */
+  async function onSlipCutClip(
+    clipId: string,
+    deltaSeconds: number,
+    opts?: { quiet?: boolean; mediaDurationSeconds?: number }
+  ) {
+    if (!timeline) throw new Error("No timeline yet");
+    const track = timeline.tracks.find((t) => t.kind === "video");
+    const clip = track?.clips.find((c) => c.id === clipId);
+    if (!track || !clip) throw new Error("Clip not found");
+    const fps = timeline.frameRate;
+    const asset = media.find((m) => m.id === clip.mediaAssetId);
+    const mediaDurSec =
+      (typeof opts?.mediaDurationSeconds === "number" &&
+      opts.mediaDurationSeconds > 0
+        ? opts.mediaDurationSeconds
+        : undefined) ??
+      (typeof asset?.durationSeconds === "number" && asset.durationSeconds > 0
+        ? asset.durationSeconds
+        : undefined);
+    if (mediaDurSec == null) {
+      throw new Error("Wait for the clip to load, then Slip");
+    }
+    const mediaDurFrames = secondsToFrames(mediaDurSec, fps);
+    const { durationFrames } = clip;
+    if (durationFrames >= mediaDurFrames) {
+      throw new Error("Nothing to slip — this take fills the whole file");
+    }
+    const deltaFrames = secondsToFrames(deltaSeconds, fps);
+    if (deltaFrames === 0) {
+      throw new Error("Slip a little farther");
+    }
+    const maxIn = Math.max(0, mediaDurFrames - durationFrames);
+    const nextIn = Math.max(0, Math.min(maxIn, clip.sourceInFrame + deltaFrames));
+    if (nextIn === clip.sourceInFrame) {
+      throw new Error(
+        deltaSeconds < 0
+          ? "Already at the start of the take"
+          : "Already at the end of the take"
+      );
+    }
+    if (!opts?.quiet) setBusy("rough_cut");
+    setError(null);
+    try {
+      const res = await aiEditorTimelineAction(getToken, projectId, {
+        action: "apply_ops",
+        ops: [
+          {
+            type: "trim",
+            clipId,
+            sourceInFrame: nextIn,
+            durationFrames,
+          },
+        ],
+        note: "Slip from Play review",
+      });
+      setTimeline(res.timeline);
+      invalidateLocalCutExport();
+      setTimelineVersions(res.versions);
+      const slipped = res.timeline.tracks
+        .find((t) => t.kind === "video")
+        ?.clips.find((c) => c.id === clipId);
+      if (!slipped) {
+        throw new Error("Slip saved, but couldn’t locate the clip — Play again.");
+      }
+      const startSeconds = framesToSeconds(slipped.sourceInFrame, fps);
+      const endSeconds =
+        startSeconds + framesToSeconds(slipped.durationFrames, fps);
+      setStatusNote(
+        `Slipped clip · cut is now v${res.summary.version} · ${res.summary.clipCount} clips`
+      );
+      return { res, slipped, frameRate: fps, startSeconds, endSeconds };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not slip clip";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
+    } finally {
+      if (!opts?.quiet) setBusy(null);
+    }
+  }
+
   /**
    * Reorder visible Play-review clips while preserving any non-visible
    * reel/track clips in their relative slots.
@@ -4952,6 +5034,44 @@ export function AiEditorClient({ projectId }: Props) {
                 }
               : undefined
           }
+          onSlipClip={
+            preview.reviewCut
+              ? async ({ clipId, deltaSeconds, mediaDurationSeconds }) => {
+                  const slip = await onSlipCutClip(clipId, deltaSeconds, {
+                    quiet: true,
+                    mediaDurationSeconds,
+                  });
+                  if (!slip) throw new Error("Could not slip clip");
+                  const prior = slip.res.versions.find(
+                    (v) => v.version === slip.res.timeline.version - 1
+                  );
+                  if (prior) pushReviewUndo(prior.id);
+                  setPreview((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          title: activeReelName
+                            ? `${activeReelName} - rough cut v${slip.res.summary.version}`
+                            : `Rough cut v${slip.res.summary.version}`,
+                          items: prev.items.map((i) =>
+                            i.clipId === clipId
+                              ? {
+                                  ...i,
+                                  startSeconds: slip.startSeconds,
+                                  endSeconds: slip.endSeconds,
+                                }
+                              : i
+                          ),
+                        }
+                      : null
+                  );
+                  return {
+                    startSeconds: slip.startSeconds,
+                    endSeconds: slip.endSeconds,
+                  };
+                }
+              : undefined
+          }
           onPreferClip={
             preview.reviewCut
               ? async (item) => {
@@ -6083,7 +6203,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → In/Out · Split/Join · reorder · Prefer / Drop · Undo → Resolve.
+                Next: Play → In/Out · Slip · Split/Join · reorder · Prefer / Drop · Undo → Resolve.
               </p>
             </div>
 
