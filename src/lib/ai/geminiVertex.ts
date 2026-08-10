@@ -444,7 +444,9 @@ export async function vertexGeminiGenerate(params: {
     ) {
       // Some Vertex model variants reject thinkingBudget=0 — retry without it.
       droppedThinkingConfig = true;
-      const gc = { ...(bodyForAttempt.generationConfig as Record<string, unknown>) };
+      const gc = {
+        ...bodyForAttempt.generationConfig,
+      } as typeof body.generationConfig & { thinkingConfig?: unknown };
       delete gc.thinkingConfig;
       bodyForAttempt = { ...bodyForAttempt, generationConfig: gc };
       console.warn("[Scout] Vertex rejected thinkingConfig — retrying without it");

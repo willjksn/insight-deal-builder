@@ -16,6 +16,7 @@ import { syncShootProgressFromContentPlan } from "@/lib/contentPlan/syncShootPro
 import { applyScriptToProject } from "@/lib/scriptWriter/adminApply";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
 import { inferScriptDetailLevel } from "@/lib/scriptWriter/brief";
+import type { ScriptWriterSession } from "@/lib/scriptWriter/types";
 
 /**
  * Push the latest Content Plan into its linked project:
@@ -117,16 +118,21 @@ export async function syncLinkedProjectFromContentPlan(params: {
     id: scriptSessionId,
     userId: uid,
     title: script.title,
+    initialIdea: plan.inputs.idea,
     brief,
     script,
+    status: "script_ready" as const,
+    messages: [],
     detailedShotList: true,
     inspirationImages: [],
-  };
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as unknown as ScriptWriterSession & { id: string };
 
   const { productionBoardId } = await applyScriptToProject({
     db,
     uid,
-    session: session as Parameters<typeof applyScriptToProject>[0]["session"],
+    session,
     script,
     projectId,
   });

@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       if (!isIndexBuildingError(err)) throw err;
       const snap = await col.where("userId", "==", uid).limit(80).get();
       plans = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
+        .map((d) => ({ id: d.id, ...d.data() }) as { id: string; [key: string]: unknown })
         .sort((a, b) => updatedAtMs(b.updatedAt) - updatedAtMs(a.updatedAt))
         .slice(0, 40);
     }
