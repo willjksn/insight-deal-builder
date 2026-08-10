@@ -110,7 +110,7 @@ IDs stay independent of folder names.
 |-------|-----|
 | **A** | Detection banner + ingest review (camera, dest preview, preflight, options preview) |
 | **B** | **Ingest into project** CTA → scan card → `runManagedCopy` (verify + optional proxies) + progress/Stop |
-| C | Live media browser populate mid-ingest |
+| **C** | Live media browser populate mid-ingest (per-clip register after verify/thumb) |
 | D–E | Proxy/analysis counts in same panel |
 | F | Safety copy + media safety status |
 
@@ -124,7 +124,7 @@ Manual “Select existing folder” / **Use this drive as source** remains.
 |-------|--------|--------|
 | **A** | Detect + review + naming preview + preflight | **Landed (initial)** |
 | **B** | One-click verified managed copy + MediaAsset register + cancel | **Landed (initial)** — wires `ManagedIngestReview` → `agentIndexFolder` + `runManagedCopy`; full `IngestSession` collection still later |
-| C | Pipelined metadata/thumbnails | Later |
+| **C** | Live library populate mid-ingest | **Landed (thin)** — `runManagedCopy` registers each clip as it finishes; concurrent pipeline jobs still Later |
 | D | Proxy queue (not from card) | Later |
 | E | Analysis queue | Later |
 | F | Safety copy / dual dest | Later |

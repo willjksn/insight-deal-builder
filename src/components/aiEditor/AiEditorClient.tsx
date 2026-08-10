@@ -1678,19 +1678,37 @@ export function AiEditorClient({ projectId }: Props) {
     }
 
     const chunkSize = 1;
-    const allResults: Array<{
+    type IndexedFile = {
       path: string;
       filename: string;
       sizeBytes?: number;
       relativeProjectPath?: string;
       probe?: Partial<MediaAsset>;
-    }> = [];
+    };
     const cam = opts.camera.replace(/_/g, " ");
     let copiedOk = 0;
     let failed = 0;
     copyAbortRef.current?.abort();
     const abort = new AbortController();
     copyAbortRef.current = abort;
+
+    /** Phase C thin — show each clip in the media browser as soon as it lands. */
+    async function registerClipInLibrary(file: IndexedFile, doneCount: number) {
+      setProgress({
+        pct: Math.min(96, Math.round((doneCount / Math.max(1, batch.length)) * 95)),
+        label: `In library ${doneCount}/${batch.length}: ${file.filename} · ${cam}`,
+      });
+      const res = await aiEditorIndexMedia(getToken, projectId, {
+        files: [file],
+        ingestMode: "managed",
+      });
+      setMedia((prev) => {
+        const byId = new Map(prev.map((m) => [m.id, m]));
+        for (const m of res.media) byId.set(m.id, m);
+        return [...byId.values()].sort((a, b) => a.filename.localeCompare(b.filename));
+      });
+      setJobs((prev) => [res.job as AiEditorJob, ...prev.filter((j) => j.id !== res.job.id)]);
+    }
 
     for (let i = 0; i < batch.length; i += chunkSize) {
       if (cancelBatchRef.current || abort.signal.aborted) break;
@@ -1745,16 +1763,23 @@ export function AiEditorClient({ projectId }: Props) {
           } catch {
             probe = { ...probe, ...(await mockMediaEngine.probe(r.destPath)) };
           }
+
+          const entry: IndexedFile = {
+            path: r.destPath,
+            filename: r.filename,
+            sizeBytes: r.sizeBytes,
+            relativeProjectPath: r.relativeProjectPath,
+            probe,
+          };
+
           if (cancelBatchRef.current || abort.signal.aborted) {
             // Still keep the verified copy we already have
-            allResults.push({
-              path: r.destPath,
-              filename: r.filename,
-              sizeBytes: r.sizeBytes,
-              relativeProjectPath: r.relativeProjectPath,
-              probe,
-            });
             copiedOk += 1;
+            try {
+              await registerClipInLibrary(entry, copiedOk);
+            } catch {
+              /* registration best-effort on stop */
+            }
             break;
           }
           try {
@@ -1764,17 +1789,12 @@ export function AiEditorClient({ projectId }: Props) {
               r.proxyPath || r.destPath
             );
             if (thumb.dataUrl) probe = { ...probe, thumbnailDataUrl: thumb.dataUrl };
+            entry.probe = probe;
           } catch {
             /* optional */
           }
-          allResults.push({
-            path: r.destPath,
-            filename: r.filename,
-            sizeBytes: r.sizeBytes,
-            relativeProjectPath: r.relativeProjectPath,
-            probe,
-          });
           copiedOk += 1;
+          await registerClipInLibrary(entry, copiedOk);
         }
       } catch (e) {
         if (
@@ -1788,19 +1808,6 @@ export function AiEditorClient({ projectId }: Props) {
       }
     }
 
-    if (allResults.length) {
-      setProgress({ pct: 98, label: "Saving clip records…" });
-      const res = await aiEditorIndexMedia(getToken, projectId, {
-        files: allResults,
-        ingestMode: "managed",
-      });
-      setMedia((prev) => {
-        const byId = new Map(prev.map((m) => [m.id, m]));
-        for (const m of res.media) byId.set(m.id, m);
-        return [...byId.values()].sort((a, b) => a.filename.localeCompare(b.filename));
-      });
-      setJobs((prev) => [res.job as AiEditorJob, ...prev]);
-    }
     const stopped = cancelBatchRef.current || abort.signal.aborted;
     setStatusNote(
       stopped
