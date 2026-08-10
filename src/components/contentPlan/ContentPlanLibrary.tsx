@@ -12,6 +12,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
+import { ContentPlanHowItWorks } from "@/components/contentPlan/ContentPlanHowItWorks";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { EmptyState, PageHeader } from "@/components/ui/PageHeader";
@@ -190,6 +191,10 @@ export function ContentPlanLibrary() {
           </div>
         }
       />
+
+      <div className="mt-6">
+        <ContentPlanHowItWorks />
+      </div>
 
       {error ? (
         <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">

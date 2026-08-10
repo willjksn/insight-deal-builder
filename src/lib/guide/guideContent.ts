@@ -60,11 +60,11 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
           {
             heading: "Recommended workflow",
             bullets: [
-              "Open Projects and create a new project (or open an existing one). Give it a working title and link a client if you already have one.",
-              "Go to Script writer. Develop the concept with the AI coach, edit the screenplay in the editor, turn on detailed shot list / storyboard, then generate.",
+              "Open Projects and create a new project (or open an existing one). Give it a working title and link a client if you already have one — or start from Content Plans (Pitch / New plan) and Create project + board from the blueprint.",
+              "Go to Script writer. Develop the concept with the AI coach, edit the screenplay in the editor, turn on detailed shot list / storyboard, then generate. (A Content Plan can also seed a script session when you create the project.)",
               "Open the project → Prep. Link the script session and Apply so cast, locations, days, and shots seed the board.",
               "Open Coverage. Review the shot bible, upload or generate AI frames, then Sync from script if the script changed (your frames and day placement are kept).",
-              "Open each shoot day’s Call sheet for logistics; print the denser one-pager for set. Use Day shots for list checkoff, storyboard, and crew packets.",
+              "Open each shoot day’s Call sheet for logistics; print the denser one-pager for set. Use Day shots for list checkoff, storyboard, and crew packets — or Content Plan Shoot Mode when the board is linked to a plan.",
               "After the shoot: open the project → AI Editor to ingest footage, Match preferred takes, Build a first cut, Play to trim/Drop, then hand off to DaVinci Resolve.",
               "Optional: use Stage planner for a lighting diagram.",
               "When the deal is ready, create an agreement from Quick quote or the full wizard, sign, and send to the client.",
@@ -349,6 +349,45 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
         ],
       },
       {
+        id: "content-plans",
+        title: "How to use Content Plans",
+        description:
+          "Pitch or blueprint an idea, create a project + board, Shoot Mode on set, then AI Editor.",
+        canAccess: production,
+        blocks: [
+          {
+            paragraphs: [
+              "Content Plans turn a short idea (or a package pitch) into a saved production blueprint: brief, story, script, shots, shoot order, and checklist. From the plan you can create a full project + Prep/Coverage board, run Shoot Mode on set with two-way board sync, then open AI Editor for Match and first cut.",
+            ],
+          },
+          {
+            heading: "Pitch or new plan",
+            bullets: [
+              "Open Content plans → Pitch ideas for a package to generate one-liners, then Develop an idea into a plan.",
+              "Or New plan: style → idea → parameters → generate.",
+              "In the Director, work Phase 1 (Brief / Story / Script / Shots), Phase 2 (edit/look), and Phase 3 (Coverage / Shoot Order / Checklist).",
+            ],
+          },
+          {
+            heading: "Board, Shoot Mode, AI Editor",
+            bullets: [
+              "Create project + board when shots exist. After regenerating, Update board + script to keep the board and AI Editor aligned.",
+              "Shoot Mode: mark done, takes, and notes in shoot order; sync to / pull from the board.",
+              "Open the linked project’s AI Editor to Match preferred takes and Play a first cut, then finish in Resolve.",
+            ],
+            tips: [
+              "The library filters by production stage and shows shot completion and linked-board status.",
+              "Deleting a plan does not delete a linked project.",
+            ],
+            links: [
+              { label: "Content plans", href: "/content-plans" },
+              { label: "Pitch", href: "/content-plans/pitch" },
+              { label: "AI Editor hub", href: "/ai-editor" },
+            ],
+          },
+        ],
+      },
+      {
         id: "ai-editor",
         title: "How to use AI Editor",
         description:
@@ -357,7 +396,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
         blocks: [
           {
             paragraphs: [
-              "AI Editor turns camera footage into a strong first cut on a Windows workstation, then hands off to DaVinci Resolve (this PC or a Mac). Originals stay on your drives — ShootSpine does not upload camera cards to the cloud. Open it from the project spine, /ai-editor, or a footage-only workspace.",
+              "AI Editor turns camera footage into a strong first cut on a Windows workstation, then hands off to DaVinci Resolve (this PC or a Mac). Originals stay on your drives — ShootSpine does not upload camera cards to the cloud. Open it from the project spine, /ai-editor, a footage-only workspace, or a Content Plan–linked production.",
             ],
           },
           {
@@ -373,7 +412,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
             bullets: [
               "Add footage with managed card ingest (detect → Ingest into project), catalog in place, or copy from a folder. Cards are never auto-erased; Step 3 keeps a recent ingest summary.",
               "Prepare proxies for tough codecs, then run analysis when you want shot breaks / search.",
-              "Match to the plan: star preferred takes, Prefer unmatched clips onto a shot, then Build first cut.",
+              "Match to the plan: star preferred takes, Prefer unmatched clips onto a shot, then Build first cut. Plans from Content Plans seed those planned shots.",
               "Play the cut to Mark In/Out, Slip/Roll, Split/Join, Duplicate, reorder, Prefer / Drop, and Undo. Rebuild when preferences change.",
             ],
           },
