@@ -6,7 +6,7 @@ import {
   requireApprovedAuthUser,
 } from "@/lib/api/routeAuth";
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
-import { getResolveManualManifest } from "@/lib/aiEditor/resolveManual";
+import { ensureResolveManualManifest } from "@/lib/aiEditor/resolveManual";
 import { renderResolveManualPage } from "@/lib/aiEditor/resolveManual/renderPage";
 
 export const runtime = "nodejs";
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const { appUser } = await requireApprovedAuthUser(request);
     assertCanUseProductionTools(appUser);
 
-    if (!getResolveManualManifest()) {
+    if (!(await ensureResolveManualManifest())) {
       return NextResponse.json({ error: "Manual index missing" }, { status: 404 });
     }
 

@@ -78,9 +78,12 @@ Access is role- and checkbox-based. Production tools (Script writer, stage plann
 3. Required for email: `RESEND_API_KEY`, `RESEND_FROM_EMAIL=ShootSpine <notifications@shootspine.com>`, `NEXT_PUBLIC_APP_URL`.
 4. Optional uptime monitors: `HEALTH_CHECK_SECRET` or reuse `CRON_SECRET` for `/api/health/firebase` and `/api/health/email` (Bearer or `x-health-secret` header).
 5. Deploy Firebase rules/indexes/storage after rule changes.
-6. Verify admin health endpoints after deploy:
+6. Resolve assistant (optional): index the Reference Manual locally, then
+   `npm run upload-resolve-manual-index` so Vercel builds can pull
+   `resolve-manual/*` from private Storage (gitignored — not in the repo).
+7. Verify admin health endpoints after deploy:
    - `GET /api/health/email` (admin auth or health secret)
-7. CI runs on push/PR to `main`: lint, tests, and production build.
+8. CI runs on push/PR to `main`: lint, tests, and production build.
 
 ## Health endpoints
 

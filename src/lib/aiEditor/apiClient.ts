@@ -637,6 +637,8 @@ export type ResolveAssistantStatus = {
     chunkCount: number;
     manualLabel: string;
   } | null;
+  /** Local-dev only: show the py index command in the status banner. */
+  showLocalIndexCommand?: boolean;
   indexHint: string;
 };
 

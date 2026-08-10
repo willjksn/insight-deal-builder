@@ -374,26 +374,36 @@ export function ResolveAssistantClient() {
           </div>
         ) : status && !status.ready ? (
           <div className="space-y-1 text-amber-950">
-            <p className="font-medium">Manual not indexed yet</p>
-            <p className="text-amber-900/90">
-              Run locally:{" "}
-              <code className="rounded bg-white px-1.5 py-0.5 text-xs">
-                {status.indexHint}
-              </code>
+            <p className="font-medium">
+              {status.showLocalIndexCommand
+                ? "Manual not indexed yet"
+                : "Manual not available on this server"}
             </p>
+            {status.showLocalIndexCommand ? (
+              <p className="text-amber-900/90">
+                Run locally:{" "}
+                <code className="rounded bg-white px-1.5 py-0.5 text-xs">
+                  {status.indexHint}
+                </code>
+              </p>
+            ) : (
+              <p className="text-amber-900/90">{status.indexHint}</p>
+            )}
           </div>
         ) : (
           <p className="text-slate-500">Checking manual index…</p>
         )}
-        <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
-          <input
-            type="checkbox"
-            checked={localOnly}
-            onChange={(e) => setLocalOnly(e.target.checked)}
-            className="rounded border-slate-300"
-          />
-          Local only (skip cloud phrasing — still shows manual steps + page images)
-        </label>
+        {status?.ready ? (
+          <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+            <input
+              type="checkbox"
+              checked={localOnly}
+              onChange={(e) => setLocalOnly(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Local only (skip cloud phrasing — still shows manual steps + page images)
+          </label>
+        ) : null}
       </div>
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

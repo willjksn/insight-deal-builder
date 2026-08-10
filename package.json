@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/download-resolve-manual-index.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -13,7 +13,9 @@
     "agent:start": "node desktop-agent/src/server.mjs",
     "process-brand-logos": "node scripts/process-brand-logos.mjs",
     "create-admin-user": "node scripts/create-admin-user.mjs",
-    "index-resolve-manual": "py -3 scripts/index-resolve-manual.py"
+    "index-resolve-manual": "py -3 scripts/index-resolve-manual.py",
+    "upload-resolve-manual-index": "node scripts/upload-resolve-manual-index.mjs",
+    "download-resolve-manual-index": "node scripts/download-resolve-manual-index.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",

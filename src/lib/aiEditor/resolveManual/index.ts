@@ -1,5 +1,11 @@
 export { answerResolveManualChat } from "./chatAnswer";
-export { getResolveManualManifest, loadResolveManualIndex, resolveManualDataDir } from "./indexStore";
+export {
+  ensureResolveManualIndex,
+  ensureResolveManualManifest,
+  getResolveManualManifest,
+  loadResolveManualIndex,
+  resolveManualDataDir,
+} from "./indexStore";
 export { renderResolveManualPage } from "./renderPage";
 export { retrieveManualChunks, tokenizeManualQuery } from "./retrieve";
 export type {

@@ -7,7 +7,7 @@ import {
 import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 import {
   answerResolveManualChat,
-  getResolveManualManifest,
+  ensureResolveManualManifest,
 } from "@/lib/aiEditor/resolveManual";
 import type { ResolveManualChatMessage } from "@/lib/aiEditor/resolveManual";
 
@@ -24,7 +24,11 @@ export async function GET(request: NextRequest) {
     const { appUser } = await requireApprovedAuthUser(request);
     assertCanUseProductionTools(appUser);
 
-    const manifest = getResolveManualManifest();
+    const manifest = await ensureResolveManualManifest();
+    // Index is gitignored locally; production loads from private Firebase Storage
+    // (build download and/or runtime fallback).
+    const isDeployedHost =
+      process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
     return NextResponse.json({
       ready: Boolean(manifest),
       manifest: manifest
@@ -35,8 +39,11 @@ export async function GET(request: NextRequest) {
             manualLabel: manifest.manualLabel,
           }
         : null,
-      indexHint:
-        'py -3 scripts/index-resolve-manual.py "C:\\path\\to\\DaVinci Resolve.pdf"',
+      /** When true, UI may show the local indexing command as a code hint. */
+      showLocalIndexCommand: !isDeployedHost,
+      indexHint: isDeployedHost
+        ? "The Reference Manual index isn’t provisioned yet. An admin should run npm run upload-resolve-manual-index (after indexing locally), then redeploy."
+        : 'py -3 scripts/index-resolve-manual.py "C:\\path\\to\\DaVinci Resolve.pdf"',
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to read manual index";

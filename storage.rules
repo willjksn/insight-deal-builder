@@ -61,6 +61,11 @@ service firebase.storage {
       allow read, write: if false;
     }
 
+    // DaVinci Resolve Reference Manual index — Admin SDK only (build/runtime pull)
+    match /resolve-manual/{allPaths=**} {
+      allow read, write: if false;
+    }
+
     match /production/{projectId}/{allPaths=**} {
       allow read: if request.auth != null && canAccessProductionStorage(projectId);
       allow write: if request.auth != null

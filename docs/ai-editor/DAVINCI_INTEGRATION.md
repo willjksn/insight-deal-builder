@@ -20,7 +20,7 @@ Do not assume Resolve and AI Editor share a machine or OS paths.
 - **V9 (initial)** — Send open checklist to production board **filming notes** (marked, replaceable section).
 - **V21 (initial)** — Soft-blend dissolves in EDL + timeline markers (acts/reels/transition cues) after import. **No baked grades.**
 - **V22 (initial)** — Local guide stubs + Step 10 CTA.
-- **V22.1** — **Resolve assistant** page (`/ai-editor/resolve-assistant`): chat grounded in the official DaVinci Resolve Reference Manual PDF (local index under `data/resolve-manual/`, retrieval + optional Gemini phrasing, PDF page citations).
+- **V22.1** — **Resolve assistant** page (`/ai-editor/resolve-assistant`): chat grounded in the official DaVinci Resolve Reference Manual PDF (local index under `data/resolve-manual/`, retrieval + optional Gemini phrasing, PDF page citations). Production: upload index to private Firebase Storage (`npm run upload-resolve-manual-index`); Vercel build + runtime load from `resolve-manual/*` (not committed — copyrighted). Page images still need a local PDF renderer and are best-effort outside a workstation.
 
 ## Phase plan
 

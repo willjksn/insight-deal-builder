@@ -1,5 +1,5 @@
 import { callGeminiJsonWithHistory } from "@/lib/ai/geminiClient";
-import { loadResolveManualIndex } from "@/lib/aiEditor/resolveManual/indexStore";
+import { ensureResolveManualIndex } from "@/lib/aiEditor/resolveManual/indexStore";
 import { retrieveManualChunks } from "@/lib/aiEditor/resolveManual/retrieve";
 import type {
   ResolveManualChatMessage,
@@ -193,16 +193,25 @@ export async function answerResolveManualChat(input: {
     };
   }
 
-  const index = loadResolveManualIndex();
+  const index = await ensureResolveManualIndex();
   if (!index) {
+    const isDeployedHost =
+      process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
     return {
-      answer:
-        "The Resolve manual isn’t indexed on this computer yet. Run: py -3 scripts/index-resolve-manual.py \"C:\\path\\to\\DaVinci Resolve.pdf\" — then ask again.",
-      steps: [
-        "Place the official DaVinci Resolve Reference Manual PDF on this PC.",
-        "From the project folder run the index script (see docs / package script).",
-        "Refresh this page and ask your question.",
-      ],
+      answer: isDeployedHost
+        ? "The Resolve Reference Manual isn’t available on this server yet. The searchable index is built on a local machine and isn’t part of the normal web deploy — ask a ShootSpine admin to provision it, or use Resolve assistant where the manual has already been indexed."
+        : 'The Resolve manual isn’t indexed on this computer yet. Run: py -3 scripts/index-resolve-manual.py "C:\\path\\to\\DaVinci Resolve.pdf" — then ask again.',
+      steps: isDeployedHost
+        ? [
+            "On a development machine, index the official DaVinci Resolve Reference Manual PDF.",
+            "Upload the index: npm run upload-resolve-manual-index",
+            "Redeploy (or wait for the next build). Refresh and ask again.",
+          ]
+        : [
+            "Place the official DaVinci Resolve Reference Manual PDF on this PC.",
+            "From the project folder run the index script (see docs / package script).",
+            "Refresh this page and ask your question.",
+          ],
       tips: [],
       citations: [],
       mode: "index_missing",
