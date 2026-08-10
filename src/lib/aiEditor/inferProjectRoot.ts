@@ -1,5 +1,5 @@
 /**
- * Infer the managed ShootSpine project root from media absolute paths.
+ * Infer the managed project root from media absolute paths.
  * Used when settings still point at an old smoke/test folder after footage moved to the SSD.
  */
 
@@ -9,21 +9,52 @@ function normalizeSlashes(p: string): string {
   return p.replace(/\//g, "\\");
 }
 
+const MANAGED_SUBFOLDER_MARKERS = new Set([
+  "01_original_media",
+  "02_proxies",
+  "03_project_files",
+  "04_audio",
+  "05_graphics",
+  "06_exports",
+  "07_cache",
+  "08_reference",
+  ".shootspine-proxies",
+]);
+
 /**
- * From a clip path like H:\Media\ShootSpine\Monopoly_Night\01_ORIGINAL_MEDIA\...
- * return H:\Media\ShootSpine\Monopoly_Night
+ * From a clip path like H:\Media\Monopoly_Night\01_ORIGINAL_MEDIA\...
+ * return H:\Media\Monopoly_Night
+ *
+ * Also supports legacy H:\Media\ShootSpine\Monopoly_Night\...
  */
 export function projectRootFromManagedMediaPath(absolutePath: string): string | null {
   const p = normalizeSlashes(absolutePath.trim());
   if (!p) return null;
   const lower = p.toLowerCase();
-  const marker = "\\media\\shootspine\\";
-  const idx = lower.indexOf(marker);
-  if (idx < 0) return null;
-  const after = p.slice(idx + marker.length);
-  const leaf = after.split("\\").filter(Boolean)[0];
-  if (!leaf) return null;
-  return `${p.slice(0, idx)}\\Media\\ShootSpine\\${leaf}`;
+
+  // Legacy: ...\Media\ShootSpine\{Project}\...
+  const legacy = "\\media\\shootspine\\";
+  const legacyIdx = lower.indexOf(legacy);
+  if (legacyIdx >= 0) {
+    const after = p.slice(legacyIdx + legacy.length);
+    const leaf = after.split("\\").filter(Boolean)[0];
+    if (!leaf) return null;
+    return `${p.slice(0, legacyIdx)}\\Media\\ShootSpine\\${leaf}`;
+  }
+
+  // Current: ...\Media\{Project}\01_ORIGINAL_MEDIA\...
+  const mediaIdx = lower.indexOf("\\media\\");
+  if (mediaIdx < 0) return null;
+  const afterMedia = p.slice(mediaIdx + "\\Media\\".length);
+  const parts = afterMedia.split("\\").filter(Boolean);
+  if (parts.length < 2) return null;
+  const projectLeaf = parts[0];
+  if (!projectLeaf || projectLeaf.toLowerCase() === "shootspine") return null;
+  const hasMarker = parts
+    .slice(1)
+    .some((seg) => MANAGED_SUBFOLDER_MARKERS.has(seg.toLowerCase()));
+  if (!hasMarker) return null;
+  return `${p.slice(0, mediaIdx)}\\Media\\${projectLeaf}`;
 }
 
 /** Most common managed root among media current/archive paths. */

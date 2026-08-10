@@ -16,18 +16,18 @@ describe("resolveBridge", () => {
 
   it("drops stale handoff paths after project root moves", () => {
     const next = activeHandoffDir(
-      "H:\\Media\\ShootSpine\\Monopoly_Night",
+      "H:\\Media\\Monopoly_Night",
       "C:\\Users\\Owner\\Videos\\ShootSpineSmoke\\03_PROJECT_FILES\\shootspine_resolve"
     );
     expect(next?.replace(/\//g, "\\")).toBe(
-      `H:\\Media\\ShootSpine\\Monopoly_Night\\${RESOLVE_HANDOFF_REL_DIR.replace(/\//g, "\\")}`
+      `H:\\Media\\Monopoly_Night\\${RESOLVE_HANDOFF_REL_DIR.replace(/\//g, "\\")}`
     );
   });
 
   it("keeps handoff when it still sits under the project root", () => {
     const stored =
-      "H:\\Media\\ShootSpine\\Monopoly_Night\\03_PROJECT_FILES\\shootspine_resolve";
-    expect(activeHandoffDir("H:\\Media\\ShootSpine\\Monopoly_Night", stored)).toBe(stored);
+      "H:\\Media\\Monopoly_Night\\03_PROJECT_FILES\\shootspine_resolve";
+    expect(activeHandoffDir("H:\\Media\\Monopoly_Night", stored)).toBe(stored);
   });
 
   it("builds companion python that links media bin then imports EDL + markers", () => {

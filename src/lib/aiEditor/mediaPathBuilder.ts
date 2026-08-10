@@ -28,8 +28,8 @@ const WIN_RESERVED = new Set([
   "LPT9",
 ]);
 
-/** Default managed media root under a storage location drive/root. */
-export const DEFAULT_MANAGED_MEDIA_SEGMENT = "Media/ShootSpine";
+/** Default managed media root under a storage location drive/root (no product name in the path). */
+export const DEFAULT_MANAGED_MEDIA_SEGMENT = "Media";
 
 export function sanitizePathSegment(raw: string, maxLen = 48): string {
   let s = String(raw || "")
@@ -67,7 +67,7 @@ export function buildManagedMediaRoot(storageRootPath: string): string {
   return `${root}${sep}${segment}`;
 }
 
-/** Guided mode: Media/ShootSpine/{ProjectName} under a drive root. */
+/** Guided mode: Media/{ProjectName} under a drive root. */
 export function buildGuidedProjectRoot(
   storageRootPath: string,
   projectName: string

@@ -9,7 +9,7 @@ import {
 
 describe("mediaPathBuilder", () => {
   it("sanitizes illegal path characters", () => {
-    expect(sanitizePathSegment('Stormi: Horror/Short?')).toBe("Stormi_HorrorShort");
+    expect(sanitizePathSegment("Stormi: Horror/Short?")).toBe("Stormi_HorrorShort");
   });
 
   it("builds YYYY-MM-DD ingest folder names", () => {
@@ -23,14 +23,14 @@ describe("mediaPathBuilder", () => {
     ).toBe("2026-08-08_Stormi_HorrorShort_FX3");
   });
 
-  it("builds managed media root under a drive", () => {
-    expect(buildManagedMediaRoot("H:\\")).toMatch(/Media[\\/]ShootSpine$/i);
-    expect(buildManagedMediaRoot("H:")).toMatch(/^H:\\Media\\ShootSpine$/i);
+  it("builds managed media root under a drive (no product folder)", () => {
+    expect(buildManagedMediaRoot("H:\\")).toMatch(/Media$/i);
+    expect(buildManagedMediaRoot("H:")).toMatch(/^H:\\Media$/i);
   });
 
   it("builds guided project root with project name", () => {
     expect(buildGuidedProjectRoot("H:\\", "Monopoly Night")).toMatch(
-      /^H:\\Media\\ShootSpine\\Monopoly_Night$/i
+      /^H:\\Media\\Monopoly_Night$/i
     );
   });
 

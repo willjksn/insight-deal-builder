@@ -249,7 +249,7 @@ export function ManagedIngestReview({
                 <p className="mt-1 text-[11px] text-slate-500">
                   Prefer your external SSD (T7 / H:). Camera cards stay in the source list only.
                   Picking a drive updates Step 2’s edit folder to{" "}
-                  <span className="font-mono">Media\ShootSpine</span> — then click{" "}
+                  <span className="font-mono">Media\Your_Project</span> — then click{" "}
                   <span className="font-medium">Save workspace</span> in Step 2.
                 </p>
               </label>

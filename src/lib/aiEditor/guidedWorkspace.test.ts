@@ -76,14 +76,14 @@ describe("guidedWorkspace", () => {
     });
     expect(plan?.shouldMigrate).toBe(true);
     expect(plan?.projectRoot.replace(/\//g, "\\")).toMatch(
-      /^H:\\Media\\ShootSpine\\Monopoly_Night$/i
+      /^H:\\Media\\Monopoly_Night$/i
     );
   });
 
   it("keeps an existing SSD project folder", () => {
     const plan = planGuidedWorkspace({
       projectName: "Monopoly Night",
-      currentProjectRoot: "H:\\Media\\ShootSpine\\Monopoly_Night",
+      currentProjectRoot: "H:\\Media\\Monopoly_Night",
       destinationDrives: [
         {
           rootPath: "H:\\",

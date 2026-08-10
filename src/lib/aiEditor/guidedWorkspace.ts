@@ -155,10 +155,18 @@ export function planGuidedCamera(sources: DetectedMediaSource[]): GuidedCameraPl
   return { source, title, detail };
 }
 
-/** True when path is under Media/ShootSpine (managed) — safe to auto-create. */
+/**
+ * True when path is a managed project folder — safe to auto-create / rename leaf.
+ * Current: Media\{ProjectName}
+ * Legacy: Media\ShootSpine\{ProjectName}
+ */
 export function isManagedShootSpinePath(projectRoot: string): boolean {
-  const n = projectRoot.replace(/\//g, "\\").toLowerCase();
-  return n.includes("\\media\\shootspine\\") || n.endsWith("\\media\\shootspine");
+  const n = projectRoot.replace(/\//g, "\\").toLowerCase().replace(/[\\]+$/, "");
+  if (n.includes("\\media\\shootspine\\") || n.endsWith("\\media\\shootspine")) {
+    return true;
+  }
+  // H:\Media\Monopoly_Night — project leaf directly under Media
+  return /\\media\\[^\\]+$/i.test(n) && !n.endsWith("\\media\\shootspine");
 }
 
 export function buildGuidedWorkspaceFromDrive(
