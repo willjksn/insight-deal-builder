@@ -731,6 +731,10 @@ export function AiEditorClient({ projectId }: Props) {
   const step6Done = Boolean(coverage && coverage.updatedAt);
   const preferredTakeCount =
     coverage?.shots?.filter((s) => s.preferredMediaAssetId).length ?? 0;
+  const unmatchedClips =
+    coverage?.unmatchedMediaIds
+      ?.map((id) => media.find((m) => m.id === id))
+      .filter((m): m is MediaAsset => Boolean(m)) ?? [];
   const step7Done = Boolean(timeline && timeline.tracks.some((t) => t.clips.length));
   const step8Done = Boolean(timeline && timeline.version > 1);
   const step9Done = Boolean(timeline?.finishing);
@@ -2443,16 +2447,21 @@ export function AiEditorClient({ projectId }: Props) {
       setJobs((prev) => [res.job, ...prev]);
       const preferredN =
         res.coverage.shots?.filter((s) => s.preferredMediaAssetId).length ?? 0;
+      const unmatchedN = res.coverage.unmatchedMediaIds?.length ?? 0;
       const coverageLine = res.coverage.plannedShotCount
         ? `Coverage: ${res.coverage.coveredCount} covered, ${res.coverage.partialCount} partial, ${res.coverage.missingCount} missing.`
         : "No planned shots on the board yet - matching saved for when coverage exists.";
+      const unmatchedCue =
+        unmatchedN > 0
+          ? ` ${unmatchedN} clip${unmatchedN === 1 ? "" : "s"} didn’t match any shot.`
+          : "";
       const nextCue =
         preferredN > 0
           ? timeline
             ? " Next: Rebuild first cut (or Play) to use preferred takes."
             : " Next: Build a first cut below, then Play."
           : "";
-      setStatusNote(`${coverageLine}${nextCue}`);
+      setStatusNote(`${coverageLine}${unmatchedCue}${nextCue}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Matching failed");
     } finally {
@@ -6394,6 +6403,14 @@ export function AiEditorClient({ projectId }: Props) {
               <p className="text-xs text-slate-500">{coverage.notes.join(" ")}</p>
             ) : null}
 
+            {unmatchedClips.length > 0 ? (
+              <p className="text-xs text-amber-800">
+                {unmatchedClips.length} clip{unmatchedClips.length === 1 ? "" : "s"} didn’t
+                match any planned shot — review below (they won’t enter a preferred-take first
+                cut until you Prefer them onto a shot).
+              </p>
+            ) : null}
+
             {coverage?.shots?.length ? (
               <ul className="space-y-3">
                 {coverage.shots.slice(0, 40).map((row) => {
@@ -6491,6 +6508,54 @@ export function AiEditorClient({ projectId }: Props) {
                   );
                 })}
               </ul>
+            ) : null}
+
+            {unmatchedClips.length > 0 ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+                <p>
+                  <span className="font-medium">Unmatched clips</span>
+                  {` — ${unmatchedClips.length} video clip${
+                    unmatchedClips.length === 1 ? "" : "s"
+                  } not linked to any planned shot.`}
+                </p>
+                <p className="mt-1 text-xs text-amber-900/80">
+                  Watch to decide if they’re B-roll, junk, or a take that needs Prefer on a shot
+                  above. Filename-only first cut may still include them.
+                </p>
+                <ul className="mt-2.5 max-h-48 space-y-1.5 overflow-y-auto">
+                  {unmatchedClips.slice(0, 24).map((m) => {
+                    const canPlay = Boolean(playbackPathForAsset(m));
+                    return (
+                      <li
+                        key={m.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-100/80 bg-white/70 px-2 py-1.5 text-xs"
+                      >
+                        <span className="min-w-0 truncate font-medium text-amber-950">
+                          {m.filename || m.id}
+                        </span>
+                        {canPlay ? (
+                          <button
+                            type="button"
+                            className="inline-flex shrink-0 items-center gap-1 text-sky-800 underline disabled:opacity-50"
+                            disabled={!!busy || !agent.connected}
+                            onClick={() => void previewClipAsset(m)}
+                          >
+                            <Play className="h-3 w-3" />
+                            Watch
+                          </button>
+                        ) : (
+                          <span className="shrink-0 text-amber-800/70">No preview path</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {unmatchedClips.length > 24 ? (
+                  <p className="mt-1.5 text-xs text-amber-900/70">
+                    Showing 24 of {unmatchedClips.length}.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
 
             {preferredTakeCount > 0 ? (
