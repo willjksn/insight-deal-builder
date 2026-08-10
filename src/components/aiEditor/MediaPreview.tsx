@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, SkipForward, Trash2, X } from "lucide-react";
+import { Loader2, SkipForward, Star, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 export type PreviewItem = {
@@ -9,6 +9,14 @@ export type PreviewItem = {
   label: string;
   /** Timeline clip id when reviewing a rough cut (for Drop). */
   clipId?: string;
+  /** Media asset id (for Prefer). */
+  mediaAssetId?: string;
+  /** Matched planned shot when coverage knows this take. */
+  plannedShotId?: string;
+  /** Shot list label for status (e.g. "Wide A"). */
+  shotLabel?: string;
+  /** Already the preferred take for plannedShotId. */
+  isPreferred?: boolean;
   /** Source in-point (seconds) */
   startSeconds?: number;
   /** Source out-point (seconds) */
@@ -23,6 +31,8 @@ type Props = {
   onClose: () => void;
   /** Rough-cut review: remove current clip from the cut (ripple delete). */
   onRemoveClip?: (clipId: string) => Promise<void> | void;
+  /** Rough-cut review: mark current take preferred for its matched shot. */
+  onPreferClip?: (item: PreviewItem) => Promise<void> | void;
 };
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tif{1,2})$/i;
@@ -37,6 +47,7 @@ export function MediaPreview({
   resolveUrl,
   onClose,
   onRemoveClip,
+  onPreferClip,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const advancingRef = useRef(false);
@@ -45,12 +56,16 @@ export function MediaPreview({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState(false);
-  const [dropNote, setDropNote] = useState<string | null>(null);
+  const [preferring, setPreferring] = useState(false);
+  const [actionNote, setActionNote] = useState<string | null>(null);
 
   const item = items[index];
   const src = item ? resolveUrl(item) : "";
   const asImage = item ? isImagePath(item.path) : false;
-  const reviewMode = Boolean(onRemoveClip);
+  const reviewMode = Boolean(onRemoveClip || onPreferClip);
+  const canPrefer =
+    Boolean(onPreferClip && item?.plannedShotId && item?.mediaAssetId) &&
+    !item?.isPreferred;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -70,6 +85,11 @@ export function MediaPreview({
       ) {
         e.preventDefault();
         void removeCurrent();
+        return;
+      }
+      if ((e.key === "p" || e.key === "P") && canPrefer) {
+        e.preventDefault();
+        void preferCurrent();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -80,7 +100,7 @@ export function MediaPreview({
       document.body.style.overflow = prevOverflow;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- key handlers use latest via closures on each render
-  }, [onClose, onRemoveClip, index, items]);
+  }, [onClose, onRemoveClip, onPreferClip, index, items, canPrefer]);
 
   useEffect(() => {
     advancingRef.current = false;
@@ -137,7 +157,7 @@ export function MediaPreview({
 
   async function removeCurrent() {
     const clipId = item?.clipId;
-    if (!clipId || !onRemoveClip || removing) return;
+    if (!clipId || !onRemoveClip || removing || preferring) return;
     setRemoving(true);
     setError(null);
     try {
@@ -150,7 +170,7 @@ export function MediaPreview({
           onClose();
           return prev;
         }
-        setDropNote(
+        setActionNote(
           next.length === 1
             ? "Dropped · 1 clip left in cut"
             : `Dropped · ${next.length} clips left in cut`
@@ -162,6 +182,35 @@ export function MediaPreview({
       setError(e instanceof Error ? e.message : "Could not remove clip from cut");
     } finally {
       setRemoving(false);
+    }
+  }
+
+  async function preferCurrent() {
+    if (!item || !onPreferClip || !canPrefer || preferring || removing) return;
+    setPreferring(true);
+    setError(null);
+    try {
+      await onPreferClip(item);
+      const shotId = item.plannedShotId;
+      const mediaId = item.mediaAssetId;
+      setItems((prev) =>
+        prev.map((i) => {
+          if (i.plannedShotId !== shotId) return i;
+          return {
+            ...i,
+            isPreferred: i.mediaAssetId === mediaId,
+          };
+        })
+      );
+      setActionNote(
+        item.shotLabel
+          ? `Preferred for ${item.shotLabel} · Rebuild first cut to reshuffle`
+          : "Preferred · Rebuild first cut to reshuffle"
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not set preferred take");
+    } finally {
+      setPreferring(false);
     }
   }
 
@@ -183,6 +232,8 @@ export function MediaPreview({
             <div className="truncate font-medium">{title}</div>
             <div className="truncate text-xs text-slate-300">
               {item.label}
+              {item.shotLabel ? ` · ${item.shotLabel}` : ""}
+              {item.isPreferred ? " · preferred" : ""}
               {items.length > 1 ? ` · ${index + 1}/${items.length}` : ""}
             </div>
           </div>
@@ -248,18 +299,39 @@ export function MediaPreview({
               type="button"
               size="sm"
               variant="secondary"
-              disabled={removing || index >= items.length - 1}
+              disabled={removing || preferring || index >= items.length - 1}
               onClick={() => advance()}
             >
               <SkipForward className="mr-1.5 h-3.5 w-3.5" />
               Skip
             </Button>
-            {item.clipId ? (
+            {canPrefer ? (
               <Button
                 type="button"
                 size="sm"
                 variant="secondary"
-                disabled={removing}
+                disabled={preferring || removing}
+                onClick={() => void preferCurrent()}
+              >
+                {preferring ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Star className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Prefer this take
+              </Button>
+            ) : item.isPreferred ? (
+              <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-700/50 bg-emerald-950/40 px-2 py-1 text-[11px] text-emerald-300">
+                <Star className="h-3 w-3" />
+                Preferred
+              </span>
+            ) : null}
+            {item.clipId && onRemoveClip ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={removing || preferring}
                 onClick={() => void removeCurrent()}
               >
                 {removing ? (
@@ -271,10 +343,12 @@ export function MediaPreview({
               </Button>
             ) : null}
             <span className="text-[11px] text-slate-400">
-              → skip · Delete drops from cut
+              → skip
+              {onPreferClip ? " · P prefer" : ""}
+              {onRemoveClip ? " · Delete drops" : ""}
             </span>
-            {dropNote ? (
-              <span className="ml-auto text-[11px] text-emerald-300">{dropNote}</span>
+            {actionNote ? (
+              <span className="ml-auto text-[11px] text-emerald-300">{actionNote}</span>
             ) : null}
           </div>
         ) : null}

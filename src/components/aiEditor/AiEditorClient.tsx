@@ -2447,8 +2447,27 @@ export function AiEditorClient({ projectId }: Props) {
     }
   }
 
-  async function onPreferTake(plannedShotId: string, mediaAssetId: string) {
-    setBusy("match");
+  /** Best coverage row for a media asset (preferred match, else highest-score candidate). */
+  function coverageShotForMedia(mediaAssetId: string) {
+    const shots = coverage?.shots;
+    if (!shots?.length) return null;
+    const asPreferred = shots.find((s) => s.preferredMediaAssetId === mediaAssetId);
+    if (asPreferred) return asPreferred;
+    let best: { shot: (typeof shots)[number]; score: number } | null = null;
+    for (const shot of shots) {
+      const cand = shot.candidates.find((c) => c.mediaAssetId === mediaAssetId);
+      if (!cand) continue;
+      if (!best || cand.score > best.score) best = { shot, score: cand.score };
+    }
+    return best?.shot ?? null;
+  }
+
+  async function onPreferTake(
+    plannedShotId: string,
+    mediaAssetId: string,
+    opts?: { quiet?: boolean; label?: string; shotLabel?: string }
+  ) {
+    if (!opts?.quiet) setBusy("match");
     setError(null);
     try {
       const overrides = [
@@ -2458,10 +2477,24 @@ export function AiEditorClient({ projectId }: Props) {
       const res = await aiEditorRunMatch(getToken, projectId, overrides);
       setCoverage(res.coverage);
       setJobs((prev) => [res.job, ...prev]);
+      const shot =
+        opts?.shotLabel ||
+        res.coverage.shots.find((s) => s.plannedShotId === plannedShotId)?.shotName ||
+        "shot";
+      const take = opts?.label?.trim();
+      setStatusNote(
+        take
+          ? `Preferred for ${shot}: ${take}. Rebuild first cut to use it in the assembly.`
+          : `Preferred take updated for ${shot}. Rebuild first cut to use it in the assembly.`
+      );
+      return res;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not set preferred take");
+      const msg = e instanceof Error ? e.message : "Could not set preferred take";
+      if (opts?.quiet) throw e instanceof Error ? e : new Error(msg);
+      setError(msg);
+      return undefined;
     } finally {
-      setBusy(null);
+      if (!opts?.quiet) setBusy(null);
     }
   }
 
@@ -2811,9 +2844,16 @@ export function AiEditorClient({ projectId }: Props) {
         const startSeconds = framesToSeconds(clip.sourceInFrame, timeline.frameRate);
         const endSeconds =
           startSeconds + framesToSeconds(clip.durationFrames, timeline.frameRate);
+        const shot = coverageShotForMedia(clip.mediaAssetId);
         items.push({
           path,
           clipId: clip.id,
+          mediaAssetId: clip.mediaAssetId,
+          plannedShotId: shot?.plannedShotId,
+          shotLabel: shot?.shotName || shot?.shotType || undefined,
+          isPreferred: Boolean(
+            shot?.preferredMediaAssetId && shot.preferredMediaAssetId === clip.mediaAssetId
+          ),
           label: clip.label || asset?.filename || clip.id,
           startSeconds,
           endSeconds,
@@ -4431,6 +4471,36 @@ export function AiEditorClient({ projectId }: Props) {
                 }
               : undefined
           }
+          onPreferClip={
+            preview.reviewCut
+              ? async (item) => {
+                  if (!item.plannedShotId || !item.mediaAssetId) {
+                    throw new Error("This clip isn’t matched to a planned shot yet.");
+                  }
+                  const res = await onPreferTake(item.plannedShotId, item.mediaAssetId, {
+                    quiet: true,
+                    label: item.label,
+                    shotLabel: item.shotLabel,
+                  });
+                  if (!res) return;
+                  setPreview((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          items: prev.items.map((i) =>
+                            i.plannedShotId !== item.plannedShotId
+                              ? i
+                              : {
+                                  ...i,
+                                  isPreferred: i.mediaAssetId === item.mediaAssetId,
+                                }
+                          ),
+                        }
+                      : null
+                  );
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -5504,9 +5574,9 @@ export function AiEditorClient({ projectId }: Props) {
               <h2 className="text-lg font-semibold text-slate-900">Line up a first cut</h2>
               <p className="mt-1 text-sm text-slate-600">
                 This is not the final edit. It lines up preferred Match takes so you can Play the
-                cut, Drop junk in the player, then hand that order to DaVinci Resolve. When clips
-                were analyzed, uses local shot breaks for in/out instead of starting at the head of
-                each file.
+                cut, Prefer better takes, Drop junk, then hand that order to DaVinci Resolve. When
+                clips were analyzed, uses local shot breaks for in/out instead of starting at the
+                head of each file.
               </p>
             </div>
           </div>
@@ -5525,7 +5595,7 @@ export function AiEditorClient({ projectId }: Props) {
                 </p>
               )}
               <p className="mt-1.5 text-xs text-slate-500">
-                Next: Play → Drop junk in the player (Delete) → hand off to Resolve.
+                Next: Play → Prefer (P) / Drop (Delete) → Rebuild if you changed preferred → Resolve.
               </p>
             </div>
 
