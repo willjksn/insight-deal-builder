@@ -1,4 +1,4 @@
-/** Default discovery keywords for future Opportunity Agent + saved searches. */
+/** Default discovery keywords — live streaming is first-class. */
 export const DEFAULT_LIVE_PRODUCTION_KEYWORDS = [
   "audio visual",
   "audiovisual",
@@ -19,12 +19,36 @@ export const DEFAULT_LIVE_PRODUCTION_KEYWORDS = [
   "rigging",
   "IMAG",
   "live streaming",
+  "livestream",
+  "live stream production",
+  "webcast",
+  "hybrid event streaming",
+  "virtual event production",
   "event technology",
   "technical production",
   "production services",
   "special events",
   "event rental",
   "production equipment rental",
+] as const;
+
+export const DEFAULT_LIVE_PRODUCTION_SERVICES = [
+  "LED",
+  "Audio",
+  "Lighting",
+  "Truss",
+  "Staging",
+  "Conference AV",
+  "Concerts",
+  "Festivals",
+  "Corporate Events",
+  "Church Events",
+  "University Events",
+  "Municipal Events",
+  "IMAG",
+  "Live Streaming",
+  "Cameras",
+  "Technical Labor",
 ] as const;
 
 export type LiveProductionTargetProfile = {
@@ -43,20 +67,14 @@ export function defaultImgLiveProductionProfile(): LiveProductionTargetProfile {
     radiusMiles: 250,
     minimumProject: 5000,
     preferredProject: 15000,
-    services: [
-      "LED",
-      "Audio",
-      "Lighting",
-      "Truss",
-      "Conference AV",
-      "Concerts",
-      "Festivals",
-      "Corporate Events",
-      "Church Events",
-      "IMAG",
-      "Streaming",
+    services: [...DEFAULT_LIVE_PRODUCTION_SERVICES],
+    exclude: [
+      "permanent AV installation",
+      "residential AV",
+      "jobs under $2,500",
+      "IT helpdesk",
+      "software development only",
     ],
-    exclude: ["permanent AV installation", "residential AV", "jobs under $2,500"],
     keywords: [...DEFAULT_LIVE_PRODUCTION_KEYWORDS],
   };
 }

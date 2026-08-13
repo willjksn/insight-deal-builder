@@ -97,12 +97,19 @@ export default function LiveProductionInboxPage() {
         subtitle="Discover, score, and convert LED / AV / staging / live-event work into quotes and ShootSpine projects."
         action={
           canManage ? (
-            <Link href="/live-production/new">
-              <Button size="touch">
-                <Plus className="mr-2 h-4 w-4" />
-                Add opportunity
-              </Button>
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/live-production/discovery">
+                <Button size="touch" variant="outline">
+                  Search
+                </Button>
+              </Link>
+              <Link href="/live-production/new">
+                <Button size="touch">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add opportunity
+                </Button>
+              </Link>
+            </div>
           ) : undefined
         }
       />

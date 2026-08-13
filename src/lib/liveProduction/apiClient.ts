@@ -160,3 +160,56 @@ export async function livePreviewAnalyze(
   });
   return parseJson<{ extract: Awaited<ReturnType<typeof import("./analyzeOpportunity").analyzeLiveOpportunityText>> }>(res);
 }
+
+export async function liveGetDiscoveryProfile(getToken: () => Promise<string | null>) {
+  const res = await fetch("/api/live-production/discovery/profile", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{
+    profile: import("./discoveryTypes").LiveDiscoveryProfileDoc;
+    discoveryMode: "live" | "demo";
+  }>(res);
+}
+
+export async function liveSaveDiscoveryProfile(
+  getToken: () => Promise<string | null>,
+  body: Partial<import("./defaultsKeywords").LiveProductionTargetProfile>
+) {
+  const res = await fetch("/api/live-production/discovery/profile", {
+    method: "PUT",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ profile: import("./discoveryTypes").LiveDiscoveryProfileDoc }>(res);
+}
+
+export async function liveListDiscoveryRuns(getToken: () => Promise<string | null>) {
+  const res = await fetch("/api/live-production/discovery/runs", {
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ runs: import("./discoveryTypes").LiveDiscoveryRun[] }>(res);
+}
+
+export async function liveRunDiscovery(getToken: () => Promise<string | null>) {
+  const res = await fetch("/api/live-production/discovery/runs", {
+    method: "POST",
+    headers: await authHeaders(getToken),
+  });
+  return parseJson<{ run: import("./discoveryTypes").LiveDiscoveryRun }>(res);
+}
+
+export async function liveImportDiscoveryCandidates(
+  getToken: () => Promise<string | null>,
+  runId: string,
+  candidateIds: string[]
+) {
+  const res = await fetch(`/api/live-production/discovery/runs/${runId}/import`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify({ candidateIds }),
+  });
+  return parseJson<{
+    opportunities: LiveOpportunity[];
+    run: import("./discoveryTypes").LiveDiscoveryRun;
+  }>(res);
+}

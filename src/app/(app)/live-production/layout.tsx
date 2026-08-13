@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils/cn";
 
 const LINKS = [
   { href: "/live-production", label: "Inbox", exact: true },
+  { href: "/live-production/discovery", label: "Search" },
   { href: "/live-production/new", label: "Add opportunity" },
 ];
 
