@@ -41,10 +41,9 @@ export default function LiveProductionInboxPage() {
     setError(null);
     try {
       const token = () => user.getIdToken();
-      const [dash, list] = await Promise.all([
-        liveGetDashboard(token),
-        liveListOpportunities(token, { seed: true }),
-      ]);
+      // Seed only via dashboard (once). Parallel seed+list caused duplicate Charlotte demos.
+      const dash = await liveGetDashboard(token);
+      const list = await liveListOpportunities(token);
       setStats(dash.stats);
       setRows(list.opportunities);
     } catch (e) {

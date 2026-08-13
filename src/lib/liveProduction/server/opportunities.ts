@@ -68,7 +68,12 @@ export async function loadCatalogAndCrew(): Promise<{
 
 export async function createLiveOpportunity(
   appUser: AppUser,
-  input: Partial<LiveOpportunity> & { title: string; organizationName: string }
+  input: Partial<LiveOpportunity> & {
+    title: string;
+    organizationName: string;
+    /** Stable id for idempotent seeds (avoids duplicate docs under race). */
+    id?: string;
+  }
 ): Promise<LiveOpportunity> {
   const db = requireDb();
   const { catalog, crew } = await loadCatalogAndCrew();
@@ -82,15 +87,43 @@ export async function createLiveOpportunity(
     distanceMiles: input.distanceMiles ?? 24,
     homeState: "NC",
   });
-  const ref = db.collection(LIVE_OPPORTUNITIES_COLLECTION).doc();
+  const ref = input.id
+    ? db.collection(LIVE_OPPORTUNITIES_COLLECTION).doc(input.id)
+    : db.collection(LIVE_OPPORTUNITIES_COLLECTION).doc();
   const row: LiveOpportunity = {
     ...matched,
     id: ref.id,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  await ref.set(stripUndefined(row));
+  await ref.set(stripUndefined(row), { merge: Boolean(input.id) });
   return row;
+}
+
+const CHARLOTTE_SEED_TITLE = "Annual Audio, Lighting & LED Production Services";
+const CHARLOTTE_SEED_ORG = "City of Charlotte";
+
+function charlotteSeedDocId(company: string): string {
+  const slug = company.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  return `seed_charlotte_annual_${slug || "default"}`;
+}
+
+/** Remove duplicate Charlotte demo rows created by the parallel seed race. */
+async function dedupeCharlotteSeeds(appUser: AppUser): Promise<void> {
+  const db = requireDb();
+  const company = tenantCompany(appUser);
+  const rows = await listLiveOpportunities(appUser, { limit: 200 });
+  const demos = rows.filter(
+    (r) => r.title === CHARLOTTE_SEED_TITLE && r.organizationName === CHARLOTTE_SEED_ORG
+  );
+  if (demos.length <= 1) return;
+  const keepId = charlotteSeedDocId(company);
+  const keep = demos.find((r) => r.id === keepId) || demos[0];
+  await Promise.all(
+    demos
+      .filter((r) => r.id !== keep.id)
+      .map((r) => db.collection(LIVE_OPPORTUNITIES_COLLECTION).doc(r.id).delete())
+  );
 }
 
 export async function updateLiveOpportunity(
@@ -130,14 +163,31 @@ export async function deleteLiveOpportunity(appUser: AppUser, id: string): Promi
   await requireDb().collection(LIVE_OPPORTUNITIES_COLLECTION).doc(id).delete();
 }
 
-/** Seed the Charlotte municipal example if the tenant has no live opportunities yet. */
+/**
+ * Seed the Charlotte municipal example once per tenant.
+ * Uses a stable document id so parallel dashboard+list calls cannot create duplicates.
+ * Also removes any duplicate demo rows left by the earlier race.
+ */
 export async function ensureCharlotteSeed(appUser: AppUser): Promise<LiveOpportunity | null> {
+  await dedupeCharlotteSeeds(appUser);
+
+  const company = tenantCompany(appUser);
+  const seedId = charlotteSeedDocId(company);
+  const existingSeed = await getLiveOpportunity(appUser, seedId);
+  if (existingSeed) return null;
+
   const existing = await listLiveOpportunities(appUser, { limit: 5 });
-  if (existing.length) return null;
+  const hasNonSeed = existing.some(
+    (r) => !(r.title === CHARLOTTE_SEED_TITLE && r.organizationName === CHARLOTTE_SEED_ORG)
+  );
+  if (hasNonSeed) return null;
+  if (existing.some((r) => r.title === CHARLOTTE_SEED_TITLE)) return null;
+
   const { equipment, crew } = charlotteSeedRequirements();
   return createLiveOpportunity(appUser, {
-    title: "Annual Audio, Lighting & LED Production Services",
-    organizationName: "City of Charlotte",
+    id: seedId,
+    title: CHARLOTTE_SEED_TITLE,
+    organizationName: CHARLOTTE_SEED_ORG,
     opportunityType: "Municipal Event Production",
     sourceKind: "city_procurement",
     sourceLabel: "City of Charlotte procurement",
@@ -148,7 +198,7 @@ export async function ensureCharlotteSeed(appUser: AppUser): Promise<LiveOpportu
     estimatedValueLow: 18000,
     estimatedValueHigh: 35000,
     distanceMiles: 24,
-    tags: ["municipal", "led", "audio", "lighting", "recurring"],
+    tags: ["municipal", "led", "audio", "lighting", "recurring", "demo_seed"],
     summary:
       "Annual event production services covering LED, audio, lighting, truss, staging, and technical labor for City of Charlotte events.",
     rawText: [

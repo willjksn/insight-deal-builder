@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { analyzeLiveOpportunityText } from "@/lib/liveProduction/analyzeOpportunity";
 import {
   createLiveOpportunity,
-  ensureCharlotteSeed,
   listLiveOpportunities,
 } from "@/lib/liveProduction/server/opportunities";
 import {
@@ -18,9 +17,6 @@ export async function GET(request: NextRequest) {
   try {
     const { appUser } = await requireLiveViewer(request);
     const { searchParams } = new URL(request.url);
-    if (searchParams.get("seed") === "1") {
-      await ensureCharlotteSeed(appUser);
-    }
     const status = searchParams.get("status") as LiveOpportunityStatus | null;
     const opportunities = await listLiveOpportunities(appUser, {
       status: status ?? undefined,

@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -12,6 +13,16 @@ import { isAiEditorEnabled } from "@/lib/aiEditor/featureFlag";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+/** Desktop Agent can only be spawned on a local workstation, never on Vercel/Lambda. */
+function isCloudServerlessHost(): boolean {
+  return (
+    process.env.VERCEL === "1" ||
+    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+    Boolean(process.env.FUNCTION_TARGET) ||
+    process.env.NEXT_RUNTIME === "edge"
+  );
+}
 
 async function agentHealthy(baseUrl = DEFAULT_AGENT_BASE_URL): Promise<boolean> {
   try {
@@ -118,22 +129,39 @@ async function waitForStopped(ms = 8000): Promise<void> {
   }
 }
 
+function resolveLogDir(agentCwd: string): string {
+  const preferred = path.join(agentCwd, "..", ".tmp-smoke");
+  try {
+    fs.mkdirSync(preferred, { recursive: true });
+    fs.accessSync(preferred, fs.constants.W_OK);
+    return preferred;
+  } catch {
+    const fallback = path.join(os.tmpdir(), "shootspine-agent-launch");
+    fs.mkdirSync(fallback, { recursive: true });
+    return fallback;
+  }
+}
+
 function spawnAgent(entry: string) {
   const cwd = path.dirname(path.dirname(entry));
-  const logDir = path.join(cwd, "..", ".tmp-smoke");
-  try {
-    fs.mkdirSync(logDir, { recursive: true });
-  } catch {
-    /* ignore */
-  }
+  const logDir = resolveLogDir(cwd);
   const outLog = path.join(logDir, "agent-launch-stdout.log");
   const errLog = path.join(logDir, "agent-launch-stderr.log");
-  const outFd = fs.openSync(outLog, "a");
-  const errFd = fs.openSync(errLog, "a");
-  fs.writeSync(
-    errFd,
-    `\n--- spawn ${new Date().toISOString()} node=${process.execPath} entry=${entry}\n`
-  );
+
+  let outFd: number | "ignore" = "ignore";
+  let errFd: number | "ignore" = "ignore";
+  try {
+    outFd = fs.openSync(outLog, "a");
+    errFd = fs.openSync(errLog, "a");
+    fs.writeSync(
+      errFd,
+      `\n--- spawn ${new Date().toISOString()} node=${process.execPath} entry=${entry}\n`
+    );
+  } catch {
+    outFd = "ignore";
+    errFd = "ignore";
+  }
+
   const child = spawn(process.execPath, [entry], {
     cwd,
     detached: true,
@@ -142,11 +170,14 @@ function spawnAgent(entry: string) {
     env: refreshedEnv(),
   });
   child.unref();
-  try {
-    fs.closeSync(outFd);
-    fs.closeSync(errFd);
-  } catch {
-    /* child keeps fds on Windows; ignore close errors */
+  for (const fd of [outFd, errFd]) {
+    if (typeof fd === "number") {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* child may keep fds on Windows */
+      }
+    }
   }
 }
 
@@ -161,6 +192,17 @@ export async function POST(request: NextRequest) {
     }
     const { appUser } = await requireApprovedAuthUser(request);
     assertCanUseProductionTools(appUser);
+
+    if (isCloudServerlessHost()) {
+      return NextResponse.json(
+        {
+          error:
+            "Desktop Agent must run on your editing PC, not on the hosted ShootSpine server. On that workstation run start-agent.cmd (or npm run agent), then use AI Editor from the same machine — or use local Next.js (npm run dev).",
+          code: "AGENT_NOT_LOCAL",
+        },
+        { status: 503 }
+      );
+    }
 
     const body = (await request.json().catch(() => ({}))) as { restart?: boolean };
     const restart = Boolean(body.restart);
