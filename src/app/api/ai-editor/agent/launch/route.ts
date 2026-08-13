@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Desktop Agent must run on your editing PC, not on the hosted ShootSpine server. On that workstation run start-agent.cmd (or npm run agent), then use AI Editor from the same machine — or use local Next.js (npm run dev).",
+            "AGENT_NOT_LOCAL: Desktop Agent runs on your editing PC. Start desktop-agent\\start-agent.cmd (or npm run agent) on this computer, then click Connect again in AI Editor.",
           code: "AGENT_NOT_LOCAL",
         },
         { status: 503 }

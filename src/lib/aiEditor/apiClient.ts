@@ -148,13 +148,27 @@ export async function aiEditorLaunchAgent(
     headers: await authHeaders(getToken),
     body: JSON.stringify({ restart: Boolean(opts?.restart) }),
   });
-  return parseJson<{
+  const data = (await res.json()) as {
+    ok?: true;
+    alreadyRunning?: boolean;
+    started?: boolean;
+    restarted?: boolean;
+    baseUrl?: string;
+    error?: string;
+    code?: string;
+  };
+  if (!res.ok) {
+    const err = new Error(data.error ?? res.statusText) as Error & { code?: string };
+    err.code = data.code;
+    throw err;
+  }
+  return data as {
     ok: true;
     alreadyRunning?: boolean;
     started?: boolean;
     restarted?: boolean;
     baseUrl?: string;
-  }>(res);
+  };
 }
 
 export async function aiEditorPatchMedia(

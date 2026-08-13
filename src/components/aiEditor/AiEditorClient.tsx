@@ -1088,6 +1088,9 @@ export function AiEditorClient({ projectId }: Props) {
     setBusy(restart ? "restart" : "agent");
     setError(null);
     setStatusNote(null);
+    const LOCAL_AGENT_HELP =
+      "On this editing PC: open the ShootSpine project folder → run desktop-agent\\start-agent.cmd (or npm run agent). Leave it running, then click Connect again. The agent must be on the same computer as this browser (localhost:17865).";
+
     try {
       if (!restart) {
         const health = await checkAgentHealth();
@@ -1101,11 +1104,44 @@ export function AiEditorClient({ projectId }: Props) {
         setAgentToken(null);
         setAgentExpiresAt(null);
       }
-      await aiEditorLaunchAgent(getToken, { restart });
-      const after = await checkAgentHealth();
+
+      let launchedRemotely = false;
+      try {
+        await aiEditorLaunchAgent(getToken, { restart });
+        launchedRemotely = true;
+      } catch (launchErr) {
+        const code =
+          launchErr && typeof launchErr === "object" && "code" in launchErr
+            ? String((launchErr as { code?: string }).code || "")
+            : "";
+        const msg = launchErr instanceof Error ? launchErr.message : "";
+        const notLocal =
+          code === "AGENT_NOT_LOCAL" ||
+          /AGENT_NOT_LOCAL|hosted ShootSpine|not on the hosted/i.test(msg);
+
+        if (!notLocal) {
+          // Local Next may still fail to spawn — fall through to health wait.
+          if (!/AGENT_START_TIMEOUT|AGENT_NOT_LOCAL|not found/i.test(msg)) {
+            throw launchErr;
+          }
+        }
+
+        setStatusNote(
+          notLocal
+            ? "Hosted ShootSpine can’t start the agent. Checking for a Desktop Agent already running on this PC…"
+            : "Waiting for Desktop Agent on this PC…"
+        );
+      }
+
+      // Poll localhost — works for both local spawn and manually started agent.
+      const deadline = Date.now() + (launchedRemotely ? 15000 : 10000);
+      let after = await checkAgentHealth();
+      while (!after.connected && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 500));
+        after = await checkAgentHealth();
+      }
       setAgent(after);
       if (after.connected) {
-        // Agent process is new — always mint/register a session before other calls.
         setAgentToken(null);
         setAgentExpiresAt(null);
         try {
@@ -1119,12 +1155,13 @@ export function AiEditorClient({ projectId }: Props) {
           setStatusNote(restart ? "Reconnected and ready." : "Connected and ready.");
         }
       } else {
-        throw new Error(
-          "Could not connect. Try Restart, or start the ShootSpine helper on this computer."
-        );
+        throw new Error(LOCAL_AGENT_HELP);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not connect this computer");
+      const msg = e instanceof Error ? e.message : "Could not connect this computer";
+      setError(
+        /AGENT_NOT_LOCAL|hosted ShootSpine/i.test(msg) ? LOCAL_AGENT_HELP : msg
+      );
     } finally {
       setBusy(null);
     }
