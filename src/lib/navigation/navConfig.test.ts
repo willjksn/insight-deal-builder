@@ -79,6 +79,17 @@ describe("getVisibleNavGroups", () => {
     expect(hrefs).toContain("/creators/reports");
   });
 
+  it("exposes Live Production Opportunities under Revenue for IMG admins", () => {
+    const hrefs = itemHrefs(imgAdmin, "business");
+    expect(hrefs).toContain("/live-production");
+    expect(hrefs).toContain("/revenue");
+  });
+
+  it("hides Live Production Opportunities from partners without revenue access", () => {
+    const hrefs = itemHrefs(partner, "business");
+    expect(hrefs).not.toContain("/live-production");
+  });
+
   it("still exposes Projects to a partner in the production workspace", () => {
     const hrefs = itemHrefs(partner, "production");
     expect(hrefs).toContain("/projects");

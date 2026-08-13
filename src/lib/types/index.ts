@@ -204,6 +204,8 @@ export interface Project {
   sourceRevenueOpportunity?: boolean;
   sourceRevenueOpportunityId?: string;
   sourceRevenueProposalId?: string;
+  sourceLiveOpportunity?: boolean;
+  sourceLiveOpportunityId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -336,8 +338,15 @@ export interface EquipmentCatalogItem {
   model?: string;
   serialNumber?: string;
   replacementValue?: number;
+  /** Units owned (live production match). Defaults to 1 when active. */
+  quantityOwned?: number;
+  /** Units currently available for jobs. */
+  quantityAvailable?: number;
   dailyRate: number;
+  weekendRate?: number;
   weeklyRate?: number;
+  warehouseLocation?: string;
+  maintenanceStatus?: "ready" | "in_shop" | "out_of_service";
   notes?: string;
   active?: boolean;
   createdAt: Timestamp;

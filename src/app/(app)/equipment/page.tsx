@@ -18,7 +18,25 @@ import { canManageProjects } from "@/lib/utils/permissions";
 import { EquipmentCatalogItem } from "@/lib/types";
 import { Trash2 } from "lucide-react";
 
-const CATEGORIES = ["Camera", "Lens", "Lighting", "Audio", "Support", "Grip", "Monitor", "Other"];
+const CATEGORIES = [
+  "Camera",
+  "Lens",
+  "Lighting",
+  "Audio",
+  "LED",
+  "Video",
+  "Monitor",
+  "Truss",
+  "Rigging",
+  "Staging",
+  "Power",
+  "Networking",
+  "Intercom",
+  "Support",
+  "Grip",
+  "Cases",
+  "Other",
+];
 
 type CatalogForm = Omit<EquipmentCatalogItem, "id" | "createdAt" | "updatedAt">;
 

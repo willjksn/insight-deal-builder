@@ -12,6 +12,7 @@ import {
   Briefcase,
   Sparkles,
   Users,
+  Speaker,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -168,6 +169,13 @@ export function BusinessDashboard() {
               {revenueEnabled ? (
                 <>
                   <QuickAction href="/revenue" icon={TrendingUp} label="Revenue & opportunities" description="Review the feed" accent="sky" />
+                  <QuickAction
+                    href="/live-production"
+                    icon={Speaker}
+                    label="Live production"
+                    description="LED / AV / staging bids"
+                    accent="indigo"
+                  />
                   <QuickAction href="/revenue/pipeline" icon={Target} label="Pipeline" description="Move deals forward" accent="violet" />
                   <QuickAction href="/revenue/inbox" icon={Inbox} label="Inbox" description="Replies & follow-ups" accent="indigo" />
                 </>
