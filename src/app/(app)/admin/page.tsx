@@ -32,8 +32,11 @@ import {
   PERMISSION_DEFINITIONS,
   PERMISSION_GROUPS,
   PERMISSION_PRESETS,
+  matchingPresetId,
+  permissionsEqual,
   sanitizePermissionsForCompany,
 } from "@/lib/constants/permissions";
+import { formatDateTime } from "@/lib/utils/format";
 import { AppUser, UserPermissions, UserRole } from "@/lib/types";
 import { Check, Shield, Users, Building2, ChevronDown, Archive, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -47,25 +50,13 @@ type UserEdits = Record<
   }
 >;
 
-function permissionsEqual(a: UserPermissions, b: UserPermissions): boolean {
-  return PERMISSION_DEFINITIONS.every((d) => a[d.key] === b[d.key]);
-}
-
-function matchingPresetId(
-  permissions: UserPermissions,
-  company: string
-): string | null {
-  for (const preset of PERMISSION_PRESETS) {
-    const sanitized = sanitizePermissionsForCompany(
-      preset.permissions,
-      company,
-      INSIGHT_MEDIA_GROUP_LLC
-    );
-    if (permissionsEqual(permissions, sanitized)) {
-      return preset.id;
-    }
+function firestoreDate(value: AppUser["createdAt"] | string | undefined): Date | undefined {
+  if (!value) return undefined;
+  if (typeof value === "string") return new Date(value);
+  if (typeof value === "object" && "toDate" in value && typeof value.toDate === "function") {
+    return value.toDate();
   }
-  return null;
+  return undefined;
 }
 
 function userSummaryLabel(permissions: UserPermissions, company: string): string {
@@ -525,7 +516,11 @@ export default function AdminPage() {
               : pending
                 ? "Pending approval"
                 : userSummaryLabel(edit.permissions, edit.company);
-            const activePresetId = matchingPresetId(edit.permissions, edit.company);
+            const activePresetId = matchingPresetId(
+              edit.permissions,
+              edit.company,
+              INSIGHT_MEDIA_GROUP_LLC
+            );
             const showArchive =
               isOrgAdmin && !archived && canRemoveUserAccess(user, appUser.id) === null;
             const showRestore = isOrgAdmin && archived && canRestorePartnerUser(user, appUser.id) === null;
@@ -588,6 +583,19 @@ export default function AdminPage() {
                       {user.archivedAt && (
                         <span className="mt-1 block text-xs opacity-80">
                           Removed {new Date(user.archivedAt).toLocaleString()}
+                        </span>
+                      )}
+                    </InfoCallout>
+                  )}
+
+                  {pending && (
+                    <InfoCallout>
+                      {user.creatorId
+                        ? "This login is linked to a creator roster profile. Assign Insight Media Group LLC and the Creator portal (network) preset, then save to approve."
+                        : "This person signed up for an account. They are not linked to a creator roster profile — pick an organization and a preset, then save to approve."}
+                      {firestoreDate(user.createdAt) && (
+                        <span className="mt-1 block text-xs opacity-80">
+                          Signed up {formatDateTime(firestoreDate(user.createdAt))}
                         </span>
                       )}
                     </InfoCallout>
@@ -683,11 +691,17 @@ export default function AdminPage() {
                   })}
 
                   <div className="flex justify-end border-t border-slate-100 pt-4">
-                    <Button size="touch" onClick={() => handleSave(user)} disabled={!dirty || saving}>
+                    <Button
+                      size="touch"
+                      onClick={() => handleSave(user)}
+                      disabled={(!dirty && !pending) || saving}
+                    >
                       {savedId === user.id ? (
                         <>
                           <Check className="mr-2 h-4 w-4" /> Saved
                         </>
+                      ) : pending && !dirty ? (
+                        "Approve access"
                       ) : (
                         "Save changes"
                       )}

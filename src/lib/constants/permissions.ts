@@ -316,3 +316,32 @@ export function sanitizePermissionsForCompany(
   }
   return next;
 }
+
+export function permissionsEqual(a: UserPermissions, b: UserPermissions): boolean {
+  return PERMISSION_DEFINITIONS.every((d) => a[d.key] === b[d.key]);
+}
+
+/**
+ * Which quick-preset chip matches the current permission set.
+ * IMG-only presets sanitize to empty when no company is set — those must not
+ * match a brand-new signup (empty permissions, organization "None").
+ */
+export function matchingPresetId(
+  permissions: UserPermissions,
+  company: string,
+  insightCompany: string
+): string | null {
+  for (const preset of PERMISSION_PRESETS) {
+    const sanitized = sanitizePermissionsForCompany(
+      preset.permissions,
+      company,
+      insightCompany
+    );
+    if (!permissionsEqual(permissions, sanitized)) continue;
+    if (preset.id !== "none" && permissionsEqual(sanitized, EMPTY_PERMISSIONS)) {
+      continue;
+    }
+    return preset.id;
+  }
+  return null;
+}

@@ -350,7 +350,7 @@ async function findCreatorByInviteToken(token: string): Promise<Creator> {
 
 /**
  * Link the signed-in user to the creator roster via invite token.
- * Approves the user with creator-portal permissions.
+ * Sets creator-portal permissions but leaves the account pending admin approval.
  */
 export async function claimCreatorInvite(
   appUser: AppUser,
@@ -387,7 +387,6 @@ export async function claimCreatorInvite(
   await db.collection("users").doc(appUser.id).update({
     company: INSIGHT_MEDIA_GROUP_LLC,
     creatorId: creator.id,
-    approved: true,
     permissions: CREATOR_PORTAL_PERMISSIONS,
     displayName: appUser.displayName || creator.professionalName,
     updatedAt: FieldValue.serverTimestamp(),
