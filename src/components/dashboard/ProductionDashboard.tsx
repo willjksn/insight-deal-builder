@@ -99,7 +99,7 @@ export function ProductionDashboard() {
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <QuickAction href="/script-writer" icon={ScrollText} label="Script writer" description="Idea → full script" accent="violet" />
                 <QuickAction href="/projects" icon={LayoutGrid} label="Pre-production" description="Open a project board" accent="indigo" />
-                <QuickAction href="/reference" icon={BookOpen} label="Reference guide" description="FX6 & lens lookup" accent="sky" />
+                <QuickAction href="/reference" icon={BookOpen} label="Reference guide" description="FX6, VP-1 & FIZ lookup" accent="sky" />
                 <QuickAction href="/stage" icon={LayoutGrid} label="Stage planner" description="Lighting diagram" accent="indigo" />
               </div>
             </section>

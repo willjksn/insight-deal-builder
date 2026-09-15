@@ -69,7 +69,7 @@ Rebalance tilt and roll for vertical. Tilt depth and pan often carry over from h
 
 ## Always rebalance when
 
-- You change lens, add ND, cage, monitor, TC-1, lav, or cables
+- You change lens, add ND, cage, monitor, TC-1, lav, cables, or Nucleus-M II motors
 - You switch horizontal ↔ vertical
 - Motors whine, drift, or Auto Tune shows yellow/red`,
     tips: [
@@ -144,7 +144,7 @@ Stiffness (after Auto Tune):
 - Prefer 24p / 23.976 with 1/48–1/50 shutter for natural motion blur (match project).
 - Avoid ultra-wide + heavy ND stacks that unbalance mid-day.
 - IBIS: often OFF or reduced on gimbal to avoid fighting motors (test your FX30 firmware — pick what looks cleaner on a walk test).
-- Manual focus or reliable AF — focus hunting reads as "unstabilized."
+- Manual focus or reliable AF — focus hunting reads as "unstabilized." VP-1 cine primes: Nucleus-M II or a marked pull; AF will not drive the barrel.
 
 ## Quick pre-roll checklist
 

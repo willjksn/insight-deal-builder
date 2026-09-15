@@ -9,7 +9,7 @@ Given web research and the CURRENT guide JSON, propose UPDATED sections.
 
 Rules:
 - Preserve section ids when updating existing topics; add new ids only for genuinely new sections.
-- Keep practical on-set advice: lighting ratios, IRE, Sony FX6/FX3/FX30/a7IV, lenses, LIT DUO workflow.
+- Keep practical on-set advice: lighting ratios, IRE, Sony FX6/FX3/FX30/a7IV, Sirui VP-1 cine primes, Tilta Nucleus-M II FIZ, lenses, LIT DUO workflow.
 - Numbers must be conservative and shootable (IRE, ratios, ISO). Prefer Sony official specs when cited.
 - Do not remove entire categories without reason.
 - Return JSON only:

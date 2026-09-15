@@ -466,7 +466,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
         blocks: [
           {
             paragraphs: [
-              "The Reference guide is a read-only, iPad-friendly page for ratios, IRE, Sony FX6/FX3/FX30/a7IV settings, and lens notes — meant for quick lookup on set, not editing.",
+              "The Reference guide is a read-only, iPad-friendly page for ratios, IRE, Sony FX6/FX3/FX30/a7IV settings, Sirui VP-1 cine primes, Nucleus-M II FIZ, and lens notes — meant for quick lookup on set, not editing.",
             ],
           },
           {

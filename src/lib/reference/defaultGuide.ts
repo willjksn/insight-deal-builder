@@ -1,14 +1,16 @@
 import { ReferenceGuideDocument } from "@/lib/reference/types";
 import { GIMBAL_GUIDE_SECTIONS } from "@/lib/reference/gimbalGuide";
+import { NUCLEUS_M2_SECTIONS } from "@/lib/reference/nucleusM2Guide";
 import { PRODUCTION_SOUND_SECTIONS } from "@/lib/reference/productionSoundGuide";
 import { SCENE_COVERAGE_SECTIONS } from "@/lib/reference/sceneCoverageGuide";
+import { SIRUI_VP1_SECTIONS } from "@/lib/reference/siruiVp1Guide";
 
 /** Baseline on-set reference — seeded from Master Filmmaking Reference Guide + FX6 + lens expansion. */
 export const DEFAULT_REFERENCE_GUIDE: ReferenceGuideDocument = {
-  version: 2,
+  version: 3,
   title: "ShootSpine production reference",
   subtitle:
-    "Lighting, cameras, lenses, gimbal, scene coverage, scripts & writing, and on-set workflow — iPad-friendly reference for ShootSpine crews.",
+    "Lighting, cameras, VP-1 cine primes, Nucleus-M II FIZ, gimbal, scene coverage, scripts & writing, and on-set workflow — iPad-friendly reference for ShootSpine crews.",
   sections: [
     {
       id: "how-to-use",
@@ -974,8 +976,12 @@ In video, color sets mood and guides the eye: match scenes for consistency, push
           ],
         },
       ],
-      body: "Pair lens choice with the look recipe ratio and IRE targets in the Looks section.",
+      body: "Pair lens choice with the look recipe ratio and IRE targets in the Looks section. House glass: Sirui VP-1 6-lens set — see the VP-1 sections under Lenses.",
+      tips: [
+        "IMG cine kit: 15 T1.6 · 24/35/50/75 T1.4 · 150 T4 macro — Nucleus-M II on 0.8 MOD gears",
+      ],
     },
+    ...SIRUI_VP1_SECTIONS,
     {
       id: "movement-shots",
       category: "movement",
@@ -996,6 +1002,7 @@ In video, color sets mood and guides the eye: match scenes for consistency, push
       tips: ["Wide = location · Medium = body language · Close-up = emotion · Insert = story detail"],
     },
     ...GIMBAL_GUIDE_SECTIONS,
+    ...NUCLEUS_M2_SECTIONS,
     ...SCENE_COVERAGE_SECTIONS,
     ...PRODUCTION_SOUND_SECTIONS,
     {
