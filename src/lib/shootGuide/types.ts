@@ -457,6 +457,10 @@ export const SHOT_VARIANT_INSTRUCTIONS = {
     "Change the camera angle and height for this shot. Keep the story purpose. Explain the new angle in reason.",
   simplify:
     "Simplify this setup: fewer lights, simpler support, easier to execute on a small crew. Keep the story purpose.",
+  less_gear:
+    "Use less gear: stay on catalog, one key, sticks not gimbal unless the beat requires it. Keep the story purpose.",
+  more_cinematic:
+    "Make this shot more cinematic: stronger angle, lens, or motivated move. Do not add exotic rentals. Keep the story purpose.",
 } as const;
 
 export type ShotVariantKey = keyof typeof SHOT_VARIANT_INSTRUCTIONS;

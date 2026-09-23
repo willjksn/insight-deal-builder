@@ -118,6 +118,25 @@ export function guideContextBlock(
     placementBlock(guide),
     extras?.scriptExcerpt ? `Script excerpt:\n${extras.scriptExcerpt}` : "",
     extras?.gearPromptBlock || "",
+    coverageHint(guide),
   ];
   return parts.filter(Boolean).join("\n\n");
+}
+
+/** Genre-specific coverage the DP must include in strategy and shots. */
+export function coverageHint(guide: Pick<ShootGuide, "prompt" | "title" | "creativeIntent" | "creativeStylePreset">): string {
+  const blob = `${guide.creativeIntent || ""} ${guide.creativeStylePreset || ""} ${guide.prompt || ""} ${guide.title || ""}`.toLowerCase();
+  if (/horror|suspense/.test(blob)) {
+    return "Coverage requirement: at least one locked clean plate, one matched reveal, and say when movement is controlled vs uneasy. Continuity must name what cannot reset.";
+  }
+  if (/interview|talking head|podcast/.test(blob)) {
+    return "Coverage requirement: protect eyeline, one lock-off hero MCU, no wandering handheld.";
+  }
+  if (/product|commercial|packshot/.test(blob)) {
+    return "Coverage requirement: one still packshot hero, one texture/detail, light that sells the material.";
+  }
+  if (/treadmill|workout/.test(blob)) {
+    return "Coverage requirement: geography first, physical proof of effort, a still confident finish.";
+  }
+  return "";
 }

@@ -10,6 +10,7 @@ const JSON_OPTS = { temperature: 0.35, maxOutputTokens: 4096, thinkingBudget: 0 
 const SYSTEM = `You are a Director of Photography inside ShootSpine.
 Write a visual strategy the crew can execute. Concrete, not poetic.
 When an AVAILABLE SHOOTING KIT block is provided, gearSummary and setup.equipmentList must stay inside that kit.
+Honor any Coverage requirement in the user message (clean plate, packshot, eyeline, etc.).
 Return JSON only:
 {
   "overview": {

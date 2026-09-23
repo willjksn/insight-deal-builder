@@ -1,9 +1,28 @@
 import type { ShootGuide } from "@/lib/shootGuide/types";
 
 const TREADMILL = /treadmill|stormi|workout/i;
+const HORROR = /horror|suspense|kitchen.*dark|uneasy/i;
+const INTERVIEW = /interview|talking head|podcast/i;
+const PRODUCT = /product|commercial|packshot|hero product/i;
+
+function blob(guide: Pick<ShootGuide, "prompt" | "title"> & { creativeIntent?: string }): string {
+  return `${guide.prompt || ""} ${guide.title || ""} ${guide.creativeIntent || ""}`;
+}
 
 function isTreadmill(guide: Pick<ShootGuide, "prompt" | "title">): boolean {
   return TREADMILL.test(`${guide.prompt} ${guide.title}`);
+}
+
+function isHorror(guide: Pick<ShootGuide, "prompt" | "title"> & { creativeIntent?: string }): boolean {
+  return HORROR.test(blob(guide)) || /horror|suspense/i.test(guide.creativeIntent || "");
+}
+
+function isInterview(guide: Pick<ShootGuide, "prompt" | "title">): boolean {
+  return INTERVIEW.test(`${guide.prompt} ${guide.title}`);
+}
+
+function isProduct(guide: Pick<ShootGuide, "prompt" | "title">): boolean {
+  return PRODUCT.test(`${guide.prompt} ${guide.title}`);
 }
 
 export function mockSceneAnalysisJson(guide: Pick<ShootGuide, "prompt" | "title" | "creativeIntent">) {
@@ -14,6 +33,33 @@ export function mockSceneAnalysisJson(guide: Pick<ShootGuide, "prompt" | "title"
       emotionalGoal: "Effort that reads as confidence, not struggle",
       environment: "Home or gym cardio corner with a treadmill as the hero prop",
       genreTone: guide.creativeIntent || "cinematic",
+    };
+  }
+  if (isHorror(guide)) {
+    return {
+      subject: "Someone alone in a kitchen after dark",
+      action: "A small sound, then a reveal of what should not be there",
+      emotionalGoal: "Dread that tightens, then a matched reveal that lands",
+      environment: "Kitchen at night; practicals only, corners that can hide a clean plate",
+      genreTone: guide.creativeIntent || "horror",
+    };
+  }
+  if (isInterview(guide)) {
+    return {
+      subject: "The interviewee in a quiet room",
+      action: "They talk; we cover geography, the thought, and a still hero listen",
+      emotionalGoal: "Trust and a last frame that feels like we heard them",
+      environment: "Simple interior with a clean background and a motivated window or practical",
+      genreTone: guide.creativeIntent || "documentary",
+    };
+  }
+  if (isProduct(guide)) {
+    return {
+      subject: "The product as hero",
+      action: "Show form, material, use, then a still packshot",
+      emotionalGoal: "Desire without a carnival of camera moves",
+      environment: "Controlled tabletop or a simple lifestyle nook",
+      genreTone: guide.creativeIntent || "commercial",
     };
   }
   return {
@@ -89,6 +135,149 @@ export function mockStrategyJson(
       },
     };
   }
+  if (isHorror(guide)) {
+    return {
+      overview: {
+        sceneSummary:
+          "Night kitchen. Hold the empty room, then a matched reveal. Movement is uneasy only when the beat earns it.",
+        toneStyle: guide.creativeIntent || "horror",
+        visualObjective: "Dread from withholding, then one reveal the audience can match.",
+        recommendedShotCount: n,
+        visualStrategy:
+          "Locked clean plate of the kitchen, then the same frame with the intrusion. Controlled holds; uneasy move only on the approach. Finish still.",
+        gearSummary: guide.useMyEquipment
+          ? "Catalog body, one wide, one longer prime, sticks. No gimbal unless you own it and the approach needs it."
+          : "Cinema body, 24/35 and 50, sticks, hard key, negative fill.",
+      },
+      setup: {
+        locationNotes: "Mark the clean plate. Hide clutter that would break the match. Practicals motivated.",
+        lightingNotes: "Underexpose the room. Hard or small key, deep neg. Exposure holds between plate and reveal.",
+        cameraSettings: "24p, 180° shutter, locked WB, ISO as low as the key allows.",
+        equipmentList: "Body, wide, normal, tripod, key, flag.",
+        cameraPlacement: "Same sticks mark for plate and reveal. Approach from the doorway if you move at all.",
+      },
+      visualAnalysis: {
+        lightingDirection: "Hard key off-axis, neg opposite, practicals dim",
+        contrast: "High; protect a sliver of face",
+        colorTemperature: "Cool practicals or mixed, locked",
+        composition: "Doorway and counter as leading lines into the empty space",
+        depth: "Dark falloff; do not fill the corners",
+        lensCharacter: "Wide for the plate, longer for the dread closer",
+        cameraAngle: "Eye level locked; low only if it makes the room feel wrong",
+        palette: "Desaturated kitchen, skin last",
+        energy: "Still until the reveal; uneasy only on the approach",
+      },
+      lightingPlan: {
+        cameraWb: "4300K",
+        summary: "Small key, heavy neg, practicals under the key. Same stop on plate and reveal.",
+        fixtures: [
+          {
+            id: "fx_01",
+            fixture: "Hard key",
+            role: "key",
+            placement: "Camera-left, skimming the counter",
+            kelvin: "4300K",
+          },
+          {
+            id: "fx_02",
+            fixture: "Solid flag",
+            role: "negative",
+            placement: "Camera-right of the subject line",
+          },
+        ],
+      },
+    };
+  }
+  if (isInterview(guide)) {
+    return {
+      overview: {
+        sceneSummary: "One person, one room, one conversation. Geography, then a still hero listen.",
+        toneStyle: guide.creativeIntent || "documentary",
+        visualObjective: "Eyeline trust and a last frame that feels heard.",
+        recommendedShotCount: n,
+        visualStrategy: "Locked wide for the room, MCU on the talk, a reverse or listen, a detail, a still hero.",
+        gearSummary: guide.useMyEquipment
+          ? "Catalog body, 35 and 50, sticks. Boom or lav from inventory."
+          : "Cinema body, 35, 50, sticks, soft key, bounce.",
+      },
+      setup: {
+        locationNotes: "Clean background. Seat them off the wall. Hide logos.",
+        lightingNotes: "Soft key 45°, bounce opposite, window as motivated if it exists.",
+        cameraSettings: "24p or 30p, 180° shutter, locked WB.",
+        equipmentList: "Body, two primes, tripod, key, bounce, mic.",
+        cameraPlacement: "A-cam just off eyeline. Wide further back on the same side.",
+      },
+      visualAnalysis: {
+        lightingDirection: "Soft key camera-left, bounce camera-right",
+        contrast: "Gentle; eyes open",
+        colorTemperature: "Match the window or 5600K",
+        composition: "Talking-room rule: looking space toward interviewer",
+        depth: "Background soft on the MCU",
+        lensCharacter: "35 geography, 50 hero",
+        cameraAngle: "Eye level, never looking down on them",
+        palette: "Neutral, skin protected",
+        energy: "Locked. No handheld.",
+      },
+      lightingPlan: {
+        cameraWb: "5600K",
+        summary: "Soft key and bounce. Do not let overheads flatten the face.",
+        fixtures: [
+          {
+            id: "fx_01",
+            fixture: "Soft key",
+            role: "key",
+            placement: "45° off eyeline, just above",
+            kelvin: "5600K",
+          },
+        ],
+      },
+    };
+  }
+  if (isProduct(guide)) {
+    return {
+      overview: {
+        sceneSummary: "The object is the talent. Form, material, use, then a still packshot.",
+        toneStyle: guide.creativeIntent || "commercial",
+        visualObjective: "Desire from light on material, not from camera gymnastics.",
+        recommendedShotCount: n,
+        visualStrategy: "Hero still, texture/detail, in-use or hand-in, lifestyle context, packshot hold.",
+        gearSummary: guide.useMyEquipment
+          ? "Catalog body, macro or 50, sticks. One key, bounce, black card."
+          : "Cinema body, 50/macro, sticks, key, bounce, flag.",
+      },
+      setup: {
+        locationNotes: "Seamless or simple nook. Kill specular junk in the background.",
+        lightingNotes: "One key that shows material; bounce for fill; flag for edge of the product.",
+        cameraSettings: "24p, 180° shutter, locked WB, stop down for texture if needed.",
+        equipmentList: "Body, 50 or macro, tripod, key, bounce, flag.",
+        cameraPlacement: "Lock the packshot. Move only for the in-use beat.",
+      },
+      visualAnalysis: {
+        lightingDirection: "Raking key to show texture",
+        contrast: "Medium-high on the object, background darker",
+        colorTemperature: "5600K or match the brand still",
+        composition: "Product dominant; negative space for a packshot crop",
+        depth: "Falloff behind the object",
+        lensCharacter: "Normal for hero, longer or macro for material",
+        cameraAngle: "Slightly above for form; eye-level for in-use",
+        palette: "Object color is the brightest thing",
+        energy: "Still except one motivated in-use move",
+      },
+      lightingPlan: {
+        cameraWb: "5600K",
+        summary: "Raking key, bounce, flag. Sell the material, then hold the packshot.",
+        fixtures: [
+          {
+            id: "fx_01",
+            fixture: "Soft key",
+            role: "key",
+            placement: "Raking across the face of the product",
+            kelvin: "5600K",
+          },
+        ],
+      },
+    };
+  }
   return {
     overview: {
       sceneSummary: guide.prompt?.trim() || guide.title || "A short scene with a clear last image.",
@@ -124,6 +313,37 @@ export function mockStrategyJson(
       summary: "Soft key, dimmed practicals, optional edge.",
       fixtures: [],
     },
+  };
+}
+
+function packGold(
+  gold: Record<string, string>[],
+  count: number,
+  guide: Pick<ShootGuide, "sourceSceneLabel">,
+  extras: { cameraSettings: string; audioRequirements: string }
+) {
+  const picked = gold.slice(0, Math.min(count, gold.length));
+  while (picked.length < count) {
+    const last = gold[gold.length - 1];
+    picked.push({ ...last, title: `${last.title} (alt ${picked.length + 1})` });
+  }
+  return {
+    shots: picked.map((s, i) => ({
+      camera: "FX3",
+      aperture: "T2.8",
+      focusStrategy: "Eyes or the hero plane",
+      lightingChanges: "Same setup unless noted",
+      blocking: "Play the beat",
+      performanceDirection: "Do not look at camera",
+      continuityRequirements: s.continuityRequirements || "Do not reset dressing or sweat.",
+      ...s,
+      shotNumber: i + 1,
+      setupLabel: `Setup ${String(i + 1).padStart(2, "0")}`,
+      sceneLabel: guide.sourceSceneLabel || undefined,
+      cameraSettings: extras.cameraSettings,
+      audioRequirements: extras.audioRequirements,
+      status: "planned",
+    })),
   };
 }
 
@@ -247,6 +467,197 @@ export function mockShotsJson(
       })),
     };
   }
+  if (isHorror(guide)) {
+    const gold = [
+      {
+        title: "Clean plate kitchen",
+        purpose: "Locked empty kitchen so the reveal can match this frame.",
+        framing: "Wide",
+        cameraAngle: "Eye level",
+        movement: "Locked — controlled",
+        lens: "35mm prime",
+        focalLength: "35mm",
+        support: "Tripod",
+        continuityRequirements: "Practicals, chairs, and counter dressing cannot move after this plate.",
+        reason: "A clean plate is the horror match; do not handheld this.",
+      },
+      {
+        title: "Uneasy approach",
+        purpose: "Someone enters; movement is uneasy only here.",
+        framing: "Medium",
+        cameraAngle: "Doorway 3/4",
+        movement: "Slow push or creep — uneasy",
+        lens: "35mm prime",
+        focalLength: "35mm",
+        support: "Slider or sticks creep",
+        reason: "One uneasy move earns the stills around it.",
+      },
+      {
+        title: "Matched reveal",
+        purpose: "Same mark as the plate, now with the intrusion in frame.",
+        framing: "Wide",
+        cameraAngle: "Eye level — same as plate",
+        movement: "Locked — controlled",
+        lens: "35mm prime",
+        focalLength: "35mm",
+        support: "Tripod",
+        continuityRequirements: "Match the plate: same sticks, same stop, same practicals.",
+        reason: "The cut only works if this is the plate with one new element.",
+      },
+      {
+        title: "Dread closer",
+        purpose: "Face or hands under load; withhold the full figure.",
+        framing: "Close-up",
+        cameraAngle: "Eye level",
+        movement: "Locked",
+        lens: "50mm prime",
+        focalLength: "50mm",
+        support: "Tripod",
+        reason: "Longer still closer after the reveal; do not chase.",
+      },
+      {
+        title: "Hold the room",
+        purpose: "Last image: the kitchen after, still, so the cut can live here.",
+        framing: "Wide",
+        cameraAngle: "Eye level",
+        movement: "Locked, extra pad",
+        lens: "35mm prime",
+        focalLength: "35mm",
+        support: "Tripod",
+        reason: "A still hold is the horror finish.",
+      },
+    ];
+    return packGold(gold, count, guide, {
+      cameraSettings: "24p · 1/48 · underexpose a stop",
+      audioRequirements: "Quiet kitchen; protect the sound of the reveal.",
+    });
+  }
+  if (isInterview(guide)) {
+    const gold = [
+      {
+        title: "Room and seat",
+        purpose: "Geography and eyeline so later MCUs have a home.",
+        framing: "Wide",
+        cameraAngle: "Same side as A-cam",
+        movement: "Locked",
+        lens: "35mm prime",
+        focalLength: "35mm",
+        support: "Tripod",
+        reason: "Locked wide protects eyeline and the room.",
+      },
+      {
+        title: "Talking MCU",
+        purpose: "The thought on their face; this is the cut you live in.",
+        framing: "MCU",
+        cameraAngle: "Just off eyeline",
+        movement: "Locked",
+        lens: "50mm prime",
+        focalLength: "50mm",
+        support: "Tripod",
+        reason: "50mm off eyeline is the interview hero, not handheld.",
+      },
+      {
+        title: "Listen / reverse",
+        purpose: "A still listen so you can cut away without breaking eyeline.",
+        framing: "Medium",
+        cameraAngle: "Opposite shoulder if two-person; same-side noddy if solo",
+        movement: "Locked",
+        lens: "50mm prime",
+        focalLength: "50mm",
+        support: "Tripod",
+        reason: "A lock-off listen saves the edit.",
+      },
+      {
+        title: "Hands or detail",
+        purpose: "A cutaway that is true to the talk, not a random insert.",
+        framing: "Close-up",
+        cameraAngle: "From the A-cam side",
+        movement: "Locked",
+        lens: "50mm or 85mm",
+        focalLength: "50mm",
+        support: "Tripod",
+        reason: "Detail from the same side keeps eyeline honest.",
+      },
+      {
+        title: "Hero listen",
+        purpose: "Last image: they finish, we hold.",
+        framing: "MCU",
+        cameraAngle: "Just off eyeline",
+        movement: "Locked, extra pad",
+        lens: "50mm prime",
+        focalLength: "50mm",
+        support: "Tripod",
+        reason: "A still hero MCU is the interview finish.",
+      },
+    ];
+    return packGold(gold, count, guide, {
+      cameraSettings: "24p · 1/48 · WB 5600K",
+      audioRequirements: "Lav plus boom if you have it; room tone.",
+    });
+  }
+  if (isProduct(guide)) {
+    const gold = [
+      {
+        title: "Hero form",
+        purpose: "Show the object’s shape so later details have a home.",
+        framing: "Medium",
+        cameraAngle: "Slightly above",
+        movement: "Locked",
+        lens: "50mm prime",
+        focalLength: "50mm",
+        support: "Tripod",
+        reason: "A still hero sells form before texture.",
+      },
+      {
+        title: "Material detail",
+        purpose: "Texture and finish — light raking the surface.",
+        framing: "Close-up",
+        cameraAngle: "Raking",
+        movement: "Locked",
+        lens: "50mm or macro",
+        focalLength: "50mm",
+        support: "Tripod",
+        reason: "Detail is the commercial proof of material.",
+      },
+      {
+        title: "In use",
+        purpose: "A hand or body uses it once, motivated.",
+        framing: "Medium",
+        cameraAngle: "Eye level",
+        movement: "Short motivated move or locked",
+        lens: "35mm prime",
+        focalLength: "35mm",
+        support: "Tripod",
+        reason: "One in-use beat; do not turn it into a gimbal ad.",
+      },
+      {
+        title: "Lifestyle nook",
+        purpose: "The object in a simple life context.",
+        framing: "Wide-medium",
+        cameraAngle: "Eye level",
+        movement: "Locked",
+        lens: "35mm prime",
+        focalLength: "35mm",
+        support: "Tripod",
+        reason: "Context without stealing the packshot.",
+      },
+      {
+        title: "Packshot hold",
+        purpose: "Last image: still product, crop-safe, extra pad.",
+        framing: "Hero still",
+        cameraAngle: "Slightly above",
+        movement: "Locked, extra two seconds",
+        lens: "50mm prime",
+        focalLength: "50mm",
+        support: "Tripod",
+        reason: "The packshot is the commercial finish.",
+      },
+    ];
+    return packGold(gold, count, guide, {
+      cameraSettings: "24p · 1/48 · WB 5600K",
+      audioRequirements: "MOS unless the use makes a useful sound.",
+    });
+  }
   const titles = ["Establish", "The work", "Detail", "Reaction", "Hero finish"];
   return {
     shots: Array.from({ length: count }, (_, i) => ({
@@ -273,13 +684,17 @@ export function mockSingleShotJson(
 ) {
   const all = mockShotsJson(guide).shots;
   const base = all[Math.max(0, shotNumber - 1)] ?? all[0];
-  const extra = instruction?.toLowerCase().includes("lens")
-    ? { lens: "85mm prime", focalLength: "85mm", reason: "Swap to 85mm to isolate her from the machine." }
-    : instruction?.toLowerCase().includes("angle")
-      ? { cameraAngle: "Low front", cameraHeight: "Deck height", reason: "Lower angle sells power in the stride." }
-      : instruction?.toLowerCase().includes("simpl")
-        ? { support: "Tripod", movement: "Locked", lightingChanges: "Key only", reason: "Locked sticks and one key — fastest version of this beat." }
-        : {};
+  const extra = instruction?.toLowerCase().includes("less gear")
+    ? { support: "Tripod", movement: "Locked", lightingChanges: "One key, no edge", reason: "Sticks and one key — drop the gimbal and the second light." }
+    : instruction?.toLowerCase().includes("cinematic")
+      ? { cameraAngle: "Slightly low", lens: "50mm prime", focalLength: "50mm", movement: "Locked with extra pad", reason: "Lower, longer, still — cinematic without a rental package." }
+      : instruction?.toLowerCase().includes("lens")
+        ? { lens: "85mm prime", focalLength: "85mm", reason: "Swap to 85mm to isolate the subject." }
+        : instruction?.toLowerCase().includes("angle")
+          ? { cameraAngle: "Low front", cameraHeight: "Lower than the working height", reason: "A lower angle sells power without new gear." }
+          : instruction?.toLowerCase().includes("simpl")
+            ? { support: "Tripod", movement: "Locked", lightingChanges: "Key only", reason: "Locked sticks and one key — fastest version of this beat." }
+            : {};
   return { shot: { ...base, ...extra, shotNumber } };
 }
 

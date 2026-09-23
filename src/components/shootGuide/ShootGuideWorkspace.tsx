@@ -92,6 +92,8 @@ const VARIANT_BUTTONS: { key: ShotVariantKey; label: string }[] = [
   { key: "different_lens", label: "Try different lens" },
   { key: "change_angle", label: "Change angle" },
   { key: "simplify", label: "Simplify" },
+  { key: "less_gear", label: "Use less gear" },
+  { key: "more_cinematic", label: "Make more cinematic" },
 ];
 
 export function ShootGuideWorkspace({
