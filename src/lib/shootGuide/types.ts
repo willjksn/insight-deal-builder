@@ -58,7 +58,7 @@ export function presetFromToneStyle(
   if (stored === "custom") return "custom";
   const tone = (toneStyle || "").trim().toLowerCase();
   if (isNamedCreativeStyle(tone)) return tone;
-  if (stored && stored !== "custom") return stored;
+  if (stored) return stored;
   if (tone && tone !== "not set yet") return "custom";
   return stored ?? "cinematic";
 }
@@ -210,6 +210,9 @@ export interface ShootGuideShot {
   aperture?: string;
   focusStrategy?: string;
   supportId?: string | null;
+  camera?: string;
+  lens?: string;
+  support?: string;
   movement?: string;
   lightingChanges?: string;
   cameraSettings?: string;
@@ -351,6 +354,9 @@ export interface ShootGuidePatch {
   currentShotId?: string | null;
   projectId?: string | null;
   references?: ShootGuideReference[];
+  sceneAnalysis?: ShootGuideSceneAnalysis | null;
+  visualAnalysis?: ShootGuideVisualAnalysis | null;
+  lightingPlan?: ShootGuideLightingPlan | null;
   overview?: Partial<ShootGuideOverview>;
   setup?: Partial<ShootGuideSetup>;
   shots?: ShootGuideShot[];
@@ -358,4 +364,31 @@ export interface ShootGuidePatch {
   slateRecords?: ShootGuideSlateRecord[];
   continuityRecords?: ShootGuideContinuityRecord[];
   notes?: ShootGuideNote[];
+}
+
+export const SHOOT_GUIDE_GENERATE_STAGES = [
+  "all",
+  "scene",
+  "strategy",
+  "shots",
+  "shot",
+] as const;
+
+export type ShootGuideGenerateStage = (typeof SHOOT_GUIDE_GENERATE_STAGES)[number];
+
+export const SHOT_VARIANT_INSTRUCTIONS = {
+  different_lens:
+    "Try a different lens for this shot. Keep the story purpose. Put the new lens in lens/focalLength and explain why in reason.",
+  change_angle:
+    "Change the camera angle and height for this shot. Keep the story purpose. Explain the new angle in reason.",
+  simplify:
+    "Simplify this setup: fewer lights, simpler support, easier to execute on a small crew. Keep the story purpose.",
+} as const;
+
+export type ShotVariantKey = keyof typeof SHOT_VARIANT_INSTRUCTIONS;
+
+export interface ShootGuideGenerateRequest {
+  stage?: ShootGuideGenerateStage;
+  shotId?: string;
+  instruction?: string;
 }

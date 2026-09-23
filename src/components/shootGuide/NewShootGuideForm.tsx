@@ -11,7 +11,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { scriptWriterListSessions } from "@/lib/scriptWriter/apiClient";
-import { createShootGuide, updateShootGuide } from "@/lib/shootGuide/apiClient";
+import { createShootGuide, generateShootGuide, updateShootGuide } from "@/lib/shootGuide/apiClient";
 import { uploadShootGuideReference } from "@/lib/shootGuide/storage";
 import {
   VISUAL_PRIORITY_OPTIONS,
@@ -182,7 +182,15 @@ export function NewShootGuideForm() {
         await updateShootGuide(getToken, guide.id, { references: uploads });
       }
 
-      router.push(`/shoot-guide/${guide.id}`);
+      try {
+        await generateShootGuide(getToken, guide.id);
+        router.push(`/shoot-guide/${guide.id}`);
+      } catch (genErr) {
+        const msg = encodeURIComponent(
+          genErr instanceof Error ? genErr.message : "Generation failed"
+        );
+        router.push(`/shoot-guide/${guide.id}?generateError=${msg}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create shoot guide");
     } finally {
@@ -218,7 +226,7 @@ export function NewShootGuideForm() {
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
       <PageHeader
         title="New Shoot Guide"
-        subtitle="Start from a Quick Scene, an existing script, or a blank guide. Generation fills a saved shell you can reopen and edit."
+        subtitle="Start from a Quick Scene, an existing script, or a blank guide. Generate writes a DP shot plan you can reopen and edit."
       />
 
       <form onSubmit={onSubmit} className="space-y-5">
@@ -417,7 +425,7 @@ export function NewShootGuideForm() {
         </Card>
 
         <Button type="submit" size="touch" className="w-full sm:w-auto" disabled={saving}>
-          {saving ? "Saving…" : "Generate Shoot Guide"}
+          {saving ? "Generating…" : "Generate Shoot Guide"}
         </Button>
       </form>
     </div>

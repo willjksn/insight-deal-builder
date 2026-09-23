@@ -10,13 +10,14 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
-import { getShootGuide, updateShootGuide } from "@/lib/shootGuide/apiClient";
+import { generateShootGuide, getShootGuide, updateShootGuide } from "@/lib/shootGuide/apiClient";
 import { completedShotCount, emptySetup } from "@/lib/shootGuide/defaults";
 import {
   hydrateGuideIfNeeded,
   overviewAfterToneChange,
 } from "@/lib/shootGuide/autofill";
 import {
+  SHOT_VARIANT_INSTRUCTIONS,
   SHOOT_GUIDE_TABS,
   creativeStyleSelectOptions,
   isNamedCreativeStyle,
@@ -27,6 +28,7 @@ import {
   type ShootGuideShot,
   type ShootGuideShotStatus,
   type ShootGuideTab,
+  type ShotVariantKey,
 } from "@/lib/shootGuide/types";
 import { cn } from "@/lib/utils/cn";
 import { useEnsureWorkspace } from "./useEnsureWorkspace";
@@ -78,14 +80,30 @@ function ReadEditBlock({
   );
 }
 
-export function ShootGuideWorkspace({ guideId }: { guideId: string }) {
+const VARIANT_BUTTONS: { key: ShotVariantKey; label: string }[] = [
+  { key: "different_lens", label: "Try different lens" },
+  { key: "change_angle", label: "Change angle" },
+  { key: "simplify", label: "Simplify" },
+];
+
+export function ShootGuideWorkspace({
+  guideId,
+  generateError,
+}: {
+  guideId: string;
+  generateError?: string;
+}) {
   useEnsureWorkspace("shoot-guide");
   const { user, appUser, loading: authLoading } = useAuth();
   const [guide, setGuide] = useState<ShootGuide | null>(null);
   const [tab, setTab] = useState<ShootGuideTab>("overview");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generatingShotId, setGeneratingShotId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    generateError ? decodeURIComponent(generateError) : null
+  );
   const [expandedShot, setExpandedShot] = useState<string | null>(null);
   const [editCopy, setEditCopy] = useState<Record<string, boolean>>({});
 
@@ -143,6 +161,40 @@ export function ShootGuideWorkspace({ guideId }: { guideId: string }) {
     await save({ shots: guide.shots });
   }
 
+  async function regenerate(stage: "all" | "shots" = "all") {
+    if (!guide) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const { guide: next } = await generateShootGuide(getToken, guide.id, { stage });
+      setGuide(next);
+      setTab("shots");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Generation failed");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function regenerateShot(shotId: string, instruction?: string) {
+    if (!guide) return;
+    setGeneratingShotId(shotId);
+    setError(null);
+    try {
+      const { guide: next } = await generateShootGuide(getToken, guide.id, {
+        stage: "shot",
+        shotId,
+        instruction,
+      });
+      setGuide(next);
+      setExpandedShot(shotId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Shot generation failed");
+    } finally {
+      setGeneratingShotId(null);
+    }
+  }
+
   async function setShotStatus(shotId: string, status: ShootGuideShotStatus) {
     if (!guide) return;
     const shots = (guide.shots ?? []).map((s) => (s.id === shotId ? { ...s, status } : s));
@@ -189,20 +241,35 @@ export function ShootGuideWorkspace({ guideId }: { guideId: string }) {
         title={guide.title || "Untitled shoot guide"}
         subtitle={`${progress.done}/${progress.total} shots complete · ${guide.creativeIntent || "style unset"}`}
         action={
-          <Link href="/shoot-guide">
-            <Button variant="outline" size="sm">
-              All guides
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={generating || saving || Boolean(generatingShotId)}
+              onClick={() => void regenerate("all")}
+            >
+              {generating && !generatingShotId ? "Generating…" : "Regenerate"}
             </Button>
-          </Link>
+            <Link href="/shoot-guide">
+              <Button variant="outline" size="sm">
+                All guides
+              </Button>
+            </Link>
+          </div>
         }
       />
       <p className="-mt-4 mb-5 text-sm text-slate-500">
-        Plan copy is filled from your scene, style, and priorities. Open Edit on a section only if you want to change it.
+        Shot cards are DP recommendations — edit any field, or ask for a different lens, angle, or simpler setup.
       </p>
 
       {error ? (
         <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
+        </p>
+      ) : null}
+      {generating || generatingShotId ? (
+        <p className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          {generatingShotId ? "Updating this shot…" : "Generating DP shot plan…"}
         </p>
       ) : null}
 
@@ -236,6 +303,42 @@ export function ShootGuideWorkspace({ guideId }: { guideId: string }) {
             onChange={(e) => setGuide({ ...guide, title: e.target.value })}
             touch
           />
+          {guide.sceneAnalysis &&
+          (guide.sceneAnalysis.subject ||
+            guide.sceneAnalysis.action ||
+            guide.sceneAnalysis.emotionalGoal) ? (
+            <div className="rounded-xl border border-slate-200/80 bg-slate-50 px-4 py-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Scene analysis
+              </p>
+              <dl className="grid gap-2 text-sm text-slate-800 sm:grid-cols-2">
+                {guide.sceneAnalysis.subject ? (
+                  <div>
+                    <dt className="text-xs text-slate-500">Subject</dt>
+                    <dd>{guide.sceneAnalysis.subject}</dd>
+                  </div>
+                ) : null}
+                {guide.sceneAnalysis.action ? (
+                  <div>
+                    <dt className="text-xs text-slate-500">Action</dt>
+                    <dd>{guide.sceneAnalysis.action}</dd>
+                  </div>
+                ) : null}
+                {guide.sceneAnalysis.emotionalGoal ? (
+                  <div>
+                    <dt className="text-xs text-slate-500">Emotional goal</dt>
+                    <dd>{guide.sceneAnalysis.emotionalGoal}</dd>
+                  </div>
+                ) : null}
+                {guide.sceneAnalysis.environment ? (
+                  <div>
+                    <dt className="text-xs text-slate-500">Environment</dt>
+                    <dd>{guide.sceneAnalysis.environment}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
+          ) : null}
           <ReadEditBlock
             label="Scene summary"
             value={guide.overview?.sceneSummary ?? ""}
@@ -423,16 +526,26 @@ export function ShootGuideWorkspace({ guideId }: { guideId: string }) {
 
       {tab === "shots" ? (
         <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={generating || saving || Boolean(generatingShotId)}
+              onClick={() => void regenerate("shots")}
+            >
+              {generating && !generatingShotId ? "Generating…" : "Regenerate shots"}
+            </Button>
+          </div>
           {(guide.shots ?? []).length === 0 ? (
-            <p className="text-sm text-slate-600">No shots yet. Create a new guide with a shot count to seed this list.</p>
+            <p className="text-sm text-slate-600">No shots yet. Generate a sequence from this guide.</p>
           ) : (
             (guide.shots ?? []).map((shot) => {
               const open = expandedShot === shot.id;
               return (
                 <Card key={shot.id}>
                   <CardBody className="space-y-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
+                    <div className="space-y-3">
+                      <div className="min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Shot {String(shot.shotNumber).padStart(2, "0")}
                           {shot.status !== "planned" ? ` · ${shot.status}` : ""}
@@ -459,6 +572,9 @@ export function ShootGuideWorkspace({ guideId }: { guideId: string }) {
                       placeholder="Why this shot exists"
                       rows={2}
                     />
+                    <p className="text-sm leading-relaxed text-slate-600">
+                      {shot.reason || "No DP note yet."}
+                    </p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <Input
                         label="Framing"
@@ -480,10 +596,50 @@ export function ShootGuideWorkspace({ guideId }: { guideId: string }) {
                         value={shot.focusStrategy ?? ""}
                         onChange={(e) => setShot(shot.id, { focusStrategy: e.target.value })}
                       />
+                      <Input
+                        label="Camera"
+                        value={shot.camera ?? ""}
+                        onChange={(e) => setShot(shot.id, { camera: e.target.value })}
+                      />
+                      <Input
+                        label="Lens"
+                        value={shot.lens || shot.focalLength || ""}
+                        onChange={(e) => setShot(shot.id, { lens: e.target.value })}
+                      />
+                      <Input
+                        label="Support"
+                        value={shot.support ?? ""}
+                        onChange={(e) => setShot(shot.id, { support: e.target.value })}
+                      />
+                      <Input
+                        label="Angle"
+                        value={shot.cameraAngle ?? ""}
+                        onChange={(e) => setShot(shot.id, { cameraAngle: e.target.value })}
+                      />
                     </div>
-                    <p className="text-sm text-slate-500">
-                      Camera {shot.cameraId || "—"} · Lens {shot.focalLength || shot.lensId || "—"} · Support {shot.supportId || "—"}
-                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {VARIANT_BUTTONS.map((v) => (
+                        <Button
+                          key={v.key}
+                          variant="outline"
+                          size="sm"
+                          disabled={generating || generatingShotId === shot.id || saving}
+                          onClick={() =>
+                            void regenerateShot(shot.id, SHOT_VARIANT_INSTRUCTIONS[v.key])
+                          }
+                        >
+                          {generatingShotId === shot.id ? "Updating…" : v.label}
+                        </Button>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={generating || generatingShotId === shot.id || saving}
+                        onClick={() => void regenerateShot(shot.id)}
+                      >
+                        Regenerate shot
+                      </Button>
+                    </div>
                     <button
                       type="button"
                       className="text-sm font-semibold text-sky-700"

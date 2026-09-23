@@ -60,3 +60,16 @@ export async function deleteShootGuide(getToken: GetToken, id: string) {
   });
   return parseJson<{ ok: true; id: string }>(res);
 }
+
+export async function generateShootGuide(
+  getToken: GetToken,
+  id: string,
+  body?: { stage?: string; shotId?: string; instruction?: string }
+) {
+  const res = await fetch(`/api/shoot-guide/${id}/generate`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body ?? { stage: "all" }),
+  });
+  return parseJson<{ guide: ShootGuide }>(res);
+}

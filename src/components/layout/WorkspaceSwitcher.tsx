@@ -55,7 +55,8 @@ export function WorkspaceSwitcher({
             aria-selected={active}
             onClick={() => handleSelect(option)}
             className={cn(
-              "flex flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-semibold leading-tight transition-colors min-h-[44px] sm:flex-row sm:gap-1 sm:px-1.5 sm:text-[11px]",
+              "flex flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[10px] font-semibold leading-tight transition-colors min-h-[44px]",
+              dark ? "sm:px-1" : "sm:px-1.5 sm:text-[11px]",
               active
                 ? dark
                   ? "bg-white text-slate-900 shadow-sm"
@@ -66,7 +67,9 @@ export function WorkspaceSwitcher({
             )}
           >
             <Icon className={cn("h-3.5 w-3.5 shrink-0", active && "text-sky-600")} />
-            <span className="text-center">{WORKSPACE_LABELS[option]}</span>
+            <span className="max-w-full px-0.5 text-center leading-tight whitespace-normal">
+              {WORKSPACE_LABELS[option]}
+            </span>
           </button>
         );
       })}
