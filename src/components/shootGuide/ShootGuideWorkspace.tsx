@@ -16,6 +16,8 @@ import {
   hydrateGuideIfNeeded,
   overviewAfterToneChange,
 } from "@/lib/shootGuide/autofill";
+import { checklistNeedsBuild } from "@/lib/shootGuide/checklist";
+import { needsEquipmentPlan } from "@/lib/shootGuide/matchEquipment";
 import {
   SHOT_VARIANT_INSTRUCTIONS,
   SHOOT_GUIDE_TABS,
@@ -32,6 +34,9 @@ import {
 } from "@/lib/shootGuide/types";
 import { cn } from "@/lib/utils/cn";
 import { useEnsureWorkspace } from "./useEnsureWorkspace";
+import { ShootGuideChecklistTab } from "./ShootGuideChecklistTab";
+import { ShootGuideGearMatch } from "./ShootGuideGearMatch";
+import { ShootGuideSlateTab } from "./ShootGuideSlateTab";
 
 const TAB_LABELS: Record<ShootGuideTab, string> = {
   overview: "Overview",
@@ -117,13 +122,19 @@ export function ShootGuideWorkspace({
     let cancelled = false;
     void getShootGuide(getToken, guideId)
       .then(async ({ guide: next }) => {
-        const patch = hydrateGuideIfNeeded(next);
+        let current = next;
+        const patch = hydrateGuideIfNeeded(current);
         if (patch) {
-          const { guide: saved } = await updateShootGuide(getToken, next.id, patch);
-          if (!cancelled) setGuide(saved);
-          return;
+          const { guide: saved } = await updateShootGuide(getToken, current.id, patch);
+          current = saved;
         }
-        if (!cancelled) setGuide(next);
+        if (needsEquipmentPlan(current) || checklistNeedsBuild(current)) {
+          const { guide: exec } = await generateShootGuide(getToken, current.id, {
+            stage: "execution",
+          });
+          current = exec;
+        }
+        if (!cancelled) setGuide(current);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load guide");
@@ -511,6 +522,26 @@ export function ShootGuideWorkspace({
               }
             />
           ))}
+          {guide.equipmentPlan?.items?.length ? (
+            <div className="rounded-xl border border-slate-200/80 bg-white px-4 py-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Catalog match
+              </p>
+              <p className="mb-2 text-sm text-slate-700">{guide.equipmentPlan.summary}</p>
+              <ul className="space-y-1 text-sm text-slate-700">
+                {guide.equipmentPlan.items.map((row) => (
+                  <li key={row.id}>
+                    <span className="font-semibold">{row.category}</span>
+                    {row.ownedMatch ? ` · ${row.ownedMatch}` : ""}
+                    {guide.showIdealWhenNotOwned && row.adjustment && row.ideal
+                      ? ` · ideal ${row.ideal}`
+                      : ""}
+                    {row.adjustment ? ` — ${row.adjustment}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <Button
             size="touch"
             disabled={saving}
@@ -617,6 +648,12 @@ export function ShootGuideWorkspace({
                         onChange={(e) => setShot(shot.id, { cameraAngle: e.target.value })}
                       />
                     </div>
+                    <ShootGuideGearMatch
+                      shot={shot}
+                      plan={guide.equipmentPlan}
+                      showIdealWhenNotOwned={guide.showIdealWhenNotOwned}
+                      useMyEquipment={guide.useMyEquipment}
+                    />
                     <div className="flex flex-wrap gap-2">
                       {VARIANT_BUTTONS.map((v) => (
                         <Button
@@ -687,28 +724,45 @@ export function ShootGuideWorkspace({
       ) : null}
 
       {tab === "slate" ? (
-        <Card>
-          <CardBody className="space-y-2 text-sm text-slate-600">
-            <p className="font-semibold text-slate-900">Slate / take tracking</p>
-            <p>
-              Roll, scene, shot, take, camera roll, sound roll, GOOD / NG / HOLD / CIRCLE, and Next Take land in Sprint 3.
-              This guide already stores <code className="text-xs">slateRecords</code> and per-shot <code className="text-xs">takeRecords</code>.
-            </p>
-            <p>{guide.slateRecords?.length ?? 0} slate records saved.</p>
-          </CardBody>
-        </Card>
+        <ShootGuideSlateTab
+          guide={guide}
+          saving={saving}
+          onChangeCurrent={(shotId) => {
+            setGuide({ ...guide, currentShotId: shotId });
+            void save({ currentShotId: shotId });
+          }}
+          onCommit={(next) => {
+            setGuide({
+              ...guide,
+              shots: next.shots,
+              slateRecords: next.slateRecords,
+              currentShotId: next.currentShotId,
+              status: next.status || guide.status,
+            });
+            void save({
+              shots: next.shots,
+              slateRecords: next.slateRecords,
+              currentShotId: next.currentShotId,
+              status: next.status,
+            });
+          }}
+        />
       ) : null}
 
       {tab === "checklist" ? (
-        <Card>
-          <CardBody className="space-y-2 text-sm text-slate-600">
-            <p className="font-semibold text-slate-900">Dynamic checklist</p>
-            <p>
-              Room, camera, lighting, audio, continuity, shot, and wrap items will generate from the actual scene in Sprint 3.
-            </p>
-            <p>{guide.checklist?.length ?? 0} checklist items saved.</p>
-          </CardBody>
-        </Card>
+        <ShootGuideChecklistTab
+          items={guide.checklist ?? []}
+          saving={saving}
+          onToggle={(id) =>
+            setGuide({
+              ...guide,
+              checklist: (guide.checklist ?? []).map((i) =>
+                i.id === id ? { ...i, done: !i.done } : i
+              ),
+            })
+          }
+          onSave={() => void save({ checklist: guide.checklist })}
+        />
       ) : null}
 
       {tab === "notes" ? (

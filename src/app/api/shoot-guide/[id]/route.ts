@@ -113,6 +113,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     if (body.sceneAnalysis !== undefined) patch.sceneAnalysis = body.sceneAnalysis;
     if (body.visualAnalysis !== undefined) patch.visualAnalysis = body.visualAnalysis;
     if (body.lightingPlan !== undefined) patch.lightingPlan = body.lightingPlan;
+    if (body.equipmentPlan !== undefined) patch.equipmentPlan = body.equipmentPlan;
     if (body.overview) {
       patch.overview = { ...(existing.overview || {}), ...body.overview };
     }

@@ -2,8 +2,9 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { stripUndefined } from "@/lib/firebase/firestore";
 import { SHOOT_GUIDES_COLLECTION } from "@/lib/shootGuide/collections";
+import { buildExecutionPatch } from "@/lib/shootGuide/generate/execution";
 import { loadScriptExcerpt } from "@/lib/shootGuide/generate/context";
-import { shootGuideGearPrompt } from "@/lib/shootGuide/generate/gear";
+import { loadShootGuideCatalog, shootGuideGearPrompt } from "@/lib/shootGuide/generate/gear";
 import { generateSceneAnalysis } from "@/lib/shootGuide/generate/scene";
 import { generateShotSequence, generateOneShot } from "@/lib/shootGuide/generate/shots";
 import { generateVisualStrategy } from "@/lib/shootGuide/generate/strategy";
@@ -55,6 +56,16 @@ export async function runShootGuideGeneration(params: {
   ]);
   const extras = { scriptExcerpt, gearPromptBlock };
 
+  async function applyExecution(current: ShootGuide): Promise<ShootGuide> {
+    const catalog = await loadShootGuideCatalog();
+    const patch = buildExecutionPatch(current, catalog);
+    return patchGuide(params.guideId, patch as ShootGuidePatch & Record<string, unknown>);
+  }
+
+  if (stage === "execution") {
+    return applyExecution(guide);
+  }
+
   if (stage === "shot") {
     const shotId = params.request?.shotId;
     if (!shotId) throw new Error("shotId is required");
@@ -65,11 +76,12 @@ export async function runShootGuideGeneration(params: {
       instruction: params.request?.instruction,
     });
     const shots = replaceGeneratedShot(guide.shots ?? [], shotId, nextShot);
-    return patchGuide(params.guideId, {
+    const saved = await patchGuide(params.guideId, {
       shots,
       currentShotId: shotId,
       status: guide.status === "draft" ? "ready" : guide.status,
     });
+    return applyExecution(saved);
   }
 
   if (stage === "all" || stage === "scene") {
@@ -101,7 +113,7 @@ export async function runShootGuideGeneration(params: {
     const generated = await generateShotSequence(guide, extras);
     if (!generated.length) throw new Error("Shot generation returned no shots");
     const shots = mergeGeneratedShots(guide.shots ?? [], generated);
-    return patchGuide(params.guideId, {
+    const saved = await patchGuide(params.guideId, {
       shots,
       currentShotId: shots[0]?.id ?? guide.currentShotId,
       status: guide.status === "draft" || guide.status === "ready" ? "ready" : guide.status,
@@ -110,6 +122,7 @@ export async function runShootGuideGeneration(params: {
         recommendedShotCount: shots.length,
       },
     });
+    return applyExecution(saved);
   }
 
   return guide;

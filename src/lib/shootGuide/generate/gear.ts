@@ -32,6 +32,25 @@ function formatOwnedKit(kit: ProductionShootingKit): string {
   return lines.join("\n");
 }
 
+export async function loadShootGuideCatalog(): Promise<
+  Pick<EquipmentCatalogItem, "id" | "name" | "category" | "brand" | "model" | "active">[]
+> {
+  const db = getAdminDb();
+  if (!db) return [];
+  const snap = await db.collection("equipmentCatalog").limit(200).get();
+  return snap.docs.map((doc) => {
+    const data = doc.data() as EquipmentCatalogItem;
+    return {
+      id: doc.id,
+      name: data.name,
+      category: data.category,
+      brand: data.brand,
+      model: data.model,
+      active: data.active,
+    };
+  });
+}
+
 export async function shootGuideGearPrompt(guide: ShootGuide): Promise<string> {
   if (!guide.useMyEquipment) {
     return [
@@ -39,18 +58,7 @@ export async function shootGuideGearPrompt(guide: ShootGuide): Promise<string> {
       "Do not invent exotic rental packages, anamorphics, or lighting trucks.",
     ].join("\n");
   }
-  const db = getAdminDb();
-  if (!db) {
-    return [
-      "AVAILABLE GEAR CONSTRAINT is on, but the catalog could not be loaded.",
-      "Use realistic small-crew cinema gear. Do not invent exotic rentals.",
-    ].join("\n");
-  }
-  const snap = await db.collection("equipmentCatalog").limit(200).get();
-  const items = snap.docs.map((doc) => {
-    const data = doc.data() as EquipmentCatalogItem;
-    return { ...data, id: doc.id, name: data.name, category: data.category, active: data.active };
-  });
+  const items = await loadShootGuideCatalog();
   const kit = kitFromEquipmentCatalog(items);
   if (!shootingKitHasGear(kit)) {
     return [

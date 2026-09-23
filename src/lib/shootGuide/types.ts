@@ -99,6 +99,24 @@ export const TAKE_STATUSES = [
 
 export type ShootGuideTakeStatus = (typeof TAKE_STATUSES)[number];
 
+export const TAKE_STATUS_LABELS: Record<ShootGuideTakeStatus, string> = {
+  GOOD: "GOOD",
+  HOLD: "HOLD",
+  NG: "NG",
+  "FALSE START": "FALSE START",
+  CIRCLE: "CIRCLE / BEST",
+};
+
+export const CHECKLIST_GROUP_LABELS: Record<ShootGuideChecklistGroup, string> = {
+  room: "Room",
+  camera: "Camera",
+  lighting: "Lighting",
+  audio: "Audio",
+  continuity: "Continuity",
+  shot: "Shot",
+  wrap: "Wrap",
+};
+
 export interface ShootGuideReference {
   id: string;
   kind: ShootGuideReferenceKind;
@@ -357,6 +375,7 @@ export interface ShootGuidePatch {
   sceneAnalysis?: ShootGuideSceneAnalysis | null;
   visualAnalysis?: ShootGuideVisualAnalysis | null;
   lightingPlan?: ShootGuideLightingPlan | null;
+  equipmentPlan?: ShootGuideEquipmentPlan | null;
   overview?: Partial<ShootGuideOverview>;
   setup?: Partial<ShootGuideSetup>;
   shots?: ShootGuideShot[];
@@ -372,6 +391,7 @@ export const SHOOT_GUIDE_GENERATE_STAGES = [
   "strategy",
   "shots",
   "shot",
+  "execution",
 ] as const;
 
 export type ShootGuideGenerateStage = (typeof SHOOT_GUIDE_GENERATE_STAGES)[number];
