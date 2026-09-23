@@ -442,10 +442,16 @@ export interface TalentAgreementDetails {
 export interface ContractorAgreementDetails {
   serviceStartDate?: string;
   serviceEndDate?: string;
+  /** Specific work / shoot dates (deal-memo call sheet dates). */
+  shootDates?: string;
   contractorRole?: string;
   servicesDescription?: string;
   feeAmount: number;
   feeType: "flat" | "day" | "hourly";
+  overtimeTerms?: string;
+  kitRentalFee?: number;
+  kitRentalNotes?: string;
+  onScreenCredit?: string;
   payeeTax?: PayeeTaxInfo;
 }
 
@@ -470,6 +476,8 @@ export interface LocationAgreementDetails {
   shootDates?: string;
   permittedUse?: string;
   restrictions?: string;
+  /** Safe access, parking, load-in, known hazards. */
+  accessNotes?: string;
   insuranceRequired?: boolean;
   insuranceNotes?: string;
   locationFee: number;

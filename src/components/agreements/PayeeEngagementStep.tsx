@@ -115,6 +115,37 @@ export function PayeeEngagementStep({
             <Input label="Service end" type="date" value={contractor.serviceEndDate || ""} onChange={(e) => updateContractor({ serviceEndDate: e.target.value })} touch />
           </div>
           <Textarea label="Services description" value={contractor.servicesDescription || ""} onChange={(e) => updateContractor({ servicesDescription: e.target.value })} touch />
+          <Input label="Work / shoot dates" value={contractor.shootDates || ""} onChange={(e) => updateContractor({ shootDates: e.target.value })} placeholder="e.g. May 12–14, 2026" touch />
+          <Textarea
+            label="Overtime terms"
+            value={contractor.overtimeTerms || ""}
+            onChange={(e) => updateContractor({ overtimeTerms: e.target.value })}
+            touch
+          />
+          <div className="grid gap-4 md:grid-cols-2">
+            <Input
+              label="Kit / box rental ($)"
+              type="number"
+              min={0}
+              value={contractor.kitRentalFee ?? 0}
+              onChange={(e) => updateContractor({ kitRentalFee: Number(e.target.value) })}
+              touch
+            />
+            <Input
+              label="On-screen credit"
+              value={contractor.onScreenCredit || ""}
+              onChange={(e) => updateContractor({ onScreenCredit: e.target.value })}
+              placeholder="e.g. Gaffer — Jane Doe"
+              touch
+            />
+          </div>
+          <Textarea
+            label="Kit rental notes"
+            value={contractor.kitRentalNotes || ""}
+            onChange={(e) => updateContractor({ kitRentalNotes: e.target.value })}
+            placeholder="What’s included in the kit (lights, lenses, vehicle…)"
+            touch
+          />
           <Card><CardBody>
             <h3 className="mb-4 font-semibold">Payee tax info (for accountant export)</h3>
             <PayeeTaxFields

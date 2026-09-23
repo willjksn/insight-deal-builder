@@ -13,15 +13,26 @@ import {
   CLAUSE_TALENT_COMPENSATION,
   CLAUSE_TALENT_RELEASE,
   CLAUSE_TALENT_INDEPENDENT,
+  CLAUSE_TALENT_INDEMNITY,
+  CLAUSE_TALENT_CANCELLATION,
   CLAUSE_CONTRACTOR_SERVICES,
   CLAUSE_CONTRACTOR_COMPENSATION,
   CLAUSE_CONTRACTOR_WORK_FOR_HIRE,
   CLAUSE_CONTRACTOR_INDEPENDENT,
+  CLAUSE_CONTRACTOR_OVERTIME,
+  CLAUSE_CONTRACTOR_KIT,
+  CLAUSE_CONTRACTOR_CREDIT,
+  CLAUSE_CONTRACTOR_INDEMNITY,
+  CLAUSE_CONTRACTOR_CANCELLATION,
   CLAUSE_LOCATION_USE,
   CLAUSE_LOCATION_PROP_RENTAL,
   CLAUSE_LOCATION_COMPENSATION,
   CLAUSE_LOCATION_RELEASE,
   CLAUSE_LOCATION_INSURANCE,
+  CLAUSE_LOCATION_DEPICTION,
+  CLAUSE_LOCATION_PRODUCER_INDEMNITY,
+  CLAUSE_LOCATION_CANCELLATION,
+  CLAUSE_LIMITATION_PAYEE,
   CLAUSE_FORCE_MAJEURE,
   CLAUSE_GOVERNING_LAW,
   CLAUSE_INDEMNIFICATION,
@@ -251,7 +262,7 @@ export const DEFAULT_CLAUSES: AgreementClause[] = [
   },
   {
     id: "talent_release",
-    title: "Name, Likeness, and Release",
+    title: "Name, Image, Likeness, and Performance Release",
     body: CLAUSE_TALENT_RELEASE,
     requiresInitials: true,
     category: "usage",
@@ -263,6 +274,22 @@ export const DEFAULT_CLAUSES: AgreementClause[] = [
     body: CLAUSE_TALENT_INDEPENDENT,
     requiresInitials: true,
     category: "general",
+    enabled: false,
+  },
+  {
+    id: "talent_indemnity",
+    title: "Talent Warranties and Indemnity",
+    body: CLAUSE_TALENT_INDEMNITY,
+    requiresInitials: true,
+    category: "general",
+    enabled: false,
+  },
+  {
+    id: "talent_cancellation",
+    title: "Talent Cancellation",
+    body: CLAUSE_TALENT_CANCELLATION,
+    requiresInitials: true,
+    category: "cancellation",
     enabled: false,
   },
   {
@@ -295,6 +322,46 @@ export const DEFAULT_CLAUSES: AgreementClause[] = [
     body: CLAUSE_CONTRACTOR_INDEPENDENT,
     requiresInitials: true,
     category: "general",
+    enabled: false,
+  },
+  {
+    id: "contractor_overtime",
+    title: "Work Dates and Overtime",
+    body: CLAUSE_CONTRACTOR_OVERTIME,
+    requiresInitials: true,
+    category: "general",
+    enabled: false,
+  },
+  {
+    id: "contractor_kit",
+    title: "Kit and Box Rental",
+    body: CLAUSE_CONTRACTOR_KIT,
+    requiresInitials: true,
+    category: "equipment",
+    enabled: false,
+  },
+  {
+    id: "contractor_credit",
+    title: "Credits",
+    body: CLAUSE_CONTRACTOR_CREDIT,
+    requiresInitials: false,
+    category: "usage",
+    enabled: false,
+  },
+  {
+    id: "contractor_indemnity",
+    title: "Contractor Indemnification",
+    body: CLAUSE_CONTRACTOR_INDEMNITY,
+    requiresInitials: true,
+    category: "general",
+    enabled: false,
+  },
+  {
+    id: "contractor_cancellation",
+    title: "Contractor Cancellation",
+    body: CLAUSE_CONTRACTOR_CANCELLATION,
+    requiresInitials: true,
+    category: "cancellation",
     enabled: false,
   },
   {
@@ -333,6 +400,38 @@ export const DEFAULT_CLAUSES: AgreementClause[] = [
     id: "location_insurance",
     title: "Insurance",
     body: CLAUSE_LOCATION_INSURANCE,
+    requiresInitials: true,
+    category: "general",
+    enabled: false,
+  },
+  {
+    id: "location_depiction",
+    title: "Photography and Depiction of the Premises",
+    body: CLAUSE_LOCATION_DEPICTION,
+    requiresInitials: true,
+    category: "usage",
+    enabled: false,
+  },
+  {
+    id: "location_producer_indemnity",
+    title: "Producer Indemnity and Damage",
+    body: CLAUSE_LOCATION_PRODUCER_INDEMNITY,
+    requiresInitials: true,
+    category: "general",
+    enabled: false,
+  },
+  {
+    id: "location_cancellation",
+    title: "Location Cancellation",
+    body: CLAUSE_LOCATION_CANCELLATION,
+    requiresInitials: true,
+    category: "cancellation",
+    enabled: false,
+  },
+  {
+    id: "limitation_liability_payee",
+    title: "Limitation of Liability",
+    body: CLAUSE_LIMITATION_PAYEE,
     requiresInitials: true,
     category: "general",
     enabled: false,
@@ -395,11 +494,10 @@ const TALENT_AGREEMENT_ENABLED = new Set([
   "talent_compensation",
   "talent_release",
   "talent_independent",
-  "payment_terms",
-  "cancellation",
+  "talent_indemnity",
+  "talent_cancellation",
   "confidentiality",
-  "limitation_liability",
-  "indemnification",
+  "limitation_liability_payee",
   "force_majeure",
   "governing_law",
 ]);
@@ -408,13 +506,15 @@ const CONTRACTOR_AGREEMENT_ENABLED = new Set([
   "electronic_signature",
   "contractor_services",
   "contractor_compensation",
+  "contractor_overtime",
+  "contractor_kit",
+  "contractor_credit",
   "contractor_work_for_hire",
   "contractor_independent",
-  "payment_terms",
-  "cancellation",
+  "contractor_indemnity",
+  "contractor_cancellation",
   "confidentiality",
-  "limitation_liability",
-  "indemnification",
+  "limitation_liability_payee",
   "force_majeure",
   "governing_law",
 ]);
@@ -422,15 +522,15 @@ const CONTRACTOR_AGREEMENT_ENABLED = new Set([
 const LOCATION_AGREEMENT_ENABLED = new Set([
   "electronic_signature",
   "location_use",
+  "location_depiction",
   "location_prop_rental",
   "location_compensation",
   "location_release",
+  "location_producer_indemnity",
   "location_insurance",
-  "payment_terms",
-  "cancellation",
+  "location_cancellation",
   "confidentiality",
-  "limitation_liability",
-  "indemnification",
+  "limitation_liability_payee",
   "force_majeure",
   "governing_law",
 ]);
@@ -530,40 +630,45 @@ This Equipment Rental Agreement is entered into by and between Insight Media Gro
 7. GOVERNING LAW
 8. ELECTRONIC SIGNATURE CONSENT`;
 
-export const TALENT_AGREEMENT_TEMPLATE = `TALENT AGREEMENT
+export const TALENT_AGREEMENT_TEMPLATE = `TALENT AGREEMENT AND RELEASE
 
-This Talent Agreement is entered into by and between Insight Media Group LLC ("Producer") and the talent identified below.
+This Talent Agreement and Release is entered into by and between Insight Media Group LLC ("Producer") and the talent identified below.
 
 1. ENGAGEMENT AND APPEARANCE
 2. COMPENSATION AND TAX
-3. NAME, LIKENESS, AND RELEASE
+3. NAME, IMAGE, LIKENESS, AND PERFORMANCE RELEASE
 4. INDEPENDENT CONTRACTOR STATUS
-5. CANCELLATION
-6. GOVERNING LAW
-7. ELECTRONIC SIGNATURE CONSENT`;
+5. WARRANTIES AND INDEMNITY
+6. CANCELLATION
+7. GOVERNING LAW
+8. ELECTRONIC SIGNATURE CONSENT`;
 
-export const CONTRACTOR_AGREEMENT_TEMPLATE = `CONTRACTOR AGREEMENT
+export const CONTRACTOR_AGREEMENT_TEMPLATE = `CREW DEAL MEMO / CONTRACTOR AGREEMENT
 
-This Contractor Agreement is entered into by and between Insight Media Group LLC ("Producer") and the contractor identified below.
+This Crew Deal Memo is entered into by and between Insight Media Group LLC ("Producer") and the contractor identified below.
 
-1. SERVICES
-2. COMPENSATION AND TAX (W-9)
-3. WORK PRODUCT / OWNERSHIP
-4. INDEPENDENT CONTRACTOR STATUS
-5. CANCELLATION
-6. GOVERNING LAW
-7. ELECTRONIC SIGNATURE CONSENT`;
+1. ROLE AND SERVICES
+2. WORK DATES, RATE, AND OVERTIME
+3. KIT / BOX RENTAL
+4. CREDITS
+5. COMPENSATION AND TAX (W-9)
+6. WORK PRODUCT / OWNERSHIP
+7. INDEPENDENT CONTRACTOR STATUS
+8. CANCELLATION
+9. GOVERNING LAW
+10. ELECTRONIC SIGNATURE CONSENT`;
 
-export const LOCATION_AGREEMENT_TEMPLATE = `LOCATION & PROP AGREEMENT
+export const LOCATION_AGREEMENT_TEMPLATE = `LOCATION AGREEMENT AND RELEASE
 
-This Location and Property Use Agreement is entered into by and between Insight Media Group LLC ("Producer") and the property owner identified below.
+This Location Agreement and Release is entered into by and between Insight Media Group LLC ("Producer") and the property owner identified below.
 
 1. PROPERTY / LOCATION DESCRIPTION
-2. PERMITTED USE AND RESTRICTIONS
-3. PROP SCHEDULE (if applicable)
-4. COMPENSATION AND TAX
-5. INSURANCE
-6. RELEASE AND INDEMNITY
-7. CANCELLATION
-8. GOVERNING LAW
-9. ELECTRONIC SIGNATURE CONSENT`;
+2. PERMITTED USE, SAFE ACCESS, AND RESTRICTIONS
+3. PHOTOGRAPHY AND DEPICTION OF THE PREMISES
+4. PROP SCHEDULE (if applicable)
+5. FEES, DAMAGE, AND TAX
+6. INSURANCE
+7. RELEASE AND INDEMNITY
+8. CANCELLATION
+9. GOVERNING LAW
+10. ELECTRONIC SIGNATURE CONSENT`;

@@ -179,7 +179,7 @@ export function AgreementSigningDocumentBody({
       )}
 
       {meta.isContractor && agreement.contractorAgreementDetails && (
-        <DetailSection title="Contractor Services">
+        <DetailSection title="Crew Deal Memo">
           <DetailLine label="Role" value={agreement.contractorAgreementDetails.contractorRole} />
           {(agreement.contractorAgreementDetails.serviceStartDate ||
             agreement.contractorAgreementDetails.serviceEndDate) && (
@@ -188,6 +188,7 @@ export function AgreementSigningDocumentBody({
               {agreement.contractorAgreementDetails.serviceEndDate || "—"}
             </p>
           )}
+          <DetailLine label="Work / shoot dates" value={agreement.contractorAgreementDetails.shootDates} />
           <DetailLine label="Services" value={agreement.contractorAgreementDetails.servicesDescription} />
           <p>
             Fee:{" "}
@@ -196,6 +197,18 @@ export function AgreementSigningDocumentBody({
               agreement.contractorAgreementDetails.feeType
             )}
           </p>
+          <DetailLine label="Overtime" value={agreement.contractorAgreementDetails.overtimeTerms} />
+          {agreement.contractorAgreementDetails.kitRentalFee ? (
+            <p>
+              Kit rental: $
+              {agreement.contractorAgreementDetails.kitRentalFee.toLocaleString("en-US", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+              })}
+            </p>
+          ) : null}
+          <DetailLine label="Kit notes" value={agreement.contractorAgreementDetails.kitRentalNotes} />
+          <DetailLine label="Credit" value={agreement.contractorAgreementDetails.onScreenCredit} />
           {formatPayeeTaxBlock(agreement.contractorAgreementDetails.payeeTax).map((line) => (
             <p key={line}>{line}</p>
           ))}
@@ -217,6 +230,7 @@ export function AgreementSigningDocumentBody({
           <DetailLine label="Shoot dates" value={agreement.locationAgreementDetails.shootDates} />
           <DetailLine label="Permitted use" value={agreement.locationAgreementDetails.permittedUse} />
           <DetailLine label="Restrictions" value={agreement.locationAgreementDetails.restrictions} />
+          <DetailLine label="Access" value={agreement.locationAgreementDetails.accessNotes} />
           {agreement.locationAgreementDetails.agreementKind !== "prop" && (
             <p>
               Location fee: {formatCurrency(calculateLocationFeeTotal(agreement.locationAgreementDetails))}

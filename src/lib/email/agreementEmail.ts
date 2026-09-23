@@ -6,13 +6,13 @@ export function getEmailSubject(agreement: Agreement): string {
     return `Equipment Rental Agreement for ${name}`;
   }
   if (agreement.agreementType === "talent_agreement") {
-    return `Talent Agreement for ${name}`;
+    return `Talent Agreement & Release for ${name}`;
   }
   if (agreement.agreementType === "contractor_agreement") {
-    return `Contractor Agreement for ${name}`;
+    return `Crew Deal Memo for ${name}`;
   }
   if (agreement.agreementType === "location_agreement") {
-    return `Location & Prop Agreement for ${name}`;
+    return `Location Agreement & Release for ${name}`;
   }
   if (agreement.agreementType === "client_project") {
     return `Project Agreement for ${name}`;
@@ -43,7 +43,7 @@ ${productionCompany}`;
   if (agreement.agreementType === "talent_agreement") {
     return `Hi ${recipientName},
 
-Attached is the talent agreement for ${name}. Please review compensation, appearance/release terms, and sign electronically. Government ID verification is required before signing.
+Attached is the talent agreement and release for ${name}. Please review compensation, appearance, and the name/image/likeness release, then sign electronically. Government ID verification is required before signing.
 
 Thank you,
 ${productionCompany}`;
@@ -52,7 +52,7 @@ ${productionCompany}`;
   if (agreement.agreementType === "contractor_agreement") {
     return `Hi ${recipientName},
 
-Attached is the contractor agreement for ${name}. Please review services, compensation, and independent contractor terms, then sign electronically.
+Attached is the crew deal memo for ${name}. Please review role, dates, rate, overtime, kit rental, credits, and independent contractor terms, then sign electronically.
 
 Thank you,
 ${productionCompany}`;
@@ -61,7 +61,7 @@ ${productionCompany}`;
   if (agreement.agreementType === "location_agreement") {
     return `Hi ${recipientName},
 
-Attached is the location and property use agreement for ${name}. Please review permitted use, fees, insurance requirements, and sign electronically.
+Attached is the location agreement and release for ${name}. Please review access, permitted use, fees, damage, insurance, and depiction rights, then sign electronically.
 
 Thank you,
 ${productionCompany}`;

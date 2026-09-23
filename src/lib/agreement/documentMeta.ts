@@ -35,11 +35,11 @@ export function getAgreementDocumentMeta(
     : isRental
       ? "Equipment Rental Agreement"
       : isTalent
-        ? "Talent Agreement"
+        ? "Talent Agreement & Release"
         : isContractor
-          ? "Contractor Agreement"
+          ? "Crew Deal Memo"
           : isLocation
-            ? "Location & Prop Agreement"
+            ? "Location Agreement & Release"
             : "Client Project Agreement";
 
   const preamble = isInternal

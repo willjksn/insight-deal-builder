@@ -111,9 +111,9 @@ function AgreementsContent() {
             { value: "internal_collaboration", label: "Partner / Internal" },
             { value: "client_project", label: "Client" },
             { value: "equipment_rental", label: "Equipment Rental" },
-            { value: "talent_agreement", label: "Talent Agreement" },
-            { value: "contractor_agreement", label: "Contractor Agreement" },
-            { value: "location_agreement", label: "Location & Prop" },
+            { value: "talent_agreement", label: "Talent Agreement & Release" },
+            { value: "contractor_agreement", label: "Crew Deal Memo" },
+            { value: "location_agreement", label: "Location Agreement & Release" },
           ]}
           touch
         />

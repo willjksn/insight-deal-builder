@@ -31,7 +31,7 @@ export function getWizardStepLabel(stepIndex: number, agreementType: AgreementTy
   }
   if (agreementType === "contractor_agreement") {
     if (stepIndex === 2) return "Project";
-    if (stepIndex === 5) return "Services & Tax";
+    if (stepIndex === 5) return "Deal Memo & Tax";
     if (stepIndex === 7) return "Payment";
   }
   if (agreementType === "location_agreement") {
@@ -66,11 +66,11 @@ export function getAgreementTypeLabel(type: AgreementType): string {
     case "equipment_rental":
       return "Equipment Rental";
     case "talent_agreement":
-      return "Talent Agreement";
+      return "Talent Agreement & Release";
     case "contractor_agreement":
-      return "Contractor Agreement";
+      return "Crew Deal Memo";
     case "location_agreement":
-      return "Location & Prop Agreement";
+      return "Location Agreement & Release";
     default:
       return "Client Project";
   }

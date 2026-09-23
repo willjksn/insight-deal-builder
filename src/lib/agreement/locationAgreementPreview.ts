@@ -26,6 +26,7 @@ export function appendLocationAgreementPreview(lines: string[], agreement: Agree
   if (loc.shootDates) lines.push(`Shoot dates: ${loc.shootDates}`);
   if (loc.permittedUse) lines.push(`Permitted use: ${loc.permittedUse}`);
   if (loc.restrictions) lines.push(`Restrictions: ${loc.restrictions}`);
+  if (loc.accessNotes) lines.push(`Access: ${loc.accessNotes}`);
 
   if (loc.agreementKind !== "prop") {
     lines.push(
@@ -73,6 +74,7 @@ export function appendLocationAgreementPdf(
       `Property: ${loc.propertyName}`,
       loc.propertyAddress && `Address: ${loc.propertyAddress}`,
       loc.permittedUse && `Permitted use: ${loc.permittedUse}`,
+      loc.accessNotes && `Access: ${loc.accessNotes}`,
       `Total: ${formatCurrency(calculateLocationAgreementTotal(loc))}`,
     ]
       .filter(Boolean)

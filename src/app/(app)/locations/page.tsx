@@ -132,7 +132,7 @@ export default function LocationCatalogPage() {
       <div className="mb-6">
         <InfoCallout variant="sky">
           Store locations you shoot at often with default fees, permitted use language, and reusable prop line items.
-          When you create a Location & Prop agreement, pick from this catalog to prefill the wizard.
+          When you create a Location Agreement & Release, pick from this catalog to prefill the wizard.
         </InfoCallout>
       </div>
 

@@ -33,8 +33,15 @@ export function appendContractorAgreementPreview(lines: string[], agreement: Agr
   if (contractor.serviceStartDate || contractor.serviceEndDate) {
     lines.push(`Service period: ${contractor.serviceStartDate || "—"} through ${contractor.serviceEndDate || "—"}`);
   }
+  if (contractor.shootDates) lines.push(`Work / shoot dates: ${contractor.shootDates}`);
   if (contractor.servicesDescription) lines.push(`Services: ${contractor.servicesDescription}`);
   lines.push(`Fee: ${formatFeeLabel(contractor.feeAmount, contractor.feeType)}`);
+  if (contractor.overtimeTerms) lines.push(`Overtime: ${contractor.overtimeTerms}`);
+  if (contractor.kitRentalFee) {
+    lines.push(`Kit rental: $${contractor.kitRentalFee.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`);
+  }
+  if (contractor.kitRentalNotes) lines.push(`Kit notes: ${contractor.kitRentalNotes}`);
+  if (contractor.onScreenCredit) lines.push(`Credit: ${contractor.onScreenCredit}`);
   const taxLines = formatPayeeTaxBlock(contractor.payeeTax);
   if (taxLines.length) {
     lines.push("");
@@ -76,8 +83,14 @@ export function appendContractorAgreementPdf(
     "Contractor Services",
     [
       contractor.contractorRole && `Role: ${contractor.contractorRole}`,
+      contractor.shootDates && `Work / shoot dates: ${contractor.shootDates}`,
       contractor.servicesDescription && `Services: ${contractor.servicesDescription}`,
       `Fee: ${formatFeeLabel(contractor.feeAmount, contractor.feeType)}`,
+      contractor.overtimeTerms && `Overtime: ${contractor.overtimeTerms}`,
+      contractor.kitRentalFee
+        ? `Kit rental: $${contractor.kitRentalFee.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+        : "",
+      contractor.onScreenCredit && `Credit: ${contractor.onScreenCredit}`,
     ]
       .filter(Boolean)
       .join("\n")

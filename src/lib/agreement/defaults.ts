@@ -114,11 +114,11 @@ export function createEmptyAgreement(type: AgreementType = "client_project"): Om
     title: isRental
       ? "Equipment Rental Agreement"
       : isTalent
-        ? "Talent Agreement"
+        ? "Talent Agreement & Release"
         : isContractor
-          ? "Contractor Agreement"
+          ? "Crew Deal Memo"
           : isLocation
-            ? "Location & Prop Agreement"
+            ? "Location Agreement & Release"
             : "",
     version: 1,
     status: "draft",
@@ -132,7 +132,7 @@ export function createEmptyAgreement(type: AgreementType = "client_project"): Om
         : isTalent
           ? "Talent appearance and services for the production identified in this agreement."
           : isContractor
-            ? "Contractor services for the production identified in this agreement."
+            ? "Crew services for the production identified in this agreement (role, dates, rate, overtime, kit, and credit)."
             : isLocation
               ? "Location and/or prop use for the production identified in this agreement."
               : PROJECT_OVERVIEW_TEMPLATES["Business Brand Package"] || "",
@@ -181,7 +181,7 @@ export function createEmptyAgreement(type: AgreementType = "client_project"): Om
       cancellationNotes:
         "Deposits and fees for work already performed are non-refundable. Cancellations within the notice period may forfeit deposits and incur committed costs. Rescheduling is subject to availability and may require additional fees.",
     },
-    clauses: getClausesForType(type, isRental || isTalent || isContractor || isLocation),
+    clauses: getClausesForType(type, isRental),
     signatures: [],
     initials: [],
     identityVerifications: [],
@@ -358,11 +358,11 @@ export function generateAgreementTitle(projectName: string, type: AgreementType)
       : type === "equipment_rental"
         ? "Equipment Rental Agreement"
         : type === "talent_agreement"
-          ? "Talent Agreement"
+          ? "Talent Agreement & Release"
           : type === "contractor_agreement"
-            ? "Contractor Agreement"
+            ? "Crew Deal Memo"
             : type === "location_agreement"
-              ? "Location & Prop Agreement"
+              ? "Location Agreement & Release"
               : "Client Project Agreement";
   return projectName ? `${projectName} — ${suffix}` : suffix;
 }

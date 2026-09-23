@@ -99,6 +99,12 @@ export function LocationAgreementStep({ agreement, onChange }: LocationAgreement
 
       <Textarea label="Permitted use" value={location.permittedUse || ""} onChange={(e) => updateLocation({ permittedUse: e.target.value })} touch />
       <Textarea label="Restrictions" value={location.restrictions || ""} onChange={(e) => updateLocation({ restrictions: e.target.value })} touch />
+      <Textarea
+        label="Safe access / parking / load-in"
+        value={location.accessNotes || ""}
+        onChange={(e) => updateLocation({ accessNotes: e.target.value })}
+        touch
+      />
 
       {showLocation && (
         <Card>

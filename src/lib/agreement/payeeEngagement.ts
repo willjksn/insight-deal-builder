@@ -23,10 +23,16 @@ export const EMPTY_TALENT_AGREEMENT_DETAILS: TalentAgreementDetails = {
 export const EMPTY_CONTRACTOR_AGREEMENT_DETAILS: ContractorAgreementDetails = {
   serviceStartDate: "",
   serviceEndDate: "",
+  shootDates: "",
   contractorRole: "",
   servicesDescription: "",
   feeAmount: 0,
   feeType: "day",
+  overtimeTerms:
+    "Day rate covers up to 10 hours including a meal break. Time beyond that is 1.5× (day rate ÷ 10) unless a different overtime term is written here.",
+  kitRentalFee: 0,
+  kitRentalNotes: "",
+  onScreenCredit: "",
   payeeTax: { entityType: "individual", w9OnFile: false },
 };
 

@@ -10,6 +10,8 @@ export const EMPTY_LOCATION_AGREEMENT_DETAILS: LocationAgreementDetails = {
   permittedUse: "Filming, photography, and related production activities for the project named in this Agreement.",
   restrictions:
     "No structural alterations, no hazardous activities without prior written approval, and restore location to prior condition except normal wear.",
+  accessNotes:
+    "Crew, vehicles, and equipment may use the agreed areas, driveways, and parking identified by Owner. Owner will disclose known hazards before first call.",
   insuranceRequired: true,
   insuranceNotes:
     "Producer must provide certificate of insurance naming property owner as additional insured with coverage limits adequate for the shoot, if required by owner.",
