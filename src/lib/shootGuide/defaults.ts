@@ -188,6 +188,7 @@ export function createGuideDocument(
     locationAnalysis: null,
     visualAnalysis: null,
     lightingPlan: null,
+    placementPlan: null,
     equipmentPlan: null,
     overview: buildOverview(autofill),
     setup: buildSetup(autofill),

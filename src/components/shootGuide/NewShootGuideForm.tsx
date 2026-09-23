@@ -380,7 +380,8 @@ export function NewShootGuideForm() {
           <CardBody className="space-y-4">
             <p className="text-sm font-semibold text-slate-900">References</p>
             <p className="text-xs text-slate-500">
-              Optional stills. Location photos inform what is possible; mood images inform the look. Analysis comes in a later sprint.
+              Optional stills. Location photos inform what is possible; mood images inform the look.
+              Generate writes location analysis, lighting, and a basic camera/light overlay.
             </p>
             <Input label="Location image(s)" type="file" accept="image/*" multiple onChange={(e) => onFiles("location", e.target.files)} />
             <Input label="Mood / look reference(s)" type="file" accept="image/*" multiple onChange={(e) => onFiles("mood", e.target.files)} />

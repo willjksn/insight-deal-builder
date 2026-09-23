@@ -58,6 +58,10 @@ export function buildChecklistFromGuide(guide: ShootGuide): ShootGuideChecklistI
   if (setup?.cameraPlacement) {
     room.push(item("room", `Marks / placement: ${setup.cameraPlacement}`, "marks"));
   }
+  const loc = guide.locationAnalysis;
+  if (loc?.clutter) room.push(item("room", `Clear: ${loc.clutter}`, "loc_clutter"));
+  if (loc?.windows) room.push(item("room", `Windows: ${loc.windows}`, "windows"));
+  if (loc?.cameraZones) room.push(item("room", `Camera zones: ${loc.cameraZones}`, "zones"));
 
   const camera: ShootGuideChecklistItem[] = [];
   const bodies = unique(shots.map((s) => s.camera || "").filter(Boolean));

@@ -18,6 +18,8 @@ import {
 } from "@/lib/shootGuide/autofill";
 import { checklistNeedsBuild } from "@/lib/shootGuide/checklist";
 import { needsEquipmentPlan } from "@/lib/shootGuide/matchEquipment";
+import { needsVisualIntelligence } from "@/lib/shootGuide/placement";
+import { uploadShootGuideReference } from "@/lib/shootGuide/storage";
 import {
   SHOT_VARIANT_INSTRUCTIONS,
   SHOOT_GUIDE_TABS,
@@ -36,6 +38,7 @@ import { cn } from "@/lib/utils/cn";
 import { useEnsureWorkspace } from "./useEnsureWorkspace";
 import { ShootGuideChecklistTab } from "./ShootGuideChecklistTab";
 import { ShootGuideGearMatch } from "./ShootGuideGearMatch";
+import { ShootGuideSetupVision } from "./ShootGuideSetupVision";
 import { ShootGuideSlateTab } from "./ShootGuideSlateTab";
 
 const TAB_LABELS: Record<ShootGuideTab, string> = {
@@ -134,6 +137,12 @@ export function ShootGuideWorkspace({
           });
           current = exec;
         }
+        if (needsVisualIntelligence(current)) {
+          const { guide: vision } = await generateShootGuide(getToken, current.id, {
+            stage: "vision",
+          });
+          current = vision;
+        }
         if (!cancelled) setGuide(current);
       })
       .catch((e) => {
@@ -167,19 +176,57 @@ export function ShootGuideWorkspace({
     setGuide({ ...guide, shots });
   }
 
+  async function addReferenceFiles(kind: "location" | "mood", list: FileList | null) {
+    if (!guide || !user || !list?.length) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const uploads = [...(guide.references ?? [])];
+      for (const file of Array.from(list)) {
+        const uploaded = await uploadShootGuideReference(
+          user.uid,
+          guide.id,
+          kind,
+          crypto.randomUUID(),
+          file
+        );
+        uploads.push({
+          id: crypto.randomUUID(),
+          kind,
+          storageUrl: uploaded.storageUrl,
+          storagePath: uploaded.storagePath,
+          fileName: uploaded.fileName,
+        });
+      }
+      const { guide: next } = await updateShootGuide(getToken, guide.id, { references: uploads });
+      setGuide(next);
+      setGenerating(true);
+      try {
+        const { guide: vision } = await generateShootGuide(getToken, next.id, { stage: "vision" });
+        setGuide(vision);
+      } finally {
+        setGenerating(false);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to upload still");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function persistShots() {
     if (!guide) return;
     await save({ shots: guide.shots });
   }
 
-  async function regenerate(stage: "all" | "shots" = "all") {
+  async function regenerate(stage: "all" | "shots" | "vision" = "all") {
     if (!guide) return;
     setGenerating(true);
     setError(null);
     try {
       const { guide: next } = await generateShootGuide(getToken, guide.id, { stage });
       setGuide(next);
-      setTab("shots");
+      if (stage !== "vision") setTab("shots");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
@@ -499,6 +546,13 @@ export function ShootGuideWorkspace({
 
       {tab === "setup" ? (
         <div className="space-y-4">
+          <ShootGuideSetupVision
+            guide={guide}
+            saving={saving}
+            generating={generating}
+            onAnalyze={() => void regenerate("vision")}
+            onFiles={(kind, files) => void addReferenceFiles(kind, files)}
+          />
           {(
             [
               ["locationNotes", "Location"],

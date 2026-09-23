@@ -140,8 +140,58 @@ export interface ShootGuideLocationAnalysis {
   windows?: string;
   obstacles?: string;
   backgrounds?: string;
+  clutter?: string;
   cameraZones?: string;
   lightZones?: string;
+  cameraDirection?: string;
+  geometry?: string;
+}
+
+export const PLACEMENT_MARKER_KINDS = [
+  "camera",
+  "subject",
+  "key",
+  "fill",
+  "negative",
+  "accent",
+  "practical",
+  "movement",
+  "set",
+] as const;
+
+export type ShootGuidePlacementKind = (typeof PLACEMENT_MARKER_KINDS)[number];
+
+export const PLACEMENT_MARKER_LABELS: Record<ShootGuidePlacementKind, string> = {
+  camera: "Camera",
+  subject: "Subject",
+  key: "Key",
+  fill: "Fill",
+  negative: "Neg fill",
+  accent: "Accent",
+  practical: "Practical",
+  movement: "Move",
+  set: "Set",
+};
+
+export interface ShootGuidePlacementMarker {
+  id: string;
+  kind: ShootGuidePlacementKind;
+  label: string;
+  x: number;
+  y: number;
+  note?: string;
+  shotId?: string | null;
+}
+
+export interface ShootGuidePlacementView {
+  referenceId?: string | null;
+  markers: ShootGuidePlacementMarker[];
+}
+
+export interface ShootGuidePlacementPlan {
+  summary?: string;
+  photoView: ShootGuidePlacementView | null;
+  topDown: ShootGuidePlacementView | null;
 }
 
 export interface ShootGuideVisualAnalysis {
@@ -330,6 +380,7 @@ export interface ShootGuide {
   locationAnalysis: ShootGuideLocationAnalysis | null;
   visualAnalysis: ShootGuideVisualAnalysis | null;
   lightingPlan: ShootGuideLightingPlan | null;
+  placementPlan: ShootGuidePlacementPlan | null;
   equipmentPlan: ShootGuideEquipmentPlan | null;
   overview: ShootGuideOverview;
   setup: ShootGuideSetup;
@@ -373,8 +424,10 @@ export interface ShootGuidePatch {
   projectId?: string | null;
   references?: ShootGuideReference[];
   sceneAnalysis?: ShootGuideSceneAnalysis | null;
+  locationAnalysis?: ShootGuideLocationAnalysis | null;
   visualAnalysis?: ShootGuideVisualAnalysis | null;
   lightingPlan?: ShootGuideLightingPlan | null;
+  placementPlan?: ShootGuidePlacementPlan | null;
   equipmentPlan?: ShootGuideEquipmentPlan | null;
   overview?: Partial<ShootGuideOverview>;
   setup?: Partial<ShootGuideSetup>;
@@ -392,6 +445,7 @@ export const SHOOT_GUIDE_GENERATE_STAGES = [
   "shots",
   "shot",
   "execution",
+  "vision",
 ] as const;
 
 export type ShootGuideGenerateStage = (typeof SHOOT_GUIDE_GENERATE_STAGES)[number];

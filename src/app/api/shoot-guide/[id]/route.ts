@@ -111,8 +111,10 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     if (body.projectId !== undefined) patch.projectId = body.projectId;
     if (Array.isArray(body.references)) patch.references = body.references;
     if (body.sceneAnalysis !== undefined) patch.sceneAnalysis = body.sceneAnalysis;
+    if (body.locationAnalysis !== undefined) patch.locationAnalysis = body.locationAnalysis;
     if (body.visualAnalysis !== undefined) patch.visualAnalysis = body.visualAnalysis;
     if (body.lightingPlan !== undefined) patch.lightingPlan = body.lightingPlan;
+    if (body.placementPlan !== undefined) patch.placementPlan = body.placementPlan;
     if (body.equipmentPlan !== undefined) patch.equipmentPlan = body.equipmentPlan;
     if (body.overview) {
       patch.overview = { ...(existing.overview || {}), ...body.overview };

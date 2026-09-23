@@ -2,12 +2,18 @@ import { emptyShot } from "./defaults";
 import type {
   ShootGuideLightingFixture,
   ShootGuideLightingPlan,
+  ShootGuideLocationAnalysis,
+  ShootGuidePlacementKind,
+  ShootGuidePlacementMarker,
+  ShootGuidePlacementPlan,
+  ShootGuidePlacementView,
   ShootGuideSceneAnalysis,
   ShootGuideSetup,
   ShootGuideShot,
   ShootGuideShotStatus,
   ShootGuideVisualAnalysis,
 } from "./types";
+import { PLACEMENT_MARKER_KINDS } from "./types";
 
 function asObject(raw: unknown): Record<string, unknown> {
   return raw && typeof raw === "object" && !Array.isArray(raw)
@@ -39,6 +45,25 @@ export function parseSceneAnalysis(raw: unknown): ShootGuideSceneAnalysis {
     emotionalGoal: str(src.emotionalGoal) || undefined,
     environment: str(src.environment) || undefined,
     genreTone: str(src.genreTone) || undefined,
+  };
+}
+
+export function parseLocationAnalysis(raw: unknown): ShootGuideLocationAnalysis {
+  const o = asObject(raw);
+  const nested = asObject(o.locationAnalysis);
+  const src = Object.keys(nested).length ? nested : o;
+  return {
+    layout: str(src.layout) || undefined,
+    subjectPlacement: str(src.subjectPlacement) || undefined,
+    practicals: str(src.practicals) || undefined,
+    windows: str(src.windows) || undefined,
+    obstacles: str(src.obstacles) || undefined,
+    backgrounds: str(src.backgrounds) || undefined,
+    clutter: str(src.clutter) || undefined,
+    cameraZones: str(src.cameraZones) || undefined,
+    lightZones: str(src.lightZones) || undefined,
+    cameraDirection: str(src.cameraDirection) || undefined,
+    geometry: str(src.geometry) || undefined,
   };
 }
 
@@ -77,6 +102,86 @@ function parseFixture(raw: unknown, index: number): ShootGuideLightingFixture | 
     kelvin: str(o.kelvin) || undefined,
     modifier: str(o.modifier) || undefined,
     notes: str(o.notes) || undefined,
+  };
+}
+
+function clamp01(v: unknown, fallback = 0.5): number {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(1, Math.max(0, n));
+}
+
+function parsePlacementKind(v: unknown): ShootGuidePlacementKind | null {
+  const s = str(v).toLowerCase();
+  if ((PLACEMENT_MARKER_KINDS as readonly string[]).includes(s)) {
+    return s as ShootGuidePlacementKind;
+  }
+  if (s === "neg" || s === "neg fill" || s === "negative fill") return "negative";
+  if (s === "cam" || s === "camera a" || s === "camera b") return "camera";
+  if (s === "talent" || s === "person") return "subject";
+  if (s === "move" || s === "path") return "movement";
+  if (s === "set" || s === "treadmill" || s === "machine" || s === "prop") return "set";
+  return null;
+}
+
+function parseMarker(raw: unknown, index: number): ShootGuidePlacementMarker | null {
+  const o = asObject(raw);
+  const kind = parsePlacementKind(o.kind) ?? parsePlacementKind(o.role);
+  if (!kind) return null;
+  const label = str(o.label, kind);
+  return {
+    id: str(o.id, `mk_${kind}_${String(index + 1).padStart(2, "0")}`),
+    kind,
+    label,
+    x: clamp01(o.x, 0.5),
+    y: clamp01(o.y, 0.5),
+    note: str(o.note) || undefined,
+    shotId: str(o.shotId) || null,
+  };
+}
+
+function parsePlacementView(raw: unknown): ShootGuidePlacementView | null {
+  const o = asObject(raw);
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(o.markers)
+      ? o.markers
+      : [];
+  const markers = list
+    .map((item, i) => parseMarker(item, i))
+    .filter((x): x is ShootGuidePlacementMarker => Boolean(x));
+  if (!markers.length && !str(o.referenceId)) return null;
+  return {
+    referenceId: str(o.referenceId) || null,
+    markers,
+  };
+}
+
+export function parsePlacementPlan(raw: unknown): ShootGuidePlacementPlan {
+  const o = asObject(raw);
+  const nested = asObject(o.placementPlan);
+  const src = Object.keys(nested).length ? nested : o;
+  return {
+    summary: str(src.summary) || undefined,
+    photoView: parsePlacementView(src.photoView ?? src.photo),
+    topDown: parsePlacementView(src.topDown ?? src.floorPlan),
+  };
+}
+
+export function mergeVisualAnalysis(
+  base: ShootGuideVisualAnalysis | null | undefined,
+  overlay: ShootGuideVisualAnalysis
+): ShootGuideVisualAnalysis {
+  return {
+    lightingDirection: overlay.lightingDirection || base?.lightingDirection,
+    contrast: overlay.contrast || base?.contrast,
+    colorTemperature: overlay.colorTemperature || base?.colorTemperature,
+    composition: overlay.composition || base?.composition,
+    depth: overlay.depth || base?.depth,
+    lensCharacter: overlay.lensCharacter || base?.lensCharacter,
+    cameraAngle: overlay.cameraAngle || base?.cameraAngle,
+    palette: overlay.palette || base?.palette,
+    energy: overlay.energy || base?.energy,
   };
 }
 

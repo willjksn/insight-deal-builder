@@ -282,3 +282,90 @@ export function mockSingleShotJson(
         : {};
   return { shot: { ...base, ...extra, shotNumber } };
 }
+
+export function mockVisualIntelligenceJson(
+  guide: Pick<ShootGuide, "prompt" | "title" | "references">
+) {
+  const locationRef = (guide.references ?? []).find((r) => r.kind === "location");
+  const treadmill = isTreadmill(guide);
+  const topDown = treadmill
+    ? [
+        { id: "mk_set_01", kind: "set", label: "Treadmill", x: 0.5, y: 0.46 },
+        { id: "mk_subject_01", kind: "subject", label: "Stormi", x: 0.5, y: 0.52 },
+        { id: "mk_camera_01", kind: "camera", label: "Cam A", x: 0.34, y: 0.84 },
+        { id: "mk_camera_02", kind: "camera", label: "Cam B", x: 0.82, y: 0.52 },
+        { id: "mk_key_01", kind: "key", label: "Key", x: 0.2, y: 0.28 },
+        { id: "mk_negative_01", kind: "negative", label: "Neg", x: 0.82, y: 0.4 },
+      ]
+    : [
+        { id: "mk_subject_01", kind: "subject", label: "Subject", x: 0.5, y: 0.52 },
+        { id: "mk_camera_01", kind: "camera", label: "Cam A", x: 0.34, y: 0.84 },
+        { id: "mk_key_01", kind: "key", label: "Key", x: 0.2, y: 0.28 },
+      ];
+  const photo = treadmill
+    ? [
+        { id: "mkp_set_01", kind: "set", label: "Treadmill", x: 0.52, y: 0.5 },
+        { id: "mkp_subject_01", kind: "subject", label: "Stormi", x: 0.55, y: 0.58, note: "On the belt, facing the console" },
+        { id: "mkp_key_01", kind: "key", label: "Key", x: 0.82, y: 0.32, note: "Camera-right of the frame" },
+        { id: "mkp_negative_01", kind: "negative", label: "Neg", x: 0.16, y: 0.4 },
+      ]
+    : [
+        { id: "mkp_subject_01", kind: "subject", label: "Subject", x: 0.5, y: 0.5 },
+        { id: "mkp_key_01", kind: "key", label: "Key", x: 0.22, y: 0.3 },
+      ];
+  return {
+    locationAnalysis: treadmill
+      ? {
+          layout: "Narrow cardio bay: treadmill as the hero prop, wall behind, console at the far end.",
+          subjectPlacement: "Stormi on the belt, facing the console, body readable from 3/4 front.",
+          practicals: "Console LEDs and any overheads — dim them under the key.",
+          windows: "If a window is in the wide, treat it as the motivated source or kill it.",
+          obstacles: "Handrails and the deck; do not hide the belt in the wide.",
+          backgrounds: "Clean wall or window behind her; hide clutter and extra machines.",
+          clutter: "Move water bottles, extra plates, and logos out of the wide.",
+          cameraZones: "Front-left of the machine for geography; rail for working; low beside the deck for stride.",
+          lightZones: "Key camera-left of the 3/4; edge from behind the far shoulder; avoid flattening overhead.",
+          cameraDirection: "Most coverage looks toward the console so the room falls off behind her.",
+          geometry: "Rectangle room, treadmill parallel to the long wall.",
+        }
+      : {
+          layout: "The space implied by the prompt.",
+          subjectPlacement: "Put the subject where the wide can still read the room.",
+          cameraZones: "Start further than feels natural, then commit closer.",
+          lightZones: "Key 45° off camera, optional edge.",
+        },
+    visualAnalysis: treadmill
+      ? {
+          lightingDirection: "Soft key camera-left, slight wrap, edge for sweat",
+          contrast: "Medium ratio so muscle and sweat still cut",
+          colorTemperature: "Warm skin against a cooler or neutral gym",
+          composition: "Belt as a leading line into her",
+          depth: "Room falls off on the closers",
+          palette: "Neutral gym, skin as the brightest thing",
+          energy: "Still frames except one motivated working move",
+        }
+      : {
+          lightingDirection: "Motivated key from the brightest practical or window",
+          contrast: "Medium",
+          energy: "Locked unless the move is motivated",
+        },
+    placementPlan: {
+      summary: treadmill
+        ? "Cam A 3/4 front of the treadmill, Cam B on the rail, key camera-left, edge on the far shoulder."
+        : "Subject center, camera further than the working shot, key 45° off.",
+      photoView: locationRef
+        ? { referenceId: locationRef.id, markers: photo }
+        : { referenceId: null, markers: [] },
+      topDown: { referenceId: null, markers: topDown },
+    },
+    setup: {
+      locationNotes: treadmill
+        ? "Clear the treadmill sightlines. Hide clutter behind her; leave a clean wall or window in the wide."
+        : "Clear sightlines and hide clutter in the wide.",
+      cameraPlacement: treadmill
+        ? "Wide: 3/4 front of the machine so the belt and room both read. Working: beside the rail. Hero: just off eyeline."
+        : "Start further than feels natural for the wide, then commit closer for the finish.",
+    },
+  };
+}
+

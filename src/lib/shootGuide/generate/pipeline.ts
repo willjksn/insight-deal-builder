@@ -8,7 +8,8 @@ import { loadShootGuideCatalog, shootGuideGearPrompt } from "@/lib/shootGuide/ge
 import { generateSceneAnalysis } from "@/lib/shootGuide/generate/scene";
 import { generateShotSequence, generateOneShot } from "@/lib/shootGuide/generate/shots";
 import { generateVisualStrategy } from "@/lib/shootGuide/generate/strategy";
-import { mergeGeneratedShots, replaceGeneratedShot } from "@/lib/shootGuide/parse";
+import { buildVisionPatch, generateVisualIntelligence } from "@/lib/shootGuide/generate/vision";
+import { mergeGeneratedShots, mergeVisualAnalysis, replaceGeneratedShot } from "@/lib/shootGuide/parse";
 import type {
   ShootGuide,
   ShootGuideGenerateRequest,
@@ -62,8 +63,20 @@ export async function runShootGuideGeneration(params: {
     return patchGuide(params.guideId, patch as ShootGuidePatch & Record<string, unknown>);
   }
 
+  async function applyVision(current: ShootGuide): Promise<ShootGuide> {
+    const parsed = await generateVisualIntelligence(current, extras);
+    return patchGuide(
+      params.guideId,
+      buildVisionPatch(current, parsed) as ShootGuidePatch & Record<string, unknown>
+    );
+  }
+
   if (stage === "execution") {
     return applyExecution(guide);
+  }
+
+  if (stage === "vision") {
+    return applyVision(guide);
   }
 
   if (stage === "shot") {
@@ -90,6 +103,10 @@ export async function runShootGuideGeneration(params: {
     if (stage === "scene") return guide;
   }
 
+  if (stage === "all") {
+    guide = await applyVision(guide);
+  }
+
   if (stage === "all" || stage === "strategy") {
     if (!guide.sceneAnalysis) {
       const sceneAnalysis = await generateSceneAnalysis(guide, extras);
@@ -99,7 +116,7 @@ export async function runShootGuideGeneration(params: {
     guide = await patchGuide(params.guideId, {
       overview: strategy.overview,
       setup: strategy.setup,
-      visualAnalysis: strategy.visualAnalysis,
+      visualAnalysis: mergeVisualAnalysis(guide.visualAnalysis, strategy.visualAnalysis),
       lightingPlan: strategy.lightingPlan,
     });
     if (stage === "strategy") return guide;

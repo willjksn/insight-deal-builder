@@ -1,6 +1,6 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { SCRIPT_WRITER_SESSIONS_COLLECTION } from "@/lib/scriptWriter/apiClient";
-import type { ShootGuide, ShootGuideSceneAnalysis } from "@/lib/shootGuide/types";
+import type { ShootGuide, ShootGuideLocationAnalysis, ShootGuideSceneAnalysis } from "@/lib/shootGuide/types";
 
 function clip(text: string, max = 1600): string {
   const t = text.replace(/\s+/g, " ").trim();
@@ -44,7 +44,7 @@ export function referenceSummary(guide: ShootGuide): string {
   const counts = new Map<string, number>();
   for (const r of refs) counts.set(r.kind, (counts.get(r.kind) || 0) + 1);
   const parts = [...counts.entries()].map(([kind, n]) => `${n} ${kind}`);
-  return `User uploaded stills (filenames only; do not invent unseen rooms): ${parts.join(", ")}.`;
+  return `User uploaded stills: ${parts.join(", ")}. Honor location analysis if present; do not invent a different room.`;
 }
 
 export function sceneAnalysisBlock(analysis: ShootGuideSceneAnalysis | null | undefined): string {
@@ -57,6 +57,43 @@ export function sceneAnalysisBlock(analysis: ShootGuideSceneAnalysis | null | un
     analysis.genreTone && `Genre / tone: ${analysis.genreTone}`,
   ].filter(Boolean);
   return lines.length ? `Scene analysis:\n${lines.join("\n")}` : "";
+}
+
+export function locationAnalysisBlock(
+  analysis: ShootGuideLocationAnalysis | null | undefined
+): string {
+  if (!analysis) return "";
+  const lines = [
+    analysis.layout && `Layout: ${analysis.layout}`,
+    analysis.subjectPlacement && `Subject placement: ${analysis.subjectPlacement}`,
+    analysis.practicals && `Practicals: ${analysis.practicals}`,
+    analysis.windows && `Windows: ${analysis.windows}`,
+    analysis.obstacles && `Obstacles: ${analysis.obstacles}`,
+    analysis.backgrounds && `Backgrounds: ${analysis.backgrounds}`,
+    analysis.clutter && `Clutter to clear: ${analysis.clutter}`,
+    analysis.cameraZones && `Camera zones: ${analysis.cameraZones}`,
+    analysis.lightZones && `Light zones: ${analysis.lightZones}`,
+    analysis.cameraDirection && `Camera direction: ${analysis.cameraDirection}`,
+    analysis.geometry && `Geometry: ${analysis.geometry}`,
+  ].filter(Boolean);
+  return lines.length
+    ? `Location analysis (this room — do not invent a different space):\n${lines.join("\n")}`
+    : "";
+}
+
+export function placementBlock(guide: ShootGuide): string {
+  const plan = guide.placementPlan;
+  if (!plan?.summary && !plan?.topDown?.markers?.length) return "";
+  const markers = (plan.topDown?.markers ?? []).map(
+    (m) => `${m.kind}: ${m.label}${m.note ? ` (${m.note})` : ""}`
+  );
+  return [
+    "Placement:",
+    plan.summary,
+    markers.length ? `Top-down: ${markers.join("; ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function guideContextBlock(
@@ -77,6 +114,8 @@ export function guideContextBlock(
       ? "If owned gear is a compromise, keep owned names in camera/lens/support and note the ideal alternative in reason."
       : "",
     referenceSummary(guide),
+    locationAnalysisBlock(guide.locationAnalysis),
+    placementBlock(guide),
     extras?.scriptExcerpt ? `Script excerpt:\n${extras.scriptExcerpt}` : "",
     extras?.gearPromptBlock || "",
   ];
