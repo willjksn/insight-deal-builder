@@ -29,6 +29,7 @@ import {
   BarChart3,
   Clapperboard,
   MessagesSquare,
+  Aperture,
 } from "lucide-react";
 import { AppUser } from "@/lib/types";
 import { Workspace } from "@/lib/workspace/types";
@@ -72,6 +73,8 @@ export type NavGroup = {
   label: string;
   scope: NavScope;
   items: NavItem[];
+  /** Hide this group even when scope would otherwise include it. */
+  omitFrom?: Workspace[];
 };
 
 const contentIdeasAccess = (user: AppUser | null) =>
@@ -110,6 +113,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Overview",
     scope: "shared",
+    omitFrom: ["shoot-guide"],
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
@@ -233,6 +237,19 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "Shoot Guide",
+    scope: "shoot-guide",
+    items: [
+      {
+        href: "/shoot-guide",
+        label: "Guides",
+        icon: Aperture,
+        canAccess: canUseProductionTools,
+        activePrefixes: ["/shoot-guide"],
+      },
+    ],
+  },
+  {
     label: "Catalogs",
     scope: "production",
     items: [
@@ -262,6 +279,7 @@ export const NAV_GROUPS: NavGroup[] = [
 
 /** True when the group belongs in the given workspace. */
 export function isGroupInWorkspace(group: NavGroup, workspace: Workspace): boolean {
+  if (group.omitFrom?.includes(workspace)) return false;
   return group.scope === "shared" || group.scope === workspace;
 }
 

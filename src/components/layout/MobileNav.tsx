@@ -31,7 +31,7 @@ export function MobileNav() {
               </div>
             </div>
             {!portalOnly ? (
-              <WorkspaceSwitcher variant="mobile" className="w-[188px] shrink-0" />
+              <WorkspaceSwitcher variant="mobile" className="w-[min(100%,252px)] shrink-0" />
             ) : null}
           </div>
           {more.length > 0 ? (

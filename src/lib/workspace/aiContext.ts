@@ -66,6 +66,29 @@ const PRODUCTION_CONTEXT: WorkspaceAiContext = {
   ],
 };
 
+const SHOOT_GUIDE_CONTEXT: WorkspaceAiContext = {
+  workspace: "shoot-guide",
+  systemFraming:
+    "You are assisting with ShootSpine's Shoot Guide workspace: an on-set planning and execution tool. Recommend structured shots, lighting, and owned-gear matches. Never invent signed legal terms, and never update records without explicit user approval.",
+  priorities: [
+    "scene intent",
+    "shot purpose",
+    "camera and lens",
+    "lighting",
+    "owned equipment",
+    "slate",
+    "takes",
+    "checklist",
+  ],
+  examplePrompts: [
+    "Build a five-shot cinematic workout sequence from this scene.",
+    "Match this lighting plan to gear I already own.",
+    "What should I check before rolling on shot 4?",
+  ],
+};
+
 export function getWorkspaceAiContext(workspace: Workspace): WorkspaceAiContext {
-  return workspace === "production" ? PRODUCTION_CONTEXT : BUSINESS_CONTEXT;
+  if (workspace === "shoot-guide") return SHOOT_GUIDE_CONTEXT;
+  if (workspace === "production") return PRODUCTION_CONTEXT;
+  return BUSINESS_CONTEXT;
 }

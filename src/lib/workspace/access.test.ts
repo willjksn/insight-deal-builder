@@ -36,6 +36,7 @@ describe("isWorkspace", () => {
   it("validates stored preference values", () => {
     expect(isWorkspace("business")).toBe(true);
     expect(isWorkspace("production")).toBe(true);
+    expect(isWorkspace("shoot-guide")).toBe(true);
     expect(isWorkspace("marketing")).toBe(false);
     expect(isWorkspace(null)).toBe(false);
     expect(isWorkspace(undefined)).toBe(false);

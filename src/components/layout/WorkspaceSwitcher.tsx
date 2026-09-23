@@ -1,20 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Briefcase, Clapperboard } from "lucide-react";
+import { Aperture, Briefcase, Clapperboard } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { WORKSPACES, WORKSPACE_LABELS, Workspace } from "@/lib/workspace/types";
+import { WORKSPACES, WORKSPACE_HOME, WORKSPACE_LABELS, Workspace } from "@/lib/workspace/types";
 
 const WORKSPACE_ICONS: Record<Workspace, typeof Briefcase> = {
   business: Briefcase,
   production: Clapperboard,
+  "shoot-guide": Aperture,
 };
 
 /**
- * Segmented [ Business ] [ Production ] control. Switching updates the persisted
- * workspace and lands the user on the workspace-aware dashboard so the change is
- * immediately visible (sidebar, dashboard, and AI context all follow).
+ * Segmented [ Business ] [ Production ] [ Shoot Guide ] control. Switching
+ * updates the persisted workspace and lands on that workspace's home.
  */
 export function WorkspaceSwitcher({
   variant = "sidebar",
@@ -29,7 +29,7 @@ export function WorkspaceSwitcher({
   const handleSelect = (next: Workspace) => {
     if (next === workspace) return;
     setWorkspace(next);
-    router.push("/dashboard");
+    router.push(WORKSPACE_HOME[next]);
   };
 
   const dark = variant === "sidebar";
@@ -39,7 +39,7 @@ export function WorkspaceSwitcher({
       role="tablist"
       aria-label="Workspace"
       className={cn(
-        "grid grid-cols-2 gap-1 rounded-xl p-1",
+        "grid grid-cols-3 gap-1 rounded-xl p-1",
         dark ? "bg-slate-800/80 ring-1 ring-slate-700/70" : "bg-slate-100 ring-1 ring-slate-200",
         className
       )}
@@ -55,7 +55,7 @@ export function WorkspaceSwitcher({
             aria-selected={active}
             onClick={() => handleSelect(option)}
             className={cn(
-              "flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors min-h-[40px]",
+              "flex flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-semibold leading-tight transition-colors min-h-[44px] sm:flex-row sm:gap-1 sm:px-1.5 sm:text-[11px]",
               active
                 ? dark
                   ? "bg-white text-slate-900 shadow-sm"
@@ -65,8 +65,8 @@ export function WorkspaceSwitcher({
                   : "text-slate-500 hover:bg-white/70 hover:text-slate-800"
             )}
           >
-            <Icon className={cn("h-4 w-4", active && "text-sky-600")} />
-            {WORKSPACE_LABELS[option]}
+            <Icon className={cn("h-3.5 w-3.5 shrink-0", active && "text-sky-600")} />
+            <span className="text-center">{WORKSPACE_LABELS[option]}</span>
           </button>
         );
       })}
