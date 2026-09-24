@@ -1,4 +1,5 @@
-import type { ShootGuide, ShootGuideCreateInput, ShootGuidePatch } from "./types";
+import type { ShootGuide, ShootGuideCreateInput, ShootGuidePatch, ShotVisualAsset } from "./types";
+import type { VisualQuality } from "@/lib/visualGeneration/types";
 
 type GetToken = () => Promise<string | null>;
 
@@ -72,4 +73,30 @@ export async function generateShootGuide(
     body: JSON.stringify(body ?? { stage: "all" }),
   });
   return parseJson<{ guide: ShootGuide }>(res);
+}
+
+export async function startShotVisual(
+  getToken: GetToken,
+  guideId: string,
+  body: { shotId: string; type: "ai_still" | "ai_motion"; quality: VisualQuality; regenerate?: boolean }
+) {
+  const res = await fetch(`/api/shoot-guide/${guideId}/visual`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ guide: ShootGuide; asset: ShotVisualAsset }>(res);
+}
+
+export async function refreshShotVisual(
+  getToken: GetToken,
+  guideId: string,
+  shotId: string,
+  assetId: string
+) {
+  const res = await fetch(
+    `/api/shoot-guide/${guideId}/visual?shotId=${encodeURIComponent(shotId)}&assetId=${encodeURIComponent(assetId)}`,
+    { headers: await authHeaders(getToken) }
+  );
+  return parseJson<{ guide: ShootGuide; asset: ShotVisualAsset }>(res);
 }

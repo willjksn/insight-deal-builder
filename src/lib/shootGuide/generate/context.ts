@@ -102,7 +102,7 @@ export function guideContextBlock(
 ): string {
   const priorities = (guide.visualPriorities ?? []).join(", ") || "none";
   const parts = [
-    `Title: ${guide.title || "Untitled shoot guide"}`,
+    `Title: ${guide.title || "Untitled scene"}`,
     `Source: ${guide.sourceType}`,
     guide.sourceSceneLabel ? `Scene: ${guide.sourceSceneLabel}` : "",
     `Prompt:\n${guide.prompt || "(none)"}`,

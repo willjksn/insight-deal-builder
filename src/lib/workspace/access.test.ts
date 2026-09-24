@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { AppUser } from "@/lib/types";
 import { defaultWorkspaceForUser } from "./access";
-import { isWorkspace } from "./types";
+import { isWorkspace, readStoredWorkspace } from "./types";
 
 const imgAdmin = {
   id: "u1",
@@ -36,7 +36,9 @@ describe("isWorkspace", () => {
   it("validates stored preference values", () => {
     expect(isWorkspace("business")).toBe(true);
     expect(isWorkspace("production")).toBe(true);
-    expect(isWorkspace("shoot-guide")).toBe(true);
+    expect(isWorkspace("scene-builder")).toBe(true);
+    expect(isWorkspace("shoot-guide")).toBe(false);
+    expect(readStoredWorkspace("shoot-guide")).toBe("scene-builder");
     expect(isWorkspace("marketing")).toBe(false);
     expect(isWorkspace(null)).toBe(false);
     expect(isWorkspace(undefined)).toBe(false);

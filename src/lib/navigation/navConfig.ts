@@ -67,6 +67,8 @@ export type NavItem = {
   exact?: boolean;
   /** Extra pathname prefixes that should also mark this item active. */
   activePrefixes?: string[];
+  /** Hidden until the user opens More in this group. */
+  secondary?: boolean;
 };
 
 export type NavGroup = {
@@ -75,6 +77,8 @@ export type NavGroup = {
   items: NavItem[];
   /** Hide this group even when scope would otherwise include it. */
   omitFrom?: Workspace[];
+  /** Start collapsed so power-user destinations are not the first thing on screen. */
+  collapsedByDefault?: boolean;
 };
 
 const contentIdeasAccess = (user: AppUser | null) =>
@@ -113,7 +117,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Overview",
     scope: "shared",
-    omitFrom: ["shoot-guide"],
+    omitFrom: ["scene-builder"],
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
@@ -143,17 +147,18 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: TrendingUp,
         canAccess: revenueAccess,
       },
+      { href: "/quick-quote", label: "Quick quote", icon: Calculator, canAccess: canCreateQuotes },
+      { href: "/agreements", label: "Agreements", icon: FileText },
       {
         href: "/live-production",
         label: "Live Production Opportunities",
         icon: Speaker,
         canAccess: revenueAccess,
         activePrefixes: ["/live-production"],
+        secondary: true,
       },
-      { href: "/quick-quote", label: "Quick quote", icon: Calculator, canAccess: canCreateQuotes },
-      { href: "/agreements", label: "Agreements", icon: FileText },
-      { href: "/templates", label: "Templates", icon: FileStack, canAccess: canManageTemplates },
-      { href: "/reports", label: "Business reports", icon: FileStack, canAccess: canAccessReports },
+      { href: "/templates", label: "Templates", icon: FileStack, canAccess: canManageTemplates, secondary: true },
+      { href: "/reports", label: "Business reports", icon: FileStack, canAccess: canAccessReports, secondary: true },
     ],
   },
   {
@@ -168,30 +173,35 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Creator network",
         icon: Users,
         canAccess: canManageCreators,
+        secondary: true,
       },
       {
         href: "/creators/applications",
         label: "Applications",
         icon: FileText,
         canAccess: canManageCreators,
+        secondary: true,
       },
       {
         href: "/creators/shortlists",
         label: "Shortlists",
         icon: Target,
         canAccess: canManageCreators,
+        secondary: true,
       },
       {
         href: "/creators/campaigns",
         label: "Creator campaigns",
         icon: Briefcase,
         canAccess: canManageCreators,
+        secondary: true,
       },
       {
         href: "/creators/reports",
         label: "Creator reports",
         icon: BarChart3,
         canAccess: canManageCreators,
+        secondary: true,
       },
     ],
   },
@@ -208,28 +218,38 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Clapperboard,
         canAccess: (u) => isAiEditorEnabled() && canUseProductionTools(u),
         activePrefixes: ["/ai-editor"],
+        secondary: true,
       },
       {
         href: "/ai-editor/resolve-assistant",
         label: "Resolve assistant",
         icon: MessagesSquare,
         canAccess: (u) => isAiEditorEnabled() && canUseProductionTools(u),
+        secondary: true,
       },
-      { href: "/script-writer", label: "Script writer", icon: ScrollText, canAccess: canUseProductionTools },
+      {
+        href: "/script-writer",
+        label: "Script writer",
+        icon: ScrollText,
+        canAccess: canUseProductionTools,
+        secondary: true,
+      },
       {
         href: "/content-plans",
         label: "Content plan",
         icon: Clapperboard,
         canAccess: canUseProductionTools,
         activePrefixes: ["/content-plans", "/reel-prompts"],
+        secondary: true,
       },
-      { href: "/stage", label: "Stage planner", icon: LayoutGrid, canAccess: canUseProductionTools },
-      { href: "/reference", label: "Reference guide", icon: BookOpen, canAccess: canUseProductionTools },
+      { href: "/stage", label: "Stage planner", icon: LayoutGrid, canAccess: canUseProductionTools, secondary: true },
+      { href: "/reference", label: "Reference guide", icon: BookOpen, canAccess: canUseProductionTools, secondary: true },
     ],
   },
   {
     label: "Content development",
     scope: "production",
+    collapsedByDefault: true,
     items: [
       { href: "/content", label: "Weekly idea engine", icon: Lightbulb, canAccess: contentIdeasAccess, activePrefixes: ["/content/ideas"] },
       { href: "/content/profiles", label: "Brand profiles", icon: UserCircle, canAccess: contentIdeasAccess },
@@ -237,21 +257,22 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: "Shoot Guide",
-    scope: "shoot-guide",
+    label: "Scene Builder",
+    scope: "scene-builder",
     items: [
       {
-        href: "/shoot-guide",
-        label: "Guides",
+        href: "/scene-builder",
+        label: "Scenes",
         icon: Aperture,
         canAccess: canUseProductionTools,
-        activePrefixes: ["/shoot-guide"],
+        activePrefixes: ["/scene-builder"],
       },
     ],
   },
   {
     label: "Catalogs",
     scope: "production",
+    collapsedByDefault: true,
     items: [
       { href: "/crew", label: "Crew", icon: UserCircle, canAccess: canManageCrew },
       { href: "/packages", label: "Packages", icon: Package, canAccess: canManageProjects },
@@ -271,8 +292,9 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Admin",
         icon: Shield,
         canAccess: (user) => canManageUsers(user) || canManageProjects(user),
+        secondary: true,
       },
-      { href: "/how-to-use", label: "How to use", icon: CircleHelp, canAccess: canAccessHowToUseGuide },
+      { href: "/how-to-use", label: "How to use", icon: CircleHelp, canAccess: canAccessHowToUseGuide, secondary: true },
     ],
   },
 ];
@@ -333,10 +355,14 @@ export function getMobileNav(
   const workspaceItems = groups
     .filter((g) => g.scope === workspace)
     .flatMap((g) => g.items);
+  const orderedWorkspace = [
+    ...workspaceItems.filter((item) => !item.secondary),
+    ...workspaceItems.filter((item) => item.secondary),
+  ];
 
   const primary: NavItem[] = [];
   if (dashboard) primary.push(dashboard);
-  for (const item of workspaceItems) {
+  for (const item of orderedWorkspace) {
     if (primary.length >= 4) break;
     primary.push(item);
   }

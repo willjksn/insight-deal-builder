@@ -312,6 +312,9 @@ export function mergeGeneratedShots(
       sceneLabel: g.sceneLabel || prev?.sceneLabel,
       takeRecords: prev?.takeRecords ?? [],
       status: prev && prev.status !== "planned" ? prev.status : g.status,
+      duration: g.duration || prev?.duration,
+      visualStatus: prev?.visualStatus ?? g.visualStatus,
+      visualAssets: prev?.visualAssets?.length ? prev.visualAssets : g.visualAssets,
     };
   });
 }
@@ -332,6 +335,9 @@ export function replaceGeneratedShot(
       sceneLabel: next.sceneLabel || s.sceneLabel,
       takeRecords: s.takeRecords,
       status: s.status !== "planned" ? s.status : next.status,
+      duration: next.duration || s.duration,
+      visualStatus: s.visualStatus ?? next.visualStatus,
+      visualAssets: s.visualAssets?.length ? s.visualAssets : next.visualAssets,
     };
   });
 }

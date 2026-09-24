@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
       { source: "/scout/:path*", destination: "/dashboard", permanent: false },
       { source: "/settings/scout-gear", destination: "/settings", permanent: false },
       { source: "/settings/lights", destination: "/settings", permanent: false },
+      { source: "/shoot-guide", destination: "/scene-builder", permanent: false },
+      { source: "/shoot-guide/:path*", destination: "/scene-builder/:path*", permanent: false },
     ];
   },
 };

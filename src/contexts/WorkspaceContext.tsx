@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Workspace,
   WORKSPACE_STORAGE_KEY,
-  isWorkspace,
+  readStoredWorkspace,
 } from "@/lib/workspace/types";
 import { defaultWorkspaceForUser } from "@/lib/workspace/access";
 import {
@@ -43,7 +43,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const value = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
-      if (isWorkspace(value)) setStored(value);
+      const next = readStoredWorkspace(value);
+      if (next) setStored(next);
     } catch {
       // localStorage unavailable (private mode, SSR) — fall back to the default.
     }

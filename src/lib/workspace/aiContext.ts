@@ -67,9 +67,9 @@ const PRODUCTION_CONTEXT: WorkspaceAiContext = {
 };
 
 const SHOOT_GUIDE_CONTEXT: WorkspaceAiContext = {
-  workspace: "shoot-guide",
+  workspace: "scene-builder",
   systemFraming:
-    "You are assisting with ShootSpine's Shoot Guide workspace: an on-set planning and execution tool. Recommend structured shots, lighting, and owned-gear matches. Never invent signed legal terms, and never update records without explicit user approval.",
+    "You are assisting with ShootSpine's Scene Builder workspace: visual scene planning for real shoots, AI previs, or a hybrid of both. Help the user turn a simple scene idea and reference images into a shot list, practical shoot notes, and optional shot-level previews. A full script is optional. Never invent signed legal terms, and never update records without explicit user approval.",
   priorities: [
     "scene intent",
     "shot purpose",
@@ -88,7 +88,7 @@ const SHOOT_GUIDE_CONTEXT: WorkspaceAiContext = {
 };
 
 export function getWorkspaceAiContext(workspace: Workspace): WorkspaceAiContext {
-  if (workspace === "shoot-guide") return SHOOT_GUIDE_CONTEXT;
+  if (workspace === "scene-builder") return SHOOT_GUIDE_CONTEXT;
   if (workspace === "production") return PRODUCTION_CONTEXT;
   return BUSINESS_CONTEXT;
 }

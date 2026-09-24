@@ -64,22 +64,49 @@ export function Sidebar() {
         ) : null}
 
         <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
-          {visibleGroups.map((group) => (
-            <div key={group.label}>
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                {group.label}
-              </p>
-              <div className="space-y-0.5">
-                {group.items.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    item={item}
-                    active={isNavItemActive(item, pathname)}
-                  />
-                ))}
+          {visibleGroups.map((group) => {
+            const primary = group.items.filter((item) => !item.secondary);
+            const secondary = group.items.filter((item) => item.secondary);
+            const links = (items: NavItem[]) =>
+              items.map((item) => (
+                <NavLink
+                  key={item.href}
+                  item={item}
+                  active={isNavItemActive(item, pathname)}
+                />
+              ));
+            const body = (
+              <>
+                <div className="space-y-0.5">{links(primary)}</div>
+                {secondary.length > 0 ? (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer list-none px-3 py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-200">
+                      More
+                    </summary>
+                    <div className="mt-0.5 space-y-0.5">{links(secondary)}</div>
+                  </details>
+                ) : null}
+              </>
+            );
+            if (group.collapsedByDefault) {
+              return (
+                <details key={group.label}>
+                  <summary className="mb-1.5 cursor-pointer list-none px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    {group.label}
+                  </summary>
+                  {body}
+                </details>
+              );
+            }
+            return (
+              <div key={group.label}>
+                <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  {group.label}
+                </p>
+                {body}
               </div>
-            </div>
-          ))}
+            );
+          })}
           {!canManageProjects(appUser) &&
           !canUseProductionTools(appUser) &&
           !canCreateQuotes(appUser) ? (

@@ -19,7 +19,78 @@ export type ShootGuideShotStatus = "planned" | "ready" | "in_progress" | "comple
 
 export type ShootGuideShotCountMode = "auto" | "3" | "5" | "8" | "custom";
 
-export type ShootGuideReferenceKind = "location" | "mood" | "subject" | "product";
+export type ShootGuideReferenceKind = "location" | "mood" | "subject" | "product" | "wardrobe";
+
+export const SCENE_OUTPUT_TYPES = ["real", "ai", "hybrid"] as const;
+
+export type SceneOutputType = (typeof SCENE_OUTPUT_TYPES)[number];
+
+export const SCENE_OUTPUT_LABELS: Record<SceneOutputType, string> = {
+  real: "Real",
+  ai: "AI",
+  hybrid: "Hybrid",
+};
+
+export const SHOT_PREVIEW_INTENTS = ["storyboard", "ai_still", "animation", "real"] as const;
+
+export type ShotPreviewIntent = (typeof SHOT_PREVIEW_INTENTS)[number];
+
+/** Visual workflow status. Separate from the older on-set `status` field. */
+export const SHOT_VISUAL_STATUSES = [
+  "planned",
+  "storyboarded",
+  "ai_previs",
+  "real_footage",
+  "ready",
+] as const;
+
+export type ShotVisualStatus = (typeof SHOT_VISUAL_STATUSES)[number];
+
+export const SHOT_VISUAL_STATUS_LABELS: Record<ShotVisualStatus, string> = {
+  planned: "Planned",
+  storyboarded: "Storyboarded",
+  ai_previs: "AI Previs",
+  real_footage: "Real Footage",
+  ready: "Ready",
+};
+
+export const SHOT_ASSET_TYPES = ["storyboard", "ai_still", "ai_motion", "real_footage"] as const;
+
+export type ShotAssetType = (typeof SHOT_ASSET_TYPES)[number];
+
+export const SHOT_ASSET_TYPE_LABELS: Record<ShotAssetType, string> = {
+  storyboard: "Storyboard Frame",
+  ai_still: "AI Still",
+  ai_motion: "AI Motion Previs",
+  real_footage: "Real Footage",
+};
+
+export const SHOT_ASSET_STATUSES = ["pending", "ready", "failed"] as const;
+
+export type ShotAssetStatus = (typeof SHOT_ASSET_STATUSES)[number];
+
+export interface ShotVisualAsset {
+  id: string;
+  sceneId: string;
+  shotId: string;
+  type: ShotAssetType;
+  /** Provider id such as "upload", or a future generator name. Null when queued. */
+  provider: string | null;
+  createdAt: string;
+  storageUrl: string | null;
+  storagePath: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  prompt: string | null;
+  status: ShotAssetStatus;
+  error?: string | null;
+  providerTaskId?: string | null;
+  model?: string | null;
+  quality?: "fast" | "high" | null;
+  estimatedCredits?: number | null;
+  actualCredits?: number | null;
+  durationSeconds?: number | null;
+}
 
 export const CREATIVE_STYLE_PRESETS = [
   "cinematic",
@@ -266,6 +337,9 @@ export interface ShootGuideShot {
   title: string;
   purpose: string;
   status: ShootGuideShotStatus;
+  /** Scene Builder visual workflow. Omitted on older shots. */
+  visualStatus?: ShotVisualStatus;
+  visualAssets?: ShotVisualAsset[];
   framing?: string;
   composition?: string;
   cameraAngle?: string;
@@ -290,6 +364,9 @@ export interface ShootGuideShot {
   continuityRequirements?: string;
   specialRequirements?: string;
   reason?: string;
+  duration?: string;
+  previewIntent?: ShotPreviewIntent | null;
+  previewNote?: string;
   takeRecords: ShootGuideTakeRecord[];
 }
 
@@ -362,6 +439,7 @@ export interface ShootGuide {
   sourceSceneId: string | null;
   sourceSceneLabel: string | null;
   prompt: string;
+  outputType?: SceneOutputType;
   status: ShootGuideStatus;
   mode: ShootGuideMode;
   creativeStylePreset: CreativeStylePreset;
@@ -398,6 +476,7 @@ export interface ShootGuideCreateInput {
   sourceSceneId?: string | null;
   sourceSceneLabel?: string | null;
   prompt?: string;
+  outputType?: SceneOutputType;
   creativeStylePreset?: CreativeStylePreset;
   creativeIntent?: string;
   visualPriorities?: VisualPriority[];
@@ -411,6 +490,7 @@ export interface ShootGuideCreateInput {
 export interface ShootGuidePatch {
   title?: string;
   prompt?: string;
+  outputType?: SceneOutputType;
   status?: ShootGuideStatus;
   mode?: ShootGuideMode;
   creativeStylePreset?: CreativeStylePreset;

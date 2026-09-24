@@ -18,9 +18,12 @@ import {
   creativeStyleSelectOptions,
   type CreativeStylePreset,
   type ShootGuideReference,
+  type SceneOutputType,
   type ShootGuideShotCountMode,
   type ShootGuideSourceType,
   type VisualPriority,
+  SCENE_OUTPUT_LABELS,
+  SCENE_OUTPUT_TYPES,
 } from "@/lib/shootGuide/types";
 import { canUseProductionTools } from "@/lib/utils/permissions";
 import { cn } from "@/lib/utils/cn";
@@ -32,12 +35,12 @@ type ScriptOption = {
   scenes: { sceneNumber: string; heading: string; action: string }[];
 };
 
-type PendingFiles = Partial<Record<"location" | "mood" | "subject" | "product", File[]>>;
+type PendingFiles = Partial<Record<"location" | "mood" | "subject" | "product" | "wardrobe", File[]>>;
 
 const SOURCE_OPTIONS: { value: ShootGuideSourceType; label: string; hint: string }[] = [
-  { value: "quick_scene", label: "Quick Scene", hint: "Describe the scene in plain language." },
-  { value: "script", label: "Existing Script / Scene", hint: "Pull a script already in ShootSpine." },
-  { value: "blank", label: "Blank", hint: "Manual setup — no prompt required." },
+  { value: "quick_scene", label: "Scene idea", hint: "Describe the scene. No script required." },
+  { value: "script", label: "From a script", hint: "Optional. Pull a script already in ShootSpine." },
+  { value: "blank", label: "Blank", hint: "Start empty and add shots yourself." },
 ];
 
 const SHOT_COUNT_OPTIONS: { value: ShootGuideShotCountMode; label: string }[] = [
@@ -49,11 +52,13 @@ const SHOT_COUNT_OPTIONS: { value: ShootGuideShotCountMode; label: string }[] = 
 ];
 
 export function NewShootGuideForm() {
-  useEnsureWorkspace("shoot-guide");
+  useEnsureWorkspace("scene-builder");
   const router = useRouter();
   const { user, appUser, loading: authLoading } = useAuth();
   const [sourceType, setSourceType] = useState<ShootGuideSourceType>("quick_scene");
+  const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [outputType, setOutputType] = useState<SceneOutputType>("hybrid");
   const [stylePreset, setStylePreset] = useState<CreativeStylePreset>("cinematic");
   const [customStyle, setCustomStyle] = useState("");
   const [priorities, setPriorities] = useState<VisualPriority[]>(["emotion", "movement"]);
@@ -144,8 +149,10 @@ export function NewShootGuideForm() {
       }
 
       const { guide } = await createShootGuide(getToken, {
+        title: title.trim() || undefined,
         sourceType,
         prompt: nextPrompt,
+        outputType,
         sourceScriptId: sourceType === "script" ? scriptId : null,
         sourceSceneId: sourceType === "script" && sceneId ? sceneId : null,
         sourceSceneLabel: sourceType === "script" ? sceneLabel : null,
@@ -159,7 +166,7 @@ export function NewShootGuideForm() {
       });
 
       const uploads: ShootGuideReference[] = [...(guide.references ?? [])];
-      const kinds = ["location", "mood", "subject", "product"] as const;
+      const kinds = ["location", "mood", "subject", "product", "wardrobe"] as const;
       for (const kind of kinds) {
         for (const file of files[kind] ?? []) {
           const uploaded = await uploadShootGuideReference(
@@ -184,12 +191,12 @@ export function NewShootGuideForm() {
 
       try {
         await generateShootGuide(getToken, guide.id);
-        router.push(`/shoot-guide/${guide.id}`);
+        router.push(`/scene-builder/${guide.id}`);
       } catch (genErr) {
         const msg = encodeURIComponent(
           genErr instanceof Error ? genErr.message : "Generation failed"
         );
-        router.push(`/shoot-guide/${guide.id}?generateError=${msg}`);
+        router.push(`/scene-builder/${guide.id}?generateError=${msg}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create shoot guide");
@@ -209,7 +216,7 @@ export function NewShootGuideForm() {
   if (!user || !appUser) {
     return (
       <div className="p-6">
-        <p className="text-sm text-slate-600">Sign in to use Shoot Guide.</p>
+        <p className="text-sm text-slate-600">Sign in to use Scene Builder.</p>
       </div>
     );
   }
@@ -225,8 +232,8 @@ export function NewShootGuideForm() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
       <PageHeader
-        title="New Shoot Guide"
-        subtitle="Start from a Quick Scene, an existing script, or a blank guide. Generate writes a DP shot plan you can reopen and edit."
+        title="New scene"
+        subtitle="Describe the idea, add references if you have them, and generate a shot plan. A script is optional."
       />
 
       <form onSubmit={onSubmit} className="space-y-5">
@@ -238,7 +245,14 @@ export function NewShootGuideForm() {
 
         <Card>
           <CardBody className="space-y-4">
-            <p className="text-sm font-semibold text-slate-900">Source</p>
+            <Input
+              label="Scene title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Cinematic treadmill workout"
+              touch
+            />
+            <p className="text-sm font-semibold text-slate-900">How do you want to start?</p>
             <div className="grid gap-2 sm:grid-cols-3">
               {SOURCE_OPTIONS.map((opt) => (
                 <button
@@ -295,7 +309,7 @@ export function NewShootGuideForm() {
             ) : null}
 
             <Textarea
-              label="Scene idea"
+              label="Scene description"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder={
@@ -312,8 +326,31 @@ export function NewShootGuideForm() {
 
         <Card>
           <CardBody className="space-y-4">
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-slate-700">Output type</p>
+              <div className="grid grid-cols-3 gap-2">
+                {SCENE_OUTPUT_TYPES.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setOutputType(value)}
+                    className={cn(
+                      "rounded-xl border px-3 py-2 text-sm font-semibold min-h-[44px]",
+                      outputType === value
+                        ? "border-sky-400 bg-sky-50 text-sky-900"
+                        : "border-slate-200 bg-white text-slate-700"
+                    )}
+                  >
+                    {SCENE_OUTPUT_LABELS[value]}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Real is a practical shoot. AI is previs. Hybrid mixes both in the same scene.
+              </p>
+            </div>
             <Select
-              label="Creative style / mood"
+              label="Scene type"
               value={stylePreset}
               onChange={(e) => setStylePreset(e.target.value as CreativeStylePreset)}
               options={creativeStyleSelectOptions()}
@@ -329,7 +366,12 @@ export function NewShootGuideForm() {
               />
             ) : null}
 
-            <div>
+            <details className="rounded-xl border border-slate-200 px-3 py-2">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-800">
+                Advanced setup
+              </summary>
+              <div className="mt-3 space-y-4">
+              <div>
               <p className="mb-1.5 text-sm font-medium text-slate-700">Visual priorities</p>
               <div className="flex flex-wrap gap-2">
                 {VISUAL_PRIORITY_OPTIONS.map((opt) => {
@@ -373,6 +415,8 @@ export function NewShootGuideForm() {
                 />
               ) : null}
             </div>
+              </div>
+            </details>
           </CardBody>
         </Card>
 
@@ -380,18 +424,20 @@ export function NewShootGuideForm() {
           <CardBody className="space-y-4">
             <p className="text-sm font-semibold text-slate-900">References</p>
             <p className="text-xs text-slate-500">
-              Optional stills. Location photos inform what is possible; mood images inform the look.
-              Generate writes location analysis, lighting, and a basic camera/light overlay.
+              Optional. These stay with the scene and carry into each shot.
             </p>
-            <Input label="Location image(s)" type="file" accept="image/*" multiple onChange={(e) => onFiles("location", e.target.files)} />
-            <Input label="Mood / look reference(s)" type="file" accept="image/*" multiple onChange={(e) => onFiles("mood", e.target.files)} />
-            <Input label="Subject reference (optional)" type="file" accept="image/*" multiple onChange={(e) => onFiles("subject", e.target.files)} />
-            <Input label="Product reference (optional)" type="file" accept="image/*" multiple onChange={(e) => onFiles("product", e.target.files)} />
+            <Input label="Actor reference" type="file" accept="image/*" multiple onChange={(e) => onFiles("subject", e.target.files)} />
+            <Input label="Location / environment" type="file" accept="image/*" multiple onChange={(e) => onFiles("location", e.target.files)} />
+            <Input label="Mood / look" type="file" accept="image/*" multiple onChange={(e) => onFiles("mood", e.target.files)} />
+            <Input label="Wardrobe" type="file" accept="image/*" multiple onChange={(e) => onFiles("wardrobe", e.target.files)} />
           </CardBody>
         </Card>
 
-        <Card>
-          <CardBody className="space-y-3">
+        <details className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-800">
+            Equipment preferences
+          </summary>
+          <div className="mt-3 space-y-3">
             <label className="flex items-start gap-3 text-sm text-slate-800">
               <input
                 type="checkbox"
@@ -422,11 +468,11 @@ export function NewShootGuideForm() {
                 </span>
               </label>
             ) : null}
-          </CardBody>
-        </Card>
+          </div>
+        </details>
 
         <Button type="submit" size="touch" className="w-full sm:w-auto" disabled={saving}>
-          {saving ? "Generating…" : "Generate Shoot Guide"}
+          {saving ? "Building scene…" : "Build shot list"}
         </Button>
       </form>
     </div>

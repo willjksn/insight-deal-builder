@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import type { Workspace } from "@/lib/workspace/types";
 
-/** On first load of a Shoot Guide route, remember that workspace. Do not fight the switcher. */
+/** On first load of a Scene Builder route, remember that workspace. Do not fight the switcher. */
 export function useEnsureWorkspace(workspace: Workspace) {
   const { setWorkspace, hydrated } = useWorkspace();
   const applied = useRef(false);

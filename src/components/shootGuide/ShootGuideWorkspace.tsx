@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -10,8 +11,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { generateShootGuide, getShootGuide, updateShootGuide } from "@/lib/shootGuide/apiClient";
-import { completedShotCount, emptySetup } from "@/lib/shootGuide/defaults";
+import { completedShotCount, emptySetup, emptyShot } from "@/lib/shootGuide/defaults";
 import {
   hydrateGuideIfNeeded,
   overviewAfterToneChange,
@@ -21,33 +23,46 @@ import { needsEquipmentPlan } from "@/lib/shootGuide/matchEquipment";
 import { needsVisualIntelligence } from "@/lib/shootGuide/placement";
 import { uploadShootGuideReference } from "@/lib/shootGuide/storage";
 import {
+  SCENE_OUTPUT_LABELS,
+  SCENE_OUTPUT_TYPES,
   SHOT_VARIANT_INSTRUCTIONS,
-  SHOOT_GUIDE_TABS,
   creativeStyleSelectOptions,
   isNamedCreativeStyle,
   presetFromToneStyle,
   type CreativeStylePreset,
+  type SceneOutputType,
   type ShootGuide,
   type ShootGuideNote,
+  type ShootGuideReferenceKind,
   type ShootGuideShot,
   type ShootGuideShotStatus,
-  type ShootGuideTab,
   type ShotVariantKey,
 } from "@/lib/shootGuide/types";
+import { preserveShotVisuals } from "@/lib/shootGuide/visualAssets";
 import { cn } from "@/lib/utils/cn";
 import { useEnsureWorkspace } from "./useEnsureWorkspace";
 import { ShootGuideChecklistTab } from "./ShootGuideChecklistTab";
 import { ShootGuideGearMatch } from "./ShootGuideGearMatch";
 import { ShootGuideSetupVision } from "./ShootGuideSetupVision";
 import { ShootGuideSlateTab } from "./ShootGuideSlateTab";
+import { ShotVisualPanel } from "./ShotVisualPanel";
 
-const TAB_LABELS: Record<ShootGuideTab, string> = {
-  overview: "Overview",
-  setup: "Setup",
-  shots: "Shots",
-  slate: "Slate",
-  checklist: "Checklist",
-  notes: "Notes",
+const SECTIONS = [
+  ["setup", "Scene Setup"],
+  ["shots", "Shot Builder"],
+  ["preview", "Visual Preview"],
+  ["details", "Shoot Details"],
+  ["handoff", "Send to Production"],
+] as const;
+
+type SceneSection = (typeof SECTIONS)[number][0];
+
+const REF_LABELS: Record<ShootGuideReferenceKind, string> = {
+  location: "Location",
+  mood: "Mood",
+  subject: "Actor",
+  product: "Product",
+  wardrobe: "Wardrobe",
 };
 
 function generalNote(notes: ShootGuideNote[] | undefined): string {
@@ -103,10 +118,14 @@ export function ShootGuideWorkspace({
   guideId: string;
   generateError?: string;
 }) {
-  useEnsureWorkspace("shoot-guide");
+  useEnsureWorkspace("scene-builder");
+  const router = useRouter();
+  const { setWorkspace } = useWorkspace();
   const { user, appUser, loading: authLoading } = useAuth();
   const [guide, setGuide] = useState<ShootGuide | null>(null);
-  const [tab, setTab] = useState<ShootGuideTab>("overview");
+  const [section, setSection] = useState<SceneSection>("setup");
+  const [setTool, setSetTool] = useState<"slate" | "checklist" | "notes" | null>(null);
+  const [selectedShotIds, setSelectedShotIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -121,6 +140,20 @@ export function ShootGuideWorkspace({
     if (!user) return Promise.resolve(null);
     return user.getIdToken();
   }, [user]);
+
+  const applyVisualGuide = useCallback((server: ShootGuide) => {
+    setGuide((current) => {
+      if (!current) return server;
+      return {
+        ...current,
+        shots: (current.shots ?? []).map((shot) => {
+          const remote = (server.shots ?? []).find((item) => item.id === shot.id);
+          if (!remote) return shot;
+          return { ...shot, visualAssets: remote.visualAssets, visualStatus: remote.visualStatus };
+        }),
+      };
+    });
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -178,7 +211,7 @@ export function ShootGuideWorkspace({
     setGuide({ ...guide, shots });
   }
 
-  async function addReferenceFiles(kind: "location" | "mood", list: FileList | null) {
+  async function addReferenceFiles(kind: ShootGuideReferenceKind, list: FileList | null) {
     if (!guide || !user || !list?.length) return;
     setSaving(true);
     setError(null);
@@ -226,9 +259,16 @@ export function ShootGuideWorkspace({
     setGenerating(true);
     setError(null);
     try {
-      const { guide: next } = await generateShootGuide(getToken, guide.id, { stage });
-      setGuide(next);
-      if (stage !== "vision") setTab("shots");
+      const { guide: generated } = await generateShootGuide(getToken, guide.id, { stage });
+      const shots = preserveShotVisuals(guide.shots ?? [], generated.shots ?? []);
+      const next = { ...generated, shots };
+      if (shots.some((shot, index) => shot !== generated.shots?.[index])) {
+        const { guide: saved } = await updateShootGuide(getToken, guide.id, { shots });
+        setGuide(saved);
+      } else {
+        setGuide(next);
+      }
+      if (stage !== "vision") setSection("shots");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
@@ -241,12 +281,18 @@ export function ShootGuideWorkspace({
     setGeneratingShotId(shotId);
     setError(null);
     try {
-      const { guide: next } = await generateShootGuide(getToken, guide.id, {
+      const { guide: generated } = await generateShootGuide(getToken, guide.id, {
         stage: "shot",
         shotId,
         instruction,
       });
-      setGuide(next);
+      const shots = preserveShotVisuals(guide.shots ?? [], generated.shots ?? []);
+      if (shots.some((shot, index) => shot !== generated.shots?.[index])) {
+        const { guide: saved } = await updateShootGuide(getToken, guide.id, { shots });
+        setGuide(saved);
+      } else {
+        setGuide(generated);
+      }
       setExpandedShot(shotId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Shot generation failed");
@@ -257,8 +303,19 @@ export function ShootGuideWorkspace({
 
   async function setShotStatus(shotId: string, status: ShootGuideShotStatus) {
     if (!guide) return;
-    const shots = (guide.shots ?? []).map((s) => (s.id === shotId ? { ...s, status } : s));
+    const shots = (guide.shots ?? []).map((s) =>
+      s.id === shotId
+        ? { ...s, status, visualStatus: status === "ready" ? ("ready" as const) : s.visualStatus }
+        : s
+    );
     await save({ shots, currentShotId: shotId });
+  }
+
+  async function updateShotAssets(shotId: string, patch: Partial<ShootGuideShot>) {
+    if (!guide) return;
+    const shots = (guide.shots ?? []).map((s) => (s.id === shotId ? { ...s, ...patch } : s));
+    setGuide({ ...guide, shots });
+    await save({ shots });
   }
 
   const progress = useMemo(() => {
@@ -277,7 +334,7 @@ export function ShootGuideWorkspace({
   if (!user || !appUser) {
     return (
       <div className="p-6">
-        <p className="text-sm text-slate-600">Sign in to use Shoot Guide.</p>
+        <p className="text-sm text-slate-600">Sign in to use Scene Builder.</p>
       </div>
     );
   }
@@ -286,8 +343,8 @@ export function ShootGuideWorkspace({
     return (
       <div className="mx-auto max-w-3xl px-4 py-8">
         <p className="text-sm text-slate-600">{error || "Guide not found."}</p>
-        <Link href="/shoot-guide" className="mt-4 inline-block text-sm font-semibold text-sky-700">
-          Back to guides
+        <Link href="/scene-builder" className="mt-4 inline-block text-sm font-semibold text-sky-700">
+          Back to scenes
         </Link>
       </div>
     );
@@ -298,8 +355,8 @@ export function ShootGuideWorkspace({
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
       <PageHeader
-        title={guide.title || "Untitled shoot guide"}
-        subtitle={`${progress.done}/${progress.total} shots complete · ${guide.creativeIntent || "style unset"}`}
+        title={guide.title || "Untitled scene"}
+        subtitle={`${SCENE_OUTPUT_LABELS[guide.outputType || "hybrid"]} · ${progress.done}/${progress.total} shots ready to shoot`}
         action={
           <div className="flex flex-wrap gap-2">
             <Button
@@ -310,16 +367,16 @@ export function ShootGuideWorkspace({
             >
               {generating && !generatingShotId ? "Generating…" : "Regenerate"}
             </Button>
-            <Link href="/shoot-guide">
+            <Link href="/scene-builder">
               <Button variant="outline" size="sm">
-                All guides
+                All scenes
               </Button>
             </Link>
           </div>
         }
       />
       <p className="-mt-4 mb-5 text-sm text-slate-500">
-        Shot cards are DP recommendations — edit any field, or ask for a different lens, angle, or simpler setup.
+        Build the scene here, then send the shots you want into Production.
       </p>
 
       {error ? (
@@ -335,34 +392,98 @@ export function ShootGuideWorkspace({
 
       <div
         role="tablist"
-        aria-label="Shoot Guide sections"
+        aria-label="Scene Builder sections"
         className="mb-5 flex gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200"
       >
-        {SHOOT_GUIDE_TABS.map((id) => (
+        {SECTIONS.map(([id, label]) => (
           <button
             key={id}
             type="button"
             role="tab"
-            aria-selected={tab === id}
-            onClick={() => setTab(id)}
+            aria-selected={section === id}
+            onClick={() => setSection(id)}
             className={cn(
               "shrink-0 rounded-lg px-3 py-2 text-sm font-semibold min-h-[44px]",
-              tab === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+              section === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
             )}
           >
-            {TAB_LABELS[id]}
+            {label}
           </button>
         ))}
       </div>
 
-      {tab === "overview" ? (
+      {section === "setup" ? (
         <div className="space-y-4">
           <Input
-            label="Title"
+            label="Scene title"
             value={guide.title}
             onChange={(e) => setGuide({ ...guide, title: e.target.value })}
             touch
           />
+          <Textarea
+            label="Scene description"
+            value={guide.prompt}
+            onChange={(e) => setGuide({ ...guide, prompt: e.target.value })}
+            placeholder="Stormi is on the treadmill doing a cinematic workout scene."
+            rows={4}
+          />
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-slate-700">Output type</p>
+            <div className="grid grid-cols-3 gap-2">
+              {SCENE_OUTPUT_TYPES.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setGuide({ ...guide, outputType: value as SceneOutputType })}
+                  className={cn(
+                    "rounded-xl border px-3 py-2 text-sm font-semibold min-h-[44px]",
+                    (guide.outputType || "hybrid") === value
+                      ? "border-sky-400 bg-sky-50 text-sky-900"
+                      : "border-slate-200 bg-white text-slate-700"
+                  )}
+                >
+                  {SCENE_OUTPUT_LABELS[value]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                ["subject", "Actor reference"],
+                ["location", "Location / environment"],
+                ["mood", "Mood / look"],
+                ["wardrobe", "Wardrobe"],
+              ] as const
+            ).map(([kind, label]) => (
+              <Input
+                key={kind}
+                label={label}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => void addReferenceFiles(kind, e.target.files)}
+              />
+            ))}
+          </div>
+          {guide.references?.length ? (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {guide.references.map((ref) => (
+                <figure key={ref.id} className="overflow-hidden rounded-xl border border-slate-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={ref.storageUrl} alt={REF_LABELS[ref.kind] || ref.kind} className="h-24 w-full object-cover" />
+                  <figcaption className="px-2 py-1 text-[11px] font-medium text-slate-500">
+                    {REF_LABELS[ref.kind] || ref.kind}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">No references yet. Shots will inherit whatever you upload here.</p>
+          )}
+          <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-800">Scene analysis and strategy</summary>
+            <div className="mt-3 space-y-4">
           {guide.sceneAnalysis &&
           (guide.sceneAnalysis.subject ||
             guide.sceneAnalysis.action ||
@@ -515,19 +636,8 @@ export function ShootGuideWorkspace({
             Progress: {progress.done} of {progress.total} shots complete.
             {guide.useMyEquipment ? " Using your Equipment Catalog." : " Ideal gear (not limited to inventory)."}
           </p>
-          {guide.references?.length ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {guide.references.map((ref) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={ref.id}
-                  src={ref.storageUrl}
-                  alt={ref.kind}
-                  className="h-24 w-full rounded-xl object-cover"
-                />
-              ))}
             </div>
-          ) : null}
+          </details>
           <Button
             size="touch"
             disabled={saving}
@@ -535,18 +645,20 @@ export function ShootGuideWorkspace({
               setEditCopy({});
               void save({
                 title: guide.title,
+                prompt: guide.prompt,
+                outputType: guide.outputType || "hybrid",
                 overview: guide.overview,
                 creativeStylePreset: guide.creativeStylePreset,
                 creativeIntent: guide.creativeIntent,
               });
             }}
           >
-            {saving ? "Saving…" : "Save overview"}
+            {saving ? "Saving…" : "Save scene"}
           </Button>
         </div>
       ) : null}
 
-      {tab === "setup" ? (
+      {section === "details" ? (
         <div className="space-y-4">
           <ShootGuideSetupVision
             guide={guide}
@@ -611,7 +723,7 @@ export function ShootGuideWorkspace({
         </div>
       ) : null}
 
-      {tab === "shots" ? (
+      {section === "shots" ? (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             <Button
@@ -620,22 +732,29 @@ export function ShootGuideWorkspace({
               disabled={generating || saving || Boolean(generatingShotId)}
               onClick={() => void regenerate("shots")}
             >
-              {generating && !generatingShotId ? "Generating…" : "Regenerate shots"}
+              {generating && !generatingShotId ? "Generating…" : "Generate shot list"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const shots = [...(guide.shots ?? []), emptyShot((guide.shots?.length ?? 0) + 1, guide.sourceSceneLabel)];
+                setGuide({ ...guide, shots });
+              }}
+            >
+              Add shot
             </Button>
           </div>
           {(guide.shots ?? []).length === 0 ? (
             <p className="text-sm text-slate-600">No shots yet. Generate a sequence from this guide.</p>
           ) : (
-            (guide.shots ?? []).map((shot) => {
-              const open = expandedShot === shot.id;
-              return (
+            (guide.shots ?? []).map((shot) => (
                 <Card key={shot.id}>
                   <CardBody className="space-y-3">
                     <div className="space-y-3">
                       <div className="min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Shot {String(shot.shotNumber).padStart(2, "0")}
-                          {shot.status !== "planned" ? ` · ${shot.status}` : ""}
                         </p>
                         <Input
                           value={shot.title}
@@ -647,21 +766,20 @@ export function ShootGuideWorkspace({
                         <Button variant="outline" size="sm" onClick={() => void setShotStatus(shot.id, "ready")}>
                           Mark ready
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => void setShotStatus(shot.id, "complete")}>
-                          Complete shot
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const shots = (guide.shots ?? [])
+                              .filter((s) => s.id !== shot.id)
+                              .map((s, i) => ({ ...s, shotNumber: i + 1 }));
+                            setGuide({ ...guide, shots });
+                          }}
+                        >
+                          Delete
                         </Button>
                       </div>
                     </div>
-                    <Textarea
-                      label="Purpose"
-                      value={shot.purpose}
-                      onChange={(e) => setShot(shot.id, { purpose: e.target.value })}
-                      placeholder="Why this shot exists"
-                      rows={2}
-                    />
-                    <p className="text-sm leading-relaxed text-slate-600">
-                      {shot.reason || "No DP note yet."}
-                    </p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <Input
                         label="Framing"
@@ -669,48 +787,38 @@ export function ShootGuideWorkspace({
                         onChange={(e) => setShot(shot.id, { framing: e.target.value })}
                       />
                       <Input
-                        label="Camera position / height"
-                        value={[shot.cameraPosition, shot.cameraHeight].filter(Boolean).join(" · ")}
-                        onChange={(e) => setShot(shot.id, { cameraPosition: e.target.value })}
-                      />
-                      <Input
-                        label="Movement"
-                        value={shot.movement ?? ""}
-                        onChange={(e) => setShot(shot.id, { movement: e.target.value })}
-                      />
-                      <Input
-                        label="Focus"
-                        value={shot.focusStrategy ?? ""}
-                        onChange={(e) => setShot(shot.id, { focusStrategy: e.target.value })}
-                      />
-                      <Input
-                        label="Camera"
-                        value={shot.camera ?? ""}
-                        onChange={(e) => setShot(shot.id, { camera: e.target.value })}
-                      />
-                      <Input
                         label="Lens"
                         value={shot.lens || shot.focalLength || ""}
                         onChange={(e) => setShot(shot.id, { lens: e.target.value })}
                       />
                       <Input
-                        label="Support"
-                        value={shot.support ?? ""}
-                        onChange={(e) => setShot(shot.id, { support: e.target.value })}
+                        label="Camera movement"
+                        value={shot.movement ?? ""}
+                        onChange={(e) => setShot(shot.id, { movement: e.target.value })}
                       />
                       <Input
-                        label="Angle"
-                        value={shot.cameraAngle ?? ""}
-                        onChange={(e) => setShot(shot.id, { cameraAngle: e.target.value })}
+                        label="Duration"
+                        value={shot.duration ?? ""}
+                        onChange={(e) => setShot(shot.id, { duration: e.target.value })}
+                        placeholder="4s"
                       />
                     </div>
-                    <ShootGuideGearMatch
-                      shot={shot}
-                      plan={guide.equipmentPlan}
-                      showIdealWhenNotOwned={guide.showIdealWhenNotOwned}
-                      useMyEquipment={guide.useMyEquipment}
-                    />
-                    <div className="flex flex-wrap gap-2">
+                    {user ? (
+                      <ShotVisualPanel
+                        guide={guide}
+                        shot={shot}
+                        userId={user.uid}
+                        compact
+                        getToken={getToken}
+                        onGuide={applyVisualGuide}
+                        onShotChange={(patch) => updateShotAssets(shot.id, patch)}
+                      />
+                    ) : null}
+                    <details>
+                      <summary className="cursor-pointer text-sm font-semibold text-slate-600">
+                        Lens and angle variations
+                      </summary>
+                    <div className="mt-2 flex flex-wrap gap-2">
                       {VARIANT_BUTTONS.map((v) => (
                         <Button
                           key={v.key}
@@ -733,45 +841,39 @@ export function ShootGuideWorkspace({
                         Regenerate shot
                       </Button>
                     </div>
-                    <button
-                      type="button"
-                      className="text-sm font-semibold text-sky-700"
-                      onClick={() => setExpandedShot(open ? null : shot.id)}
-                    >
-                      {open ? "Hide details" : "Settings, performance, why"}
-                    </button>
-                    {open ? (
-                      <div className="space-y-3 border-t border-slate-100 pt-3">
+                    </details>
+                    <details>
+                      <summary className="cursor-pointer text-sm font-semibold text-slate-600">
+                        Advanced shot details
+                      </summary>
+                      <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
                         <Textarea
-                          label="Why this setup"
-                          value={shot.reason ?? ""}
-                          onChange={(e) => setShot(shot.id, { reason: e.target.value })}
+                          label="Shot description"
+                          value={shot.purpose}
+                          onChange={(e) => setShot(shot.id, { purpose: e.target.value })}
                           rows={2}
                         />
-                        <Textarea
-                          label="Lighting changes"
-                          value={shot.lightingChanges ?? ""}
-                          onChange={(e) => setShot(shot.id, { lightingChanges: e.target.value })}
-                          rows={2}
-                        />
-                        <Textarea
-                          label="Performance"
-                          value={shot.performanceDirection ?? ""}
-                          onChange={(e) => setShot(shot.id, { performanceDirection: e.target.value })}
-                          rows={2}
-                        />
-                        <Textarea
-                          label="Continuity / audio"
-                          value={[shot.continuityRequirements, shot.audioRequirements].filter(Boolean).join("\n")}
-                          onChange={(e) => setShot(shot.id, { continuityRequirements: e.target.value })}
-                          rows={2}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Input label="Camera" value={shot.camera ?? ""} onChange={(e) => setShot(shot.id, { camera: e.target.value })} />
+                          <Input label="Angle" value={shot.cameraAngle ?? ""} onChange={(e) => setShot(shot.id, { cameraAngle: e.target.value })} />
+                          <Input label="Focus" value={shot.focusStrategy ?? ""} onChange={(e) => setShot(shot.id, { focusStrategy: e.target.value })} />
+                          <Input label="Exposure / settings" value={shot.cameraSettings ?? ""} onChange={(e) => setShot(shot.id, { cameraSettings: e.target.value })} />
+                          <Input label="Support / gear" value={shot.support ?? ""} onChange={(e) => setShot(shot.id, { support: e.target.value })} />
+                          <Input label="Lighting" value={shot.lightingChanges ?? ""} onChange={(e) => setShot(shot.id, { lightingChanges: e.target.value })} />
+                        </div>
+                        <Textarea label="Audio notes" value={shot.audioRequirements ?? ""} onChange={(e) => setShot(shot.id, { audioRequirements: e.target.value })} rows={2} />
+                        <Textarea label="Technical notes" value={shot.reason ?? ""} onChange={(e) => setShot(shot.id, { reason: e.target.value })} rows={2} />
+                        <ShootGuideGearMatch
+                          shot={shot}
+                          plan={guide.equipmentPlan}
+                          showIdealWhenNotOwned={guide.showIdealWhenNotOwned}
+                          useMyEquipment={guide.useMyEquipment}
                         />
                       </div>
-                    ) : null}
+                    </details>
                   </CardBody>
                 </Card>
-              );
-            })
+            ))
           )}
           <Button size="touch" disabled={saving} onClick={() => void persistShots()}>
             {saving ? "Saving…" : "Save shots"}
@@ -779,7 +881,98 @@ export function ShootGuideWorkspace({
         </div>
       ) : null}
 
-      {tab === "slate" ? (
+      {section === "preview" ? (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">
+            Each shot keeps its own stills and clips. Scene references stay on the scene.
+          </p>
+          {(guide.shots ?? []).length === 0 ? (
+            <p className="text-sm text-slate-600">Generate or add shots first.</p>
+          ) : (
+            (guide.shots ?? []).map((shot) => (
+              <Card key={shot.id}>
+                <CardBody className="space-y-3">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {String(shot.shotNumber).padStart(2, "0")} · {shot.title || "Untitled shot"}
+                  </p>
+                  {user ? (
+                    <ShotVisualPanel
+                      guide={guide}
+                      shot={shot}
+                      userId={user.uid}
+                      getToken={getToken}
+                      onGuide={applyVisualGuide}
+                      onShotChange={(patch) => updateShotAssets(shot.id, patch)}
+                    />
+                  ) : null}
+                </CardBody>
+              </Card>
+            ))
+          )}
+        </div>
+      ) : null}
+
+      {section === "handoff" ? (
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Mark the shots that should move into Production. This keeps the scene here and opens the production project, or the project list if none is linked yet.
+          </p>
+          {(guide.shots ?? []).map((shot) => (
+            <label key={shot.id} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4"
+                checked={selectedShotIds.includes(shot.id)}
+                onChange={(e) =>
+                  setSelectedShotIds((prev) =>
+                    e.target.checked ? [...prev, shot.id] : prev.filter((id) => id !== shot.id)
+                  )
+                }
+              />
+              <span>
+                <span className="font-semibold text-slate-900">
+                  {String(shot.shotNumber).padStart(2, "0")} · {shot.title || "Untitled shot"}
+                </span>
+                <span className="mt-0.5 block text-slate-500">{shot.purpose || "No description"}</span>
+              </span>
+            </label>
+          ))}
+          <Button
+            size="touch"
+            disabled={saving || selectedShotIds.length === 0}
+            onClick={() => {
+              const shots = (guide.shots ?? []).map((shot) =>
+                selectedShotIds.includes(shot.id) ? { ...shot, status: "ready" as const } : shot
+              );
+              void save({ shots, status: "ready" }).then(() => {
+                setWorkspace("production");
+                router.push(guide.projectId ? `/projects/${guide.projectId}` : "/projects");
+              });
+            }}
+          >
+            {saving ? "Sending…" : "Send selected shots to Production"}
+          </Button>
+        </div>
+      ) : null}
+
+      <details className="mt-8 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-700">Set tools</summary>
+        <p className="mt-2 text-xs text-slate-500">Slate, checklist, and notes stay available without crowding the plan.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {(["slate", "checklist", "notes"] as const).map((id) => (
+            <Button
+              key={id}
+              variant={setTool === id ? "primary" : "outline"}
+              size="sm"
+              onClick={() => setSetTool(setTool === id ? null : id)}
+            >
+              {id[0].toUpperCase() + id.slice(1)}
+            </Button>
+          ))}
+        </div>
+      </details>
+
+      {setTool === "slate" ? (
         <ShootGuideSlateTab
           guide={guide}
           saving={saving}
@@ -805,7 +998,7 @@ export function ShootGuideWorkspace({
         />
       ) : null}
 
-      {tab === "checklist" ? (
+      {setTool === "checklist" ? (
         <ShootGuideChecklistTab
           items={guide.checklist ?? []}
           saving={saving}
@@ -821,7 +1014,7 @@ export function ShootGuideWorkspace({
         />
       ) : null}
 
-      {tab === "notes" ? (
+      {setTool === "notes" ? (
         <div className="space-y-4">
           <Textarea
             label="Notes"

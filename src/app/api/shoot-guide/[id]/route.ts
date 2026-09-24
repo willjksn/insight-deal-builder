@@ -89,6 +89,9 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
 
     if (body.title !== undefined) patch.title = String(body.title || "").trim() || existing.title;
     if (body.prompt !== undefined) patch.prompt = String(body.prompt || "").trim();
+    if (body.outputType === "real" || body.outputType === "ai" || body.outputType === "hybrid") {
+      patch.outputType = body.outputType;
+    }
     if (body.status !== undefined) patch.status = body.status;
     if (body.mode !== undefined) patch.mode = body.mode;
     if (body.creativeStylePreset !== undefined) patch.creativeStylePreset = body.creativeStylePreset;

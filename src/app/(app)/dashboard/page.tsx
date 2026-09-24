@@ -14,6 +14,6 @@ export default function DashboardPage() {
   if (isCreatorPortalUser(appUser)) {
     return <CreatorPortalHome />;
   }
-  if (workspace === "shoot-guide") return <ShootGuideLibrary />;
+  if (workspace === "scene-builder") return <ShootGuideLibrary />;
   return workspace === "production" ? <ProductionDashboard /> : <BusinessDashboard />;
 }

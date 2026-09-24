@@ -44,7 +44,7 @@ function sourceLabel(guide: ShootGuide): string {
 }
 
 export function ShootGuideLibrary() {
-  useEnsureWorkspace("shoot-guide");
+  useEnsureWorkspace("scene-builder");
   const { user, appUser, loading: authLoading } = useAuth();
   const [guides, setGuides] = useState<ShootGuide[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +89,7 @@ export function ShootGuideLibrary() {
   if (!user || !appUser) {
     return (
       <div className="p-6">
-        <p className="text-sm text-slate-600">Sign in to use Shoot Guide.</p>
+        <p className="text-sm text-slate-600">Sign in to use Scene Builder.</p>
       </div>
     );
   }
@@ -97,7 +97,7 @@ export function ShootGuideLibrary() {
   if (!allowed) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <PageHeader title="Shoot Guide" subtitle="On-set planning and execution." />
+        <PageHeader title="Scene Builder" subtitle="Turn a scene idea into shots, previews, and a production handoff." />
         <p className="text-sm text-slate-600">You do not have access to production tools.</p>
       </div>
     );
@@ -106,10 +106,10 @@ export function ShootGuideLibrary() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
       <PageHeader
-        title="Shoot Guide"
-        subtitle="What you are shooting, which shots you need, and what to check before you roll."
-        actionLabel="New guide"
-        actionHref="/shoot-guide/new"
+        title="Scene Builder"
+        subtitle="Start with an idea or a photo. Plan the shots, preview them, then send the scene to Production."
+        actionLabel="New scene"
+        actionHref="/scene-builder/new"
       />
 
       {error ? (
@@ -124,10 +124,10 @@ export function ShootGuideLibrary() {
         </div>
       ) : guides.length === 0 ? (
         <EmptyState
-          title="No shoot guides yet"
-          description="Start from a Quick Scene, pull an existing script, or open a blank guide."
-          actionLabel="New guide"
-          actionHref="/shoot-guide/new"
+          title="No scenes yet"
+          description="Describe a scene in plain language. A full script is optional."
+          actionLabel="New scene"
+          actionHref="/scene-builder/new"
         />
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
@@ -137,7 +137,7 @@ export function ShootGuideLibrary() {
             return (
               <li key={guide.id}>
                 <Link
-                  href={`/shoot-guide/${guide.id}`}
+                  href={`/scene-builder/${guide.id}`}
                   className="block rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm ring-1 ring-slate-100 transition hover:border-sky-200 hover:shadow-md"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -147,7 +147,7 @@ export function ShootGuideLibrary() {
                         {sourceLabel(guide)}
                       </div>
                       <h2 className="truncate text-base font-semibold text-slate-900">
-                        {guide.title || "Untitled shoot guide"}
+                        {guide.title || "Untitled scene"}
                       </h2>
                       <p className="mt-1 line-clamp-2 text-sm text-slate-600">
                         {guide.prompt || guide.overview?.sceneSummary || "No scene description yet."}
@@ -156,12 +156,12 @@ export function ShootGuideLibrary() {
                     <button
                       type="button"
                       className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                      aria-label="Delete guide"
+                      aria-label="Delete scene"
                       disabled={busyId === guide.id}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (!window.confirm("Delete this shoot guide?")) return;
+                        if (!window.confirm("Delete this scene?")) return;
                         setBusyId(guide.id);
                         void deleteShootGuide(getToken, guide.id)
                           .then(() => setGuides((prev) => prev.filter((g) => g.id !== guide.id)))
@@ -186,10 +186,10 @@ export function ShootGuideLibrary() {
       )}
 
       <div className="mt-6 sm:hidden">
-        <Link href="/shoot-guide/new">
+        <Link href="/scene-builder/new">
           <Button size="touch" className="w-full">
             <Plus className="mr-2 h-4 w-4" />
-            New guide
+            New scene
           </Button>
         </Link>
       </div>

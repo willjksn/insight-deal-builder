@@ -27,7 +27,7 @@ export function resolveShotCount(
   return AUTO_SHOT_COUNT;
 }
 
-export function titleFromPrompt(prompt: string, fallback = "Untitled shoot guide"): string {
+export function titleFromPrompt(prompt: string, fallback = "Untitled scene"): string {
   const cleaned = prompt.replace(/\s+/g, " ").trim();
   if (!cleaned) return fallback;
   const first = cleaned.split(/[.!?]/)[0]?.trim() || cleaned;
@@ -72,6 +72,11 @@ export function emptyShot(
     continuityRequirements: "",
     specialRequirements: "",
     reason: "",
+    duration: "",
+    previewIntent: null,
+    previewNote: "",
+    visualStatus: "planned",
+    visualAssets: [],
     takeRecords: [],
   };
 }
@@ -123,7 +128,7 @@ export function normalizeCreateInput(raw: ShootGuideCreateInput): {
     : [];
   const useMyEquipment = Boolean(raw.useMyEquipment);
   return {
-    title: String(raw.title || "").trim() || titleFromPrompt(prompt, sceneLabel || "Untitled shoot guide"),
+    title: String(raw.title || "").trim() || titleFromPrompt(prompt, sceneLabel || "Untitled scene"),
     sourceType,
     sourceScriptId: raw.sourceScriptId?.trim() || null,
     sourceSceneId: raw.sourceSceneId?.trim() || null,
@@ -173,6 +178,10 @@ export function createGuideDocument(
     sourceSceneId: normalized.sourceSceneId,
     sourceSceneLabel: normalized.sourceSceneLabel,
     prompt: normalized.prompt,
+    outputType:
+      input.outputType === "real" || input.outputType === "ai" || input.outputType === "hybrid"
+        ? input.outputType
+        : "hybrid",
     status: "draft",
     mode: "plan",
     creativeStylePreset: normalized.creativeStylePreset,

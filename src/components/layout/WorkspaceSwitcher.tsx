@@ -9,11 +9,11 @@ import { WORKSPACES, WORKSPACE_HOME, WORKSPACE_LABELS, Workspace } from "@/lib/w
 const WORKSPACE_ICONS: Record<Workspace, typeof Briefcase> = {
   business: Briefcase,
   production: Clapperboard,
-  "shoot-guide": Aperture,
+  "scene-builder": Aperture,
 };
 
 /**
- * Segmented [ Business ] [ Production ] [ Shoot Guide ] control. Switching
+ * Segmented [ Business ] [ Production ] [ Scene Builder ] control. Switching
  * updates the persisted workspace and lands on that workspace's home.
  */
 export function WorkspaceSwitcher({

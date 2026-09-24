@@ -22,11 +22,11 @@ const partner = {
   company: "Partner Co",
 } as AppUser;
 
-function groupLabels(user: AppUser | null, workspace: "business" | "production" | "shoot-guide") {
+function groupLabels(user: AppUser | null, workspace: "business" | "production" | "scene-builder") {
   return getVisibleNavGroups(workspace, user).map((g) => g.label);
 }
 
-function itemHrefs(user: AppUser | null, workspace: "business" | "production" | "shoot-guide") {
+function itemHrefs(user: AppUser | null, workspace: "business" | "production" | "scene-builder") {
   return getVisibleNavGroups(workspace, user).flatMap((g) => g.items.map((i) => i.href));
 }
 
@@ -36,22 +36,22 @@ describe("isGroupInWorkspace", () => {
     expect(isGroupInWorkspace(overview, "business")).toBe(true);
     expect(isGroupInWorkspace(overview, "production")).toBe(true);
     const system = NAV_GROUPS.find((g) => g.label === "System")!;
-    expect(isGroupInWorkspace(system, "shoot-guide")).toBe(true);
+    expect(isGroupInWorkspace(system, "scene-builder")).toBe(true);
   });
 
   it("keeps workspace groups scoped", () => {
     const production = NAV_GROUPS.find((g) => g.label === "Production")!;
     expect(isGroupInWorkspace(production, "production")).toBe(true);
     expect(isGroupInWorkspace(production, "business")).toBe(false);
-    expect(isGroupInWorkspace(production, "shoot-guide")).toBe(false);
+    expect(isGroupInWorkspace(production, "scene-builder")).toBe(false);
   });
 
-  it("omits Overview from Shoot Guide so the on-set workspace stays lean", () => {
+  it("omits Overview from Scene Builder so the planning workspace stays lean", () => {
     const overview = NAV_GROUPS.find((g) => g.label === "Overview")!;
-    expect(isGroupInWorkspace(overview, "shoot-guide")).toBe(false);
-    const shootGuide = NAV_GROUPS.find((g) => g.label === "Shoot Guide")!;
-    expect(isGroupInWorkspace(shootGuide, "shoot-guide")).toBe(true);
-    expect(isGroupInWorkspace(shootGuide, "production")).toBe(false);
+    expect(isGroupInWorkspace(overview, "scene-builder")).toBe(false);
+    const sceneBuilder = NAV_GROUPS.find((g) => g.label === "Scene Builder")!;
+    expect(isGroupInWorkspace(sceneBuilder, "scene-builder")).toBe(true);
+    expect(isGroupInWorkspace(sceneBuilder, "production")).toBe(false);
   });
 });
 
@@ -117,15 +117,15 @@ describe("getVisibleNavGroups", () => {
     expect(groupLabels(imgAdmin, "production")).not.toContain("Content development");
   });
 
-  it("shows Shoot Guide (not Production or Revenue) in the shoot-guide workspace", () => {
-    const labels = groupLabels(imgAdmin, "shoot-guide");
-    const hrefs = itemHrefs(imgAdmin, "shoot-guide");
-    expect(labels).toContain("Shoot Guide");
+  it("shows Scene Builder (not Production or Revenue) in the scene-builder workspace", () => {
+    const labels = groupLabels(imgAdmin, "scene-builder");
+    const hrefs = itemHrefs(imgAdmin, "scene-builder");
+    expect(labels).toContain("Scene Builder");
     expect(labels).toContain("System");
     expect(labels).not.toContain("Overview");
     expect(labels).not.toContain("Production");
     expect(labels).not.toContain("Revenue");
-    expect(hrefs).toContain("/shoot-guide");
+    expect(hrefs).toContain("/scene-builder");
   });
 
   it("limits network creators to the creator portal nav only", () => {

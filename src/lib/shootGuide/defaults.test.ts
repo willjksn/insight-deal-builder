@@ -24,7 +24,7 @@ describe("titleFromPrompt", () => {
     expect(titleFromPrompt("Stormi is on the treadmill working out. More later.")).toBe(
       "Stormi is on the treadmill working out"
     );
-    expect(titleFromPrompt("")).toBe("Untitled shoot guide");
+    expect(titleFromPrompt("")).toBe("Untitled scene");
   });
 });
 
@@ -66,7 +66,7 @@ describe("createGuideDocument", () => {
   it("allows a blank guide without a prompt", () => {
     const input = normalizeCreateInput({ sourceType: "blank" });
     expect(input.prompt).toBe("");
-    expect(input.title).toBe("Untitled shoot guide");
+    expect(input.title).toBe("Untitled scene");
     const overview = buildOverview({
       prompt: "",
       creativeIntent: "cinematic",

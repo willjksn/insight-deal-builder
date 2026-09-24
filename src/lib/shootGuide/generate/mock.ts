@@ -317,7 +317,7 @@ export function mockStrategyJson(
 }
 
 function packGold(
-  gold: Record<string, string>[],
+  gold: Array<{ title: string } & Record<string, string | undefined>>,
   count: number,
   guide: Pick<ShootGuide, "sourceSceneLabel">,
   extras: { cameraSettings: string; audioRequirements: string }
