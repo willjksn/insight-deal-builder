@@ -12,7 +12,8 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { generateShootGuide, getShootGuide, updateShootGuide } from "@/lib/shootGuide/apiClient";
+import { generateShootGuide, getShootGuide, sendSceneToProduction, updateShootGuide } from "@/lib/shootGuide/apiClient";
+import { useAccessibleProjects } from "@/hooks/useAccessibleProjects";
 import { completedShotCount, emptySetup, emptyShot } from "@/lib/shootGuide/defaults";
 import {
   hydrateGuideIfNeeded,
@@ -126,6 +127,11 @@ export function ShootGuideWorkspace({
   const [section, setSection] = useState<SceneSection>("setup");
   const [setTool, setSetTool] = useState<"slate" | "checklist" | "notes" | null>(null);
   const [selectedShotIds, setSelectedShotIds] = useState<string[]>([]);
+  const [sendMode, setSendMode] = useState<"new" | "existing">("new");
+  const [sendProjectName, setSendProjectName] = useState("");
+  const [sendProjectId, setSendProjectId] = useState("");
+  const [sendMessage, setSendMessage] = useState<string | null>(null);
+  const { projects } = useAccessibleProjects();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -365,7 +371,7 @@ export function ShootGuideWorkspace({
               disabled={generating || saving || Boolean(generatingShotId)}
               onClick={() => void regenerate("all")}
             >
-              {generating && !generatingShotId ? "Generating…" : "Regenerate"}
+              {generating && !generatingShotId ? "Rebuilding…" : "Rebuild shot list"}
             </Button>
             <Link href="/scene-builder">
               <Button variant="outline" size="sm">
@@ -447,12 +453,14 @@ export function ShootGuideWorkspace({
               ))}
             </div>
           </div>
+          <p className="text-xs text-slate-500">
+            Actor, location, and wardrobe. Those are the three images a still can use.
+          </p>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
                 ["subject", "Actor reference"],
                 ["location", "Location / environment"],
-                ["mood", "Mood / look"],
                 ["wardrobe", "Wardrobe"],
               ] as const
             ).map(([kind, label]) => (
@@ -915,7 +923,7 @@ export function ShootGuideWorkspace({
       {section === "handoff" ? (
         <div className="space-y-4">
           <p className="text-sm text-slate-600">
-            Mark the shots that should move into Production. This keeps the scene here and opens the production project, or the project list if none is linked yet.
+            Choose the shots to copy into Production. The scene stays here. Sending the same shot again updates the production copy instead of adding a duplicate.
           </p>
           {(guide.shots ?? []).map((shot) => (
             <label key={shot.id} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm">
@@ -937,21 +945,66 @@ export function ShootGuideWorkspace({
               </span>
             </label>
           ))}
-          <Button
-            size="touch"
-            disabled={saving || selectedShotIds.length === 0}
-            onClick={() => {
-              const shots = (guide.shots ?? []).map((shot) =>
-                selectedShotIds.includes(shot.id) ? { ...shot, status: "ready" as const } : shot
-              );
-              void save({ shots, status: "ready" }).then(() => {
-                setWorkspace("production");
-                router.push(guide.projectId ? `/projects/${guide.projectId}` : "/projects");
-              });
-            }}
-          >
-            {saving ? "Sending…" : "Send selected shots to Production"}
-          </Button>
+          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-sm font-semibold text-slate-900">Where should these shots go?</p>
+            <div className="flex flex-wrap gap-2">
+              {(["new", "existing"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${sendMode === mode ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`}
+                  onClick={() => setSendMode(mode)}
+                >
+                  {mode === "new" ? "Create new project" : "Add to existing project"}
+                </button>
+              ))}
+            </div>
+            {sendMode === "new" ? (
+              <Input
+                label="Project name"
+                value={sendProjectName || guide.title}
+                onChange={(e) => setSendProjectName(e.target.value)}
+              />
+            ) : (
+              <Select
+                label="Production project"
+                value={sendProjectId}
+                onChange={(e) => setSendProjectId(e.target.value)}
+                options={[
+                  { value: "", label: "Choose a project" },
+                  ...projects
+                    .filter((project) => project.ownerUserId === user?.uid)
+                    .map((project) => ({ value: project.id, label: project.projectName })),
+                ]}
+              />
+            )}
+            {sendMessage ? <p className="text-sm text-slate-600">{sendMessage}</p> : null}
+            <Button
+              size="touch"
+              disabled={saving || selectedShotIds.length === 0 || (sendMode === "existing" && !sendProjectId)}
+              onClick={() => {
+                setSaving(true);
+                setError(null);
+                setSendMessage(null);
+                void sendSceneToProduction(getToken, guide.id, {
+                  shotIds: selectedShotIds,
+                  mode: sendMode,
+                  projectName: sendProjectName || guide.title,
+                  projectId: sendProjectId,
+                })
+                  .then((result) => {
+                    setWorkspace("production");
+                    const verb = result.updated && !result.created ? "Updated" : "Sent";
+                    setSendMessage(`${verb} ${result.created + result.updated} shot${result.created + result.updated === 1 ? "" : "s"}.`);
+                    router.push(`/projects/${result.projectId}/production/days/${result.dayId}/shots`);
+                  })
+                  .catch((err) => setError(err instanceof Error ? err.message : "Could not send shots"))
+                  .finally(() => setSaving(false));
+              }}
+            >
+              {saving ? "Sending…" : "Send selected shots to Production"}
+            </Button>
+          </div>
         </div>
       ) : null}
 

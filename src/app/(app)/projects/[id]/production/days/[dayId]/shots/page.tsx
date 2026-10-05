@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ProductionDayNav } from "@/components/production/ProductionDayNav";
 import { ProductionShotListEditor } from "@/components/production/ProductionShotListEditor";
+import { SceneBuilderShotList } from "@/components/production/SceneBuilderShotList";
 import { SceneCoverageChecklistPanel } from "@/components/production/SceneCoverageChecklistPanel";
 import { CoverageBoardView } from "@/components/production/CoverageBoardView";
 import { ShotListPrintView } from "@/components/production/ShotListPrintView";
@@ -677,6 +678,15 @@ export default function ShotListDayPage() {
               </button>
             </div>
           ) : null}
+          <SceneBuilderShotList
+            projectId={projectId}
+            dayId={dayId}
+            shots={day.shots}
+            groups={board?.takeGroups}
+            canEdit={canEditShots}
+            getToken={getToken}
+            onShotsChange={patchShots}
+          />
           <ProductionShotListEditor
             shots={day.shots}
             onChange={patchShots}

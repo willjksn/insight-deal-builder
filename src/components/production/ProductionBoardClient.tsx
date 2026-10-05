@@ -288,6 +288,11 @@ export function ProductionBoardClient({ project }: ProductionBoardClientProps) {
                 </Link>
               </>
             ) : null}
+            <Link href={`/projects/${project.id}/production/ingest`}>
+              <Button size="touch" variant="outline">
+                Ingest Media
+              </Button>
+            </Link>
             <Link href={`/projects/${project.id}`}>
               <Button size="touch" variant="outline">
                 <ArrowLeft className="mr-2 h-5 w-5" />

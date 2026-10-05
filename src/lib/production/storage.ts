@@ -161,6 +161,38 @@ export function productionAssetPath(
   return `production/${projectId}/${folder}/${assetId}.${ext}`;
 }
 
+const FOOTAGE_MAX_MB = 100;
+
+export async function uploadProductionFootage(
+  projectId: string,
+  shotId: string,
+  assetId: string,
+  file: File,
+  onProgress?: (pct: number) => void
+): Promise<{ storagePath: string; storageUrl: string; fileName: string; mimeType: string }> {
+  const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+  const isImage = file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name);
+  if (!isVideo && !isImage) throw new Error("Footage must be a video or image");
+  if (file.size > FOOTAGE_MAX_MB * 1024 * 1024) throw new Error(`File must be under ${FOOTAGE_MAX_MB} MB`);
+  const ext = (file.name.split(".").pop() || (isVideo ? "mp4" : "jpg")).toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+  const mimeType = file.type || (isVideo ? "video/mp4" : "image/jpeg");
+  const path = `production/${projectId}/shots/${shotId}/footage/${assetId}.${ext}`;
+  const storageRef = ref(ensureStorage(), path);
+  const task = uploadBytesResumable(storageRef, file, { contentType: mimeType });
+  await new Promise<void>((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snap: UploadTaskSnapshot) => {
+        const pct = snap.totalBytes > 0 ? (snap.bytesTransferred / snap.totalBytes) * 100 : 0;
+        onProgress?.(pct);
+      },
+      reject,
+      () => resolve()
+    );
+  });
+  return { storagePath: path, storageUrl: await getDownloadURL(storageRef), fileName: file.name, mimeType };
+}
+
 export async function uploadProductionImage(
   projectId: string,
   folder: string,

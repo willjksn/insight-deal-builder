@@ -13,6 +13,7 @@ import {
   motionDurationSeconds,
   selectReferenceImages,
 } from "./prompts";
+import { providerLimits } from "./providerLimits";
 import { getVisualProvider } from "./runway";
 import type { VisualQuality, VisualTask } from "./types";
 
@@ -78,13 +79,15 @@ export async function startShotVisual(params: {
     throw new Error("Add a storyboard or AI still before animating this shot");
   }
 
+  const requestedDuration = motionDurationSeconds(shot);
+  const motion = motionModel(params.quality, requestedDuration);
+  const durationSeconds = params.type === "ai_motion" ? motion.duration : requestedDuration;
+  const limits = providerLimits.runway;
   const prompt =
     params.type === "ai_still"
-      ? buildStillPrompt(guide, shot, references)
-      : buildMotionPrompt(guide, shot);
-  const durationSeconds = motionDurationSeconds(shot);
-  const estimate =
-    params.type === "ai_still" ? stillModel(references.length) : motionModel(params.quality, durationSeconds);
+      ? buildStillPrompt(guide, shot, references, limits.stillPromptMaxCharacters)
+      : buildMotionPrompt(guide, shot, still, references, durationSeconds, limits.motionPromptMaxCharacters);
+  const estimate = params.type === "ai_still" ? stillModel(references.length) : motion;
 
   const asset: ShotVisualAsset = existing ?? {
     id: crypto.randomUUID(),

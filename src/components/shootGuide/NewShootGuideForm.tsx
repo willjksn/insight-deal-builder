@@ -424,11 +424,10 @@ export function NewShootGuideForm() {
           <CardBody className="space-y-4">
             <p className="text-sm font-semibold text-slate-900">References</p>
             <p className="text-xs text-slate-500">
-              Optional. These stay with the scene and carry into each shot.
+              Optional. Actor, location, and wardrobe are the three images used when generating a still.
             </p>
             <Input label="Actor reference" type="file" accept="image/*" multiple onChange={(e) => onFiles("subject", e.target.files)} />
             <Input label="Location / environment" type="file" accept="image/*" multiple onChange={(e) => onFiles("location", e.target.files)} />
-            <Input label="Mood / look" type="file" accept="image/*" multiple onChange={(e) => onFiles("mood", e.target.files)} />
             <Input label="Wardrobe" type="file" accept="image/*" multiple onChange={(e) => onFiles("wardrobe", e.target.files)} />
           </CardBody>
         </Card>

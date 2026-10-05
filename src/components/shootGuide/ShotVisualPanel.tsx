@@ -27,6 +27,17 @@ function latestAsset(assets: ShotVisualAsset[], type: ShotAssetType): ShotVisual
   return [...assets].reverse().find((asset) => asset.type === type) ?? null;
 }
 
+function friendlyVisualError(error: string | null | undefined): string {
+  if (!error) return "The image did not generate. Click Generate image to try again.";
+  if (error.includes("RUNWAYML_API_SECRET")) {
+    return "Image generation is not ready yet. Restart the app, then click Generate image again.";
+  }
+  if (error.includes("storyboard or AI still")) {
+    return "Generate an image first. Animate uses that picture as the first frame.";
+  }
+  return error;
+}
+
 export function ShotVisualPanel({
   guide,
   shot,
@@ -47,13 +58,15 @@ export function ShotVisualPanel({
   const storyboardRef = useRef<HTMLInputElement>(null);
   const footageRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<ShotAssetType | null>(null);
-  const [quality, setQuality] = useState<VisualQuality>("fast");
+  const [quality, setQuality] = useState<VisualQuality>("high");
   const [error, setError] = useState<string | null>(null);
   const assets = shot.visualAssets ?? [];
   const preview = latestPreviewAsset(assets);
   const visualStatus = resolveVisualStatus(shot);
   const stillJob = latestAsset(assets, "ai_still");
   const motionJob = latestAsset(assets, "ai_motion");
+  const stillRunning = stillJob?.status === "pending" && Boolean(stillJob.providerTaskId);
+  const motionRunning = motionJob?.status === "pending" && Boolean(motionJob.providerTaskId);
   const stillCost = formatApproxCost(stillModel(selectReferenceImages(guide).length).credits);
   const motionCost = formatApproxCost(motionModel(quality, motionDurationSeconds(shot)).credits);
   const pendingKey = assets
@@ -162,31 +175,37 @@ export function ShotVisualPanel({
           <span className="font-semibold text-slate-700">{SHOT_VISUAL_STATUS_LABELS[visualStatus]}</span>
         </div>
       </div>
-      {stillJob?.status === "failed" || motionJob?.status === "failed" ? (
-        <p className="text-sm text-red-700">
-          {stillJob?.status === "failed" ? stillJob.error || "AI still failed." : ""}
-          {motionJob?.status === "failed" ? ` ${motionJob.error || "Animation failed."}` : ""}
-        </p>
+      <p className="text-sm text-slate-600">
+        Generate image makes a picture of this shot. Animate turns that picture into a short clip. High Quality is
+        selected because Fast Previs looks rough and the person falls apart.
+      </p>
+      {stillRunning || motionRunning ? (
+        <p className="text-sm text-sky-800">Working. This usually takes under a minute. You can keep editing other shots.</p>
       ) : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {stillJob?.status === "failed" ? (
+        <p className="text-sm text-red-700">{friendlyVisualError(stillJob.error)}</p>
+      ) : null}
+      {motionJob?.status === "failed" ? (
+        <p className="text-sm text-red-700">{friendlyVisualError(motionJob.error)}</p>
+      ) : null}
+      {error ? <p className="text-sm text-red-700">{friendlyVisualError(error)}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" disabled={Boolean(busy)} onClick={() => storyboardRef.current?.click()}>
-          {busy === "storyboard" ? "Uploading…" : "Storyboard frame"}
-        </Button>
         <Button
           type="button"
-          variant="outline"
           size="sm"
-          disabled={Boolean(busy) || stillJob?.status === "pending"}
+          disabled={Boolean(busy) || stillRunning}
           onClick={() => void generate("ai_still", stillJob?.status === "failed" || stillJob?.status === "ready")}
         >
-          {stillJob?.status === "pending" || busy === "ai_still"
-            ? "Generating…"
-            : stillJob?.status === "failed" || stillJob?.status === "ready"
-              ? "Regenerate still"
-              : "Generate AI shot"}
+          {stillRunning || busy === "ai_still"
+            ? "Generating image…"
+            : stillJob?.status === "ready"
+              ? "Regenerate image"
+              : "Generate image"}
         </Button>
         <span className="text-xs text-slate-500">{stillCost}</span>
+        <Button type="button" variant="outline" size="sm" disabled={Boolean(busy)} onClick={() => storyboardRef.current?.click()}>
+          {busy === "storyboard" ? "Uploading…" : "Upload a still instead"}
+        </Button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
@@ -205,14 +224,14 @@ export function ShotVisualPanel({
           type="button"
           variant="outline"
           size="sm"
-          disabled={Boolean(busy) || motionJob?.status === "pending"}
+          disabled={Boolean(busy) || motionRunning || !latestPreviewAsset(assets.filter((asset) => asset.type !== "ai_motion"))}
           onClick={() => void generate("ai_motion", motionJob?.status === "failed" || motionJob?.status === "ready")}
         >
-          {motionJob?.status === "pending" || busy === "ai_motion"
+          {motionRunning || busy === "ai_motion"
             ? "Animating…"
-            : motionJob?.status === "failed" || motionJob?.status === "ready"
+            : motionJob?.status === "ready"
               ? "Regenerate animation"
-              : "Animate frame"}
+              : "Animate"}
         </Button>
         <span className="text-xs text-slate-500">{motionCost}</span>
         <Button type="button" variant="outline" size="sm" disabled={Boolean(busy)} onClick={() => footageRef.current?.click()}>

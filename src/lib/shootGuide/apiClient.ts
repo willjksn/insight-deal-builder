@@ -88,6 +88,19 @@ export async function startShotVisual(
   return parseJson<{ guide: ShootGuide; asset: ShotVisualAsset }>(res);
 }
 
+export async function sendSceneToProduction(
+  getToken: GetToken,
+  guideId: string,
+  body: { shotIds: string[]; mode: "new" | "existing"; projectName?: string; projectId?: string }
+) {
+  const res = await fetch(`/api/shoot-guide/${guideId}/send`, {
+    method: "POST",
+    headers: await authHeaders(getToken),
+    body: JSON.stringify(body),
+  });
+  return parseJson<{ projectId: string; dayId: string; created: number; updated: number }>(res);
+}
+
 export async function refreshShotVisual(
   getToken: GetToken,
   guideId: string,

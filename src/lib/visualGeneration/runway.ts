@@ -67,13 +67,16 @@ export const runwayProvider: VisualGenerationProvider = {
   async generateMotion(input: VisualMotionRequest): Promise<VisualTask> {
     const choice = motionModel(input.quality, input.durationSeconds);
     const runway = client();
-    if (choice.model === "gen4.5") {
+    if (choice.model === "veo3.1") {
+      const duration = choice.duration as 4 | 6 | 8;
       const created = await runway.imageToVideo.create({
-        model: "gen4.5",
+        model: "veo3.1",
         promptImage: input.startFrameUrl,
         promptText: input.prompt,
-        ratio: "1280:720",
-        duration: input.durationSeconds,
+        ratio: "1920:1080",
+        duration,
+        audio: false,
+        negativePrompt: "morphing, extra limbs, deformed hands, face change, flicker, blur, text, watermark, cartoon",
       });
       return pendingTask({
         id: created.id,
@@ -86,7 +89,7 @@ export const runwayProvider: VisualGenerationProvider = {
       promptImage: input.startFrameUrl,
       promptText: input.prompt,
       ratio: "1280:720",
-      duration: input.durationSeconds,
+      duration: choice.duration,
     });
     return pendingTask({
       id: created.id,

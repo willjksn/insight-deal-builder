@@ -14,7 +14,7 @@ import { URL } from "node:url";
 
 const PORT = Number(process.env.SHOOTSPINE_AGENT_PORT || 17865);
 const HOST = "127.0.0.1";
-const VERSION = "0.17.15";
+const VERSION = "0.19.0";
 /** Set SHOOTSPINE_AGENT_DEV_OPEN=1 to accept any non-empty Bearer token (local agent testing). */
 const DEV_OPEN = process.env.SHOOTSPINE_AGENT_DEV_OPEN === "1";
 /** Optional: ShootSpine origin for verifying minted tokens (e.g. http://localhost:3000). */
@@ -3184,6 +3184,404 @@ async function createThumbnail(filePath, outputDir) {
   }
 }
 
+/** Production ingest jobs. Filesystem only — ShootSpine owns session and shot state. */
+const productionJobs = new Map();
+
+function productionJobView(job) {
+  const files = job.files;
+  const done = files.filter((f) => f.status === "verified" || f.status === "failed" || f.status === "conflict").length;
+  const bytesCopied = files.reduce((n, f) => n + (f.bytesCopied || 0), 0);
+  const totalBytes = files.reduce((n, f) => n + (f.sizeBytes || 0), 0);
+  const current = files.find((f) => f.status === "copying" || f.status === "verifying");
+  return {
+    id: job.id,
+    status: job.status,
+    filesCompleted: done,
+    totalFiles: files.length,
+    bytesCopied,
+    totalBytes,
+    currentFile: current?.filename || null,
+    bytesPerSecond: job.bytesPerSecond || 0,
+    files: files.map((f) => ({
+      id: f.id,
+      filename: f.filename,
+      sourcePath: f.sourcePath,
+      destPath: f.destPath,
+      status: f.status,
+      error: f.error,
+      sizeBytes: f.sizeBytes,
+      bytesCopied: f.bytesCopied || 0,
+      verification: f.verification,
+      metadata: f.metadata,
+      localThumbnailPath: f.localThumbnailPath,
+      thumbnailDataUrl: f.thumbnailDataUrl,
+      proxyStatus: f.proxyStatus || "none",
+      proxyError: f.proxyError,
+      proxyPercent: Number.isFinite(f.proxyPercent) ? f.proxyPercent : null,
+      localProxyPath: f.localProxyPath,
+    })),
+  };
+}
+
+function productionProxyPath(originalPath, clipId) {
+  const sep = originalPath.includes("\\") ? "\\" : "/";
+  const parts = String(originalPath).split(/[/\\]/).filter((part) => part.length > 0);
+  const file = parts[parts.length - 1] || "clip";
+  const stem = file.replace(/\.[^.]+$/, "") || "clip";
+  const name = `${clipId}_${stem}.mp4`;
+  const marker = parts.findIndex((part) => part.toUpperCase() === "01_ORIGINAL_MEDIA");
+  if (marker >= 0) {
+    return path.join(...parts.slice(0, marker), "02_PROXIES", ...parts.slice(marker + 1, -1), name);
+  }
+  return path.join(...parts.slice(0, -1), "02_PROXIES", name);
+}
+
+const proxyQueue = [];
+let proxyPumpRunning = false;
+
+function enqueueProductionProxy(file) {
+  file.proxyStatus = "queued";
+  file.proxyError = undefined;
+  file.proxyPercent = null;
+  if (!file.localProxyPath) file.localProxyPath = productionProxyPath(file.destPath, file.id);
+  proxyQueue.push(file);
+  void pumpProductionProxies();
+}
+
+function ffmpegTimeSeconds(stderr) {
+  const matches = String(stderr).match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/g);
+  if (!matches?.length) return null;
+  const last = matches[matches.length - 1].slice(5).split(":").map(Number);
+  return last[0] * 3600 + last[1] * 60 + last[2];
+}
+
+function runReviewProxy(filePath, outPath, durationSeconds, onPercent) {
+  return new Promise((resolve, reject) => {
+    const bin = process.env.FFMPEG_PATH || "ffmpeg";
+    const args = [
+      "-y",
+      "-i",
+      filePath,
+      "-map",
+      "0:v:0",
+      "-map",
+      "0:a:0?",
+      "-vf",
+      "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      "23",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-movflags",
+      "+faststart",
+      outPath,
+    ];
+    const child = spawn(bin, args, { windowsHide: true });
+    let stderr = "";
+    child.stderr.on("data", (d) => {
+      stderr += d;
+      if (stderr.length > 20000) stderr = stderr.slice(-8000);
+      if (!durationSeconds) return;
+      const seen = ffmpegTimeSeconds(stderr);
+      if (seen == null) return;
+      onPercent(Math.max(0, Math.min(99, Math.round((seen / durationSeconds) * 100))));
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) {
+        const line = stderr.split(/\r?\n/).map((row) => row.trim()).filter(Boolean).slice(-3).join(" ");
+        reject(new Error(line || `ffmpeg exit ${code}`));
+      } else resolve();
+    });
+  });
+}
+
+async function pumpProductionProxies() {
+  if (proxyPumpRunning) return;
+  proxyPumpRunning = true;
+  while (proxyQueue.length) {
+    const file = proxyQueue.shift();
+    const originalStatus = file.status;
+    file.proxyStatus = "generating";
+    file.proxyPercent = null;
+    try {
+      const out = file.localProxyPath || productionProxyPath(file.destPath, file.id);
+      assertSafePath(file.destPath);
+      assertSafePath(out);
+      await fs.mkdir(path.dirname(out), { recursive: true });
+      const before = await fs.stat(file.destPath);
+      await runReviewProxy(file.destPath, out, file.metadata?.durationSeconds, (pct) => {
+        file.proxyPercent = pct;
+      });
+      const after = await fs.stat(file.destPath);
+      if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
+        throw new Error("Original file changed during proxy generation");
+      }
+      file.localProxyPath = out;
+      file.proxyStatus = "ready";
+      file.proxyPercent = 100;
+      file.proxyError = undefined;
+    } catch (e) {
+      file.proxyStatus = "failed";
+      file.proxyPercent = null;
+      file.proxyError = e instanceof Error ? e.message : "Proxy failed";
+    }
+    file.status = originalStatus;
+  }
+  for (const job of productionJobs.values()) {
+    if (job.kind !== "proxy") continue;
+    const busy = job.files.some((f) => f.proxyStatus === "queued" || f.proxyStatus === "generating");
+    job.status = busy ? "running" : "complete";
+  }
+  proxyPumpRunning = false;
+}
+
+function copyFileWithProgress(src, dest, onBytes) {
+  return new Promise((resolve, reject) => {
+    const input = fssync.createReadStream(src);
+    const output = fssync.createWriteStream(dest, { flags: "wx" });
+    let copied = 0;
+    input.on("data", (chunk) => {
+      copied += chunk.length;
+      onBytes(copied);
+    });
+    input.on("error", reject);
+    output.on("error", reject);
+    output.on("finish", () => resolve(copied));
+    input.pipe(output);
+  });
+}
+
+async function enrichCopiedFile(file) {
+  try {
+    const probe = await probeFile(file.destPath);
+    const audioCount = Array.isArray(probe.audioTracks) ? probe.audioTracks.length : probe.audioChannels ? 1 : undefined;
+    file.metadata = {
+      codec: probe.codec || undefined,
+      durationSeconds: probe.durationSeconds,
+      resolution: probe.resolution,
+      frameRate: probe.frameRate,
+      recordedAt: probe.creationTime,
+      timecodeStart: probe.startTimecode,
+      audioTracks: audioCount,
+      sizeBytes: probe.sizeBytes,
+    };
+  } catch {
+    file.metadata = undefined;
+  }
+  try {
+    const thumbDir = path.join(path.dirname(file.destPath), ".shootspine-thumbs");
+    const thumb = await createThumbnail(file.destPath, thumbDir);
+    file.localThumbnailPath = thumb.path;
+    file.thumbnailDataUrl = thumb.dataUrl;
+  } catch {
+    /* poster is optional */
+  }
+  if (file.generateProxy && file.proxyStatus !== "ready") enqueueProductionProxy(file);
+}
+
+async function runProductionJob(job) {
+  job.status = "running";
+  for (const file of job.files) {
+    const started = Date.now();
+    try {
+      const src = path.resolve(file.sourcePath);
+      const dest = path.resolve(file.destPath);
+      assertSafePath(src);
+      assertSafePath(dest);
+      const srcStat = await fs.stat(src);
+      if (!srcStat.isFile()) throw new Error("Source is not a file");
+      file.sizeBytes = srcStat.size;
+      let destExists = false;
+      try {
+        const destStat = await fs.stat(dest);
+        destExists = destStat.isFile();
+      } catch {
+        destExists = false;
+      }
+      if (destExists) {
+        file.status = "verifying";
+        const sourceChecksum = await sha256File(src);
+        const destinationChecksum = await sha256File(dest);
+        const verifiedAt = new Date().toISOString();
+        if (sourceChecksum === destinationChecksum) {
+          file.bytesCopied = srcStat.size;
+          file.status = "verified";
+      file.verification = {
+        algorithm: "sha256",
+        sourceChecksum,
+        destinationChecksum,
+        verifiedAt,
+        result: "identical",
+      };
+      file.generateProxy = job.generateProxies === true;
+      void enrichCopiedFile(file);
+      continue;
+        }
+        file.status = "conflict";
+        file.error = "Destination already has this filename and the checksum does not match. Nothing was overwritten.";
+        file.verification = {
+          algorithm: "sha256",
+          sourceChecksum,
+          destinationChecksum,
+          verifiedAt,
+          result: "conflict",
+        };
+        continue;
+      }
+      file.status = "copying";
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await copyFileWithProgress(src, dest, (copied) => {
+        file.bytesCopied = copied;
+        const seconds = Math.max(0.2, (Date.now() - started) / 1000);
+        job.bytesPerSecond = Math.round(copied / seconds);
+      });
+      file.status = "copied";
+      file.status = "verifying";
+      const sourceChecksum = await sha256File(src);
+      const destinationChecksum = await sha256File(dest);
+      const verifiedAt = new Date().toISOString();
+      if (sourceChecksum !== destinationChecksum) {
+        try {
+          await fs.unlink(dest);
+        } catch {
+          /* leave the failed destination if it cannot be removed */
+        }
+        file.status = "failed";
+        file.error = "Checksum mismatch. The source file was not changed.";
+        file.verification = {
+          algorithm: "sha256",
+          sourceChecksum,
+          destinationChecksum,
+          verifiedAt,
+          result: "mismatch",
+        };
+        continue;
+      }
+      file.bytesCopied = srcStat.size;
+      file.status = "verified";
+      file.verification = {
+        algorithm: "sha256",
+        sourceChecksum,
+        destinationChecksum,
+        verifiedAt,
+        result: "match",
+      };
+      file.generateProxy = job.generateProxies === true;
+      void enrichCopiedFile(file);
+    } catch (e) {
+      file.status = "failed";
+      file.error = e instanceof Error ? e.message : "Copy failed";
+    }
+  }
+  job.status = "complete";
+  job.bytesPerSecond = 0;
+}
+
+const audioCache = new Map();
+
+function pcmFromBuffer(buf) {
+  const samples = Math.floor(buf.length / 2);
+  const out = new Float32Array(samples);
+  for (let i = 0; i < samples; i++) out[i] = buf.readInt16LE(i * 2) / 32768;
+  return out;
+}
+
+function extractMatchAudio(filePath) {
+  return new Promise((resolve, reject) => {
+    const bin = process.env.FFMPEG_PATH || "ffmpeg";
+    const child = spawn(bin, ["-v", "error", "-t", "20", "-i", filePath, "-ac", "1", "-ar", "4000", "-f", "s16le", "pipe:1"], { windowsHide: true });
+    const chunks = [];
+    let stderr = "";
+    child.stdout.on("data", (chunk) => chunks.push(chunk));
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0 || !chunks.length) reject(new Error(stderr.trim().split(/\r?\n/).slice(-2).join(" ") || "No usable audio"));
+      else resolve(Buffer.concat(chunks));
+    });
+  });
+}
+
+async function cachedMatchAudio(filePath) {
+  assertSafePath(filePath);
+  const st = await fs.stat(filePath);
+  const key = `${path.resolve(filePath)}:${st.mtimeMs}:${st.size}`;
+  if (audioCache.has(key)) return audioCache.get(key);
+  const cachePath = path.join(os.tmpdir(), "shootspine-audio", `${crypto.createHash("sha1").update(key).digest("hex")}.json`);
+  try {
+    const saved = JSON.parse(await fs.readFile(cachePath, "utf8"));
+    const samples = Float32Array.from(saved);
+    audioCache.set(key, samples);
+    return samples;
+  } catch {
+    /* analyze */
+  }
+  const samples = pcmFromBuffer(await extractMatchAudio(filePath));
+  await fs.mkdir(path.dirname(cachePath), { recursive: true });
+  await fs.writeFile(cachePath, JSON.stringify(Array.from(samples)));
+  audioCache.set(key, samples);
+  return samples;
+}
+
+function correlateAudio(a, b) {
+  const maxLag = 4000 * 8;
+  const window = 4000 * 8;
+  let best = 0;
+  let bestLag = 0;
+  for (let lag = -maxLag; lag <= maxLag; lag += 40) {
+    const startA = Math.max(0, -lag);
+    const startB = Math.max(0, lag);
+    const end = Math.min(window, a.length - startA, b.length - startB);
+    if (end < 4000) continue;
+    let dot = 0;
+    let ea = 0;
+    let eb = 0;
+    for (let i = 0; i < end; i += 4) {
+      const av = a[startA + i];
+      const bv = b[startB + i];
+      dot += av * bv;
+      ea += av * av;
+      eb += bv * bv;
+    }
+    const score = ea > 1e-6 && eb > 1e-6 ? dot / Math.sqrt(ea * eb) : 0;
+    if (score > best) {
+      best = score;
+      bestLag = lag;
+    }
+  }
+  return { score: Math.max(0, Math.min(1, best)), offsetSeconds: bestLag / 4000 };
+}
+
+async function matchProductionAudio(files) {
+  const loaded = [];
+  for (const file of files) {
+    try {
+      loaded.push({ id: String(file.id), samples: await cachedMatchAudio(String(file.path)) });
+    } catch (e) {
+      loaded.push({ id: String(file.id), error: e instanceof Error ? e.message : "No usable audio" });
+    }
+  }
+  const pairs = [];
+  for (let i = 0; i < loaded.length; i++) {
+    if (!loaded[i].samples) continue;
+    for (let j = i + 1; j < loaded.length; j++) {
+      if (!loaded[j].samples) continue;
+      const match = correlateAudio(loaded[i].samples, loaded[j].samples);
+      pairs.push({ a: loaded[i].id, b: loaded[j].id, score: Math.round(match.score * 1000) / 1000, offsetSeconds: Math.round(match.offsetSeconds * 1000) / 1000 });
+    }
+  }
+  return { pairs, skipped: loaded.filter((file) => file.error).map((file) => ({ id: file.id, error: file.error })) };
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method === "OPTIONS") {
@@ -3441,6 +3839,74 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const synced = await syncFromResolve(body);
       return json(res, 200, synced);
+    }
+
+    if (req.method === "POST" && pathname === "/v1/production/ingest/jobs") {
+      const body = await readBody(req);
+      const incoming = Array.isArray(body.files) ? body.files : [];
+      if (!incoming.length) throw new Error("No files to copy");
+      if (incoming.length > 500) throw new Error("Max 500 files per ingest job");
+      const id = crypto.randomUUID();
+      const job = {
+        id,
+        status: "queued",
+        bytesPerSecond: 0,
+        files: incoming.map((f) => ({
+          id: String(f.id || crypto.randomUUID()),
+          filename: path.basename(String(f.sourcePath || "")),
+          sourcePath: String(f.sourcePath || ""),
+          destPath: String(f.destPath || ""),
+          status: "waiting",
+          bytesCopied: 0,
+          proxyStatus: "none",
+        })),
+        generateProxies: body.generateProxies === true,
+      };
+      productionJobs.set(id, job);
+      void runProductionJob(job);
+      return json(res, 200, { ok: true, job: productionJobView(job) });
+    }
+
+    const productionJobMatch = pathname.match(/^\/v1\/production\/ingest\/jobs\/([^/]+)$/);
+    if (req.method === "GET" && productionJobMatch) {
+      const job = productionJobs.get(productionJobMatch[1]);
+      if (!job) return json(res, 404, { error: "Ingest job not found" });
+      return json(res, 200, { ok: true, job: productionJobView(job) });
+    }
+
+    if (req.method === "POST" && pathname === "/v1/production/ingest/proxies") {
+      const body = await readBody(req);
+      const incoming = Array.isArray(body.files) ? body.files : [];
+      if (!incoming.length) throw new Error("No clips to proxy");
+      const id = crypto.randomUUID();
+      const job = {
+        id,
+        kind: "proxy",
+        status: "running",
+        bytesPerSecond: 0,
+        files: incoming.map((f) => ({
+          id: String(f.id || crypto.randomUUID()),
+          filename: path.basename(String(f.originalPath || "")),
+          sourcePath: String(f.originalPath || ""),
+          destPath: String(f.originalPath || ""),
+          status: "verified",
+          proxyStatus: "none",
+          localProxyPath: f.proxyPath ? String(f.proxyPath) : undefined,
+          metadata: { durationSeconds: Number(f.durationSeconds) || undefined },
+        })),
+      };
+      productionJobs.set(id, job);
+      for (const file of job.files) enqueueProductionProxy(file);
+      return json(res, 200, { ok: true, job: productionJobView(job) });
+    }
+
+    if (req.method === "POST" && pathname === "/v1/production/ingest/audio-match") {
+      const body = await readBody(req);
+      const files = Array.isArray(body.files) ? body.files : [];
+      if (!files.length) throw new Error("No clips to analyze");
+      if (files.length > 40) throw new Error("Match up to 40 clips at a time");
+      const result = await matchProductionAudio(files);
+      return json(res, 200, { ok: true, ...result });
     }
 
     if (req.method === "POST" && pathname === "/v1/shutdown") {

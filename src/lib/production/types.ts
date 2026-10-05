@@ -3,6 +3,7 @@ import { ProductionChecklistItem, ProductionChecklistMode } from "@/lib/producti
 import { CrewPrintoutPacket } from "@/lib/production/crewPacketTypes";
 import type { SceneCoverageChecklist } from "@/lib/production/sceneCoverageChecklist";
 import { ProductionShootingKit } from "@/lib/production/shootingKit";
+import type { ProductionIngestSession, TakeGroup } from "@/lib/production/ingestTypes";
 
 export type { SceneCoverageChecklist } from "@/lib/production/sceneCoverageChecklist";
 
@@ -74,6 +75,59 @@ export type ProductionShotImageSource =
   | "scene_migrate"
   | "ai_generate";
 
+/** On-set status. Separate from Scene Builder visual status. */
+export const PRODUCTION_SHOT_STATUSES = ["planned", "ready", "shot", "needs_pickup", "complete"] as const;
+export type ProductionShotStatus = (typeof PRODUCTION_SHOT_STATUSES)[number];
+export const PRODUCTION_SHOT_STATUS_LABELS: Record<ProductionShotStatus, string> = {
+  planned: "Planned",
+  ready: "Ready",
+  shot: "Shot",
+  needs_pickup: "Needs Pickup",
+  complete: "Complete",
+};
+
+export type ProductionShotMediaRole = "planned_reference" | "ai_previs" | "captured_footage";
+
+export type TakeDecision = "unreviewed" | "best" | "alternate" | "reject";
+
+/** Editorial decision for one captured clip or one confirmed Take Group. Media is not deleted. */
+export interface ShotTakeReview {
+  id: string;
+  source: "clip" | "group";
+  decision: TakeDecision;
+  rating?: number | null;
+  note?: string;
+  preferredVideoClipId?: string | null;
+  preferredAudioClipId?: string | null;
+  reviewedAt?: string;
+  updatedAt: string;
+}
+
+export type ShotReviewState = "unreviewed" | "in_review" | "reviewed" | "needs_pickup";
+
+export interface ProductionShotMedia {
+  id: string;
+  role: ProductionShotMediaRole;
+  url: string;
+  storagePath?: string;
+  label?: string;
+  mimeType?: string;
+  projectId?: string;
+  productionShotId?: string;
+  fileName?: string;
+  mediaType?: string;
+  createdAt?: string;
+  camera?: string;
+  takeNumber?: number | null;
+  /** Clip length when known. Separate from the shot's planned duration. */
+  clipDuration?: string;
+  notes?: string;
+  rating?: number | null;
+  preferred?: boolean;
+  /** Room for later ingest: timecode, source card, camera body, reel. */
+  metadata?: Record<string, string>;
+}
+
 /**
  * Coverage unit: one shot = one storyboard frame.
  * Rich DP fields mirror ScriptSuggestedShot so apply/refresh no longer collapses into notes only.
@@ -119,6 +173,27 @@ export interface ProductionDayShot {
   referenceImageStoragePath?: string;
   referenceImageSource?: ProductionShotImageSource;
   inspirationImageId?: string;
+  /** Scene Builder scene this shot was copied from. */
+  sourceSceneId?: string;
+  /** Scene Builder shot this production shot was copied from. */
+  sourceShotId?: string;
+  sourceSceneTitle?: string;
+  /** When Scene Builder last pushed this shot. */
+  sourceSyncedAt?: string;
+  /** Set when the source scene or shot can no longer be found. The production shot is kept. */
+  sourceUnavailable?: boolean;
+  cameraAngle?: string;
+  /** Planning notes copied from Scene Builder. Production `notes` are left alone on later syncs. */
+  sceneNotes?: string;
+  productionStatus?: ProductionShotStatus;
+  /** Editorial review progress. Separate from productionStatus. */
+  reviewState?: ShotReviewState;
+  /** Why a shot needs to be picked up. Kept separate from Scene Builder notes. */
+  pickupReason?: string;
+  /** Human review decisions for captured takes and take groups. */
+  takeReviews?: ShotTakeReview[];
+  /** Planned references, AI previs, and later captured footage. */
+  media?: ProductionShotMedia[];
 }
 
 export type ProductionSceneFrameImageSource = "inspiration" | "upload" | "script_match";
@@ -202,6 +277,10 @@ export interface ProductionBoard {
   /** Pre-production → post checklist (portfolio vs client template) */
   checklistMode?: ProductionChecklistMode;
   checklistItems?: ProductionChecklistItem[];
+  /** Camera-card ingest sessions. Originals stay on the selected drive. */
+  ingestSessions?: ProductionIngestSession[];
+  /** Suggested and confirmed multicam/audio groups. Members point at ingest clips. */
+  takeGroups?: TakeGroup[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

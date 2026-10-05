@@ -29,7 +29,7 @@ export function ShootGuideSetupVision({
   saving: boolean;
   generating: boolean;
   onAnalyze: () => void;
-  onFiles: (kind: "location" | "mood", files: FileList | null) => void;
+  onFiles: (kind: "location", files: FileList | null) => void;
 }) {
   const loc = guide.locationAnalysis;
   const locRows = LOCATION_FIELDS.filter((f) => loc?.[f.key]);
@@ -42,25 +42,15 @@ export function ShootGuideSetupVision({
           Stills
         </p>
         <p className="mb-3 text-xs text-slate-500">
-          Location photos inform what is possible in this room. Mood stills inform the look.
-          Analyze reads your stills into location notes, lighting, and the grade — not a diagram.
+          Location photos inform what is possible in this room. Analyze reads those stills into location notes, lighting, and the grade — not a diagram.
         </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Input
-            label="Location image(s)"
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => onFiles("location", e.target.files)}
-          />
-          <Input
-            label="Mood / look reference(s)"
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => onFiles("mood", e.target.files)}
-          />
-        </div>
+        <Input
+          label="Location image(s)"
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => onFiles("location", e.target.files)}
+        />
         <Button
           className="mt-3"
           variant="outline"
